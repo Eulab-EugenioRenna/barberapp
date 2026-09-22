@@ -107,6 +107,7 @@ export class CustomersAlignmentService {
           orderBy: { startsAt: "desc" },
         },
         sales: {
+          where: { paymentStatus: { in: ["paid", "partial"] } },
           select: { total: true, soldAt: true },
           orderBy: { soldAt: "desc" },
         },
@@ -128,6 +129,7 @@ export class CustomersAlignmentService {
           select: { id: true, status: true },
         },
         sales: {
+          where: { paymentStatus: { in: ["paid", "partial"] } },
           select: { total: true },
         },
       },

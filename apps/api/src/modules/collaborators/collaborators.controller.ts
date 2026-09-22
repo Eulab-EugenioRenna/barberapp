@@ -45,9 +45,6 @@ export class CollaboratorsController {
           where: { tenantId },
           orderBy: [{ isActive: "desc" }, { firstName: "asc" }],
           include: {
-            services: {
-              select: { id: true, name: true },
-            },
             weeklySchedules: {
               orderBy: { weekday: "asc" },
             },
@@ -128,7 +125,6 @@ export class CollaboratorsController {
           : undefined,
       },
       include: {
-        services: { select: { id: true, name: true } },
         weeklySchedules: { orderBy: { weekday: "asc" } },
         dayOverrides: { orderBy: { date: "asc" } },
       },
@@ -224,7 +220,6 @@ export class CollaboratorsController {
               },
       },
       include: {
-        services: { select: { id: true, name: true } },
         weeklySchedules: { orderBy: { weekday: "asc" } },
         dayOverrides: { orderBy: { date: "asc" } },
       },

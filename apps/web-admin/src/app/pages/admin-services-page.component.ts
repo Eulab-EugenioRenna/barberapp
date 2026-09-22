@@ -35,6 +35,104 @@ import { CustomSelectComponent } from "../custom-select.component";
               </p>
             </div>
           </button>
+          <article
+            *ngIf="!services.length"
+            class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
+          >
+            Nessun servizio. Crea il primo servizio dal modulo a destra.
+          </article>
+        </div>
+
+        <div class="mt-8 border-t border-black/10 pt-6">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="eyebrow text-[var(--accent)]">Retail</p>
+              <h3 class="font-display text-2xl">Prodotti</h3>
+            </div>
+            <span class="status-pill status-pill-neutral">{{
+              products.length
+            }}</span>
+          </div>
+          <div class="mt-4 grid gap-2 sm:grid-cols-2">
+            <button
+              *ngFor="let product of products"
+              type="button"
+              class="list-card text-left"
+              (click)="editProduct.emit(product)"
+            >
+              <strong>{{ product.name }}</strong>
+              <span class="text-sm text-[var(--muted)]">
+                {{
+                  product.price === null || product.price === undefined
+                    ? "Prezzo libero"
+                    : "€" + Number(product.price).toFixed(2)
+                }}
+              </span>
+            </button>
+            <article
+              *ngIf="!products.length"
+              class="rounded-2xl border border-dashed border-[var(--line)] p-4 text-sm text-[var(--muted)] sm:col-span-2"
+            >
+              Nessun prodotto nel catalogo.
+            </article>
+          </div>
+          <form
+            class="mt-5 grid gap-3 rounded-2xl border border-black/10 p-4"
+            (ngSubmit)="saveProduct.emit()"
+          >
+            <strong>{{
+              productForm.id ? "Modifica prodotto" : "Nuovo prodotto"
+            }}</strong>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="field"
+                ><span>Nome</span
+                ><input
+                  [(ngModel)]="productForm.name"
+                  name="productName"
+                  required
+              /></label>
+              <label class="field"
+                ><span>Prezzo opzionale</span
+                ><input
+                  [(ngModel)]="productForm.price"
+                  name="productPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Da inserire in cassa"
+              /></label>
+            </div>
+            <label class="field"
+              ><span>Descrizione</span
+              ><input
+                [(ngModel)]="productForm.description"
+                name="productDescription"
+            /></label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="submit"
+                class="primary-btn"
+                [disabled]="loading || !productFormValid"
+              >
+                {{ productForm.id ? "Salva prodotto" : "Crea prodotto" }}
+              </button>
+              <button
+                *ngIf="productForm.id"
+                type="button"
+                class="pill-btn"
+                (click)="removeProduct.emit()"
+              >
+                Elimina prodotto
+              </button>
+              <button
+                type="button"
+                class="secondary-btn"
+                (click)="resetProduct.emit()"
+              >
+                Nuovo prodotto
+              </button>
+            </div>
+          </form>
         </div>
       </article>
 
@@ -46,7 +144,7 @@ import { CustomSelectComponent } from "../custom-select.component";
         <form class="mt-5 grid gap-4" (ngSubmit)="save.emit()">
           <label class="field">
             <span>Nome</span>
-            <input [(ngModel)]="serviceForm.name" name="serviceName" />
+            <input [(ngModel)]="serviceForm.name" name="serviceName" required />
           </label>
           <label class="field">
             <span>Descrizione pubblica</span>
@@ -104,27 +202,6 @@ import { CustomSelectComponent } from "../custom-select.component";
                 <span>Prenotabile online</span>
               </label>
             </div>
-          </div>
-          <div class="field">
-            <span>Collaboratori abilitati</span>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <button
-                *ngFor="let collaborator of serviceCollaboratorChips"
-                type="button"
-                class="pill-btn"
-                [ngClass]="{
-                  'bg-[var(--accent)] text-white border-transparent':
-                    collaborator.selected,
-                }"
-                (click)="toggleCollaborator.emit(collaborator.id)"
-              >
-                {{ collaborator.label }}
-              </button>
-            </div>
-            <p class="mt-2 text-xs text-[var(--muted)]">
-              Se vuoto, il servizio non avra collaboratori associati nel booking
-              pubblico.
-            </p>
           </div>
           <div class="field">
             <span>Catalogo prodotti collegato</span>
@@ -216,7 +293,11 @@ import { CustomSelectComponent } from "../custom-select.component";
             </div>
           </div>
           <div class="flex flex-wrap gap-3">
-            <button type="submit" class="primary-btn" [disabled]="loading">
+            <button
+              type="submit"
+              class="primary-btn"
+              [disabled]="loading || !serviceFormValid"
+            >
               {{ serviceForm.id ? "Salva servizio" : "Crea servizio" }}
             </button>
             <button
@@ -228,7 +309,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               Elimina
             </button>
             <button type="button" class="secondary-btn" (click)="reset.emit()">
-              Reset
+              Nuovo servizio
             </button>
           </div>
         </form>
@@ -237,13 +318,11 @@ import { CustomSelectComponent } from "../custom-select.component";
   `,
 })
 export class AdminServicesPageComponent {
+  protected readonly Number = Number;
   @Input() services: any[] = [];
+  @Input() products: any[] = [];
   @Input() serviceForm: any = {};
-  @Input() serviceCollaboratorChips: Array<{
-    id: string;
-    label: string;
-    selected: boolean;
-  }> = [];
+  @Input() productForm: any = {};
   @Input() serviceProductForm: any = {};
   @Input() serviceProductModeOptions: Array<{ value: string; label: string }> =
     [];
@@ -251,10 +330,28 @@ export class AdminServicesPageComponent {
   @Input() loading = false;
 
   @Output() edit = new EventEmitter<any>();
-  @Output() toggleCollaborator = new EventEmitter<string>();
   @Output() detachProduct = new EventEmitter<string>();
   @Output() attachProduct = new EventEmitter<void>();
   @Output() save = new EventEmitter<void>();
   @Output() remove = new EventEmitter<void>();
   @Output() reset = new EventEmitter<void>();
+  @Output() editProduct = new EventEmitter<any>();
+  @Output() saveProduct = new EventEmitter<void>();
+  @Output() removeProduct = new EventEmitter<void>();
+  @Output() resetProduct = new EventEmitter<void>();
+
+  get serviceFormValid(): boolean {
+    return (
+      Boolean(textValue(this.serviceForm.name)) &&
+      Number(this.serviceForm.durationMinutes) > 0
+    );
+  }
+
+  get productFormValid(): boolean {
+    return Boolean(textValue(this.productForm.name));
+  }
+}
+
+function textValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }

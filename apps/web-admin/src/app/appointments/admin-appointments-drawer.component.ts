@@ -1,5 +1,11 @@
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import {
+  Component,
+  EventEmitter,
+  HostListener,
+  Input,
+  Output,
+} from "@angular/core";
 
 @Component({
   selector: "barber-admin-appointments-drawer",
@@ -76,7 +82,12 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
   ],
   template: `
     <div class="drawer-overlay" (click)="close.emit()"></div>
-    <aside class="drawer-panel">
+    <aside
+      class="drawer-panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="appointment-drawer-title"
+    >
       <div class="flex items-start justify-between gap-3">
         <div>
           <p class="eyebrow text-[var(--accent)]">
@@ -86,7 +97,7 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
                 : "Evento selezionato"
             }}
           </p>
-          <h3 class="mt-2 font-display text-3xl">
+          <h3 id="appointment-drawer-title" class="mt-2 font-display text-3xl">
             {{ appointment?.customer?.firstName }}
             {{ appointment?.customer?.lastName }}
           </h3>
@@ -190,6 +201,11 @@ export class AdminAppointmentsDrawerComponent {
   @Output() close = new EventEmitter<void>();
   @Output() details = new EventEmitter<string>();
   @Output() edit = new EventEmitter<string>();
+
+  @HostListener("document:keydown.escape")
+  closeOnEscape(): void {
+    this.close.emit();
+  }
 
   formatDateTime(value?: string): string {
     if (!value) return "";

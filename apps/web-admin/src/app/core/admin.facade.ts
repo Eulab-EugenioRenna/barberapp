@@ -15,6 +15,7 @@ export class AdminFacade {
   readonly currentUser = computed(() => this.sessionStore.currentUser());
   readonly tenant = signal<any>(null);
   readonly revenueMetrics = signal<any[]>([]);
+  readonly revenueReport = signal<any>(null);
   readonly appointmentStats = signal<any>(null);
   readonly collaboratorStats = signal<any[]>([]);
   readonly serviceStats = signal<any[]>([]);
@@ -63,6 +64,7 @@ export class AdminFacade {
 
       void firstValueFrom(this.adminApi.loadAdminStatsData()).then(
         (statsResponse: any) => {
+          this.revenueReport.set(statsResponse.revenue || null);
           this.revenueMetrics.set(statsResponse.revenue?.metrics || []);
           this.appointmentStats.set(statsResponse.appointmentStats);
           this.collaboratorStats.set(statsResponse.collaboratorStats as any[]);

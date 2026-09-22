@@ -1,5 +1,11 @@
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import {
+  Component,
+  EventEmitter,
+  HostListener,
+  Input,
+  Output,
+} from "@angular/core";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
 
@@ -29,10 +35,15 @@ import { CustomSelectComponent } from "../custom-select.component";
       (click)="cancel.emit()"
     ></div>
     <section
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quick-reschedule-title"
       class="absolute left-1/2 top-1/2 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 panel rounded-[2rem] p-5"
     >
       <p class="eyebrow text-[var(--accent)]">Sposta appuntamento</p>
-      <h3 class="mt-2 font-display text-3xl">Conferma nuova collocazione</h3>
+      <h3 id="quick-reschedule-title" class="mt-2 font-display text-3xl">
+        Conferma nuova collocazione
+      </h3>
       <p class="mt-2 text-sm text-[var(--muted)]">
         {{ appointment?.customer?.firstName }}
         {{ appointment?.customer?.lastName }} · {{ appointment?.service?.name }}
@@ -115,6 +126,11 @@ export class AdminAppointmentsQuickRescheduleModalComponent {
     key: "targetDate" | "startsAt" | "collaboratorId";
     value: string;
   }>();
+
+  @HostListener("document:keydown.escape")
+  closeOnEscape(): void {
+    this.cancel.emit();
+  }
 
   originalTimeLabel(): string {
     if (!this.appointment?.startsAt) {

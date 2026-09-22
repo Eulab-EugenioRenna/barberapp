@@ -178,38 +178,42 @@ export class PublicBookingController {
       cacheKeys.publicServices(tenant.id),
       CACHE_TTL_SECONDS.publicServices,
       () =>
-        this.prisma.service.findMany({
-          where: {
-            tenantId: tenant.id,
-            isActive: true,
-            isPublic: true,
-            isBookableOnline: true,
-          },
-          orderBy: { name: "asc" },
-          include: {
-            collaborators: {
-              where: { isActive: true, isPublic: true },
+        this.prisma.service
+          .findMany({
+            where: {
+              tenantId: tenant.id,
+              isActive: true,
+              isPublic: true,
+              isBookableOnline: true,
+            },
+            orderBy: { name: "asc" },
+            include: {
+              serviceProducts: {
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      category: true,
+                      price: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+          .then(async (services) => {
+            const collaborators = await this.prisma.collaborator.findMany({
+              where: { tenantId: tenant.id, isActive: true, isPublic: true },
               select: {
                 id: true,
                 firstName: true,
                 lastName: true,
                 calendarColor: true,
               },
-            },
-            serviceProducts: {
-              include: {
-                product: {
-                  select: {
-                    id: true,
-                    name: true,
-                    category: true,
-                    price: true,
-                  },
-                },
-              },
-            },
-          },
-        }),
+            });
+            return services.map((service) => ({ ...service, collaborators }));
+          }),
     );
   }
 

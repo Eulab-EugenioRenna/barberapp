@@ -80,6 +80,11 @@ export class TenantController {
             holidays: {
               orderBy: { date: "asc" },
             },
+            stations: {
+              where: { isActive: true },
+              orderBy: { name: "asc" },
+              include: { room: { select: { id: true, name: true } } },
+            },
           },
         }),
     );

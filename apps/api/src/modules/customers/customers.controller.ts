@@ -177,15 +177,28 @@ export class CustomersController {
           }),
           this.prisma.sale.findMany({
             where: { customerId: id, tenantId },
-            include: { items: true },
+            orderBy: { soldAt: "desc" },
+            include: {
+              items: {
+                include: {
+                  product: true,
+                  service: true,
+                  stations: { include: { station: true } },
+                },
+              },
+            },
           }),
         ]);
 
         return {
           customerId: id,
           appointments,
+          sales,
           salesTotal: sales.reduce(
-            (total, sale) => total + Number(sale.total),
+            (total, sale) =>
+              ["paid", "partial"].includes(sale.paymentStatus)
+                ? total + Number(sale.total)
+                : total,
             0,
           ),
         };

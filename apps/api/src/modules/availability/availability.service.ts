@@ -78,15 +78,6 @@ export class AvailabilityService {
   ): Promise<AvailabilitySlot[]> {
     const service = await this.prisma.service.findFirst({
       where: { id: serviceId, tenantId, isActive: true },
-      include: {
-        collaborators: {
-          where: {
-            isActive: true,
-            ...(options?.publicOnly ? { isPublic: true } : {}),
-            ...(collaboratorId ? { id: collaboratorId } : {}),
-          },
-        },
-      },
     });
 
     if (!service) {
@@ -98,7 +89,15 @@ export class AvailabilityService {
         return [];
       }
 
-      if (service.collaborators.length === 0) {
+      const collaboratorExists = await this.prisma.collaborator.count({
+        where: {
+          tenantId,
+          id: collaboratorId,
+          isActive: true,
+          ...(options?.publicOnly ? { isPublic: true } : {}),
+        },
+      });
+      if (!collaboratorExists) {
         throw new BadRequestException("Collaborator not available for service");
       }
     }
@@ -165,7 +164,14 @@ export class AvailabilityService {
     });
 
     const availableCollaborators = service.requiresCollaborator
-      ? service.collaborators
+      ? await this.prisma.collaborator.findMany({
+          where: {
+            tenantId,
+            isActive: true,
+            ...(options?.publicOnly ? { isPublic: true } : {}),
+            ...(collaboratorId ? { id: collaboratorId } : {}),
+          },
+        })
       : [
           {
             id: "any",

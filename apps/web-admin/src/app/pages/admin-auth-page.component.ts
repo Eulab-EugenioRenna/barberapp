@@ -79,6 +79,8 @@ import { SessionStore } from "../core/session.store";
                   [(ngModel)]="signupForm.firstName"
                   name="signupFirstName"
                   placeholder="Giulia"
+                  autocomplete="given-name"
+                  required
               /></label>
               <label class="field"
                 ><span>Cognome</span
@@ -86,6 +88,8 @@ import { SessionStore } from "../core/session.store";
                   [(ngModel)]="signupForm.lastName"
                   name="signupLastName"
                   placeholder="Riva"
+                  autocomplete="family-name"
+                  required
               /></label>
             </div>
 
@@ -95,6 +99,8 @@ import { SessionStore } from "../core/session.store";
                 [(ngModel)]="signupForm.companyName"
                 name="companyName"
                 placeholder="Atelier Barberia Milano"
+                autocomplete="organization"
+                required
               />
             </label>
 
@@ -103,7 +109,10 @@ import { SessionStore } from "../core/session.store";
               ><input
                 [(ngModel)]="loginForm.email"
                 name="loginEmail"
+                type="email"
                 placeholder="owner@atelier.it"
+                autocomplete="email"
+                required
             /></label>
             <label class="field"
               ><span>Password</span
@@ -112,6 +121,9 @@ import { SessionStore } from "../core/session.store";
                 name="loginPassword"
                 type="password"
                 placeholder="••••••••"
+                [autocomplete]="authMode === 'login' ? 'current-password' : 'new-password'"
+                minlength="8"
+                required
             /></label>
 
             <label *ngIf="authMode === 'signup'" class="field">
@@ -121,17 +133,22 @@ import { SessionStore } from "../core/session.store";
                 name="signupPasswordConfirm"
                 type="password"
                 placeholder="••••••••"
+                autocomplete="new-password"
+                minlength="8"
+                required
               />
             </label>
 
             <p
               *ngIf="feedback"
+              role="alert"
+              aria-live="assertive"
               class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
             >
               {{ feedback }}
             </p>
 
-            <button type="submit" class="primary-btn" [disabled]="loading">
+            <button type="submit" class="primary-btn" [disabled]="loading || !formValid">
               {{
                 loading
                   ? "Caricamento..."
@@ -162,6 +179,20 @@ export class AdminAuthPageComponent implements OnInit {
     lastName: "",
   };
   signupPasswordConfirm = "";
+
+  get formValid(): boolean {
+    const credentialsValid =
+      this.loginForm.email.trim().length > 0 &&
+      this.loginForm.password.length >= 8;
+    if (this.authMode === "login") return credentialsValid;
+    return Boolean(
+      credentialsValid &&
+        this.signupForm.companyName.trim() &&
+        this.signupForm.firstName.trim() &&
+        this.signupForm.lastName.trim() &&
+        this.signupPasswordConfirm.length >= 8,
+    );
+  }
 
   ngOnInit(): void {
     this.authMode =

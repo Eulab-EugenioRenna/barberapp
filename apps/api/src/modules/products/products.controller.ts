@@ -72,7 +72,12 @@ export class ProductsController {
         sku: typeof body["sku"] === "string" ? body["sku"] : undefined,
         category:
           typeof body["category"] === "string" ? body["category"] : undefined,
-        price: Number(body["price"] ?? 0),
+        price:
+          body["price"] === undefined ||
+          body["price"] === null ||
+          body["price"] === ""
+            ? null
+            : Number(body["price"]),
       },
     });
 
@@ -110,7 +115,12 @@ export class ProductsController {
         sku: typeof body["sku"] === "string" ? body["sku"] : undefined,
         category:
           typeof body["category"] === "string" ? body["category"] : undefined,
-        price: body["price"] === undefined ? undefined : Number(body["price"]),
+        price:
+          body["price"] === undefined
+            ? undefined
+            : body["price"] === null || body["price"] === ""
+              ? null
+              : Number(body["price"]),
         isActive:
           typeof body["isActive"] === "boolean" ? body["isActive"] : undefined,
       },

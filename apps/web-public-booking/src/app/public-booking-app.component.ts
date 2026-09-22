@@ -72,6 +72,14 @@ import { CustomSelectComponent } from "./custom-select.component";
 
         <section class="panel public-panel">
           <div class="public-panel-scroll">
+            <p
+              *ngIf="loading() && !settings()"
+              role="status"
+              aria-live="polite"
+              class="rounded-2xl bg-white/70 p-4 text-sm text-[var(--muted)]"
+            >
+              Caricamento disponibilità...
+            </p>
             <div
               class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"
             >
@@ -192,6 +200,12 @@ import { CustomSelectComponent } from "./custom-select.component";
                   </p>
                 </div>
               </button>
+              <article
+                *ngIf="!loading() && !services().length"
+                class="rounded-[1.4rem] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
+              >
+                Nessun servizio prenotabile online in questo momento.
+              </article>
             </div>
 
             <div
@@ -218,7 +232,7 @@ import { CustomSelectComponent } from "./custom-select.component";
                   label="Orario"
                   [placeholder]="
                     !selectedCollaboratorId()
-                      ? 'Prima seleziona la postazione'
+                      ? 'Prima seleziona il collaboratore'
                       : slots().length
                         ? 'Seleziona orario'
                         : 'Nessuno slot disponibile'
@@ -238,6 +252,8 @@ import { CustomSelectComponent } from "./custom-select.component";
                     "
                     name="customerName"
                     placeholder="Mario Rossi"
+                    autocomplete="name"
+                    required
                   />
                 </label>
                 <label class="field">
@@ -246,7 +262,9 @@ import { CustomSelectComponent } from "./custom-select.component";
                     [ngModel]="bookingForm().email"
                     (ngModelChange)="onBookingFieldChange('email', $event)"
                     name="email"
+                    type="email"
                     placeholder="mario@email.it"
+                    autocomplete="email"
                   />
                 </label>
               </div>
@@ -257,7 +275,9 @@ import { CustomSelectComponent } from "./custom-select.component";
                     [ngModel]="bookingForm().phone"
                     (ngModelChange)="onBookingFieldChange('phone', $event)"
                     name="phone"
+                    type="tel"
                     placeholder="+39 333 123 4567"
+                    autocomplete="tel"
                   />
                 </label>
                 <label class="field">
@@ -275,6 +295,8 @@ import { CustomSelectComponent } from "./custom-select.component";
 
               <p
                 *ngIf="feedback()"
+                role="status"
+                aria-live="polite"
                 class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
               >
                 {{ feedback() }}
@@ -283,7 +305,12 @@ import { CustomSelectComponent } from "./custom-select.component";
               <button
                 type="submit"
                 class="primary-btn"
-                [disabled]="loading() || !selectedService() || !selectedSlot()"
+                [disabled]="
+                  loading() ||
+                  !selectedService() ||
+                  !selectedSlot() ||
+                  !bookingForm().customerName.trim()
+                "
               >
                 {{ loading() ? "Invio in corso..." : "Conferma prenotazione" }}
               </button>

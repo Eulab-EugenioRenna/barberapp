@@ -41,6 +41,12 @@ import { FormsModule } from "@angular/forms";
               </span>
             </div>
           </button>
+          <article
+            *ngIf="!collaborators.length"
+            class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)] md:col-span-2"
+          >
+            Nessun collaboratore. Crea il primo membro del team dal modulo.
+          </article>
         </div>
       </article>
 
@@ -60,6 +66,8 @@ import { FormsModule } from "@angular/forms";
               <input
                 [(ngModel)]="collaboratorForm.firstName"
                 name="collaboratorFirstName"
+                autocomplete="given-name"
+                required
               />
             </label>
             <label class="field">
@@ -67,6 +75,8 @@ import { FormsModule } from "@angular/forms";
               <input
                 [(ngModel)]="collaboratorForm.lastName"
                 name="collaboratorLastName"
+                autocomplete="family-name"
+                required
               />
             </label>
           </div>
@@ -76,6 +86,8 @@ import { FormsModule } from "@angular/forms";
               <input
                 [(ngModel)]="collaboratorForm.email"
                 name="collaboratorEmail"
+                type="email"
+                autocomplete="email"
               />
             </label>
             <label class="field">
@@ -83,6 +95,8 @@ import { FormsModule } from "@angular/forms";
               <input
                 [(ngModel)]="collaboratorForm.phone"
                 name="collaboratorPhone"
+                type="tel"
+                autocomplete="tel"
               />
             </label>
           </div>
@@ -226,7 +240,11 @@ import { FormsModule } from "@angular/forms";
             </div>
           </div>
           <div class="flex flex-wrap gap-3">
-            <button type="submit" class="primary-btn" [disabled]="loading">
+            <button
+              type="submit"
+              class="primary-btn"
+              [disabled]="loading || !formValid"
+            >
               {{
                 collaboratorForm.id
                   ? "Salva collaboratore"
@@ -263,7 +281,7 @@ import { FormsModule } from "@angular/forms";
               Collaboratore default: impostane un altro prima di eliminarlo
             </span>
             <button type="button" class="secondary-btn" (click)="reset.emit()">
-              Reset
+              Nuovo collaboratore
             </button>
           </div>
         </form>
@@ -282,6 +300,13 @@ export class AdminCollaboratorsPageComponent {
   @Output() setDefault = new EventEmitter<string>();
   @Output() remove = new EventEmitter<void>();
   @Output() reset = new EventEmitter<void>();
+
+  get formValid(): boolean {
+    return Boolean(
+      collaboratorText(this.collaboratorForm.firstName) &&
+      collaboratorText(this.collaboratorForm.lastName),
+    );
+  }
 
   readonly weekdayLabels = [
     "Lunedi",
@@ -320,4 +345,8 @@ export class AdminCollaboratorsPageComponent {
       this.collaboratorForm.dayOverrides || []
     ).filter((_: unknown, currentIndex: number) => currentIndex !== index);
   }
+}
+
+function collaboratorText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }

@@ -15,14 +15,20 @@ describe("AvailabilityService", () => {
             requiresRoom: false,
             requiresStation: false,
             color: "#111111",
-            collaborators: [
-              {
-                id: "collaborator-1",
-                firstName: "Mario",
-                lastName: "Rossi",
-              },
-            ],
           }),
+        },
+        collaborator: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: "collaborator-1",
+              tenantId: "tenant-1",
+              firstName: "Mario",
+              lastName: "Rossi",
+              calendarColor: "#111111",
+              isActive: true,
+              isPublic: true,
+            },
+          ]),
         },
         appointment: {
           findMany: jest.fn().mockResolvedValue([
@@ -49,6 +55,14 @@ describe("AvailabilityService", () => {
           async (_key: string, _ttl: number, loader: () => Promise<unknown>) =>
             loader(),
         ),
+      } as never,
+      {
+        resolveWorkingWindow: jest.fn().mockResolvedValue({
+          isAvailable: true,
+          isHoliday: false,
+          startMinutes: 9 * 60,
+          endMinutes: 19 * 60,
+        }),
       } as never,
     );
 

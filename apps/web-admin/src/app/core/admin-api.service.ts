@@ -221,6 +221,32 @@ export class AdminApiService {
     return this.http.post(`${ADMIN_API_URL}/sales`, payload);
   }
 
+  createOrUpdateProduct(
+    id: string,
+    payload: Record<string, unknown>,
+  ): Observable<any> {
+    return id
+      ? this.http.patch(`${ADMIN_API_URL}/products/${id}`, payload)
+      : this.http.post(`${ADMIN_API_URL}/products`, payload);
+  }
+
+  deleteProduct(id: string): Observable<any> {
+    return this.http.delete(`${ADMIN_API_URL}/products/${id}`);
+  }
+
+  loadRevenueReport(filters: Record<string, string>): Observable<any> {
+    const query = new URLSearchParams(
+      Object.entries(filters).filter(([, value]) => Boolean(value)),
+    ).toString();
+    return this.http.get(
+      `${ADMIN_API_URL}/dashboard/revenue${query ? `?${query}` : ""}`,
+    );
+  }
+
+  loadCustomerHistory(customerId: string): Observable<any> {
+    return this.http.get(`${ADMIN_API_URL}/customers/${customerId}/history`);
+  }
+
   createOrUpdateService(
     id: string,
     payload: Record<string, unknown>,

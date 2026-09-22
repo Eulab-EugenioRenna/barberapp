@@ -20,6 +20,7 @@ import { AdminPlatformPageComponent } from "./pages/admin-platform-page.componen
 import { AdminSalesPageComponent } from "./pages/admin-sales-page.component";
 import { AdminServicesPageComponent } from "./pages/admin-services-page.component";
 import { AdminSettingsPageComponent } from "./pages/admin-settings-page.component";
+import { QuickOrderModalComponent } from "./quick-order/quick-order-modal.component";
 
 type ViewKey =
   | "platform"
@@ -51,18 +52,36 @@ type ViewKey =
     AdminCollaboratorsPageComponent,
     AdminPlatformPageComponent,
     AdminSettingsPageComponent,
+    QuickOrderModalComponent,
   ],
   template: `
     <main class="admin-shell min-h-screen">
+      <barber-quick-order-modal
+        *ngIf="quickOrderOpen"
+        [customers]="customers"
+        [stations]="stations"
+        [services]="services"
+        [products]="products"
+        [loading]="loading"
+        (close)="quickOrderOpen = false"
+        (submitOrder)="saveQuickOrder($event)"
+      ></barber-quick-order-modal>
       <div *ngIf="confirmDialog" class="confirm-overlay">
         <button
           type="button"
           class="confirm-backdrop"
           (click)="closeConfirmDialog()"
         ></button>
-        <article class="confirm-dialog panel">
+        <article
+          class="confirm-dialog panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-dialog-title"
+        >
           <p class="eyebrow text-[var(--accent)]">Conferma eliminazione</p>
-          <h2 class="mt-3 font-display text-3xl">{{ confirmDialog.title }}</h2>
+          <h2 id="confirm-dialog-title" class="mt-3 font-display text-3xl">
+            {{ confirmDialog.title }}
+          </h2>
           <p class="mt-4 text-sm text-[var(--muted)]">
             {{ confirmDialog.body }}
           </p>
@@ -218,6 +237,8 @@ type ViewKey =
 
             <p
               *ngIf="feedback"
+              role="status"
+              aria-live="polite"
               class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
             >
               {{ feedback }}
@@ -405,7 +426,14 @@ type ViewKey =
               [appointmentStats]="appointmentStats"
               [appointments]="appointments"
               [collaboratorStats]="collaboratorStats"
+              [revenueReport]="revenueReport"
+              [revenueFilters]="revenueFilters"
+              [customerOptions]="customerSelectOptions"
+              [stationOptions]="stationSelectOptions"
+              [loading]="loading"
               (editAppointment)="editAppointment($event)"
+              (applyRevenueFilters)="loadRevenueReport()"
+              (openQuickOrder)="quickOrderOpen = true"
             ></barber-admin-dashboard-page>
 
             <barber-admin-appointments-feature-page
@@ -435,6 +463,8 @@ type ViewKey =
               *ngIf="activeView === 'customers'"
               [customers]="customers"
               [customerForm]="customerForm"
+              [customerHistory]="customerHistory"
+              [historyLoading]="customerHistoryLoading"
               [loading]="loading"
               (edit)="editCustomer($event)"
               (save)="saveCustomer()"
@@ -445,19 +475,23 @@ type ViewKey =
             <barber-admin-services-page
               *ngIf="activeView === 'services'"
               [services]="services"
+              [products]="products"
               [serviceForm]="serviceForm"
-              [serviceCollaboratorChips]="serviceCollaboratorChips"
+              [productForm]="productForm"
               [serviceProductForm]="serviceProductForm"
               [serviceProductModeOptions]="serviceProductModeOptions"
               [productSelectOptions]="productSelectOptions"
               [loading]="loading"
               (edit)="editService($event)"
-              (toggleCollaborator)="toggleServiceCollaborator($event)"
               (detachProduct)="detachProductFromService($event)"
               (attachProduct)="attachProductToService()"
               (save)="saveService()"
               (remove)="removeService()"
               (reset)="resetServiceForm()"
+              (editProduct)="editProduct($event)"
+              (saveProduct)="saveProduct()"
+              (removeProduct)="removeProduct()"
+              (resetProduct)="resetProductForm()"
             ></barber-admin-services-page>
 
             <barber-admin-collaborators-page
@@ -569,6 +603,7 @@ export class AdminAppComponent implements OnInit {
 
   tenant: any = null;
   revenueMetrics: any[] = [];
+  revenueReport: any = null;
   appointmentStats: any = null;
   collaboratorStats: any[] = [];
   serviceStats: any[] = [];
@@ -578,6 +613,16 @@ export class AdminAppComponent implements OnInit {
   products: any[] = [];
   collaborators: any[] = [];
   customers: any[] = [];
+  stations: any[] = [];
+  quickOrderOpen = false;
+  customerHistory: any = null;
+  customerHistoryLoading = false;
+  revenueFilters = {
+    period: "month",
+    date: new Date().toISOString().slice(0, 10),
+    customerId: "",
+    stationId: "",
+  };
   platformTenants: any[] = [];
   selectedPlatformTenant: any = null;
   platformPlans: any[] = [];
@@ -606,6 +651,7 @@ export class AdminAppComponent implements OnInit {
     action: (() => Promise<void>) | null;
   } | null = null;
   serviceForm = this.emptyServiceForm();
+  productForm = this.emptyProductForm();
   collaboratorForm = this.emptyCollaboratorForm();
   saleForm = this.emptySaleForm();
   customerForm = this.emptyCustomerForm();
@@ -700,29 +746,8 @@ export class AdminAppComponent implements OnInit {
     label: string;
   }> {
     const defaultCollaboratorId = this.tenant?.defaultCollaboratorId;
-    const selectedService = this.services.find(
-      (service) => service.id === this.appointmentForm.serviceId,
-    );
-    const assignedCollaboratorIds = new Set(
-      Array.isArray(selectedService?.collaborators)
-        ? selectedService.collaborators.map(
-            (collaborator: any) => collaborator.id,
-          )
-        : [],
-    );
 
     return [...this.collaborators]
-      .filter((collaborator) => {
-        if (!selectedService) {
-          return true;
-        }
-
-        if (!Array.isArray(selectedService.collaborators)) {
-          return true;
-        }
-
-        return assignedCollaboratorIds.has(collaborator.id);
-      })
       .sort((left, right) => {
         if (left.id === defaultCollaboratorId) return -1;
         if (right.id === defaultCollaboratorId) return 1;
@@ -737,20 +762,6 @@ export class AdminAppComponent implements OnInit {
           collaborator.id === defaultCollaboratorId ? " · default" : ""
         }`,
       }));
-  }
-
-  get serviceCollaboratorChips(): Array<{
-    id: string;
-    label: string;
-    selected: boolean;
-  }> {
-    const selectedIds = new Set(this.serviceForm.collaboratorIds || []);
-
-    return this.collaborators.map((collaborator) => ({
-      id: collaborator.id,
-      label: `${collaborator.firstName} ${collaborator.lastName}`.trim(),
-      selected: selectedIds.has(collaborator.id),
-    }));
   }
 
   get customerSelectOptions(): Array<{ value: string; label: string }> {
@@ -778,7 +789,19 @@ export class AdminAppComponent implements OnInit {
   get productSelectOptions(): Array<{ value: string; label: string }> {
     return this.products.map((product) => ({
       value: product.id,
-      label: `${product.name} · €${Number(product.price || 0).toFixed(2)}`,
+      label:
+        product.price === null || product.price === undefined
+          ? `${product.name} · prezzo da inserire`
+          : `${product.name} · €${Number(product.price).toFixed(2)}`,
+    }));
+  }
+
+  get stationSelectOptions(): Array<{ value: string; label: string }> {
+    return this.stations.map((station) => ({
+      value: station.id,
+      label: station.room?.name
+        ? `${station.name} · ${station.room.name}`
+        : station.name,
     }));
   }
 
@@ -1044,8 +1067,16 @@ export class AdminAppComponent implements OnInit {
       color: "#1c7c64",
       isPublic: true,
       isBookableOnline: true,
-      collaboratorIds: [] as string[],
       serviceProducts: [] as any[],
+    };
+  }
+
+  private emptyProductForm() {
+    return {
+      id: "",
+      name: "",
+      description: "",
+      price: null as number | null,
     };
   }
 
@@ -1087,7 +1118,7 @@ export class AdminAppComponent implements OnInit {
         {
           productId: "",
           quantity: 1,
-          unitPrice: 0,
+          unitPrice: null as number | null,
           discount: 0,
           taxTotal: 0,
         },
@@ -1201,6 +1232,7 @@ export class AdminAppComponent implements OnInit {
 
       this.tenant = this.adminFacade.tenant();
       this.revenueMetrics = this.adminFacade.revenueMetrics();
+      this.revenueReport = this.adminFacade.revenueReport();
       this.appointmentStats = this.adminFacade.appointmentStats();
       this.collaboratorStats = this.adminFacade.collaboratorStats();
       this.serviceStats = this.adminFacade.serviceStats();
@@ -1210,6 +1242,9 @@ export class AdminAppComponent implements OnInit {
       this.products = this.adminFacade.products();
       this.collaborators = this.adminFacade.collaborators();
       this.customers = this.adminFacade.customers();
+      this.stations = Array.isArray(this.tenant?.stations)
+        ? this.tenant.stations
+        : [];
       this.filteredAppointmentCustomers = [...this.customers];
       this.settingsForm = {
         name: this.tenant?.name,
@@ -1753,9 +1788,6 @@ export class AdminAppComponent implements OnInit {
       color: service.color || "#1c7c64",
       isPublic: Boolean(service.isPublic),
       isBookableOnline: Boolean(service.isBookableOnline),
-      collaboratorIds: Array.isArray(service.collaborators)
-        ? service.collaborators.map((collaborator: any) => collaborator.id)
-        : [],
       serviceProducts: Array.isArray(service.serviceProducts)
         ? service.serviceProducts
         : [],
@@ -1768,18 +1800,15 @@ export class AdminAppComponent implements OnInit {
     };
   }
 
-  toggleServiceCollaborator(collaboratorId: string): void {
-    const selectedIds = new Set(this.serviceForm.collaboratorIds || []);
-
-    if (selectedIds.has(collaboratorId)) {
-      selectedIds.delete(collaboratorId);
-    } else {
-      selectedIds.add(collaboratorId);
-    }
-
-    this.serviceForm = {
-      ...this.serviceForm,
-      collaboratorIds: [...selectedIds],
+  editProduct(product: any): void {
+    this.productForm = {
+      id: product.id,
+      name: product.name || "",
+      description: product.description || "",
+      price:
+        product.price === null || product.price === undefined
+          ? null
+          : Number(product.price),
     };
   }
 
@@ -1814,7 +1843,7 @@ export class AdminAppComponent implements OnInit {
     };
   }
 
-  editCustomer(customer: any): void {
+  async editCustomer(customer: any): Promise<void> {
     this.customerForm = {
       id: customer.id,
       firstName: customer.firstName || "",
@@ -1824,10 +1853,24 @@ export class AdminAppComponent implements OnInit {
       tagsText: Array.isArray(customer.tags) ? customer.tags.join(", ") : "",
       notes: customer.notes || "",
     };
+    this.customerHistory = null;
+    this.customerHistoryLoading = true;
+    try {
+      this.customerHistory = await firstValueFrom(
+        this.adminApi.loadCustomerHistory(customer.id),
+      );
+    } catch (error: any) {
+      this.feedback =
+        error?.error?.message || "Storico cliente non disponibile";
+    } finally {
+      this.customerHistoryLoading = false;
+    }
   }
 
   resetCustomerForm(): void {
     this.customerForm = this.emptyCustomerForm();
+    this.customerHistory = null;
+    this.customerHistoryLoading = false;
   }
 
   async selectPlatformTenant(tenant: any): Promise<void> {
@@ -2299,12 +2342,47 @@ export class AdminAppComponent implements OnInit {
     this.resetServiceProductForm();
   }
 
+  resetProductForm(): void {
+    this.productForm = this.emptyProductForm();
+  }
+
   resetCollaboratorForm(): void {
     this.collaboratorForm = this.emptyCollaboratorForm();
   }
 
   resetSaleForm(): void {
     this.saleForm = this.emptySaleForm();
+  }
+
+  async loadRevenueReport(): Promise<void> {
+    this.loading = true;
+    try {
+      this.revenueReport = await firstValueFrom(
+        this.adminApi.loadRevenueReport(this.revenueFilters),
+      );
+      this.revenueMetrics = this.revenueReport?.metrics || [];
+    } catch (error: any) {
+      this.feedback =
+        error?.error?.message || "Caricamento fatturato non riuscito";
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async saveQuickOrder(payload: Record<string, unknown>): Promise<void> {
+    this.loading = true;
+    try {
+      await firstValueFrom(this.adminApi.createSale(payload));
+      this.quickOrderOpen = false;
+      this.feedback = "Ordine registrato";
+      await this.refreshAll();
+      await this.loadRevenueReport();
+    } catch (error: any) {
+      this.feedback =
+        error?.error?.message || "Registrazione ordine non riuscita";
+    } finally {
+      this.loading = false;
+    }
   }
 
   resetServiceProductForm(): void {
@@ -2324,7 +2402,7 @@ export class AdminAppComponent implements OnInit {
         {
           productId: "",
           quantity: 1,
-          unitPrice: 0,
+          unitPrice: null as number | null,
           discount: 0,
           taxTotal: 0,
         },
@@ -2351,7 +2429,10 @@ export class AdminAppComponent implements OnInit {
 
     this.saleForm.items[index] = {
       ...item,
-      unitPrice: Number(product.price || 0),
+      unitPrice:
+        product.price === null || product.price === undefined
+          ? null
+          : Number(product.price),
     };
   }
 
@@ -2443,7 +2524,10 @@ export class AdminAppComponent implements OnInit {
           .map((item: any) => ({
             productId: item.productId,
             quantity: Number(item.quantity || 1),
-            unitPrice: Number(item.unitPrice || 0),
+            unitPrice:
+              item.unitPrice === null
+                ? undefined
+                : Number(item.unitPrice),
             discount: Number(item.discount || 0),
             taxTotal: Number(item.taxTotal || 0),
           })),
@@ -2478,7 +2562,6 @@ export class AdminAppComponent implements OnInit {
         color: this.serviceForm.color,
         isPublic: this.serviceForm.isPublic,
         isBookableOnline: this.serviceForm.isBookableOnline,
-        collaboratorIds: this.serviceForm.collaboratorIds,
       };
 
       if (this.serviceForm.id) {
@@ -2508,6 +2591,59 @@ export class AdminAppComponent implements OnInit {
     } finally {
       this.loading = false;
     }
+  }
+
+  async saveProduct(): Promise<void> {
+    if (!this.productForm.name?.trim()) {
+      this.feedback = "Inserisci il nome del prodotto";
+      return;
+    }
+    this.loading = true;
+    try {
+      await firstValueFrom(
+        this.adminApi.createOrUpdateProduct(this.productForm.id, {
+          name: this.productForm.name.trim(),
+          description: this.productForm.description || undefined,
+          price:
+            this.productForm.price === null ||
+            String(this.productForm.price).trim() === ""
+              ? null
+              : Number(this.productForm.price),
+        }),
+      );
+      this.feedback = this.productForm.id
+        ? "Prodotto aggiornato"
+        : "Prodotto creato";
+      this.resetProductForm();
+      await this.refreshAll();
+    } catch (error: any) {
+      this.feedback =
+        error?.error?.message || "Salvataggio prodotto non riuscito";
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  removeProduct(): void {
+    if (!this.productForm.id) return;
+    this.openDeleteDialog(
+      "Eliminare questo prodotto?",
+      `Stai per eliminare ${this.productForm.name || "il prodotto selezionato"}.`,
+      "Elimina prodotto",
+      async () => {
+        this.loading = true;
+        try {
+          await firstValueFrom(
+            this.adminApi.deleteProduct(this.productForm.id),
+          );
+          this.feedback = "Prodotto eliminato";
+          this.resetProductForm();
+          await this.refreshAll();
+        } finally {
+          this.loading = false;
+        }
+      },
+    );
   }
 
   async removeService(): Promise<void> {

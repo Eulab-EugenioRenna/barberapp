@@ -279,7 +279,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               <h3 class="font-display text-3xl">Piani</h3>
             </div>
             <button type="button" class="pill-btn" (click)="resetPlan.emit()">
-              Reset
+              Nuovo piano
             </button>
           </div>
           <div class="mt-5 grid gap-3">

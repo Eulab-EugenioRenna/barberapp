@@ -81,24 +81,8 @@ export class AppointmentsFacade {
 
   readonly appointmentCollaboratorOptions = computed(() => {
     const defaultCollaboratorId = this.tenant()?.defaultCollaboratorId;
-    const selectedService = this.services().find(
-      (service) => service.id === this.appointmentForm().serviceId,
-    );
-    const assignedCollaboratorIds = new Set(
-      Array.isArray(selectedService?.collaborators)
-        ? selectedService.collaborators.map(
-            (collaborator: any) => collaborator.id,
-          )
-        : [],
-    );
 
     return [...this.collaborators()]
-      .filter((collaborator) => {
-        if (!selectedService || !Array.isArray(selectedService.collaborators)) {
-          return true;
-        }
-        return assignedCollaboratorIds.has(collaborator.id);
-      })
       .sort((left, right) => {
         if (left.id === defaultCollaboratorId) return -1;
         if (right.id === defaultCollaboratorId) return 1;

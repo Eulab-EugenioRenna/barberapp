@@ -147,10 +147,7 @@ export class PlatformAdminService {
       this.prisma.user.findMany({ where: { tenantId } }),
       this.prisma.collaborator.findMany({ where: { tenantId } }),
       this.prisma.customer.findMany({ where: { tenantId } }),
-      this.prisma.service.findMany({
-        where: { tenantId },
-        include: { collaborators: { select: { id: true } } },
-      }),
+      this.prisma.service.findMany({ where: { tenantId } }),
       this.prisma.product.findMany({ where: { tenantId } }),
       this.prisma.serviceProduct.findMany({ where: { service: { tenantId } } }),
       this.prisma.appointment.findMany({ where: { tenantId } }),
@@ -168,10 +165,7 @@ export class PlatformAdminService {
       users,
       collaborators,
       customers,
-      services: services.map((service) => ({
-        ...service,
-        collaboratorIds: service.collaborators.map((item) => item.id),
-      })),
+      services,
       products,
       serviceProducts,
       appointments,
@@ -552,23 +546,12 @@ export class PlatformAdminService {
         });
       }
       for (const service of snapshot["services"] ?? []) {
-        const { collaboratorIds = [], ...serviceData } = service;
+        const { collaboratorIds: _legacyCollaboratorIds, ...serviceData } =
+          service;
         await tx.service.upsert({
           where: { id: service.id },
-          update: {
-            ...serviceData,
-            tenantId,
-            collaborators: {
-              set: collaboratorIds.map((id: string) => ({ id })),
-            },
-          },
-          create: {
-            ...serviceData,
-            tenantId,
-            collaborators: {
-              connect: collaboratorIds.map((id: string) => ({ id })),
-            },
-          },
+          update: { ...serviceData, tenantId },
+          create: { ...serviceData, tenantId },
         });
       }
       for (const serviceProduct of snapshot["serviceProducts"] ?? []) {

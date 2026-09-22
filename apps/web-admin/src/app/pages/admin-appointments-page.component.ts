@@ -275,7 +275,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               Annulla appuntamento
             </button>
             <button type="button" class="secondary-btn" (click)="reset.emit()">
-              Reset
+              Nuova prenotazione
             </button>
           </div>
         </form>

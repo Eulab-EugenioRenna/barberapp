@@ -331,13 +331,6 @@ async function recreateDemoTenant() {
         color: "#1c7c64",
         isPublic: true,
         isBookableOnline: true,
-        collaborators: {
-          connect: [
-            { id: ownerCollaborator.id },
-            { id: marco.id },
-            { id: nina.id },
-          ],
-        },
       },
     }),
     prisma.service.create({
@@ -350,13 +343,6 @@ async function recreateDemoTenant() {
         color: "#f59e0b",
         isPublic: true,
         isBookableOnline: true,
-        collaborators: {
-          connect: [
-            { id: ownerCollaborator.id },
-            { id: marco.id },
-            { id: sara.id },
-          ],
-        },
       },
     }),
     prisma.service.create({
@@ -370,9 +356,6 @@ async function recreateDemoTenant() {
         color: "#111827",
         isPublic: true,
         isBookableOnline: true,
-        collaborators: {
-          connect: [{ id: ownerCollaborator.id }, { id: nina.id }],
-        },
       },
     }),
     prisma.service.create({
@@ -385,7 +368,6 @@ async function recreateDemoTenant() {
         color: "#7c3aed",
         isPublic: false,
         isBookableOnline: false,
-        collaborators: { connect: [{ id: sara.id }] },
       },
     }),
   ]);
@@ -670,7 +652,13 @@ async function recreateDemoTenant() {
         createdById: owner.id,
         items: {
           create: [
-            { productId: pomade.id, quantity: 1, unitPrice: 18, lineTotal: 18 },
+            {
+              productId: pomade.id,
+              label: pomade.name,
+              quantity: 1,
+              unitPrice: 18,
+              lineTotal: 18,
+            },
           ],
         },
       },
@@ -688,7 +676,13 @@ async function recreateDemoTenant() {
         createdById: owner.id,
         items: {
           create: [
-            { productId: oil.id, quantity: 1, unitPrice: 24, lineTotal: 24 },
+            {
+              productId: oil.id,
+              label: oil.name,
+              quantity: 1,
+              unitPrice: 24,
+              lineTotal: 24,
+            },
           ],
         },
       },
@@ -705,8 +699,20 @@ async function recreateDemoTenant() {
         createdById: owner.id,
         items: {
           create: [
-            { productId: pomade.id, quantity: 2, unitPrice: 18, lineTotal: 36 },
-            { productId: oil.id, quantity: 1, unitPrice: 24, lineTotal: 24 },
+            {
+              productId: pomade.id,
+              label: pomade.name,
+              quantity: 2,
+              unitPrice: 18,
+              lineTotal: 36,
+            },
+            {
+              productId: oil.id,
+              label: oil.name,
+              quantity: 1,
+              unitPrice: 24,
+              lineTotal: 24,
+            },
           ],
         },
       },
@@ -725,6 +731,7 @@ async function recreateDemoTenant() {
           create: [
             {
               productId: shampoo.id,
+              label: shampoo.name,
               quantity: 1,
               unitPrice: 16,
               lineTotal: 16,

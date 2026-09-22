@@ -26,11 +26,14 @@ type SelectOption = {
   template: `
     <div class="select-shell" [class.open]="open" [class.disabled]="disabled">
       <div
-        role="button"
-        tabindex="0"
+        role="combobox"
+        [attr.tabindex]="disabled ? -1 : 0"
         class="select-trigger"
         [attr.aria-expanded]="open"
         [attr.aria-disabled]="disabled"
+        aria-haspopup="listbox"
+        [attr.aria-controls]="listboxId"
+        [attr.aria-label]="label || placeholder"
         (click)="onTriggerClick($event)"
         (keydown.enter)="onTriggerClick($event)"
         (keydown.space)="onTriggerClick($event)"
@@ -54,6 +57,8 @@ type SelectOption = {
 
       <div
         *ngIf="open"
+        role="listbox"
+        [id]="listboxId"
         class="select-popover"
         (click)="$event.stopPropagation()"
       >
@@ -62,6 +67,7 @@ type SelectOption = {
             [(ngModel)]="filterQuery"
             class="select-filter-input"
             placeholder="Filtra opzioni"
+            aria-label="Filtra opzioni"
             (pointerdown)="$event.stopPropagation()"
             (click)="$event.stopPropagation()"
           />
@@ -69,7 +75,9 @@ type SelectOption = {
         <div
           *ngFor="let option of filteredOptions"
           role="option"
-          tabindex="0"
+          [attr.tabindex]="option.disabled ? -1 : 0"
+          [attr.aria-selected]="option.value === value"
+          [attr.aria-disabled]="option.disabled || null"
           class="select-option"
           [class.active]="option.value === value"
           [class.option-disabled]="option.disabled"
@@ -222,7 +230,9 @@ type SelectOption = {
   ],
 })
 export class CustomSelectComponent implements OnChanges {
+  private static nextId = 0;
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+  readonly listboxId = `select-listbox-${CustomSelectComponent.nextId++}`;
 
   @Input() value = "";
   @Input() options: SelectOption[] = [];
@@ -262,6 +272,11 @@ export class CustomSelectComponent implements OnChanges {
     if (target && !this.elementRef.nativeElement.contains(target)) {
       this.open = false;
     }
+  }
+
+  @HostListener("document:keydown.escape")
+  closeOnEscape(): void {
+    this.open = false;
   }
 
   onTriggerClick(event: Event): void {

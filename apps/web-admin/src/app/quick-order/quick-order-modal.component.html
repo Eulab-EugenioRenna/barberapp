@@ -1,0 +1,189 @@
+<div
+  class="quick-order-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="quick-order-title"
+  [attr.aria-busy]="loading"
+>
+  <button
+    class="quick-order-backdrop"
+    type="button"
+    aria-label="Chiudi ordine rapido"
+    (click)="close.emit()"
+  ></button>
+  <section class="quick-order-sheet">
+    <header class="quick-order-header">
+      <div>
+        <p class="eyebrow text-[var(--accent)]">Touch mode</p>
+        <h2 id="quick-order-title" class="font-display text-4xl">
+          Ordine rapido
+        </h2>
+        <p class="mt-1 text-sm text-[var(--muted)]">
+          I servizi vengono registrati come appuntamento completato che termina
+          ora, anche in sovrapposizione al calendario.
+        </p>
+      </div>
+      <button type="button" class="pill-btn" (click)="close.emit()">
+        Chiudi
+      </button>
+    </header>
+
+    <div class="quick-order-layout">
+      <div class="quick-order-catalog">
+        <label class="field">
+          <span>1 · Cliente</span>
+          <barber-custom-select
+            [value]="customerId"
+            (valueChange)="customerId = $event"
+            [options]="customerOptions"
+            label="Cliente"
+            placeholder="Seleziona il cliente"
+          ></barber-custom-select>
+        </label>
+
+        <div>
+          <p class="quick-order-step">2 · Tocca servizi o prodotti</p>
+          <div class="touch-grid">
+            <button
+              *ngFor="let service of services"
+              type="button"
+              class="touch-card service-card"
+              (click)="addService(service)"
+            >
+              <span class="touch-card-kind">Servizio</span>
+              <strong>{{ service.name }}</strong>
+              <span>€{{ Number(service.basePrice || 0).toFixed(2) }}</span>
+            </button>
+            <button
+              *ngFor="let product of products"
+              type="button"
+              class="touch-card product-card"
+              (click)="addProduct(product)"
+            >
+              <span class="touch-card-kind">Prodotto</span>
+              <strong>{{ product.name }}</strong>
+              <span>{{
+                product.price === null || product.price === undefined
+                  ? "Prezzo da inserire"
+                  : "€" + Number(product.price).toFixed(2)
+              }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="quick-order-cart">
+        <p class="quick-order-step">3 · Riepilogo ordine</p>
+        <div class="cart-empty" *ngIf="!items.length">
+          Tocca un servizio o un prodotto per iniziare.
+        </div>
+        <article *ngFor="let item of items; let i = index" class="cart-line">
+          <div class="cart-line-head">
+            <div>
+              <span class="touch-card-kind">{{
+                item.kind === "service" ? "Servizio" : "Prodotto"
+              }}</span>
+              <strong>{{ item.label }}</strong>
+            </div>
+            <button type="button" class="remove-line" (click)="removeItem(i)">
+              Rimuovi
+            </button>
+          </div>
+          <div class="cart-line-fields">
+            <label>
+              <span>Q.tà</span>
+              <input
+                [(ngModel)]="item.quantity"
+                [name]="'quickQty' + i"
+                type="number"
+                min="1"
+                inputmode="numeric"
+              />
+            </label>
+            <label>
+              <span>Prezzo</span>
+              <input
+                [(ngModel)]="item.unitPrice"
+                [name]="'quickPrice' + i"
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                (focus)="pricePadIndex = i"
+              />
+            </label>
+          </div>
+          <div *ngIf="item.kind === 'service'" class="station-picker">
+            <span>Postazioni (anche più di una)</span>
+            <div class="station-chips">
+              <button
+                *ngFor="let station of stations"
+                type="button"
+                [class.selected]="item.stationIds.includes(station.id)"
+                (click)="toggleStation(item, station.id)"
+              >
+                {{ station.name }}
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <div
+          *ngIf="pricePadIndex >= 0 && items[pricePadIndex]"
+          class="price-pad"
+        >
+          <div class="price-pad-title">
+            <span>Prezzo · {{ items[pricePadIndex].label }}</span>
+            <button type="button" (click)="pricePadIndex = -1">OK</button>
+          </div>
+          <div class="price-pad-grid">
+            <button
+              *ngFor="
+                let key of [
+                  '1',
+                  '2',
+                  '3',
+                  '4',
+                  '5',
+                  '6',
+                  '7',
+                  '8',
+                  '9',
+                  '0',
+                  '.',
+                ]
+              "
+              type="button"
+              (click)="appendPrice(key)"
+            >
+              {{ key }}
+            </button>
+            <button type="button" (click)="clearPrice()">C</button>
+          </div>
+        </div>
+
+        <div class="checkout-bar">
+          <label class="field">
+            <span>Pagamento</span>
+            <select [(ngModel)]="paymentMethod" name="quickPaymentMethod">
+              <option value="cash">Contanti</option>
+              <option value="card">Carta</option>
+              <option value="mixed">Misto</option>
+            </select>
+          </label>
+          <div class="checkout-total">
+            <span>Totale</span><strong>€{{ total.toFixed(2) }}</strong>
+          </div>
+          <button
+            type="button"
+            class="primary-btn"
+            [disabled]="loading || !canSubmit()"
+            (click)="submit()"
+          >
+            {{ loading ? "Registrazione..." : "Conferma ordine" }}
+          </button>
+        </div>
+      </aside>
+    </div>
+  </section>
+</div>

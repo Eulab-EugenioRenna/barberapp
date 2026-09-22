@@ -20,7 +20,10 @@ import { CustomSelectComponent } from "../custom-select.component";
           >
         </div>
         <div class="mt-5 grid gap-3">
-          <article *ngFor="let sale of sales" class="list-card text-left">
+          <article
+            *ngFor="let sale of displayedSales; trackBy: trackById"
+            class="list-card text-left"
+          >
             <div>
               <strong>
                 {{ sale.customer?.firstName || "Vendita" }}
@@ -38,6 +41,21 @@ import { CustomSelectComponent } from "../custom-select.component";
               </p>
             </div>
           </article>
+          <article
+            *ngIf="!sales.length"
+            class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
+          >
+            Nessun ordine registrato. Usa “Ordine rapido” dalla dashboard o il
+            modulo di cassa.
+          </article>
+          <button
+            *ngIf="displayedSales.length < sales.length"
+            type="button"
+            class="secondary-btn justify-self-start"
+            (click)="salesLimit = salesLimit + 100"
+          >
+            Mostra altri ordini
+          </button>
         </div>
       </article>
 
@@ -188,11 +206,15 @@ import { CustomSelectComponent } from "../custom-select.component";
             <strong>Totale: €{{ saleFormTotal.toFixed(2) }}</strong>
           </div>
           <div class="flex flex-wrap gap-3">
-            <button type="submit" class="primary-btn" [disabled]="loading">
+            <button
+              type="submit"
+              class="primary-btn"
+              [disabled]="loading || !formValid"
+            >
               Registra vendita
             </button>
             <button type="button" class="secondary-btn" (click)="reset.emit()">
-              Reset
+              Nuovo ordine
             </button>
           </div>
         </form>
@@ -221,6 +243,25 @@ export class AdminSalesPageComponent {
   @Output() handleProductChange = new EventEmitter<number>();
 
   protected readonly Number = Number;
+  salesLimit = 100;
+
+  get displayedSales(): any[] {
+    return this.sales.slice(0, this.salesLimit);
+  }
+
+  trackById(_index: number, item: any): string {
+    return item.id;
+  }
+
+  get formValid(): boolean {
+    return this.saleForm.items?.some(
+      (item: any) =>
+        item.productId &&
+        item.unitPrice !== "" &&
+        item.unitPrice !== null &&
+        Number(item.unitPrice) >= 0,
+    );
+  }
 
   formatDateTime(value: string): string {
     return new Date(value).toLocaleString("it-IT", {

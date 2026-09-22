@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -18,21 +17,6 @@ import {
   resolveRequestSession,
 } from "../../common/request-session";
 
-function readCollaboratorIds(
-  body: Record<string, unknown>,
-): string[] | undefined {
-  const input = body["collaboratorIds"];
-
-  if (!Array.isArray(input)) {
-    return undefined;
-  }
-
-  return input
-    .filter((value): value is string => typeof value === "string")
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
 @Controller("services")
 export class ServicesController {
   constructor(
@@ -40,33 +24,6 @@ export class ServicesController {
     private readonly cacheService: AppCacheService,
     private readonly cacheInvalidationService: CacheInvalidationService,
   ) {}
-
-  private async validateCollaboratorIds(
-    tenantId: string,
-    collaboratorIds?: string[],
-  ): Promise<string[] | undefined> {
-    if (!collaboratorIds) {
-      return undefined;
-    }
-
-    if (collaboratorIds.length === 0) {
-      return [];
-    }
-
-    const existingCollaborators = await this.prisma.collaborator.findMany({
-      where: {
-        tenantId,
-        id: { in: collaboratorIds },
-      },
-      select: { id: true },
-    });
-
-    if (existingCollaborators.length !== collaboratorIds.length) {
-      throw new BadRequestException("One or more collaborators are invalid");
-    }
-
-    return collaboratorIds;
-  }
 
   @Get()
   async findAll(
@@ -87,9 +44,6 @@ export class ServicesController {
           where: { tenantId },
           orderBy: [{ isActive: "desc" }, { name: "asc" }],
           include: {
-            collaborators: {
-              select: { id: true, firstName: true, lastName: true },
-            },
             serviceProducts: {
               include: {
                 product: true,
@@ -111,10 +65,6 @@ export class ServicesController {
     );
 
     const tenantId = requireTenantId(session);
-    const collaboratorIds = await this.validateCollaboratorIds(
-      tenantId,
-      readCollaboratorIds(body),
-    );
     const created = await this.prisma.service.create({
       data: {
         tenantId,
@@ -136,11 +86,6 @@ export class ServicesController {
           body["requiresCollaborator"] === undefined
             ? true
             : Boolean(body["requiresCollaborator"]),
-        collaborators: collaboratorIds?.length
-          ? {
-              connect: collaboratorIds.map((id) => ({ id })),
-            }
-          : undefined,
       },
     });
 
@@ -166,10 +111,6 @@ export class ServicesController {
     );
 
     const tenantId = requireTenantId(session);
-    const collaboratorIds = await this.validateCollaboratorIds(
-      tenantId,
-      readCollaboratorIds(body),
-    );
     const updated = await this.prisma.service.update({
       where: { id },
       data: {
@@ -200,13 +141,6 @@ export class ServicesController {
             : undefined,
         isActive:
           typeof body["isActive"] === "boolean" ? body["isActive"] : undefined,
-        collaborators: collaboratorIds
-          ? {
-              set: collaboratorIds.map((collaboratorId) => ({
-                id: collaboratorId,
-              })),
-            }
-          : undefined,
       },
     });
 

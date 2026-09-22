@@ -74,6 +74,21 @@ select {
   font: inherit;
 }
 
+button,
+[role="button"],
+[role="option"] {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible,
+[role="option"]:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 0.1875rem solid rgba(var(--accent-rgb, 249, 115, 22), 0.72);
+  outline-offset: 0.1875rem;
+}
+
 .font-display {
   font-family: "Syne", sans-serif;
 }
@@ -230,6 +245,13 @@ select {
   box-shadow: 0 1rem 2.25rem rgba(var(--brand-rgb, 28, 124, 100), 0.22);
 }
 
+.primary-btn:disabled,
+button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .success-card {
   border: 0.0625rem solid rgba(16, 185, 129, 0.18);
   background: linear-gradient(
@@ -247,5 +269,16 @@ select {
   .public-hero,
   .public-panel {
     height: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
