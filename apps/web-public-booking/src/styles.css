@@ -1,0 +1,251 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@500;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #14181f;
+  --muted: #5f6876;
+  --line: rgba(20, 24, 31, 0.08);
+  --brand: #1c7c64;
+  --accent: #f97316;
+  --scrollbar-track: rgba(20, 24, 31, 0.05);
+  --scrollbar-thumb: rgba(20, 24, 31, 0.18);
+  --scrollbar-thumb-hover: rgba(20, 24, 31, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999rem;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999rem;
+  border: 0.15rem solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: "Plus Jakarta Sans", sans-serif;
+  background:
+    radial-gradient(
+      circle at 12% 18%,
+      rgba(249, 115, 22, 0.16),
+      transparent 22rem
+    ),
+    radial-gradient(
+      circle at 88% 12%,
+      rgba(28, 124, 100, 0.18),
+      transparent 24rem
+    ),
+    linear-gradient(135deg, #fff8ef 0%, #eff4f1 48%, #f8f2eb 100%);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.font-display {
+  font-family: "Syne", sans-serif;
+}
+
+.public-shell {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 12% 18%,
+      rgba(var(--accent-rgb, 249, 115, 22), 0.16),
+      transparent 22rem
+    ),
+    radial-gradient(
+      circle at 88% 12%,
+      rgba(var(--brand-rgb, 28, 124, 100), 0.18),
+      transparent 24rem
+    ),
+    linear-gradient(135deg, #fff8ef 0%, #eff4f1 48%, #f8f2eb 100%);
+}
+
+.public-frame {
+  display: grid;
+  grid-template-columns: 100%;
+  gap: 1rem;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  overflow: hidden;
+}
+
+.booking-hero {
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(249, 115, 22, 0.18),
+      transparent 18rem
+    ),
+    linear-gradient(180deg, #101923 0%, #0d141c 100%);
+  box-shadow: 0 1.75rem 5rem rgba(10, 14, 20, 0.28);
+}
+
+.public-hero,
+.public-panel {
+  min-height: 0;
+  height: 100%;
+  border-radius: 2rem;
+}
+
+.public-hero {
+  overflow: auto;
+  padding: 1.5rem;
+}
+
+.panel {
+  border: 0.0625rem solid var(--line);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 1.25rem 4.375rem rgba(15, 23, 32, 0.08);
+  backdrop-filter: blur(1.125rem);
+}
+
+.public-panel {
+  overflow: hidden;
+}
+
+.public-panel-scroll {
+  height: 100%;
+  overflow: auto;
+  padding: 1.5rem;
+}
+
+.public-date-field {
+  width: 100%;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.hero-step,
+.service-card,
+.field input,
+.field select,
+.primary-btn,
+.success-card {
+  transition: 180ms ease;
+}
+
+.hero-step {
+  border: 0.0625rem solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.field {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.field span {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  border: 0.0625rem solid var(--line);
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.95rem 1rem;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.34);
+  box-shadow: 0 0 0 0.25rem rgba(var(--brand-rgb, 28, 124, 100), 0.1);
+}
+
+.service-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 0.0625rem solid var(--line);
+  border-radius: 1.4rem;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 1rem;
+}
+
+.service-card:hover,
+.service-card.active,
+.primary-btn:hover,
+.success-card:hover {
+  transform: translateY(-0.125rem);
+}
+
+.service-card.active {
+  border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.25);
+  background: rgba(var(--brand-rgb, 28, 124, 100), 0.08);
+}
+
+.primary-btn {
+  border: 0;
+  cursor: pointer;
+  border-radius: 1.35rem;
+  background: linear-gradient(135deg, var(--brand), #123b33);
+  padding: 1rem 1.2rem;
+  color: white;
+  font-weight: 800;
+  box-shadow: 0 1rem 2.25rem rgba(var(--brand-rgb, 28, 124, 100), 0.22);
+}
+
+.success-card {
+  border: 0.0625rem solid rgba(16, 185, 129, 0.18);
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.1),
+    rgba(255, 255, 255, 0.7)
+  );
+}
+
+@media (min-width: 64rem) {
+  .public-frame {
+    grid-template-columns: 44% 56%;
+  }
+
+  .public-hero,
+  .public-panel {
+    height: 100%;
+  }
+}

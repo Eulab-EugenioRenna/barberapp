@@ -1,0 +1,1173 @@
+{
+  "version": "6.0",
+  "nxVersion": "20.8.4",
+  "pathMappings": {
+    "@barber/shared/types": [
+      "libs/shared/types/src/index.ts"
+    ],
+    "@barber/shared/utils": [
+      "libs/shared/utils/src/index.ts"
+    ],
+    "@barber/shared/validation": [
+      "libs/shared/validation/src/index.ts"
+    ]
+  },
+  "nxJsonPlugins": [],
+  "fileMap": {
+    "nonProjectFiles": [
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.service.js.map",
+        "hash": "6469254267306947600"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.utils.ts",
+        "hash": "10158984429670309697"
+      },
+      {
+        "file": "apps/web-admin/src/app/shared/admin-metrics-grid.component.ts",
+        "hash": "8888345167040984173"
+      },
+      {
+        "file": ".angular/cache/18.2.21/web-admin/angular-compiler.db-lock",
+        "hash": "5663132903564348052"
+      },
+      {
+        "file": "dist/apps/api/modules/health/health.controller.js",
+        "hash": "12230527626754311141"
+      },
+      {
+        "file": "apps/web-admin/src/app/core/admin.facade.ts",
+        "hash": "629367781487236491"
+      },
+      {
+        "file": "libs/shared/types/src/index.ts",
+        "hash": "16213225430710233816"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.processor.js",
+        "hash": "1834154469534894508"
+      },
+      {
+        "file": "dist/apps/api/modules/users/users.module.js.map",
+        "hash": "848864543021956150"
+      },
+      {
+        "file": "dist/apps/api/modules/audit/audit.controller.js.map",
+        "hash": "2482708213442461060"
+      },
+      {
+        "file": "dist/apps/web-public-booking/browser/styles.css",
+        "hash": "5714421457835627413"
+      },
+      {
+        "file": "apps/api/src/modules/tenant/tenant.controller.ts",
+        "hash": "442222841881604518"
+      },
+      {
+        "file": "apps/web-admin/src/app/admin.routes.ts",
+        "hash": "18150621771292574632"
+      },
+      {
+        "file": "dist/apps/api/modules/auth/auth.module.js.map",
+        "hash": "8614548936456736713"
+      },
+      {
+        "file": "apps/api/src/modules/availability/collaborator-schedule.service.ts",
+        "hash": "16762324003662207996"
+      },
+      {
+        "file": "docker/web-public-booking.Dockerfile",
+        "hash": "17507930206763567403"
+      },
+      {
+        "file": "apps/web-admin/src/app/core/api-config.ts",
+        "hash": "12757769222840182924"
+      },
+      {
+        "file": "package.json",
+        "hash": "14935268914630774684"
+      },
+      {
+        "file": "dist/apps/api/common/correlation-id.interceptor.js",
+        "hash": "1532936915081360646"
+      },
+      {
+        "file": "dist/out-tsc/web-admin/apps/web-admin/src/main.js.map",
+        "hash": "2833981694037655547"
+      },
+      {
+        "file": "dist/apps/api/modules/availability/availability.controller.js",
+        "hash": "6143434701628679638"
+      },
+      {
+        "file": "apps/api/src/cache/cache.service.ts",
+        "hash": "4387598626877717347"
+      },
+      {
+        "file": "dist/apps/web-admin/browser/polyfills.js",
+        "hash": "13576170651250845855"
+      },
+      {
+        "file": "dist/apps/api/modules/audit/audit.module.js.map",
+        "hash": "660528549267225711"
+      },
+      {
+        "file": "node_modules/.prisma/client/edge.d.ts",
+        "hash": "11303388507078878756"
+      },
+      {
+        "file": "node_modules/.prisma/client/index-browser.js",
+        "hash": "11128485234530367420"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-services-page.component.ts",
+        "hash": "6375160018403161098"
+      },
+      {
+        "file": "apps/web-public-booking/src/app/public-booking-app.component.ts",
+        "hash": "3400881018929862631"
+      },
+      {
+        "file": ".nx/workspace-data/file-map.json",
+        "hash": "5717189167652960539"
+      },
+      {
+        "file": "apps/api/src/main.ts",
+        "hash": "11014044342608810677"
+      },
+      {
+        "file": "apps/web-public-booking/src/app/public.routes.ts",
+        "hash": "509812026381965922"
+      },
+      {
+        "file": "dist/apps/api/modules/appointments/appointments.module.js",
+        "hash": "7915404883874279239"
+      },
+      {
+        "file": "apps/web-admin/src/index.html",
+        "hash": "2045553215186637447"
+      },
+      {
+        "file": "apps/api/src/app.module.ts",
+        "hash": "13159058564922987001"
+      },
+      {
+        "file": "dist/apps/api/modules/availability/availability.service.js.map",
+        "hash": "12573737812317508002"
+      },
+      {
+        "file": "dist/apps/api/modules/payments/payments.module.js",
+        "hash": "1407938844085267319"
+      },
+      {
+        "file": "IMPLEMENTATION_PLAN.md",
+        "hash": "5974227281997508229"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.utils.js.map",
+        "hash": "7294282457857291197"
+      },
+      {
+        "file": "apps/web-admin/src/app/appointments/admin-appointments-quick-reschedule-modal.component.ts",
+        "hash": "4187647818206821265"
+      },
+      {
+        "file": "dist/out-tsc/web-public-booking/libs/shared/types/src/index.js.map",
+        "hash": "7679500264273136064"
+      },
+      {
+        "file": "apps/api/src/modules/services/services.module.ts",
+        "hash": "17704673801634548163"
+      },
+      {
+        "file": "apps/web-admin/src/app/core/auth-api.service.ts",
+        "hash": "17116398839115655242"
+      },
+      {
+        "file": "dist/apps/api/modules/health/health.module.js.map",
+        "hash": "17229001476991609773"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.controller.js",
+        "hash": "4261966830348812267"
+      },
+      {
+        "file": "apps/web-public-booking/src/app/core/public-booking-api.service.ts",
+        "hash": "13669124146232783801"
+      },
+      {
+        "file": "dist/apps/api/prisma/prisma.service.js.map",
+        "hash": "9670753954733054530"
+      },
+      {
+        "file": "dist/out-tsc/web-admin/apps/web-admin/src/app/admin-app.component.js",
+        "hash": "10922172228489543867"
+      },
+      {
+        "file": "apps/web-public-booking/src/app/custom-select.component.ts",
+        "hash": "9063318543020226012"
+      },
+      {
+        "file": "node_modules/.prisma/client/wasm.js",
+        "hash": "11128485234530367420"
+      },
+      {
+        "file": "apps/api/src/common/domain-types.ts",
+        "hash": "4042844370275395239"
+      },
+      {
+        "file": "nx.json",
+        "hash": "16436049820157029434"
+      },
+      {
+        "file": "apps/web-admin/src/app/appointments/appointments.service.ts",
+        "hash": "11999316849795643977"
+      },
+      {
+        "file": "node_modules/.prisma/client/index.js",
+        "hash": "3423758988086637126"
+      },
+      {
+        "file": "apps/api/src/modules/public-booking/public-booking.controller.ts",
+        "hash": "15907948821947181685"
+      },
+      {
+        "file": "dist/out-tsc/web-public-booking/apps/web-public-booking/src/app/public-booking-app.component.js",
+        "hash": "10850530164085994599"
+      },
+      {
+        "file": "dist/apps/api/modules/availability/availability.module.js",
+        "hash": "15378332460083095604"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.constants.js",
+        "hash": "5169320440239810694"
+      },
+      {
+        "file": "apps/api/src/modules/dashboard/dashboard.module.ts",
+        "hash": "1776251335560097244"
+      },
+      {
+        "file": "package-lock.json",
+        "hash": "13650704289980167899"
+      },
+      {
+        "file": ".nx/workspace-data/nx_files.nxt",
+        "hash": "129250208923815632"
+      },
+      {
+        "file": "dist/apps/api/modules/auth/auth.controller.js.map",
+        "hash": "14118066476792157796"
+      },
+      {
+        "file": "dist/apps/api/app.module.js.map",
+        "hash": "4223736564809175680"
+      },
+      {
+        "file": "dist/out-tsc/web-public-booking/apps/web-public-booking/src/app/public-booking-app.component.js.map",
+        "hash": "2933743612702472069"
+      },
+      {
+        "file": "dist/apps/api/modules/payments/payments.controller.js",
+        "hash": "18230534428395685755"
+      },
+      {
+        "file": "dist/apps/api/modules/dashboard/dashboard.controller.js",
+        "hash": "15778845542964716632"
+      },
+      {
+        "file": "apps/web-admin/src/app/core/auth.interceptor.ts",
+        "hash": "15345469076945958568"
+      },
+      {
+        "file": "docker/api-entrypoint.sh",
+        "hash": "5653508080214423446"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.types.ts",
+        "hash": "10682940697173631056"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.providers.js",
+        "hash": "979147705791378335"
+      },
+      {
+        "file": "dist/apps/web-public-booking/browser/index.html",
+        "hash": "7790253404661939414"
+      },
+      {
+        "file": "dist/apps/api/app.controller.js",
+        "hash": "6402019918562273987"
+      },
+      {
+        "file": "apps/web-admin/src/app/appointments/admin-appointments-feature-page.component.ts",
+        "hash": "3844395788007267754"
+      },
+      {
+        "file": "apps/api/src/modules/customers/customers.module.ts",
+        "hash": "17930195921261643477"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-customers-page.component.ts",
+        "hash": "8508786134190563680"
+      },
+      {
+        "file": "dist/apps/api/app.module.js",
+        "hash": "7451365290139244216"
+      },
+      {
+        "file": "apps/api/src/modules/products/products.controller.ts",
+        "hash": "6341323909997868064"
+      },
+      {
+        "file": "apps/api/src/modules/availability/availability.service.ts",
+        "hash": "8135197991320156290"
+      },
+      {
+        "file": "dist/out-tsc/web-public-booking/apps/web-public-booking/src/main.js.map",
+        "hash": "4106034420406574196"
+      },
+      {
+        "file": "docker/web-admin.Dockerfile",
+        "hash": "8126356440231936039"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.providers.ts",
+        "hash": "9648060373781534185"
+      },
+      {
+        "file": "apps/web-admin/src/app/admin-app.component.ts",
+        "hash": "12352490598213280037"
+      },
+      {
+        "file": "apps/api/src/modules/customers/customers.processor.ts",
+        "hash": "2767368792554454480"
+      },
+      {
+        "file": "apps/api/src/modules/customers/customers-alignment.service.ts",
+        "hash": "15908519787246412808"
+      },
+      {
+        "file": "dist/apps/api/modules/availability/collaborator-schedule.service.js",
+        "hash": "17466862741154996136"
+      },
+      {
+        "file": "dist/apps/api/modules/users/users.controller.js",
+        "hash": "4162133230890528586"
+      },
+      {
+        "file": "dist/apps/api/modules/services/services.module.js.map",
+        "hash": "10735179350581068495"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.controller.js.map",
+        "hash": "3241504020228223300"
+      },
+      {
+        "file": "apps/api/src/modules/products/products.module.ts",
+        "hash": "15079684439174184075"
+      },
+      {
+        "file": "angular.json",
+        "hash": "5526779510019408636"
+      },
+      {
+        "file": "dist/apps/api/common/correlation-id.interceptor.js.map",
+        "hash": "1617153393584299087"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-sales-page.component.ts",
+        "hash": "13906724680166756213"
+      },
+      {
+        "file": ".nx/workspace-data/source-maps.json",
+        "hash": "1389868326933519382"
+      },
+      {
+        "file": "apps/api/src/modules/dashboard/dashboard.controller.ts",
+        "hash": "15891892886753798937"
+      },
+      {
+        "file": "apps/web-public-booking/src/app/public-root.component.ts",
+        "hash": "12225586143439311594"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.module.js.map",
+        "hash": "2739908630228576783"
+      },
+      {
+        "file": "dist/apps/api/modules/collaborators/collaborators.module.js.map",
+        "hash": "1846589142486736420"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-appointments-page.component.ts",
+        "hash": "15274030381003354502"
+      },
+      {
+        "file": "apps/api/src/prisma/prisma.service.ts",
+        "hash": "6612443331220982328"
+      },
+      {
+        "file": "apps/api/src/modules/availability/availability.module.ts",
+        "hash": "14996449202419956145"
+      },
+      {
+        "file": "apps/web-public-booking/src/app/core/public-booking.facade.ts",
+        "hash": "8699308284426546008"
+      },
+      {
+        "file": "apps/api/src/modules/customers/customers.types.ts",
+        "hash": "2450390107968352178"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.constants.js.map",
+        "hash": "4033350447165569940"
+      },
+      {
+        "file": "apps/api/src/modules/health/health.module.ts",
+        "hash": "9308726677769553295"
+      },
+      {
+        "file": "apps/api/src/modules/availability/availability.service.spec.ts",
+        "hash": "17529290344449461940"
+      },
+      {
+        "file": "apps/web-admin/src/app/appointments/admin-appointments-calendar.component.ts",
+        "hash": "17241870281657700615"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.service.ts",
+        "hash": "14899802210099141782"
+      },
+      {
+        "file": "apps/web-admin/src/app/appointments/appointments-collaborator-multi-select.component.ts",
+        "hash": "7996249626274288155"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.processor.js.map",
+        "hash": "17364047564754427663"
+      },
+      {
+        "file": "apps/api/src/modules/customers/customers.controller.ts",
+        "hash": "13211441372077802799"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.types.js",
+        "hash": "15643789310861943086"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.dispatch.service.ts",
+        "hash": "7472076933432034086"
+      },
+      {
+        "file": "dist/apps/api/modules/tenant/tenant.controller.js.map",
+        "hash": "174744555962844655"
+      },
+      {
+        "file": "dist/apps/api/common/domain-types.js",
+        "hash": "10286717034809088373"
+      },
+      {
+        "file": "apps/api/src/modules/sales/sales.controller.ts",
+        "hash": "2114028682073121601"
+      },
+      {
+        "file": "node_modules/.prisma/client/wasm.d.ts",
+        "hash": "6801102947810818358"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.module.js.map",
+        "hash": "64085467933017816"
+      },
+      {
+        "file": "node_modules/.prisma/client/default.js",
+        "hash": "2742901603506114256"
+      },
+      {
+        "file": "apps/web-admin/src/app/core/session.store.ts",
+        "hash": "15302774079033357026"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.types.js.map",
+        "hash": "1098905835361885504"
+      },
+      {
+        "file": "postcss.config.js",
+        "hash": "17789872283383255573"
+      },
+      {
+        "file": "apps/api/src/common/request-session.spec.ts",
+        "hash": "7235881712584941425"
+      },
+      {
+        "file": "dist/apps/api/common/request-session.js.map",
+        "hash": "4984092022813966202"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.constants.js",
+        "hash": "12683648399542872703"
+      },
+      {
+        "file": "dist/apps/api/modules/dashboard/dashboard.module.js.map",
+        "hash": "17659160850594329019"
+      },
+      {
+        "file": "apps/web-admin/src/app/calendar-input.component.ts",
+        "hash": "984186212168641064"
+      },
+      {
+        "file": "apps/web-public-booking/src/main.ts",
+        "hash": "7540042684277628689"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.events.service.js.map",
+        "hash": "5736748890096577286"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-collaborators-page.component.ts",
+        "hash": "10127007476592886876"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.utils.js",
+        "hash": "14192599064983484505"
+      },
+      {
+        "file": "dist/apps/api/modules/audit/audit.module.js",
+        "hash": "18000073862173634628"
+      },
+      {
+        "file": "dist/apps/api/modules/appointments/appointments.module.js.map",
+        "hash": "14510674121598146119"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-settings-page.component.ts",
+        "hash": "15875608642656561197"
+      },
+      {
+        "file": "dist/out-tsc/web-admin/libs/shared/types/src/index.js",
+        "hash": "15744844643574860862"
+      },
+      {
+        "file": "node_modules/.prisma/client/libquery_engine-darwin-arm64.dylib.node",
+        "hash": "17675950247762786327"
+      },
+      {
+        "file": "apps/api/src/modules/appointments/appointments.controller.ts",
+        "hash": "15294933733347278165"
+      },
+      {
+        "file": "apps/web-public-booking/tsconfig.app.json",
+        "hash": "3197215365837254380"
+      },
+      {
+        "file": "dist/apps/api/modules/appointments/appointments.controller.js.map",
+        "hash": "8328496308154757488"
+      },
+      {
+        "file": "dist/apps/api/modules/services/services.controller.js.map",
+        "hash": "16513829485253592393"
+      },
+      {
+        "file": "dist/apps/api/modules/services/services.controller.js",
+        "hash": "17207020812178084336"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.module.ts",
+        "hash": "6666040327674638824"
+      },
+      {
+        "file": "apps/api/src/modules/users/users.module.ts",
+        "hash": "5547517464751647308"
+      },
+      {
+        "file": "dist/apps/api/modules/auth/auth.module.js",
+        "hash": "10017780932242313316"
+      },
+      {
+        "file": "dist/apps/api/common/domain-types.js.map",
+        "hash": "12125500030198539652"
+      },
+      {
+        "file": "apps/web-admin/src/app/appointments/appointments.facade.ts",
+        "hash": "17281225170005177795"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.service.spec.ts",
+        "hash": "1851485454955343024"
+      },
+      {
+        "file": "dist/out-tsc/web-admin/apps/web-admin/src/main.js",
+        "hash": "3526118103924259901"
+      },
+      {
+        "file": "apps/api/src/modules/availability/availability.controller.ts",
+        "hash": "8676579188859346376"
+      },
+      {
+        "file": "dist/apps/api/modules/availability/availability.service.js",
+        "hash": "5932892073710841424"
+      },
+      {
+        "file": "apps/api/src/modules/platform-admin/platform-admin.module.ts",
+        "hash": "9452615437539740428"
+      },
+      {
+        "file": "dist/apps/api/modules/collaborators/collaborators.controller.js",
+        "hash": "9432616741807659887"
+      },
+      {
+        "file": "dist/apps/api/modules/payments/payments.module.js.map",
+        "hash": "1185376361275334206"
+      },
+      {
+        "file": "dist/out-tsc/web-public-booking/libs/shared/types/src/index.js",
+        "hash": "15744844643574860862"
+      },
+      {
+        "file": ".nx/workspace-data/project-graph.json",
+        "hash": "9805720874232744790"
+      },
+      {
+        "file": "prisma/seed.ts",
+        "hash": "8586013678920423030"
+      },
+      {
+        "file": "apps/api/tsconfig.app.json",
+        "hash": "14902268529402602548"
+      },
+      {
+        "file": "apps/web-admin/tsconfig.app.json",
+        "hash": "1950413940541855686"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.dispatch.service.js",
+        "hash": "15723737980190705230"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.processor.js",
+        "hash": "1078229104465275970"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.module.js",
+        "hash": "11318101489618604663"
+      },
+      {
+        "file": "dist/apps/api/modules/dashboard/dashboard.module.js",
+        "hash": "1386001500366066450"
+      },
+      {
+        "file": "docker/api.Dockerfile",
+        "hash": "217457266887778355"
+      },
+      {
+        "file": ".angular/cache/18.2.21/web-public-booking/angular-compiler.db",
+        "hash": "7380042393375133746"
+      },
+      {
+        "file": "tsconfig.base.json",
+        "hash": "2964939389153952434"
+      },
+      {
+        "file": "dist/apps/api/modules/health/health.controller.js.map",
+        "hash": "5628385053462263836"
+      },
+      {
+        "file": "apps/api/src/modules/collaborators/collaborators.controller.ts",
+        "hash": "14844588284969015741"
+      },
+      {
+        "file": "dist/apps/api/modules/tenant/tenant.module.js.map",
+        "hash": "1544469441465332809"
+      },
+      {
+        "file": "screen.png",
+        "hash": "17887710859501537498"
+      },
+      {
+        "file": "apps/api/src/modules/audit/audit.module.ts",
+        "hash": "15065646176229447934"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.templates.js.map",
+        "hash": "9626886362233262499"
+      },
+      {
+        "file": "apps/api/src/modules/auth/auth.controller.ts",
+        "hash": "14218418552725735559"
+      },
+      {
+        "file": "apps/api/src/modules/appointments/appointments.module.ts",
+        "hash": "4651579473213767949"
+      },
+      {
+        "file": "apps/api/src/app.controller.ts",
+        "hash": "3457180136324441397"
+      },
+      {
+        "file": "apps/api/src/modules/public-booking/public-booking.module.ts",
+        "hash": "16579507327011159131"
+      },
+      {
+        "file": "dist/apps/api/prisma/prisma.module.js.map",
+        "hash": "2900478035885002014"
+      },
+      {
+        "file": "node_modules/.prisma/client/schema.prisma",
+        "hash": "5465403921557549607"
+      },
+      {
+        "file": "prisma/migrations/20260512130000_notifications_system/migration.sql",
+        "hash": "11963610997366055004"
+      },
+      {
+        "file": "dist/apps/api/modules/users/users.controller.js.map",
+        "hash": "18031066518881965538"
+      },
+      {
+        "file": ".dockerignore",
+        "hash": "594176551435762944"
+      },
+      {
+        "file": ".angular/cache/18.2.21/web-public-booking/.tsbuildinfo",
+        "hash": "5979515263263518687"
+      },
+      {
+        "file": "dist/apps/api/modules/appointments/appointments.controller.js",
+        "hash": "16276309522110872356"
+      },
+      {
+        "file": "dist/apps/web-admin/browser/main.js",
+        "hash": "6788704261113953256"
+      },
+      {
+        "file": "dist/out-tsc/web-admin/libs/shared/types/src/index.js.map",
+        "hash": "7679500264273136064"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.controller.spec.ts",
+        "hash": "15161181216553822225"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.constants.js.map",
+        "hash": "16283053092110516032"
+      },
+      {
+        "file": "apps/api/src/modules/audit/audit.controller.ts",
+        "hash": "12042019775669063626"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.dispatch.service.js.map",
+        "hash": "12810108470468197910"
+      },
+      {
+        "file": "dist/apps/api/modules/availability/collaborator-schedule.service.js.map",
+        "hash": "7958409702086426775"
+      },
+      {
+        "file": "apps/api/src/modules/health/health.controller.ts",
+        "hash": "16890366644923663765"
+      },
+      {
+        "file": "node_modules/.prisma/client/index.d.ts",
+        "hash": "3095880760083060943"
+      },
+      {
+        "file": "docker-compose.yml",
+        "hash": "7731209854408116911"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.controller.js",
+        "hash": "4787357408861867263"
+      },
+      {
+        "file": "dist/apps/api/modules/audit/audit.controller.js",
+        "hash": "2164957283254720800"
+      },
+      {
+        "file": "apps/api/src/modules/collaborators/collaborators.module.ts",
+        "hash": "2418672604783287852"
+      },
+      {
+        "file": ".angular/cache/18.2.21/web-admin/.tsbuildinfo",
+        "hash": "11819592086409464543"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.service.js",
+        "hash": "10629372527813077910"
+      },
+      {
+        "file": "dist/apps/api/modules/dashboard/dashboard.controller.js.map",
+        "hash": "10464426484665160013"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.types.js",
+        "hash": "16890203601800010624"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers-alignment.service.js",
+        "hash": "2916202108167477882"
+      },
+      {
+        "file": "dist/apps/web-admin/3rdpartylicenses.txt",
+        "hash": "6909525788389296311"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-dashboard-page.component.ts",
+        "hash": "2428224924458880917"
+      },
+      {
+        "file": "dist/apps/api/cache/cache.helpers.js",
+        "hash": "18072213733467020044"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.constants.ts",
+        "hash": "322701399193679468"
+      },
+      {
+        "file": "apps/api/src/cache/cache.module.ts",
+        "hash": "11183208169570434360"
+      },
+      {
+        "file": "dist/apps/api/modules/payments/payments.controller.js.map",
+        "hash": "8083552589256819448"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.events.service.ts",
+        "hash": "16455347421195065021"
+      },
+      {
+        "file": "apps/api/src/cache/cache.helpers.ts",
+        "hash": "2278151320359203628"
+      },
+      {
+        "file": "libs/shared/validation/src/index.ts",
+        "hash": "6651189988157671140"
+      },
+      {
+        "file": "PRD.md",
+        "hash": "7562458595342474822"
+      },
+      {
+        "file": "apps/api/src/modules/sales/sales.module.ts",
+        "hash": "2095776487369463188"
+      },
+      {
+        "file": "dist/apps/api/main.js.map",
+        "hash": "11158956558990240125"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers-alignment.service.js.map",
+        "hash": "4525802238217080293"
+      },
+      {
+        "file": ".angular/cache/18.2.21/web-admin/angular-compiler.db",
+        "hash": "9857685259026302995"
+      },
+      {
+        "file": "dist/apps/api/modules/health/health.module.js",
+        "hash": "15393002026836532990"
+      },
+      {
+        "file": "node_modules/.prisma/client/edge.js",
+        "hash": "4848561487116144009"
+      },
+      {
+        "file": "dist/apps/web-admin/browser/styles.css",
+        "hash": "4874061071725369974"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.controller.js.map",
+        "hash": "7432262465550503263"
+      },
+      {
+        "file": "apps/api/src/modules/customers/customers.constants.ts",
+        "hash": "15134958431264516572"
+      },
+      {
+        "file": "apps/api/src/modules/users/users.controller.ts",
+        "hash": "17859174454537941837"
+      },
+      {
+        "file": "apps/web-admin/src/app/core/auth.guard.ts",
+        "hash": "9396592299889948418"
+      },
+      {
+        "file": "node_modules/.prisma/client/package.json",
+        "hash": "9988055246603433308"
+      },
+      {
+        "file": "apps/web-admin/src/main.ts",
+        "hash": "5152715580964052503"
+      },
+      {
+        "file": "apps/api/src/cache/cache.constants.ts",
+        "hash": "1547082602472902742"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-platform-page.component.ts",
+        "hash": "5895481523133051624"
+      },
+      {
+        "file": "README.md",
+        "hash": "7790714143102502277"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.templates.ts",
+        "hash": "329792805137154301"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.processor.ts",
+        "hash": "12822162607752163337"
+      },
+      {
+        "file": "apps/web-admin/src/app/custom-select.component.ts",
+        "hash": "10077945263816705825"
+      },
+      {
+        "file": "dist/apps/api/common/request-session.js",
+        "hash": "16665955418935893553"
+      },
+      {
+        "file": "apps/web-public-booking/src/app/calendar-input.component.ts",
+        "hash": "15687189006025078923"
+      },
+      {
+        "file": "dist/apps/api/app.controller.js.map",
+        "hash": "2161440840938654044"
+      },
+      {
+        "file": "apps/api/src/modules/payments/payments.module.ts",
+        "hash": "6090615371486601519"
+      },
+      {
+        "file": ".nx/workspace-data/d/server-process.json",
+        "hash": "2161777016779862336"
+      },
+      {
+        "file": "dist/apps/api/modules/tenant/tenant.module.js",
+        "hash": "9044282382106043538"
+      },
+      {
+        "file": "dist/apps/api/modules/collaborators/collaborators.module.js",
+        "hash": "12297227776623838846"
+      },
+      {
+        "file": "dist/apps/api/cache/cache.helpers.js.map",
+        "hash": "14877586357964521111"
+      },
+      {
+        "file": "apps/api/tsconfig.spec.json",
+        "hash": "12636918532990839000"
+      },
+      {
+        "file": "dist/out-tsc/web-public-booking/apps/web-public-booking/src/main.js",
+        "hash": "9442552989782287325"
+      },
+      {
+        "file": "jest.config.js",
+        "hash": "3941484371693822798"
+      },
+      {
+        "file": "dist/apps/api/prisma/prisma.service.js",
+        "hash": "4691126664979562428"
+      },
+      {
+        "file": "apps/web-public-booking/src/index.html",
+        "hash": "7259602711792565546"
+      },
+      {
+        "file": "dist/apps/web-public-booking/browser/main.js",
+        "hash": "9713336854169634231"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.providers.js.map",
+        "hash": "3079200255907908995"
+      },
+      {
+        "file": "apps/api/nest-cli.json",
+        "hash": "8319573686177782223"
+      },
+      {
+        "file": "apps/api/src/modules/notifications/notifications.controller.ts",
+        "hash": "259103178180249108"
+      },
+      {
+        "file": "dist/apps/api/modules/users/users.module.js",
+        "hash": "14511244921752243532"
+      },
+      {
+        "file": "apps/web-admin/src/app/core/admin-api.service.ts",
+        "hash": "15484952686700580047"
+      },
+      {
+        "file": "apps/api/src/modules/platform-admin/platform-admin.controller.ts",
+        "hash": "3246723496671757993"
+      },
+      {
+        "file": "tailwind.config.js",
+        "hash": "15825772152956892607"
+      },
+      {
+        "file": "apps/api/src/cache/cache-invalidation.service.ts",
+        "hash": "12400792487597318965"
+      },
+      {
+        "file": ".env",
+        "hash": "3777925565349747762"
+      },
+      {
+        "file": "apps/web-admin/src/app/admin-root.component.ts",
+        "hash": "18329280859041630568"
+      },
+      {
+        "file": "dist/apps/web-public-booking/browser/polyfills.js",
+        "hash": "13576170651250845855"
+      },
+      {
+        "file": "dist/apps/api/main.js",
+        "hash": "761911708888529750"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.templates.js",
+        "hash": "1872127028477413391"
+      },
+      {
+        "file": "dist/apps/api/prisma/prisma.module.js",
+        "hash": "17572530567404276646"
+      },
+      {
+        "file": "apps/web-admin/src/styles.css",
+        "hash": "1799952325409283438"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.module.js",
+        "hash": "15717074316568621430"
+      },
+      {
+        "file": "apps/web-admin/src/app/pages/admin-auth-page.component.ts",
+        "hash": "15846342052540676962"
+      },
+      {
+        "file": "dist/apps/api/modules/availability/availability.controller.js.map",
+        "hash": "96924346432812776"
+      },
+      {
+        "file": "apps/api/src/modules/platform-admin/platform-admin.service.ts",
+        "hash": "8496147358779212570"
+      },
+      {
+        "file": "dist/apps/api/modules/notifications/notifications.events.service.js",
+        "hash": "2653329425078959193"
+      },
+      {
+        "file": "apps/api/src/prisma/prisma.module.ts",
+        "hash": "16960547643101127562"
+      },
+      {
+        "file": "apps/api/src/modules/services/services.controller.ts",
+        "hash": "1808536961640525966"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.types.js.map",
+        "hash": "6472540744018671375"
+      },
+      {
+        "file": "node_modules/.prisma/client/default.d.ts",
+        "hash": "6801102947810818358"
+      },
+      {
+        "file": "dist/out-tsc/web-admin/apps/web-admin/src/app/admin-app.component.js.map",
+        "hash": "9729604159364636521"
+      },
+      {
+        "file": "apps/api/src/modules/payments/payments.controller.ts",
+        "hash": "16133612654055920965"
+      },
+      {
+        "file": "apps/web-admin/src/app/appointments/admin-appointments-drawer.component.ts",
+        "hash": "12459386648444335338"
+      },
+      {
+        "file": "dist/apps/api/modules/tenant/tenant.controller.js",
+        "hash": "14224394761570068855"
+      },
+      {
+        "file": "apps/web-public-booking/src/app/core/public-api-config.ts",
+        "hash": "12083928537621078397"
+      },
+      {
+        "file": "apps/api/src/modules/auth/auth.module.ts",
+        "hash": "5835635546343181524"
+      },
+      {
+        "file": "prisma/schema.prisma",
+        "hash": "17346288248897284229"
+      },
+      {
+        "file": "libs/shared/utils/src/index.ts",
+        "hash": "9585344058763437917"
+      },
+      {
+        "file": ".nx/workspace-data/lockfile.hash",
+        "hash": "11672638478905277944"
+      },
+      {
+        "file": "apps/api/src/common/request-session.ts",
+        "hash": "17942072381733915850"
+      },
+      {
+        "file": "dist/apps/api/modules/services/services.module.js",
+        "hash": "12008298049771619397"
+      },
+      {
+        "file": ".angular/cache/18.2.21/web-public-booking/angular-compiler.db-lock",
+        "hash": "13986754098295302766"
+      },
+      {
+        "file": "dist/apps/api/modules/availability/availability.module.js.map",
+        "hash": "6712654573258600587"
+      },
+      {
+        "file": ".env.example",
+        "hash": "14961509850726169721"
+      },
+      {
+        "file": "dist/apps/api/modules/customers/customers.processor.js.map",
+        "hash": "16634177233506865465"
+      },
+      {
+        "file": "apps/api/src/common/correlation-id.interceptor.ts",
+        "hash": "510099333711308665"
+      },
+      {
+        "file": ".nx/workspace-data/parsed-lock-file.json",
+        "hash": "13363258903430987895"
+      },
+      {
+        "file": "apps/web-public-booking/src/styles.css",
+        "hash": "14535128968958905720"
+      },
+      {
+        "file": "apps/api/src/modules/tenant/tenant.module.ts",
+        "hash": "14744622091572222072"
+      },
+      {
+        "file": "dist/apps/web-admin/browser/index.html",
+        "hash": "18416413350423818884"
+      },
+      {
+        "file": "dist/apps/api/modules/collaborators/collaborators.controller.js.map",
+        "hash": "11397043994183334087"
+      },
+      {
+        "file": "dist/apps/web-public-booking/3rdpartylicenses.txt",
+        "hash": "6909525788389296311"
+      },
+      {
+        "file": "dist/apps/api/modules/auth/auth.controller.js",
+        "hash": "18069534294779267256"
+      }
+    ],
+    "projectFileMap": {}
+  }
+}

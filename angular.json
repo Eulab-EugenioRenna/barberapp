@@ -1,0 +1,64 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "newProjectRoot": "apps",
+  "projects": {
+    "web-admin": {
+      "projectType": "application",
+      "root": "apps/web-admin",
+      "sourceRoot": "apps/web-admin/src",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:application",
+          "options": {
+            "outputPath": "dist/apps/web-admin",
+            "index": "apps/web-admin/src/index.html",
+            "browser": "apps/web-admin/src/main.ts",
+            "polyfills": ["zone.js"],
+            "tsConfig": "apps/web-admin/tsconfig.app.json",
+            "inlineStyleLanguage": "css",
+            "assets": [],
+            "styles": ["apps/web-admin/src/styles.css"]
+          }
+        },
+        "serve": {
+          "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "buildTarget": "web-admin:build",
+            "proxyConfig": "apps/web-admin/proxy.conf.json"
+          }
+        }
+      }
+    },
+    "web-public-booking": {
+      "projectType": "application",
+      "root": "apps/web-public-booking",
+      "sourceRoot": "apps/web-public-booking/src",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:application",
+          "options": {
+            "outputPath": "dist/apps/web-public-booking",
+            "index": "apps/web-public-booking/src/index.html",
+            "browser": "apps/web-public-booking/src/main.ts",
+            "polyfills": ["zone.js"],
+            "tsConfig": "apps/web-public-booking/tsconfig.app.json",
+            "inlineStyleLanguage": "css",
+            "assets": [],
+            "styles": ["apps/web-public-booking/src/styles.css"]
+          }
+        },
+        "serve": {
+          "builder": "@angular-devkit/build-angular:dev-server",
+          "options": {
+            "buildTarget": "web-public-booking:build",
+            "proxyConfig": "apps/web-public-booking/proxy.conf.json"
+          }
+        }
+      }
+    }
+  },
+  "cli": {
+    "analytics": false
+  }
+}

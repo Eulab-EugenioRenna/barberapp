@@ -1,0 +1,599 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  platform_admin
+  owner
+  manager
+  collaborator
+  reception
+  client
+}
+
+enum BookingMode {
+  public
+  closed
+  hybrid
+}
+
+enum AppointmentStatus {
+  draft
+  requested
+  confirmed
+  checked_in
+  completed
+  cancelled
+  no_show
+  rescheduled
+}
+
+enum AppointmentSource {
+  public
+  internal
+  import
+  api
+}
+
+enum PaymentStatus {
+  unpaid
+  paid
+  partial
+  refunded
+  cancelled
+}
+
+enum NotificationChannel {
+  email
+  telegram
+  whatsapp
+  in_app
+  webhook
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+  skipped
+}
+
+enum NotificationRecipientType {
+  user
+  collaborator
+  customer
+  webhook
+}
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  suspended
+  cancelled
+}
+
+enum BillingInterval {
+  monthly
+  yearly
+  one_time
+}
+
+model Tenant {
+  id             String          @id @default(uuid())
+  name           String
+  slug           String          @unique
+  publicDomain   String?         @unique
+  defaultCollaboratorId String?
+  isActive       Boolean         @default(true)
+  isSuspended    Boolean         @default(false)
+  suspendedAt    DateTime?
+  suspensionReason String?
+  notes          String?
+  bookingMode    BookingMode     @default(hybrid)
+  publicTitle    String?
+  publicDescription String?
+  publicSteps    String[]        @default([])
+  timezone       String          @default("Europe/Rome")
+  currency       String          @default("EUR")
+  language       String          @default("it")
+  primaryColor   String          @default("#0f766e")
+  accentColor    String          @default("#f59e0b")
+  logoUrl        String?
+  coverUrl       String?
+  publicEnabled  Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  users          User[]
+  collaborators  Collaborator[]
+  customers      Customer[]
+  services       Service[]
+  rooms          Room[]
+  stations       Station[]
+  appointments   Appointment[]
+  products       Product[]
+  sales          Sale[]
+  auditLogs      AuditLog[]
+  notifications  NotificationHistory[]
+  notificationInboxItems NotificationInbox[]
+  notificationPreferenceTenants NotificationPreferenceTenant[]
+  notificationPreferenceUsers NotificationPreferenceUser[]
+  notificationTemplates NotificationTemplate[]
+  notificationProviderConfigs NotificationProviderConfig[]
+  subscriptions  TenantSubscription[]
+  holidays       TenantHoliday[]
+
+  @@index([createdAt])
+  @@index([isActive, isSuspended])
+}
+
+model TenantHoliday {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  date      DateTime
+  name      String
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, date])
+  @@index([tenantId, date])
+}
+
+model User {
+  id           String       @id @default(uuid())
+  tenantId     String?
+  tenant       Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email        String       @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole
+  permissions  String[]     @default([])
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  collaborator Collaborator?
+  notificationInboxItems NotificationInbox[]
+  notificationPreferenceUsers NotificationPreferenceUser[]
+
+  @@index([tenantId, role])
+}
+
+model Collaborator {
+  id              String        @id @default(uuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId          String?       @unique
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  calendarColor   String        @default("#0f766e")
+  isPublic        Boolean       @default(false)
+  isActive        Boolean       @default(true)
+  appointments    Appointment[]
+  sales           Sale[]
+  services        Service[]     @relation("CollaboratorServices")
+  weeklySchedules CollaboratorWeeklySchedule[]
+  dayOverrides    CollaboratorDayOverride[]
+
+  @@index([tenantId, isActive])
+}
+
+model CollaboratorWeeklySchedule {
+  id             String       @id @default(uuid())
+  collaboratorId String
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  weekday        Int
+  isWorkingDay   Boolean      @default(true)
+  startTime      String?
+  endTime        String?
+
+  @@unique([collaboratorId, weekday])
+}
+
+model CollaboratorDayOverride {
+  id             String       @id @default(uuid())
+  collaboratorId String
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  date           DateTime
+  isWorkingDay   Boolean      @default(true)
+  startTime      String?
+  endTime        String?
+  note           String?
+  isHoliday      Boolean      @default(false)
+
+  @@unique([collaboratorId, date])
+}
+
+model Customer {
+  id               String        @id @default(uuid())
+  tenantId         String
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  birthDate        DateTime?
+  tags             String[]      @default([])
+  autoTags         String[]      @default([])
+  loyaltyTier      String?
+  visitsCount      Int           @default(0)
+  completedVisitsCount Int       @default(0)
+  totalSpent       Decimal       @default(0) @db.Decimal(10, 2)
+  lastAlignedAt    DateTime?
+  notes            String?
+  privacyConsent   Boolean       @default(false)
+  marketingConsent Boolean       @default(false)
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  appointments     Appointment[]
+  sales            Sale[]
+
+  @@index([tenantId, email])
+  @@index([tenantId, createdAt])
+}
+
+model Service {
+  id                    String         @id @default(uuid())
+  tenantId              String
+  tenant                Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                  String
+  publicDescription     String?
+  internalDescription   String?
+  durationMinutes       Int
+  bufferBeforeMinutes   Int            @default(0)
+  bufferAfterMinutes    Int            @default(0)
+  basePrice             Decimal        @db.Decimal(10, 2)
+  vatRate               Decimal?       @db.Decimal(5, 2)
+  category              String?
+  requiresCollaborator  Boolean        @default(true)
+  requiresRoom          Boolean        @default(false)
+  requiresStation       Boolean        @default(false)
+  isPublic              Boolean        @default(false)
+  isBookableOnline      Boolean        @default(false)
+  color                 String         @default("#0f766e")
+  isActive              Boolean        @default(true)
+  collaborators         Collaborator[] @relation("CollaboratorServices")
+  appointments          Appointment[]
+  serviceProducts       ServiceProduct[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, isBookableOnline])
+}
+
+model Room {
+  id          String        @id @default(uuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  capacity    Int           @default(1)
+  notes       String?
+  isPublic    Boolean       @default(false)
+  isActive    Boolean       @default(true)
+  stations    Station[]
+  appointments Appointment[]
+
+  @@index([tenantId, isActive])
+}
+
+model Station {
+  id          String        @id @default(uuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roomId      String?
+  room        Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  name        String
+  code        String?
+  isActive    Boolean       @default(true)
+  appointments Appointment[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, roomId])
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  tenantId       String
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer          @relation(fields: [customerId], references: [id])
+  serviceId      String
+  service        Service           @relation(fields: [serviceId], references: [id])
+  collaboratorId String?
+  collaborator   Collaborator?     @relation(fields: [collaboratorId], references: [id], onDelete: SetNull)
+  roomId         String?
+  room           Room?             @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  stationId      String?
+  station        Station?          @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  startsAt       DateTime
+  endsAt         DateTime
+  status         AppointmentStatus @default(draft)
+  source         AppointmentSource @default(internal)
+  estimatedPrice Decimal?          @db.Decimal(10, 2)
+  finalPrice     Decimal?          @db.Decimal(10, 2)
+  customerNotes  String?
+  internalNotes  String?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  sales          Sale[]
+  cancellations  AppointmentCancellation[]
+
+  @@index([tenantId, startsAt])
+  @@index([tenantId, status])
+  @@index([tenantId, collaboratorId, startsAt])
+  @@index([tenantId, customerId])
+  @@index([tenantId, serviceId])
+}
+
+model Product {
+  id              String           @id @default(uuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  imageUrl        String?
+  sku             String?
+  category        String?
+  price           Decimal          @db.Decimal(10, 2)
+  vatRate         Decimal?         @db.Decimal(5, 2)
+  cost            Decimal?         @db.Decimal(10, 2)
+  attributes      Json?
+  isActive        Boolean          @default(true)
+  serviceProducts ServiceProduct[]
+  saleItems       SaleItem[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, sku])
+}
+
+model ServiceProduct {
+  id             String  @id @default(uuid())
+  serviceId      String
+  service        Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mode           String
+  quantity       Int     @default(1)
+  priceLocked    Boolean @default(false)
+
+  @@unique([serviceId, productId])
+}
+
+model Sale {
+  id              String        @id @default(uuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  collaboratorId  String?
+  collaborator    Collaborator? @relation(fields: [collaboratorId], references: [id], onDelete: SetNull)
+  appointmentId   String?
+  appointment     Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  subtotal        Decimal       @db.Decimal(10, 2)
+  discountTotal   Decimal       @default(0) @db.Decimal(10, 2)
+  taxTotal        Decimal       @default(0) @db.Decimal(10, 2)
+  total           Decimal       @db.Decimal(10, 2)
+  paymentStatus   PaymentStatus @default(unpaid)
+  paymentMethod   String?
+  soldAt          DateTime      @default(now())
+  createdById     String?
+  items           SaleItem[]
+
+  @@index([tenantId, soldAt])
+  @@index([tenantId, paymentStatus])
+}
+
+model SaleItem {
+  id          String  @id @default(uuid())
+  saleId      String
+  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(10, 2)
+  discount    Decimal @default(0) @db.Decimal(10, 2)
+  taxTotal    Decimal @default(0) @db.Decimal(10, 2)
+  lineTotal   Decimal @db.Decimal(10, 2)
+}
+
+model AppointmentCancellation {
+  id                String      @id @default(uuid())
+  appointmentId     String
+  appointment       Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  cancelledByType   String
+  cancelledById     String?
+  reason            String?
+  policyResult      String
+  refundStatus      String?
+  cancelledAt       DateTime    @default(now())
+
+  @@index([appointmentId])
+}
+
+model NotificationHistory {
+  id                String              @id @default(uuid())
+  tenantId          String
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipientUserId   String?
+  customerId        String?
+  channel           NotificationChannel
+  providerKey       String?
+  recipientType     NotificationRecipientType?
+  recipientEmail    String?
+  recipientWebhookUrl String?
+  eventType         String
+  templateId        String?
+  payload           Json?
+  status            NotificationStatus  @default(pending)
+  error             String?
+  providerMessageId String?
+  attemptCount      Int                 @default(0)
+  lastAttemptAt     DateTime?
+  nextRetryAt       DateTime?
+  metadata          Json?
+  notificationInboxId String?
+  createdAt         DateTime            @default(now())
+  sentAt            DateTime?
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+}
+
+model NotificationInbox {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipientUserId String
+  recipientUser   User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  eventType       String
+  title           String
+  message         String
+  payload         Json?
+  entityType      String?
+  entityId        String?
+  readAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, recipientUserId, createdAt])
+  @@index([tenantId, recipientUserId, readAt])
+}
+
+model NotificationPreferenceTenant {
+  id                       String              @id @default(uuid())
+  tenantId                 String
+  tenant                   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventType                String
+  channel                  NotificationChannel
+  enabled                  Boolean             @default(true)
+  sendToCustomer           Boolean             @default(false)
+  sendToAssignedCollaborator Boolean           @default(false)
+  sendToOwners             Boolean             @default(true)
+  sendToManagers           Boolean             @default(true)
+  sendToReception          Boolean             @default(true)
+  options                  Json?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  @@unique([tenantId, eventType, channel])
+  @@index([tenantId, channel])
+}
+
+model NotificationPreferenceUser {
+  id          String              @id @default(uuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventType   String
+  channel     NotificationChannel
+  enabled     Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([tenantId, userId, eventType, channel])
+  @@index([tenantId, userId])
+}
+
+model NotificationTemplate {
+  id          String              @id @default(uuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventType   String
+  channel     NotificationChannel
+  subject     String?
+  title       String?
+  body        String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([tenantId, eventType, channel])
+  @@index([eventType, channel])
+}
+
+model NotificationProviderConfig {
+  id          String              @id @default(uuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel     NotificationChannel
+  providerKey String
+  enabled     Boolean             @default(true)
+  config      Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([tenantId, channel])
+  @@index([tenantId, providerKey])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  tenantId       String?
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  actorUserId    String?
+  actorRole      String?
+  action         String
+  entityType     String
+  entityId       String?
+  before         Json?
+  after          Json?
+  ipAddress      String?
+  userAgent      String?
+  correlationId  String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+  @@index([correlationId])
+}
+
+model SubscriptionPlan {
+  id                    String              @id @default(uuid())
+  code                  String              @unique
+  name                  String
+  description           String?
+  price                 Decimal             @default(0) @db.Decimal(10, 2)
+  currency              String              @default("EUR")
+  billingInterval       BillingInterval     @default(monthly)
+  maxUsers              Int?
+  maxCollaborators      Int?
+  maxAppointmentsPerMonth Int?
+  features              Json?
+  isActive              Boolean             @default(true)
+  isPublic              Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  subscriptions         TenantSubscription[]
+
+  @@index([isActive, isPublic])
+}
+
+model TenantSubscription {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  tenant                Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planId                String
+  plan                  SubscriptionPlan    @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status                SubscriptionStatus  @default(trialing)
+  startsAt              DateTime            @default(now())
+  trialEndsAt           DateTime?
+  endsAt                DateTime?
+  suspendedAt           DateTime?
+  cancellationReason    String?
+  externalReference     String?
+  metadata              Json?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([tenantId, status])
+  @@index([planId, status])
+}
