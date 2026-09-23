@@ -1,6 +1,7 @@
 import { Injectable, computed, signal, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 import { AdminApiService } from "../core/admin-api.service";
+import { AdminFacade } from "../core/admin.facade";
 import { AppointmentsService } from "./appointments.service";
 
 type CalendarView = "day" | "week" | "month";
@@ -18,6 +19,7 @@ type QuickRescheduleState = {
 @Injectable()
 export class AppointmentsFacade {
   private readonly adminApi = inject(AdminApiService);
+  private readonly adminFacade = inject(AdminFacade);
   private readonly appointmentsService = inject(AppointmentsService);
 
   private readonly appointmentsState = signal<any[]>([]);
@@ -69,6 +71,13 @@ export class AppointmentsFacade {
     this.services().map((service) => ({
       value: service.id,
       label: service.name,
+    })),
+  );
+
+  readonly appointmentCustomerOptions = computed(() =>
+    this.customers().map((customer) => ({
+      value: customer.id,
+      label: this.appointmentCustomerOptionLabel(customer),
     })),
   );
 
@@ -415,22 +424,27 @@ export class AppointmentsFacade {
 
   replaceSourceData(input: {
     appointments: any[];
-    collaborators: any[];
-    services: any[];
-    customers: any[];
+    collaborators: any;
+    services: any;
+    customers: any;
     tenant: any;
   }): void {
-    this.appointmentsState.set(input.appointments || []);
-    this.collaboratorsState.set(input.collaborators || []);
-    this.servicesState.set(input.services || []);
-    this.customersState.set(input.customers || []);
-    this.tenantState.set(input.tenant || null);
-    this.filteredAppointmentCustomers.set([...(input.customers || [])]);
+    const collaborators = unwrapPage(input.collaborators);
+    const services = unwrapPage(input.services);
+    const customers = unwrapPage(input.customers);
 
-    if (!this.appointmentForm().serviceId && input.services?.[0]) {
+    this.appointmentsState.set(input.appointments || []);
+    this.collaboratorsState.set(collaborators.items);
+    this.servicesState.set(services.items);
+    this.customersState.set(customers.items);
+    this.tenantState.set(input.tenant || null);
+    this.adminFacade.setCoreData(input);
+    this.filteredAppointmentCustomers.set([...customers.items]);
+
+    if (!this.appointmentForm().serviceId && services.items[0]) {
       this.appointmentForm.update((form) => ({
         ...form,
-        serviceId: input.services[0].id,
+        serviceId: services.items[0].id,
       }));
     }
   }
@@ -449,6 +463,12 @@ export class AppointmentsFacade {
         customers: response.customers || [],
         tenant: response.tenant || null,
       });
+      try {
+        await this.adminFacade.refreshStatsData();
+      } catch {
+        // The agenda state is already current; keep it visible if a secondary
+        // dashboard metric cannot be refreshed.
+      }
     } catch (error: any) {
       this.feedback.set(
         error?.error?.message ||
@@ -608,6 +628,30 @@ export class AppointmentsFacade {
     );
   }
 
+  selectAppointmentCustomer(customerId: string): void {
+    const customer = this.customers().find((entry) => entry.id === customerId);
+    if (!customer) return;
+    this.appointmentForm.update((form) => ({
+      ...form,
+      customerId: customer.id,
+      customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+      email: customer.email || "",
+      phone: customer.phone || "",
+    }));
+    this.appointmentCustomerSearch.set(this.appointmentCustomerOptionLabel(customer));
+  }
+
+  selectQuickCreatedEntity(kind: "customer" | "service", entity: any): void {
+    if (kind === "customer") {
+      this.customersState.update((items) => [entity, ...items]);
+      this.selectAppointmentCustomer(entity.id);
+      return;
+    }
+    this.servicesState.update((items) => [...items, entity]);
+    this.setAppointmentValue("serviceId", entity.id);
+    this.updateAppointmentSlots();
+  }
+
   updateAppointmentSlots(): void {
     const form = this.appointmentForm();
 
@@ -623,25 +667,41 @@ export class AppointmentsFacade {
       }));
     }
 
+    const selectedDate = this.appointmentSelectedDate();
+    const collaboratorId = this.appointmentForm().collaboratorId;
     const service = this.services().find(
       (item) => item.id === this.appointmentForm().serviceId,
     );
-    if (
-      !service ||
-      !this.appointmentSelectedDate() ||
-      !this.appointmentForm().collaboratorId
-    ) {
-      this.appointmentSlots.set([]);
-      this.appointmentForm.update((current) => ({ ...current, startsAt: "" }));
+    const currentAppointmentId = this.appointmentForm().id;
+    const currentSelected = this.appointmentForm().startsAt;
+    const currentIsOnSelectedDate =
+      Boolean(currentSelected) &&
+      currentSelected.startsWith(`${selectedDate}T`);
+
+    // Senza servizio, data o collaboratore non possiamo proporre la griglia
+    // degli slot. Se stiamo modificando un appuntamento esistente conserviamo
+    // comunque l'orario reale (es. ordine rapido senza collaboratore), cosi
+    // l'utente puo salvare le altre modifiche senza reinserire l'ora.
+    if (!service || !selectedDate || !collaboratorId) {
+      const preserved = this.preserveCurrentAppointmentSlot(
+        [],
+        currentAppointmentId,
+        currentSelected,
+        currentIsOnSelectedDate,
+      );
+      this.appointmentSlots.set(preserved);
+      if (!preserved.some((slot) => slot.startsAt === currentSelected)) {
+        this.appointmentForm.update((current) => ({
+          ...current,
+          startsAt: "",
+        }));
+      }
       return;
     }
 
     const durationMinutes = Number(service.durationMinutes || 30);
-    const dayStart = new Date(`${this.appointmentSelectedDate()}T00:00`);
-    const dayEnd = new Date(`${this.appointmentSelectedDate()}T23:59:59`);
-    const collaboratorId = this.appointmentForm().collaboratorId;
-    const currentAppointmentId = this.appointmentForm().id;
-    const currentSelected = this.appointmentForm().startsAt;
+    const dayStart = new Date(`${selectedDate}T00:00`);
+    const dayEnd = new Date(`${selectedDate}T23:59:59`);
     const slots: Array<{ startsAt: string; label: string }> = [];
 
     for (let hour = 9; hour < 19; hour += 1) {
@@ -686,11 +746,49 @@ export class AppointmentsFacade {
       }
     }
 
+    this.preserveCurrentAppointmentSlot(
+      slots,
+      currentAppointmentId,
+      currentSelected,
+      currentIsOnSelectedDate,
+    );
     this.appointmentSlots.set(slots);
 
     if (!slots.some((slot) => slot.startsAt === currentSelected)) {
       this.appointmentForm.update((current) => ({ ...current, startsAt: "" }));
     }
+  }
+
+  /**
+   * Gli ordini rapidi generano appuntamenti a consuntivo con orari non
+   * allineati alla griglia di 30 minuti (Now() - durata servizi). Quando si
+   * modifica un appuntamento esistente dobbiamo conservarne l'orario reale
+   * invece di azzerarlo, altrimenti il form obbliga a reinserire l'ora.
+   */
+  private preserveCurrentAppointmentSlot(
+    slots: Array<{ startsAt: string; label: string }>,
+    currentAppointmentId: string,
+    currentSelected: string,
+    currentIsOnSelectedDate: boolean,
+  ): Array<{ startsAt: string; label: string }> {
+    if (
+      currentAppointmentId &&
+      currentIsOnSelectedDate &&
+      currentSelected &&
+      !slots.some((slot) => slot.startsAt === currentSelected)
+    ) {
+      const currentDate = new Date(currentSelected);
+      slots.push({
+        startsAt: currentSelected,
+        label: currentDate.toLocaleTimeString("it-IT", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
+      slots.sort((left, right) => left.startsAt.localeCompare(right.startsAt));
+    }
+
+    return slots;
   }
 
   async saveAppointment(): Promise<string> {
@@ -1036,4 +1134,15 @@ export class AppointmentsFacade {
     const minutes = String(value.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
+}
+
+function unwrapPage(input: any): { items: any[]; hasMore: boolean } {
+  if (Array.isArray(input)) {
+    return { items: input, hasMore: false };
+  }
+
+  return {
+    items: Array.isArray(input?.items) ? input.items : [],
+    hasMore: Boolean(input?.hasMore),
+  };
 }

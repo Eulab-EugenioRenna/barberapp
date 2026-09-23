@@ -10,11 +10,12 @@ import {
   SimpleChanges,
   ViewChild,
 } from "@angular/core";
+import { CalendarInputComponent } from "../calendar-input.component";
 
 @Component({
   selector: "barber-admin-appointments-calendar",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CalendarInputComponent],
   styles: [
     `
       :host {
@@ -99,9 +100,15 @@ import {
         background: rgba(249, 115, 22, 0.08);
       }
 
-      .calendar-drop-surface {
-        position: absolute;
-        inset: -0.5rem;
+      .calendar-drag-ghost {
+        pointer-events: none;
+        z-index: 2;
+        opacity: 0.55;
+        border: 1px dashed rgba(255, 255, 255, 0.65);
+        box-shadow: 0 18px 30px rgba(15, 23, 32, 0.2);
+        transition:
+          top 120ms ease,
+          min-height 120ms ease;
       }
 
       .calendar-current-time-line {
@@ -345,21 +352,29 @@ import {
   ],
   template: `
     <article class="calendar-shell panel rounded-[2rem] p-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p class="eyebrow text-[var(--accent)]">Calendario agenda</p>
           <h3 class="font-display text-3xl">{{ title }}</h3>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button type="button" class="pill-btn" (click)="today.emit()">
-            Oggi
-          </button>
-          <button type="button" class="pill-btn" (click)="navigate.emit(-1)">
-            Prev
-          </button>
-          <button type="button" class="pill-btn" (click)="navigate.emit(1)">
-            Next
-          </button>
+        <div class="ml-auto flex w-full flex-col gap-2 sm:w-auto sm:min-w-[16rem]">
+          <barber-calendar-input
+            [value]="calendarDateKey"
+            (valueChange)="selectDateKey($event)"
+            label="Vai a"
+            placeholder="Seleziona data"
+          ></barber-calendar-input>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="pill-btn" (click)="today.emit()">
+              Oggi
+            </button>
+            <button type="button" class="pill-btn" (click)="navigate.emit(-1)">
+              Prev
+            </button>
+            <button type="button" class="pill-btn" (click)="navigate.emit(1)">
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
@@ -450,7 +465,7 @@ import {
 
             <div class="calendar-day-columns">
               <article
-                *ngFor="let column of dayColumns"
+                *ngFor="let column of dayColumns; trackBy: trackByColumn"
                 class="calendar-day-column"
                 [class.calendar-is-today]="isCurrentCalendarDate()"
                 [class.calendar-is-selected]="isCurrentCalendarDate()"
@@ -492,9 +507,9 @@ import {
                 >
                   <div
                     class="calendar-day-track relative min-h-[55rem] rounded-[1.2rem] bg-white/80"
-                    [class.calendar-drag-preview]="
-                      dragOverKey === 'day:' + column.id
-                    "
+                    (dragover)="handleDayDragOver($event, column)"
+                    (dragleave)="handleDayDragLeave($event, column.id)"
+                    (drop)="handleDrop($event, column.id)"
                   >
                     <div
                       class="calendar-hour-grid absolute inset-0 pointer-events-none"
@@ -526,13 +541,29 @@ import {
                       "
                     ></div>
                     <div
-                      class="calendar-drop-surface"
-                      (dragenter)="dragOverKey = 'day:' + column.id"
-                      (dragover)="handleDragOver($event, 'day:' + column.id)"
-                      (drop)="handleDrop($event, column.id)"
-                    ></div>
+                      *ngIf="
+                        draggedAppointment &&
+                        dayDragPreview &&
+                        dayDragPreview.columnId === column.id
+                      "
+                      class="calendar-drag-ghost absolute left-2 right-2 rounded-[1rem] px-3 py-2 text-left text-white"
+                      [style.top.rem]="dayDragPreview.top"
+                      [style.min-height.rem]="dayDragPreview.height"
+                      [style.background]="dayDragPreview.color"
+                    >
+                      <strong class="block text-sm"
+                        >{{ dayDragPreview.timeLabel }} ·
+                        {{ dayDragPreview.title }}</strong
+                      >
+                      <span class="block text-xs text-white/80">{{
+                        dayDragPreview.subtitle
+                      }}</span>
+                    </div>
                     <button
-                      *ngFor="let appointment of column.appointments"
+                      *ngFor="
+                        let appointment of column.appointments;
+                        trackBy: trackByAppointment
+                      "
                       type="button"
                       class="absolute left-2 right-2 rounded-[1rem] px-3 py-2 text-left text-white shadow-lg"
                       [style.top.rem]="appointment.top"
@@ -540,6 +571,7 @@ import {
                       [style.background]="appointment.color"
                       draggable="true"
                       (dragstart)="handleDragStart($event, appointment.id)"
+                      (dragend)="handleDragEnd()"
                       (click)="appointmentClick.emit(appointment.id)"
                     >
                       <strong class="block text-sm"
@@ -582,7 +614,7 @@ import {
 
             <div class="calendar-week-grid lg:grid-cols-7">
               <article
-                *ngFor="let day of weekDays"
+                *ngFor="let day of weekDays; trackBy: trackByKey"
                 class="calendar-week-day calendar-week-day-card rounded-[1.5rem] border border-[var(--line)]/70 bg-white/80 p-3"
                 [class.calendar-unavailable-day]="day.isUnavailable"
                 [class.calendar-is-today]="day.isToday"
@@ -591,6 +623,7 @@ import {
                   dragOverKey === 'week:' + day.key
                 "
                 (click)="selectCalendarDate(day.date)"
+                (dblclick)="openDayView(day.date)"
                 (dragenter)="dragOverKey = 'week:' + day.key"
                 (dragover)="handleDragOver($event, 'week:' + day.key)"
                 (drop)="handleWeekDrop($event, day)"
@@ -608,7 +641,10 @@ import {
                 <div class="calendar-week-day-scroll">
                   <div class="grid gap-2">
                     <button
-                      *ngFor="let appointment of day.appointments"
+                      *ngFor="
+                        let appointment of day.appointments;
+                        trackBy: trackByAppointment
+                      "
                       type="button"
                       class="rounded-[1rem] px-3 py-2 text-left text-white"
                       [style.background]="appointment.color"
@@ -676,7 +712,7 @@ import {
 
             <div class="calendar-month-grid md:grid-cols-7">
               <article
-                *ngFor="let cell of monthCells"
+                *ngFor="let cell of monthCells; trackBy: trackByKey"
                 class="calendar-month-cell min-h-[9rem] rounded-[1.4rem] border border-[var(--line)]/70 p-3"
                 [class.calendar-month-cell-active]="cell.inMonth"
                 [class.calendar-month-cell-muted]="!cell.inMonth"
@@ -687,6 +723,7 @@ import {
                   dragOverKey === 'month:' + cell.key
                 "
                 (click)="selectCalendarDate(cell.date)"
+                (dblclick)="openDayView(cell.date)"
                 (dragenter)="dragOverKey = 'month:' + cell.key"
                 (dragover)="handleDragOver($event, 'month:' + cell.key)"
                 (drop)="handleMonthDrop($event, cell.date)"
@@ -698,7 +735,10 @@ import {
                 </header>
                 <div class="grid gap-2">
                   <button
-                    *ngFor="let appointment of cell.visibleAppointments"
+                    *ngFor="
+                      let appointment of cell.visibleAppointments;
+                      trackBy: trackByAppointment
+                    "
                     type="button"
                     class="rounded-[0.9rem] px-2 py-1 text-left text-xs text-white"
                     [style.background]="appointment.color"
@@ -753,6 +793,16 @@ export class AdminAppointmentsCalendarComponent
   @Input() weekDays: any[] = [];
   @Input() monthCells: any[] = [];
   dragOverKey = "";
+  draggedAppointment: any = null;
+  dayDragPreview: {
+    columnId: string;
+    top: number;
+    height: number;
+    color: string;
+    timeLabel: string;
+    title: string;
+    subtitle: string;
+  } | null = null;
 
   @Output() viewChange = new EventEmitter<"day" | "week" | "month">();
   @Output() navigate = new EventEmitter<-1 | 1>();
@@ -834,6 +884,45 @@ export class AdminAppointmentsCalendarComponent
     this.calendarDateSelect.emit(new Date(date));
   }
 
+  trackByColumn(_index: number, item: any): string {
+    return item.id;
+  }
+
+  trackByKey(_index: number, item: any): string {
+    return item.key;
+  }
+
+  trackByAppointment(_index: number, item: any): string {
+    return item.id;
+  }
+
+  get calendarDateKey(): string {
+    const date =
+      this.calendarDate instanceof Date
+        ? this.calendarDate
+        : new Date(this.calendarDate);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  selectDateKey(value: string): void {
+    if (!value) {
+      return;
+    }
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(year, (month ?? 1) - 1, day ?? 1);
+    if (!Number.isNaN(date.getTime())) {
+      this.calendarDateSelect.emit(date);
+    }
+  }
+
+  openDayView(date: Date): void {
+    this.calendarDateSelect.emit(new Date(date));
+    this.viewChange.emit("day");
+  }
+
   ngAfterViewInit(): void {
     this.scrollDayViewIntoPosition();
   }
@@ -901,6 +990,7 @@ export class AdminAppointmentsCalendarComponent
     event.dataTransfer?.setData("text/plain", appointmentId);
     const appointment = this.findDraggedAppointment(appointmentId);
     if (appointment) {
+      this.draggedAppointment = appointment;
       event.dataTransfer?.setData(
         "application/json",
         JSON.stringify({
@@ -932,6 +1022,68 @@ export class AdminAppointmentsCalendarComponent
     }
   }
 
+  handleDayDragOver(event: DragEvent, column: any): void {
+    event.preventDefault();
+    if (!this.draggedAppointment) {
+      return;
+    }
+    const track = event.currentTarget as HTMLElement;
+    const rect = track.getBoundingClientRect();
+    if (!rect.height) {
+      return;
+    }
+    const totalSlots = Math.round(
+      (AdminAppointmentsCalendarComponent.DAY_END_MINUTES -
+        AdminAppointmentsCalendarComponent.DAY_START_MINUTES) /
+        30,
+    );
+    const slotPx = rect.height / totalSlots;
+    const heightSlots = Math.max(
+      1,
+      Math.ceil(
+        this.draggedAppointment.height /
+          AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM,
+      ),
+    );
+    const rawIndex = Math.floor((event.clientY - rect.top) / slotPx);
+    const slotIndex = Math.max(
+      0,
+      Math.min(totalSlots - heightSlots, rawIndex),
+    );
+    const totalMinutes =
+      AdminAppointmentsCalendarComponent.DAY_START_MINUTES + slotIndex * 30;
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+    this.dragOverKey = "day:" + column.id;
+    this.dayDragPreview = {
+      columnId: column.id,
+      top:
+        slotIndex * AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM,
+      height: this.draggedAppointment.height,
+      color: this.draggedAppointment.color,
+      timeLabel: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+      title: this.draggedAppointment.title,
+      subtitle: this.draggedAppointment.subtitle,
+    };
+  }
+
+  handleDayDragLeave(event: DragEvent, columnId: string): void {
+    const next = event.relatedTarget as Node | null;
+    const current = event.currentTarget as HTMLElement;
+    if (next && current.contains(next)) {
+      return;
+    }
+    if (this.dayDragPreview?.columnId === columnId) {
+      this.dayDragPreview = null;
+    }
+  }
+
+  handleDragEnd(): void {
+    this.dragOverKey = "";
+    this.draggedAppointment = null;
+    this.dayDragPreview = null;
+  }
+
   clearDragPreview(key: string): void {
     if (this.dragOverKey === key) {
       this.dragOverKey = "";
@@ -941,6 +1093,7 @@ export class AdminAppointmentsCalendarComponent
   handleDrop(event: DragEvent, collaboratorId: string): void {
     event.preventDefault();
     this.dragOverKey = "";
+    this.dayDragPreview = null;
     const payload = this.readDragPayload(event);
     if (!payload) {
       return;

@@ -115,12 +115,17 @@ import { CustomSelectComponent } from "../custom-select.component";
               </label>
             </div>
             <div class="flex flex-wrap gap-3">
-              <button type="submit" class="primary-btn" [disabled]="loading">
+              <button
+                type="submit"
+                class="primary-btn"
+                [disabled]="loading || !tenantFormValid"
+              >
                 Salva tenant
               </button>
               <button
                 type="button"
                 class="pill-btn"
+                [disabled]="loading"
                 (click)="suspendTenant.emit()"
               >
                 Sospendi
@@ -128,6 +133,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               <button
                 type="button"
                 class="pill-btn"
+                [disabled]="loading"
                 (click)="reactivateTenant.emit()"
               >
                 Riattiva
@@ -135,6 +141,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               <button
                 type="button"
                 class="pill-btn"
+                [disabled]="loading"
                 (click)="resetTenantData.emit()"
               >
                 Reset dati
@@ -333,7 +340,11 @@ import { CustomSelectComponent } from "../custom-select.component";
                 ></barber-custom-select>
               </label>
             </div>
-            <button type="submit" class="primary-btn" [disabled]="loading">
+            <button
+              type="submit"
+              class="primary-btn"
+              [disabled]="loading || !planFormValid"
+            >
               {{ platformPlanForm.id ? "Aggiorna piano" : "Crea piano" }}
             </button>
           </form>
@@ -437,6 +448,24 @@ export class AdminPlatformPageComponent {
   @Output() editPlan = new EventEmitter<any>();
   @Output() savePlan = new EventEmitter<void>();
   @Output() saveSubscription = new EventEmitter<void>();
+
+  get tenantFormValid(): boolean {
+    return Boolean(
+      typeof this.platformTenantForm.name === "string" &&
+        this.platformTenantForm.name.trim() &&
+        typeof this.platformTenantForm.slug === "string" &&
+        this.platformTenantForm.slug.trim(),
+    );
+  }
+
+  get planFormValid(): boolean {
+    return Boolean(
+      typeof this.platformPlanForm.code === "string" &&
+        this.platformPlanForm.code.trim() &&
+        typeof this.platformPlanForm.name === "string" &&
+        this.platformPlanForm.name.trim(),
+    );
+  }
 
   formatPlatformTenantStatus(tenant: {
     isSuspended?: boolean;

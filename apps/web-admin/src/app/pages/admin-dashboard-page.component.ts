@@ -1,17 +1,19 @@
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
-import { FormsModule } from "@angular/forms";
 import { AdminMetricsGridComponent } from "../shared/admin-metrics-grid.component";
+import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
+import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 
 @Component({
   selector: "barber-admin-dashboard-page",
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
     AdminMetricsGridComponent,
+    CalendarInputComponent,
     CustomSelectComponent,
+    InfiniteScrollDirective,
   ],
   template: `
     <section class="grid gap-4">
@@ -21,100 +23,183 @@ import { CustomSelectComponent } from "../custom-select.component";
             <p class="eyebrow text-[var(--accent)]">Controllo economico</p>
             <h3 class="font-display text-3xl">Fatturato</h3>
           </div>
-          <button
-            type="button"
-            class="primary-btn"
-            (click)="openQuickOrder.emit()"
-          >
-            + Ordine rapido
-          </button>
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              class="ghost-btn"
+              [disabled]="loading"
+              (click)="resetRevenueFilters.emit()"
+            >
+              Azzera filtri
+            </button>
+            <button
+              type="button"
+              class="primary-btn"
+              (click)="openQuickOrder.emit()"
+            >
+              + Ordine rapido
+            </button>
+          </div>
         </div>
         <div class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label class="field">
             <span>Periodo</span>
             <barber-custom-select
               [value]="revenueFilters.period"
-              (valueChange)="revenueFilters.period = $event"
+              (valueChange)="applyPeriod($event)"
               [options]="periodOptions"
               label="Periodo"
             ></barber-custom-select>
           </label>
           <label class="field" *ngIf="revenueFilters.period !== 'all'">
             <span>Data di riferimento</span>
-            <input
-              [(ngModel)]="revenueFilters.date"
-              name="revenueDate"
-              type="date"
-            />
+            <barber-calendar-input
+              [value]="revenueFilters.date"
+              (valueChange)="applyDate($event)"
+              label="Data"
+              placeholder="Seleziona data"
+            ></barber-calendar-input>
           </label>
           <label class="field">
             <span>Cliente</span>
             <barber-custom-select
               [value]="revenueFilters.customerId"
-              (valueChange)="revenueFilters.customerId = $event"
-              [options]="customerOptions"
+              (valueChange)="applyCustomer($event)"
+              [options]="customerFilterOptions"
               label="Cliente"
               placeholder="Tutti i clienti"
             ></barber-custom-select>
           </label>
           <label class="field">
-            <span>Postazione</span>
+            <span>Collaboratore</span>
             <barber-custom-select
-              [value]="revenueFilters.stationId"
-              (valueChange)="revenueFilters.stationId = $event"
-              [options]="stationOptions"
-              label="Postazione"
-              placeholder="Tutte le postazioni"
+              [value]="revenueFilters.collaboratorId"
+              (valueChange)="applyCollaborator($event)"
+              [options]="collaboratorFilterOptions"
+              label="Collaboratore"
+              placeholder="Tutti i collaboratori"
             ></barber-custom-select>
           </label>
         </div>
-        <button
-          type="button"
-          class="secondary-btn mt-4"
-          [disabled]="loading"
-          (click)="applyRevenueFilters.emit()"
-        >
-          {{ loading ? "Aggiornamento..." : "Applica filtri" }}
-        </button>
       </article>
 
       <barber-admin-metrics-grid
         [metrics]="revenueMetrics"
       ></barber-admin-metrics-grid>
 
-      <div class="grid gap-4 lg:grid-cols-2" *ngIf="revenueReport">
+      <div class="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <article class="panel rounded-[2rem] p-5">
-          <p class="eyebrow text-[var(--accent)]">Clienti</p>
-          <h3 class="font-display text-2xl">Fatturato per cliente</h3>
-          <div class="mt-4 grid max-h-96 gap-2 overflow-auto pr-1">
-            <div *ngFor="let row of revenueReport.byCustomer" class="list-card">
-              <strong>{{ row.label }}</strong
-              ><span>€{{ row.revenue | number: "1.2-2" }}</span>
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="eyebrow text-[var(--accent)]">Movimenti</p>
+              <h3 class="font-display text-2xl">Ordini e prenotazioni</h3>
+            </div>
+            <span class="status-pill status-pill-neutral"
+              >{{ activity.length }}</span
+            >
+          </div>
+          <div class="mt-4 grid max-h-[32rem] gap-2 overflow-auto pr-1">
+            <div
+              *ngFor="let entry of activity"
+              class="list-card items-center"
+            >
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span
+                    class="status-pill"
+                    [ngClass]="
+                      entry.kind === 'appointment'
+                        ? 'status-pill-green'
+                        : 'status-pill-blue'
+                    "
+                    >{{
+                      entry.kind === "appointment"
+                        ? "Prenotazione"
+                        : entry.kind === "combined"
+                          ? "Ordine e prenotazione"
+                          : "Ordine"
+                    }}</span
+                  >
+                  <strong class="truncate">{{ entry.customerName }}</strong>
+                </div>
+                <p class="mt-1 text-sm text-[var(--muted)]">
+                  {{ formatDateTime(entry.occurredAt) }} · {{ entry.detail }}
+                </p>
+                <p
+                  *ngIf="entry.collaboratorName"
+                  class="mt-1 text-xs text-[var(--muted)]"
+                >
+                  {{ entry.collaboratorName }}
+                </p>
+              </div>
+              <div class="text-right">
+                <strong>€{{ entry.amount | number: "1.2-2" }}</strong>
+                <p class="text-sm text-[var(--muted)]">
+                  {{ formatActivityStatus(entry.status) }}
+                </p>
+              </div>
             </div>
             <p
-              *ngIf="!revenueReport.byCustomer?.length"
-              class="text-sm text-[var(--muted)]"
+              *ngIf="!activity.length && !activityLoading"
+              class="rounded-2xl border border-dashed border-[var(--line)] p-4 text-sm text-[var(--muted)]"
             >
-              Nessun fatturato nel periodo selezionato.
+              Nessun ordine o prenotazione nel periodo selezionato.
             </p>
-          </div>
-        </article>
-        <article class="panel rounded-[2rem] p-5">
-          <p class="eyebrow text-[var(--accent)]">Postazioni</p>
-          <h3 class="font-display text-2xl">Fatturato per postazione</h3>
-          <div class="mt-4 grid max-h-96 gap-2 overflow-auto pr-1">
-            <div *ngFor="let row of revenueReport.byStation" class="list-card">
-              <strong>{{ row.label }}</strong
-              ><span>€{{ row.revenue | number: "1.2-2" }}</span>
-            </div>
             <p
-              *ngIf="!revenueReport.byStation?.length"
-              class="text-sm text-[var(--muted)]"
+              *ngIf="activityLoading"
+              class="py-2 text-center text-xs uppercase tracking-wider text-[var(--muted)]"
             >
-              Nessun fatturato associato a postazioni.
+              Caricamento...
             </p>
+            <div
+              *ngIf="activityHasMore"
+              class="h-px w-full"
+              barberInfiniteScroll
+              (loadMore)="loadMoreActivity.emit()"
+            ></div>
           </div>
         </article>
+
+        <div class="grid gap-4">
+          <article class="panel rounded-[2rem] p-5">
+            <p class="eyebrow text-[var(--accent)]">Clienti</p>
+            <h3 class="font-display text-2xl">Fatturato per cliente</h3>
+            <div class="mt-4 grid max-h-72 gap-2 overflow-auto pr-1">
+              <div
+                *ngFor="let row of revenueReport?.byCustomer"
+                class="list-card"
+              >
+                <strong>{{ row.label }}</strong
+                ><span>€{{ row.revenue | number: "1.2-2" }}</span>
+              </div>
+              <p
+                *ngIf="!revenueReport?.byCustomer?.length"
+                class="text-sm text-[var(--muted)]"
+              >
+                Nessun fatturato nel periodo selezionato.
+              </p>
+            </div>
+          </article>
+          <article class="panel rounded-[2rem] p-5">
+            <p class="eyebrow text-[var(--accent)]">Collaboratori</p>
+            <h3 class="font-display text-2xl">Fatturato per collaboratore</h3>
+            <div class="mt-4 grid max-h-72 gap-2 overflow-auto pr-1">
+              <div
+                *ngFor="let row of revenueReport?.byCollaborator"
+                class="list-card"
+              >
+                <strong>{{ row.label }}</strong
+                ><span>€{{ row.revenue | number: "1.2-2" }}</span>
+              </div>
+              <p
+                *ngIf="!revenueReport?.byCollaborator?.length"
+                class="text-sm text-[var(--muted)]"
+              >
+                Nessun fatturato associato a collaboratori.
+              </p>
+            </div>
+          </article>
+        </div>
       </div>
 
       <div class="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -192,18 +277,54 @@ export class AdminDashboardPageComponent {
   @Input() appointments: any[] = [];
   @Input() collaboratorStats: any[] = [];
   @Input() revenueReport: any = null;
+  @Input() activity: any[] = [];
+  @Input() activityHasMore = false;
+  @Input() activityLoading = false;
   @Input() revenueFilters: any = {
     period: "month",
     date: "",
     customerId: "",
-    stationId: "",
+    collaboratorId: "",
   };
   @Input() customerOptions: Array<{ value: string; label: string }> = [];
-  @Input() stationOptions: Array<{ value: string; label: string }> = [];
+  @Input() collaboratorOptions: Array<{ value: string; label: string }> = [];
   @Input() loading = false;
   @Output() editAppointment = new EventEmitter<any>();
   @Output() applyRevenueFilters = new EventEmitter<void>();
+  @Output() resetRevenueFilters = new EventEmitter<void>();
+  @Output() loadMoreActivity = new EventEmitter<void>();
   @Output() openQuickOrder = new EventEmitter<void>();
+
+  get customerFilterOptions(): Array<{ value: string; label: string }> {
+    return [{ value: "", label: "Tutti i clienti" }, ...this.customerOptions];
+  }
+
+  applyPeriod(period: string): void {
+    this.revenueFilters.period = period;
+    this.applyRevenueFilters.emit();
+  }
+
+  applyCustomer(customerId: string): void {
+    this.revenueFilters.customerId = customerId;
+    this.applyRevenueFilters.emit();
+  }
+
+  applyCollaborator(collaboratorId: string): void {
+    this.revenueFilters.collaboratorId = collaboratorId;
+    this.applyRevenueFilters.emit();
+  }
+
+  applyDate(date: string): void {
+    this.revenueFilters.date = date;
+    this.applyRevenueFilters.emit();
+  }
+
+  get collaboratorFilterOptions(): Array<{ value: string; label: string }> {
+    return [
+      { value: "", label: "Tutti i collaboratori" },
+      ...this.collaboratorOptions,
+    ];
+  }
 
   readonly periodOptions = [
     { value: "day", label: "Giorno" },
@@ -236,6 +357,19 @@ export class AdminDashboardPageComponent {
       hour: "2-digit",
       minute: "2-digit",
     });
+  }
+
+  formatDateTime(value: string): string {
+    return new Date(value).toLocaleString("it-IT", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  formatActivityStatus(status: string): string {
+    return (status || "").replace(/_/g, " ");
   }
 
   formatAppointmentStatus(status: string): string {

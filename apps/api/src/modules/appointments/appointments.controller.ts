@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
 import { AppointmentStatus } from "../../common/domain-types";
@@ -19,6 +20,11 @@ import {
   resolveRequestSession,
   requireUser,
 } from "../../common/request-session";
+import {
+  buildPaginatedResult,
+  isPaginationRequested,
+  parsePagination,
+} from "../../common/pagination";
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
 import { NotificationsEventsService } from "../notifications/notifications.events.service";
 import { CollaboratorScheduleService } from "../availability/collaborator-schedule.service";
@@ -82,7 +88,6 @@ export class AppointmentsController {
       endsAt: Date;
       collaboratorId?: string | null;
       roomId?: string | null;
-      stationId?: string | null;
       excludeId?: string;
     },
   ): Promise<void> {
@@ -94,10 +99,6 @@ export class AppointmentsController {
 
     if (input.roomId) {
       resourceClauses.push({ roomId: input.roomId });
-    }
-
-    if (input.stationId) {
-      resourceClauses.push({ stationId: input.stationId });
     }
 
     const overlapping = await this.prisma.appointment.findFirst({
@@ -156,6 +157,7 @@ export class AppointmentsController {
   @Get()
   async findAll(
     @Req() request: { headers: { authorization?: string } },
+    @Query() query: Record<string, string> = {},
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -163,22 +165,57 @@ export class AppointmentsController {
     );
 
     const tenantId = requireTenantId(session);
+    const from = query["from"] ? new Date(query["from"]) : undefined;
+    const to = query["to"] ? new Date(query["to"]) : undefined;
+    const where = {
+      tenantId,
+      ...(from && !Number.isNaN(from.getTime())
+        ? { startsAt: { gte: from } }
+        : {}),
+      ...(to && !Number.isNaN(to.getTime())
+        ? { startsAt: { ...(from ? { gte: from } : {}), lte: to } }
+        : {}),
+    };
+    const paginated = isPaginationRequested(query);
+    const { page, pageSize, skip, take } = parsePagination(query, {
+      defaultPageSize: 50,
+    });
+    const cacheSuffix = paginated
+      ? `:p${page}:s${pageSize}`
+      : `:range:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`;
 
     return this.cacheService.getOrSet(
-      cacheKeys.appointmentsList(tenantId),
+      `${cacheKeys.appointmentsList(tenantId)}${cacheSuffix}`,
       CACHE_TTL_SECONDS.appointments,
-      () =>
-        this.prisma.appointment.findMany({
-          where: { tenantId },
-          orderBy: { startsAt: "asc" },
-          include: {
-            customer: true,
-            service: true,
-            collaborator: true,
-            room: true,
-            station: true,
-          },
-        }),
+      async () => {
+        const include = {
+          customer: true,
+          service: true,
+          collaborator: true,
+          room: true,
+        } as const;
+
+        if (!paginated) {
+          return this.prisma.appointment.findMany({
+            where,
+            orderBy: { startsAt: "asc" },
+            include,
+          });
+        }
+
+        const [items, total] = await Promise.all([
+          this.prisma.appointment.findMany({
+            where,
+            orderBy: { startsAt: "desc" },
+            skip,
+            take,
+            include,
+          }),
+          this.prisma.appointment.count({ where }),
+        ]);
+
+        return buildPaginatedResult(items, total, page, pageSize);
+      },
     );
   }
 
@@ -217,15 +254,12 @@ export class AppointmentsController {
         : undefined;
     const roomId =
       typeof body["roomId"] === "string" ? body["roomId"] : undefined;
-    const stationId =
-      typeof body["stationId"] === "string" ? body["stationId"] : undefined;
 
     await this.ensureNoConflicts(tenantId, {
       startsAt,
       endsAt,
       collaboratorId,
       roomId,
-      stationId,
     });
     await this.ensureWorkingWindow({
       tenantId,
@@ -242,7 +276,6 @@ export class AppointmentsController {
         serviceId,
         collaboratorId,
         roomId,
-        stationId,
         startsAt,
         endsAt,
         status:
@@ -336,7 +369,6 @@ export class AppointmentsController {
             service: true,
             collaborator: true,
             room: true,
-            station: true,
             cancellations: true,
           },
         }),
@@ -384,17 +416,12 @@ export class AppointmentsController {
         : current.collaboratorId;
     const roomId =
       typeof body["roomId"] === "string" ? body["roomId"] : current.roomId;
-    const stationId =
-      typeof body["stationId"] === "string"
-        ? body["stationId"]
-        : current.stationId;
 
     await this.ensureNoConflicts(requireTenantId(session), {
       startsAt,
       endsAt,
       collaboratorId,
       roomId,
-      stationId,
       excludeId: id,
     });
     await this.ensureWorkingWindow({
@@ -411,7 +438,6 @@ export class AppointmentsController {
         serviceId,
         collaboratorId,
         roomId,
-        stationId,
         startsAt,
         endsAt,
         status:

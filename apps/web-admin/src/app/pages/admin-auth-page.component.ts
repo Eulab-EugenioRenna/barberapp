@@ -74,7 +74,7 @@ import { SessionStore } from "../core/session.store";
               class="grid gap-4 md:grid-cols-2"
             >
               <label class="field"
-                ><span>Nome</span
+                ><span>Nome <em class="required-mark" aria-hidden="true">*</em></span
                 ><input
                   [(ngModel)]="signupForm.firstName"
                   name="signupFirstName"
@@ -83,7 +83,7 @@ import { SessionStore } from "../core/session.store";
                   required
               /></label>
               <label class="field"
-                ><span>Cognome</span
+                ><span>Cognome <em class="required-mark" aria-hidden="true">*</em></span
                 ><input
                   [(ngModel)]="signupForm.lastName"
                   name="signupLastName"
@@ -94,7 +94,7 @@ import { SessionStore } from "../core/session.store";
             </div>
 
             <label *ngIf="authMode === 'signup'" class="field">
-              <span>Nome attivita</span>
+              <span>Nome attivita <em class="required-mark" aria-hidden="true">*</em></span>
               <input
                 [(ngModel)]="signupForm.companyName"
                 name="companyName"
@@ -105,7 +105,7 @@ import { SessionStore } from "../core/session.store";
             </label>
 
             <label class="field"
-              ><span>Email</span
+              ><span>Email <em class="required-mark" aria-hidden="true">*</em></span
               ><input
                 [(ngModel)]="loginForm.email"
                 name="loginEmail"
@@ -115,7 +115,7 @@ import { SessionStore } from "../core/session.store";
                 required
             /></label>
             <label class="field"
-              ><span>Password</span
+              ><span>Password <em class="required-mark" aria-hidden="true">*</em></span
               ><input
                 [(ngModel)]="loginForm.password"
                 name="loginPassword"
@@ -127,7 +127,7 @@ import { SessionStore } from "../core/session.store";
             /></label>
 
             <label *ngIf="authMode === 'signup'" class="field">
-              <span>Ripeti password</span>
+              <span>Ripeti password <em class="required-mark" aria-hidden="true">*</em></span>
               <input
                 [(ngModel)]="signupPasswordConfirm"
                 name="signupPasswordConfirm"

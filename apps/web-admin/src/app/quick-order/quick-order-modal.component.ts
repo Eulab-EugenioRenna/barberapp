@@ -4,44 +4,104 @@ import {
   EventEmitter,
   HostListener,
   Input,
+  OnInit,
   Output,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CustomSelectComponent } from "../custom-select.component";
+import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dialog.component";
 
 @Component({
   selector: "barber-quick-order-modal",
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, CustomSelectComponent, QuickCreateDialogComponent],
   templateUrl: "./quick-order-modal.component.html",
   styleUrl: "./quick-order-modal.component.css",
 })
-export class QuickOrderModalComponent {
+export class QuickOrderModalComponent implements OnInit {
   protected readonly Number = Number;
   @Input() customers: any[] = [];
-  @Input() stations: any[] = [];
   @Input() services: any[] = [];
   @Input() products: any[] = [];
+  @Input() collaborators: any[] = [];
+  @Input() appointment: any = null;
   @Input() loading = false;
 
   @Output() close = new EventEmitter<void>();
   @Output() submitOrder = new EventEmitter<Record<string, unknown>>();
+  @Output() catalogChanged = new EventEmitter<void>();
 
   customerId = "";
+  collaboratorId = "";
+  appointmentId = "";
   paymentMethod = "cash";
   items: any[] = [];
   pricePadIndex = -1;
+  quickCreateKind: QuickCreateKind | null = null;
+  private readonly createdCustomers: any[] = [];
+  private readonly createdServices: any[] = [];
+  private readonly createdProducts: any[] = [];
 
   @HostListener("document:keydown.escape")
   closeOnEscape(): void {
     if (!this.loading) this.close.emit();
   }
 
+  ngOnInit(): void {
+    if (!this.appointment) {
+      return;
+    }
+    this.appointmentId = this.appointment.id;
+    this.customerId =
+      this.appointment.customerId || this.appointment.customer?.id || "";
+    this.collaboratorId =
+      this.appointment.collaboratorId ||
+      this.appointment.collaborator?.id ||
+      "";
+    if (this.appointment.service) {
+      this.addService(this.appointment.service);
+    }
+  }
+
   get customerOptions() {
-    return this.customers.map((customer) => ({
+    return this.uniqueEntities([...this.createdCustomers, ...this.customers]).map((customer) => ({
       value: customer.id,
       label: `${customer.firstName} ${customer.lastName}`.trim(),
     }));
+  }
+
+  get collaboratorOptions() {
+    return this.collaborators.map((collaborator) => ({
+      value: collaborator.id,
+      label: `${collaborator.firstName} ${collaborator.lastName}`.trim(),
+    }));
+  }
+
+  get catalogServices(): any[] { return this.uniqueEntities([...this.createdServices, ...this.services]); }
+  get catalogProducts(): any[] { return this.uniqueEntities([...this.createdProducts, ...this.products]); }
+
+  onQuickCreated(event: { kind: QuickCreateKind; entity: any }): void {
+    if (event.kind === "customer") {
+      this.createdCustomers.unshift(event.entity);
+      this.customerId = event.entity.id;
+    } else if (event.kind === "service") {
+      this.createdServices.unshift(event.entity);
+      this.addService(event.entity);
+    } else {
+      this.createdProducts.unshift(event.entity);
+      this.addProduct(event.entity);
+    }
+    this.quickCreateKind = null;
+    this.catalogChanged.emit();
+  }
+
+  private uniqueEntities(items: any[]): any[] {
+    const ids = new Set<string>();
+    return items.filter((item) => {
+      if (!item?.id || ids.has(item.id)) return false;
+      ids.add(item.id);
+      return true;
+    });
   }
 
   get total(): number {
@@ -52,6 +112,40 @@ export class QuickOrderModalComponent {
     );
   }
 
+  get totalServiceDurationMinutes(): number {
+    return this.items.reduce((sum, item) => {
+      if (item.kind !== "service") return sum;
+      const service =
+        this.services.find((entry) => entry.id === item.serviceId) ??
+        this.createdServices.find((entry) => entry.id === item.serviceId);
+      return sum + Number(service?.durationMinutes || 0) * Number(item.quantity || 1);
+    }, 0);
+  }
+
+  /**
+   * L'ordine viene registrato a consuntivo: l'appuntamento termina adesso e
+   * inizia indietro della durata totale dei servizi, cosi il calendario
+   * racconta una storia realistica invece di un blocco a orario fisso.
+   */
+  get appointmentWindowLabel(): string {
+    const durationMinutes = this.totalServiceDurationMinutes;
+    if (!durationMinutes) return "";
+
+    const endsAt = new Date();
+    const startsAt = new Date(endsAt.getTime() - durationMinutes * 60_000);
+    const format = (value: Date) =>
+      value.toLocaleTimeString("it-IT", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+    return `${format(startsAt)} – ${format(endsAt)}`;
+  }
+
+  get isLinkedToAppointment(): boolean {
+    return Boolean(this.appointmentId);
+  }
+
   addService(service: any): void {
     this.items.push({
       kind: "service",
@@ -59,7 +153,6 @@ export class QuickOrderModalComponent {
       label: service.name,
       quantity: 1,
       unitPrice: Number(service.basePrice || 0),
-      stationIds: [],
     });
   }
 
@@ -71,7 +164,6 @@ export class QuickOrderModalComponent {
       label: product.name,
       quantity: 1,
       unitPrice: requiresPrice ? "" : Number(product.price),
-      stationIds: [],
       requiresPrice,
     });
     if (requiresPrice) this.pricePadIndex = this.items.length - 1;
@@ -81,16 +173,6 @@ export class QuickOrderModalComponent {
     this.items.splice(index, 1);
     if (this.pricePadIndex === index) this.pricePadIndex = -1;
     if (this.pricePadIndex > index) this.pricePadIndex -= 1;
-  }
-
-  toggleStation(item: any, stationId: string): void {
-    const selected = new Set(item.stationIds || []);
-    if (selected.has(stationId)) {
-      selected.delete(stationId);
-    } else {
-      selected.add(stationId);
-    }
-    item.stationIds = [...selected];
   }
 
   appendPrice(value: string): void {
@@ -111,7 +193,8 @@ export class QuickOrderModalComponent {
       this.customerId &&
       this.items.length &&
       this.items.every(
-        (item) => item.unitPrice !== "" && Number(item.unitPrice) >= 0,
+        (item) =>
+          item.unitPrice !== "" && Number(item.unitPrice) >= 0,
       ),
     );
   }
@@ -120,6 +203,8 @@ export class QuickOrderModalComponent {
     if (!this.canSubmit()) return;
     this.submitOrder.emit({
       customerId: this.customerId,
+      collaboratorId: this.collaboratorId || undefined,
+      appointmentId: this.appointmentId || undefined,
       paymentStatus: "paid",
       paymentMethod: this.paymentMethod,
       items: this.items.map((item) => ({
@@ -128,7 +213,6 @@ export class QuickOrderModalComponent {
         serviceId: item.serviceId,
         quantity: Number(item.quantity || 1),
         unitPrice: Number(item.unitPrice),
-        stationIds: item.stationIds || [],
       })),
     });
   }

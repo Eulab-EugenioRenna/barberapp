@@ -65,7 +65,6 @@ export type Permission =
   | 'services.manage'
   | 'collaborators.manage'
   | 'rooms.manage'
-  | 'stations.manage'
   | 'products.manage'
   | 'sales.create'
   | 'dashboard.revenue.read'

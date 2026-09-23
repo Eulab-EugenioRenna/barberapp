@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
 import { CacheInvalidationService } from "../../cache/cache-invalidation.service";
@@ -16,6 +17,10 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
+import {
+  buildPaginatedResult,
+  parsePagination,
+} from "../../common/pagination";
 
 @Controller("services")
 export class ServicesController {
@@ -28,6 +33,7 @@ export class ServicesController {
   @Get()
   async findAll(
     @Req() request: { headers: { authorization?: string } },
+    @Query() query: Record<string, string> = {},
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -35,22 +41,33 @@ export class ServicesController {
     );
 
     const tenantId = requireTenantId(session);
+    const { page, pageSize, skip, take } = parsePagination(query, {
+      defaultPageSize: 50,
+    });
 
     return this.cacheService.getOrSet(
-      cacheKeys.servicesList(tenantId),
+      `${cacheKeys.servicesList(tenantId)}:p${page}:s${pageSize}`,
       CACHE_TTL_SECONDS.lists,
-      () =>
-        this.prisma.service.findMany({
-          where: { tenantId },
-          orderBy: [{ isActive: "desc" }, { name: "asc" }],
-          include: {
-            serviceProducts: {
-              include: {
-                product: true,
+      async () => {
+        const [items, total] = await Promise.all([
+          this.prisma.service.findMany({
+            where: { tenantId },
+            orderBy: [{ isActive: "desc" }, { name: "asc" }],
+            skip,
+            take,
+            include: {
+              serviceProducts: {
+                include: {
+                  product: true,
+                },
               },
             },
-          },
-        }),
+          }),
+          this.prisma.service.count({ where: { tenantId } }),
+        ]);
+
+        return buildPaginatedResult(items, total, page, pageSize);
+      },
     );
   }
 

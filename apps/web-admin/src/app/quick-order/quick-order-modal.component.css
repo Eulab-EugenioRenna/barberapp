@@ -7,8 +7,8 @@
   inset: 0;
   z-index: 90;
   display: grid;
-  place-items: end center;
-  padding: 1rem;
+  place-items: center;
+  padding: clamp(1rem, 5vw, 5rem);
 }
 .quick-order-backdrop {
   position: absolute;
@@ -20,12 +20,16 @@
 .quick-order-sheet {
   position: relative;
   width: min(1180px, 100%);
-  max-height: calc(100vh - 2rem);
+  height: min(780px, 100%);
+  max-height: 100%;
+  margin: 0;
+  box-sizing: border-box;
   overflow: auto;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 2rem;
   background: #f7f3ea;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.38);
+  padding: 0;
 }
 .quick-order-header {
   position: sticky;
@@ -145,8 +149,7 @@
   grid-template-columns: 90px 1fr;
   gap: 0.75rem;
 }
-.cart-line-fields label,
-.station-picker {
+.cart-line-fields label {
   display: grid;
   gap: 0.35rem;
   font-size: 0.72rem;
@@ -159,23 +162,6 @@
   padding: 0.7rem;
   color: #fff;
   background: rgba(0, 0, 0, 0.2);
-}
-.station-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-.station-chips button {
-  padding: 0.5rem 0.7rem;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  color: rgba(255, 255, 255, 0.72);
-  background: transparent;
-}
-.station-chips button.selected {
-  border-color: #f59e0b;
-  color: #111;
-  background: #f59e0b;
 }
 .price-pad {
   padding: 1rem;
@@ -228,11 +214,15 @@
 }
 @media (max-width: 820px) {
   .quick-order-overlay {
+    place-items: stretch;
     padding: 0;
   }
   .quick-order-sheet {
+    width: 100%;
     max-height: 100vh;
+    margin: 0;
     border-radius: 0;
+    padding: 1rem;
   }
   .quick-order-layout {
     grid-template-columns: 1fr;

@@ -35,7 +35,10 @@ export class CustomersAlignmentService {
       CUSTOMERS_ALIGNMENT_QUEUE,
       { tenantId, reason: "daily_get" },
       {
-        jobId: `customers-alignment:${tenantId}:${today}`,
+        // BullMQ rejects custom job IDs containing ':'. This runs in the
+        // customer read/create path, so a rejected job must never turn a
+        // successfully persisted customer into an HTTP 500.
+        jobId: `customers-alignment-${tenantId}-${today}`,
         removeOnComplete: 100,
         removeOnFail: 100,
       },
@@ -52,7 +55,7 @@ export class CustomersAlignmentService {
       CUSTOMERS_ALIGNMENT_QUEUE,
       { tenantId, customerId, reason },
       {
-        jobId: `customers-alignment:${tenantId}:${customerId}:${reason}`,
+        jobId: `customers-alignment-${tenantId}-${customerId}-${reason}`,
         removeOnComplete: 100,
         removeOnFail: 100,
       },

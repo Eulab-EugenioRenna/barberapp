@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
 import { CacheInvalidationService } from "../../cache/cache-invalidation.service";
@@ -16,6 +17,11 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
+import {
+  buildPaginatedResult,
+  parsePagination,
+} from "../../common/pagination";
+import { resolveSaleItemLabels } from "../sales/sales.logic";
 import { CustomersAlignmentService } from "./customers-alignment.service";
 
 @Controller("customers")
@@ -30,6 +36,7 @@ export class CustomersController {
   @Get()
   async findAll(
     @Req() request: { headers: { authorization?: string } },
+    @Query() query: Record<string, string> = {},
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -40,14 +47,38 @@ export class CustomersController {
 
     await this.customersAlignmentService.ensureDailyAlignmentQueued(tenantId);
 
+    const { page, pageSize, skip, take } = parsePagination(query);
+    const search = (query["search"] ?? query["q"] ?? "").trim();
+    const where = {
+      tenantId,
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search, mode: "insensitive" as const } },
+              { lastName: { contains: search, mode: "insensitive" as const } },
+              { email: { contains: search, mode: "insensitive" as const } },
+              { phone: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
+
     return this.cacheService.getOrSet(
-      cacheKeys.customersList(tenantId),
+      `${cacheKeys.customersList(tenantId)}:p${page}:s${pageSize}:q${search.toLowerCase()}`,
       CACHE_TTL_SECONDS.lists,
-      () =>
-        this.prisma.customer.findMany({
-          where: { tenantId },
-          orderBy: { createdAt: "desc" },
-        }),
+      async () => {
+        const [items, total] = await Promise.all([
+          this.prisma.customer.findMany({
+            where,
+            orderBy: { createdAt: "desc" },
+            skip,
+            take,
+          }),
+          this.prisma.customer.count({ where }),
+        ]);
+
+        return buildPaginatedResult(items, total, page, pageSize);
+      },
     );
   }
 
@@ -166,7 +197,7 @@ export class CustomersController {
       cacheKeys.customerHistory(tenantId, id),
       CACHE_TTL_SECONDS.lists,
       async () => {
-        const [appointments, sales] = await Promise.all([
+        const [appointments, salesRaw] = await Promise.all([
           this.prisma.appointment.findMany({
             where: { customerId: id, tenantId },
             orderBy: { startsAt: "desc" },
@@ -183,17 +214,22 @@ export class CustomersController {
                 include: {
                   product: true,
                   service: true,
-                  stations: { include: { station: true } },
                 },
               },
             },
           }),
         ]);
 
+        const sales = salesRaw.map((sale) => ({
+          ...sale,
+          items: resolveSaleItemLabels(sale.items),
+        }));
+
         return {
           customerId: id,
           appointments,
           sales,
+          timeline: buildCustomerTimeline(appointments, sales),
           salesTotal: sales.reduce(
             (total, sale) =>
               ["paid", "partial"].includes(sale.paymentStatus)
@@ -223,4 +259,55 @@ export class CustomersController {
 
     return { id, removed: true };
   }
+}
+
+function dayKey(value: Date | string): string {
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+export function buildCustomerTimeline(
+  appointments: Array<Record<string, any>>,
+  sales: Array<Record<string, any>>,
+): Array<{
+  date: string;
+  appointments: Array<Record<string, any>>;
+  sales: Array<Record<string, any>>;
+  salesTotal: number;
+}> {
+  const groups = new Map<
+    string,
+    {
+      date: string;
+      appointments: Array<Record<string, any>>;
+      sales: Array<Record<string, any>>;
+      salesTotal: number;
+    }
+  >();
+
+  const ensureGroup = (date: string) => {
+    const existing = groups.get(date);
+    if (existing) {
+      return existing;
+    }
+
+    const created = { date, appointments: [], sales: [], salesTotal: 0 };
+    groups.set(date, created);
+    return created;
+  };
+
+  for (const appointment of appointments) {
+    ensureGroup(dayKey(appointment["startsAt"])).appointments.push(appointment);
+  }
+
+  for (const sale of sales) {
+    const group = ensureGroup(dayKey(sale["soldAt"]));
+    group.sales.push(sale);
+    if (["paid", "partial"].includes(sale["paymentStatus"])) {
+      group.salesTotal += Number(sale["total"] ?? 0);
+    }
+  }
+
+  return [...groups.values()].sort((left, right) =>
+    right.date.localeCompare(left.date),
+  );
 }

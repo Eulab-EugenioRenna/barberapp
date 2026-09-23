@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
 import { CacheInvalidationService } from "../../cache/cache-invalidation.service";
@@ -16,10 +17,15 @@ import {
   requireUser,
   resolveRequestSession,
 } from "../../common/request-session";
+import {
+  buildPaginatedResult,
+  parsePagination,
+} from "../../common/pagination";
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
 import {
   calculateRetroactiveAppointment,
   normalizeOrderItems,
+  resolveSaleLabels,
 } from "./sales.logic";
 
 @Controller("sales")
@@ -34,33 +40,47 @@ export class SalesController {
   @Get()
   async findAll(
     @Req() request: { headers: { authorization?: string } },
+    @Query() query: Record<string, string> = {},
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    const { page, pageSize, skip, take } = parsePagination(query);
 
     return this.cacheService.getOrSet(
-      cacheKeys.salesList(tenantId),
+      `${cacheKeys.salesList(tenantId)}:p${page}:s${pageSize}`,
       CACHE_TTL_SECONDS.lists,
-      () =>
-        this.prisma.sale.findMany({
-          where: { tenantId },
-          orderBy: { soldAt: "desc" },
-          include: {
-            items: {
-              include: {
-                product: true,
-                service: true,
-                stations: { include: { station: true } },
+      async () => {
+        const [items, total] = await Promise.all([
+          this.prisma.sale.findMany({
+            where: { tenantId },
+            orderBy: { soldAt: "desc" },
+            skip,
+            take,
+            include: {
+              items: {
+                include: {
+                  product: true,
+                  service: true,
+                },
               },
+              customer: true,
+              collaborator: true,
+              appointment: true,
             },
-            customer: true,
-            collaborator: true,
-            appointment: true,
-          },
-        }),
+          }),
+          this.prisma.sale.count({ where: { tenantId } }),
+        ]);
+
+        return buildPaginatedResult(
+          items.map((sale) => resolveSaleLabels(sale)),
+          total,
+          page,
+          pageSize,
+        );
+      },
     );
   }
 
@@ -102,14 +122,10 @@ export class SalesController {
       throw new BadRequestException("Aggiungi almeno un servizio o prodotto");
     }
 
-    const [products, services, stations, customer, collaborator, appointment] =
+    const [products, services, customer, collaborator, appointment] =
       await Promise.all([
         this.prisma.product.findMany({ where: { tenantId, isActive: true } }),
         this.prisma.service.findMany({ where: { tenantId, isActive: true } }),
-        this.prisma.station.findMany({
-          where: { tenantId, isActive: true },
-          select: { id: true },
-        }),
         customerId
           ? this.prisma.customer.findFirst({
               where: { id: customerId, tenantId, isActive: true },
@@ -146,7 +162,6 @@ export class SalesController {
         items: itemsInput,
         products,
         services,
-        validStationIds: new Set(stations.map((station) => station.id)),
       });
     } catch (error) {
       throw new BadRequestException(
@@ -200,7 +215,6 @@ export class SalesController {
             customerId,
             serviceId: firstServiceItem.serviceId as string,
             collaboratorId,
-            stationId: firstServiceItem.stationIds[0],
             startsAt: retroactiveAppointment.startsAt,
             endsAt: retroactiveAppointment.endsAt,
             status: "completed",
@@ -218,7 +232,7 @@ export class SalesController {
         resolvedAppointmentId = generatedAppointment.id;
       }
 
-      return transaction.sale.create({
+      const createdSale = await transaction.sale.create({
         data: {
           tenantId,
           customerId,
@@ -236,12 +250,7 @@ export class SalesController {
           soldAt,
           createdById: user.id,
           items: {
-            create: normalizedItems.map(({ stationIds, ...item }) => ({
-              ...item,
-              stations: stationIds.length
-                ? { create: stationIds.map((stationId) => ({ stationId })) }
-                : undefined,
-            })),
+            create: normalizedItems,
           },
         },
         include: {
@@ -249,7 +258,6 @@ export class SalesController {
             include: {
               product: true,
               service: true,
-              stations: { include: { station: true } },
             },
           },
           customer: true,
@@ -257,6 +265,18 @@ export class SalesController {
           appointment: true,
         },
       });
+
+      if (resolvedAppointmentId) {
+        await transaction.appointment.updateMany({
+          where: {
+            id: resolvedAppointmentId,
+            status: { notIn: ["cancelled", "no_show"] },
+          },
+          data: { finalPrice: total, status: "completed" },
+        });
+      }
+
+      return createdSale;
     });
 
     await Promise.all([
@@ -294,22 +314,24 @@ export class SalesController {
     return this.cacheService.getOrSet(
       cacheKeys.saleDetail(tenantId, id),
       CACHE_TTL_SECONDS.lists,
-      () =>
-        this.prisma.sale.findFirst({
+      async () => {
+        const sale = await this.prisma.sale.findFirst({
           where: { id, tenantId },
           include: {
             items: {
               include: {
                 product: true,
                 service: true,
-                stations: { include: { station: true } },
               },
             },
             customer: true,
             collaborator: true,
             appointment: true,
           },
-        }),
+        });
+
+        return sale ? resolveSaleLabels(sale) : sale;
+      },
     );
   }
 }

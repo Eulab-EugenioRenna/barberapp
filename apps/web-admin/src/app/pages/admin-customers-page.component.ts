@@ -1,28 +1,34 @@
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 
 @Component({
   selector: "barber-admin-customers-page",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, InfiniteScrollDirective],
   template: `
-    <section class="grid gap-4 xl:grid-cols-2">
+    <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-5">
         <div class="flex items-center justify-between gap-3">
           <div>
             <p class="eyebrow text-[var(--accent)]">CRM</p>
             <h3 class="font-display text-3xl">Clienti</h3>
           </div>
-          <span class="status-pill status-pill-neutral"
-            >{{ customers.length }} contatti</span
-          >
+          <div class="flex items-center gap-2">
+            <button type="button" class="primary-btn" (click)="openNew()">
+              + Nuovo cliente
+            </button>
+            <span class="status-pill status-pill-neutral"
+              >{{ customers.length }} contatti</span
+            >
+          </div>
         </div>
         <label class="field mt-5">
           <span>Cerca cliente</span>
           <input
             [(ngModel)]="customerQuery"
-            (ngModelChange)="customerLimit = 100"
+            (ngModelChange)="searchChange.emit($event)"
             name="customerSearch"
             type="search"
             autocomplete="off"
@@ -31,10 +37,10 @@ import { FormsModule } from "@angular/forms";
         </label>
         <div class="mt-5 grid gap-3">
           <button
-            *ngFor="let customer of visibleCustomers; trackBy: trackById"
+            *ngFor="let customer of customers; trackBy: trackById"
             type="button"
             class="list-card text-left"
-            (click)="edit.emit(customer)"
+            (click)="openEdit(customer)"
           >
             <div>
               <strong>{{ customer.firstName }} {{ customer.lastName }}</strong>
@@ -59,37 +65,66 @@ import { FormsModule } from "@angular/forms";
             </div>
           </button>
           <article
-            *ngIf="!customers.length"
+            *ngIf="!customers.length && !loading"
             class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
           >
-            Nessun cliente. Usa “Nuovo cliente” per creare il primo contatto.
+            Nessun cliente trovato. Usa “+ Nuovo cliente” per creare il primo
+            contatto.
           </article>
-          <article
-            *ngIf="customers.length && !filteredCustomers.length"
-            class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
+          <p
+            *ngIf="hasMore"
+            class="text-center text-xs uppercase tracking-wider text-[var(--muted)]"
           >
-            Nessun cliente corrisponde alla ricerca.
-          </article>
-          <button
-            *ngIf="visibleCustomers.length < filteredCustomers.length"
-            type="button"
-            class="secondary-btn justify-self-start"
-            (click)="customerLimit = customerLimit + 100"
-          >
-            Mostra altri clienti
-          </button>
+            Scorri per caricare altri clienti
+          </p>
+          <div
+            *ngIf="hasMore"
+            class="h-px w-full"
+            barberInfiniteScroll
+            (loadMore)="loadMore.emit()"
+          ></div>
         </div>
       </article>
+    </section>
 
-      <article class="dark-panel rounded-[2rem] p-5 text-white">
-        <p class="eyebrow text-white/45">CRUD clienti</p>
-        <h3 class="font-display text-3xl">
-          {{ customerForm.id ? "Modifica cliente" : "Nuovo cliente" }}
-        </h3>
-        <form class="mt-5 grid gap-4" (ngSubmit)="save.emit()">
+    <div *ngIf="formOpen" class="confirm-overlay">
+      <button
+        type="button"
+        class="confirm-backdrop"
+        (click)="formOpen = false"
+        aria-label="Chiudi modulo cliente"
+      ></button>
+      <article
+        class="confirm-dialog panel max-h-[85vh] overflow-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="customer-form-title"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="eyebrow text-[var(--accent)]">Cliente</p>
+            <h2
+              id="customer-form-title"
+              class="mt-2 font-display text-3xl"
+            >
+              {{ customerForm.id ? "Modifica cliente" : "Nuovo cliente" }}
+            </h2>
+          </div>
+          <button
+            type="button"
+            class="pill-btn"
+            (click)="formOpen = false"
+          >
+            Chiudi
+          </button>
+        </div>
+
+        <form class="mt-5 grid gap-4" (ngSubmit)="submit()">
           <div class="grid gap-4 md:grid-cols-2">
             <label class="field">
-              <span>Nome</span>
+              <span
+                >Nome <em class="required-mark" aria-hidden="true">*</em></span
+              >
               <input
                 [(ngModel)]="customerForm.firstName"
                 name="customerFirstName"
@@ -98,7 +133,10 @@ import { FormsModule } from "@angular/forms";
               />
             </label>
             <label class="field">
-              <span>Cognome</span>
+              <span
+                >Cognome
+                <em class="required-mark" aria-hidden="true">*</em></span
+              >
               <input
                 [(ngModel)]="customerForm.lastName"
                 name="customerLastName"
@@ -155,11 +193,17 @@ import { FormsModule } from "@angular/forms";
               *ngIf="customerForm.id"
               type="button"
               class="pill-btn"
-              (click)="remove.emit(customerForm)"
+              [disabled]="loading"
+              (click)="removeCustomer()"
             >
               Elimina cliente
             </button>
-            <button type="button" class="secondary-btn" (click)="reset.emit()">
+            <button
+              type="button"
+              class="secondary-btn"
+              [disabled]="loading"
+              (click)="openNew()"
+            >
               Nuovo cliente
             </button>
           </div>
@@ -167,76 +211,158 @@ import { FormsModule } from "@angular/forms";
 
         <section
           *ngIf="customerForm.id"
-          class="mt-6 border-t border-white/10 pt-5"
+          class="mt-6 border-t border-[var(--line)] pt-5"
         >
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="eyebrow text-white/45">Timeline</p>
+              <p class="eyebrow text-[var(--muted)]">Timeline</p>
               <h4 class="font-display text-2xl">Storico cliente</h4>
             </div>
             <strong *ngIf="customerHistory"
               >€{{ customerHistory.salesTotal | number: "1.2-2" }}</strong
             >
           </div>
-          <p *ngIf="historyLoading" class="mt-4 text-sm text-white/60">
+          <p *ngIf="historyLoading" class="mt-4 text-sm text-[var(--muted)]">
             Caricamento storico...
           </p>
           <div
             *ngIf="!historyLoading"
             class="mt-4 grid max-h-[28rem] gap-3 overflow-auto pr-1"
           >
-            <article
-              *ngFor="let appointment of customerHistory?.appointments"
-              class="rounded-2xl border border-white/10 p-4"
+            <button
+              *ngFor="let entry of historyTimeline; trackBy: trackByDate"
+              type="button"
+              class="list-card text-left"
+              (click)="openTimelineEntry(entry)"
             >
-              <span class="text-xs uppercase tracking-wider text-white/45"
-                >Prenotazione · {{ appointment.status }}</span
-              >
-              <strong class="mt-1 block">{{
-                appointment.service?.name
-              }}</strong>
-              <p class="text-sm text-white/65">
-                {{ formatDateTime(appointment.startsAt) }} ·
-                {{ appointment.collaborator?.firstName || "Non assegnato" }}
-              </p>
-            </article>
-            <article
-              *ngFor="let sale of customerHistory?.sales"
-              class="rounded-2xl border border-white/10 p-4"
-            >
-              <span class="text-xs uppercase tracking-wider text-white/45"
-                >Ordine · {{ sale.paymentStatus }}</span
-              >
-              <strong class="mt-1 block"
-                >€{{ sale.total | number: "1.2-2" }}</strong
-              >
-              <p class="text-sm text-white/65">
-                {{ formatDateTime(sale.soldAt) }} ·
-                {{ sale.items?.length || 0 }} righe
-              </p>
-              <p class="mt-1 text-xs text-white/50">
-                {{ saleItemLabels(sale) }}
-              </p>
-            </article>
+              <div>
+                <strong>{{ formatDay(entry.date) }}</strong>
+                <p class="mt-1 text-sm text-[var(--muted)]">
+                  <span *ngIf="entry.appointments.length"
+                    >{{ entry.appointments.length }} prenotazione/i</span
+                  >
+                  <span
+                    *ngIf="entry.appointments.length && entry.sales.length"
+                    > · </span
+                  >
+                  <span *ngIf="entry.sales.length"
+                    >{{ entry.sales.length }} ordine/i</span
+                  >
+                </p>
+              </div>
+              <div class="text-right">
+                <strong *ngIf="entry.sales.length"
+                  >€{{ entry.salesTotal | number: "1.2-2" }}</strong
+                >
+                <p class="text-xs text-[var(--muted)]">Apri dettaglio</p>
+              </div>
+            </button>
             <p
-              *ngIf="
-                !customerHistory?.appointments?.length &&
-                !customerHistory?.sales?.length
-              "
-              class="text-sm text-white/60"
+              *ngIf="!historyTimeline.length"
+              class="text-sm text-[var(--muted)]"
             >
               Nessuna attività registrata.
             </p>
           </div>
         </section>
       </article>
-    </section>
+    </div>
+
+    <div *ngIf="timelineEntry" class="confirm-overlay">
+      <button
+        type="button"
+        class="confirm-backdrop"
+        (click)="closeTimelineEntry()"
+        aria-label="Chiudi dettaglio storico"
+      ></button>
+      <article
+        class="confirm-dialog panel max-h-[85vh] overflow-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-modal-title"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="eyebrow text-[var(--accent)]">Storico cliente</p>
+            <h2
+              id="history-modal-title"
+              class="mt-2 font-display text-3xl"
+            >
+              {{ formatDay(timelineEntry.date) }}
+            </h2>
+          </div>
+          <button
+            type="button"
+            class="pill-btn"
+            (click)="closeTimelineEntry()"
+          >
+            Chiudi
+          </button>
+        </div>
+
+        <section *ngIf="timelineEntry.appointments.length" class="mt-6">
+          <h3 class="font-display text-xl">Prenotazioni</h3>
+          <article
+            *ngFor="let appointment of timelineEntry.appointments"
+            class="mt-3 rounded-2xl border border-[var(--line)] p-4"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <strong>{{ appointment.service?.name || "Servizio" }}</strong>
+              <span class="status-pill status-pill-neutral">{{
+                appointment.status
+              }}</span>
+            </div>
+            <p class="mt-1 text-sm text-[var(--muted)]">
+              {{ formatDateTime(appointment.startsAt) }}
+              <span *ngIf="appointment.endsAt">
+                - {{ formatTime(appointment.endsAt) }}</span
+              >
+              ·
+              {{ appointment.collaborator?.firstName || "Non assegnato" }}
+            </p>
+            <p
+              *ngIf="appointment.customerNotes"
+              class="mt-2 text-sm text-[var(--muted)]"
+            >
+              Note: {{ appointment.customerNotes }}
+            </p>
+          </article>
+        </section>
+
+        <section *ngIf="timelineEntry.sales.length" class="mt-6">
+          <h3 class="font-display text-xl">Ordini</h3>
+          <article
+            *ngFor="let sale of timelineEntry.sales"
+            class="mt-3 rounded-2xl border border-[var(--line)] p-4"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <strong>€{{ sale.total | number: "1.2-2" }}</strong>
+              <span class="status-pill status-pill-neutral">{{
+                sale.paymentStatus
+              }}</span>
+            </div>
+            <p class="mt-1 text-sm text-[var(--muted)]">
+              {{ formatDateTime(sale.soldAt) }} ·
+              {{ sale.paymentMethod || "metodo non indicato" }}
+            </p>
+            <ul class="mt-2 grid gap-1 text-sm text-[var(--muted)]">
+              <li *ngFor="let item of sale.items">
+                {{ item.quantity }} ×
+                {{ item.service?.name || item.product?.name || item.label }}
+                <span>€{{ item.lineTotal | number: "1.2-2" }}</span>
+              </li>
+            </ul>
+          </article>
+        </section>
+      </article>
+    </div>
   `,
 })
 export class AdminCustomersPageComponent {
   @Input() customers: any[] = [];
   @Input() customerForm: any = {};
   @Input() loading = false;
+  @Input() hasMore = false;
   @Input() historyLoading = false;
   @Input() customerHistory: any = null;
 
@@ -244,30 +370,53 @@ export class AdminCustomersPageComponent {
   @Output() save = new EventEmitter<void>();
   @Output() remove = new EventEmitter<any>();
   @Output() reset = new EventEmitter<void>();
+  @Output() loadMore = new EventEmitter<void>();
+  @Output() searchChange = new EventEmitter<string>();
 
   customerQuery = "";
-  customerLimit = 100;
+  formOpen = false;
+  timelineEntry: any = null;
 
-  get filteredCustomers(): any[] {
-    const query = this.customerQuery.trim().toLocaleLowerCase("it-IT");
-    if (!query) {
-      return this.customers;
-    }
-    return this.customers.filter((customer) =>
-      [customer.firstName, customer.lastName, customer.email, customer.phone]
-        .filter(Boolean)
-        .join(" ")
-        .toLocaleLowerCase("it-IT")
-        .includes(query),
-    );
+  get historyTimeline(): any[] {
+    return Array.isArray(this.customerHistory?.timeline)
+      ? this.customerHistory.timeline
+      : [];
   }
 
-  get visibleCustomers(): any[] {
-    return this.filteredCustomers.slice(0, this.customerLimit);
+  openEdit(customer: any): void {
+    this.edit.emit(customer);
+    this.formOpen = true;
+  }
+
+  openNew(): void {
+    this.reset.emit();
+    this.formOpen = true;
+  }
+
+  submit(): void {
+    this.save.emit();
+    this.formOpen = false;
+  }
+
+  removeCustomer(): void {
+    this.formOpen = false;
+    this.remove.emit(this.customerForm);
+  }
+
+  openTimelineEntry(entry: any): void {
+    this.timelineEntry = entry;
+  }
+
+  closeTimelineEntry(): void {
+    this.timelineEntry = null;
   }
 
   trackById(_index: number, item: any): string {
     return item.id;
+  }
+
+  trackByDate(_index: number, entry: any): string {
+    return entry.date;
   }
 
   get formValid(): boolean {
@@ -277,10 +426,26 @@ export class AdminCustomersPageComponent {
     );
   }
 
+  formatDay(value: string): string {
+    return new Date(`${value}T00:00:00`).toLocaleDateString("it-IT", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  }
+
   formatDateTime(value: string): string {
     return new Date(value).toLocaleString("it-IT", {
       dateStyle: "short",
       timeStyle: "short",
+    });
+  }
+
+  formatTime(value: string): string {
+    return new Date(value).toLocaleTimeString("it-IT", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }
 

@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit, inject } from "@angular/core";
+import { Component, EventEmitter, OnInit, Output, inject } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import { AdminAppointmentsDrawerComponent } from "./admin-appointments-drawer.component";
 import { AdminAppointmentsQuickRescheduleModalComponent } from "./admin-appointments-quick-reschedule-modal.component";
@@ -7,6 +7,7 @@ import { AdminAppointmentsPageComponent } from "../pages/admin-appointments-page
 import { AdminAppointmentsCalendarComponent } from "./admin-appointments-calendar.component";
 import { AppointmentsCollaboratorMultiSelectComponent } from "./appointments-collaborator-multi-select.component";
 import { AppointmentsFacade } from "./appointments.facade";
+import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dialog.component";
 
 @Component({
   selector: "barber-admin-appointments-feature-page",
@@ -18,6 +19,7 @@ import { AppointmentsFacade } from "./appointments.facade";
     AdminAppointmentsPageComponent,
     AdminAppointmentsCalendarComponent,
     AppointmentsCollaboratorMultiSelectComponent,
+    QuickCreateDialogComponent,
   ],
   providers: [AppointmentsFacade],
   template: `
@@ -120,14 +122,9 @@ import { AppointmentsFacade } from "./appointments.facade";
           <barber-admin-appointments-page
             [appointments]="appointmentsFacade.listAppointments()"
             [appointmentForm]="appointmentsFacade.appointmentForm()"
-            [appointmentCustomerSearch]="
-              appointmentsFacade.appointmentCustomerSearch()
-            "
+            [appointmentCustomerOptions]="appointmentsFacade.appointmentCustomerOptions()"
             (appointmentValueChange)="
               appointmentsFacade.setAppointmentValue($event.key, $event.value)
-            "
-            [filteredAppointmentCustomers]="
-              appointmentsFacade.filteredAppointmentCustomers()
             "
             [serviceSelectOptions]="appointmentsFacade.serviceSelectOptions()"
             [appointmentCollaboratorOptions]="
@@ -145,9 +142,8 @@ import { AppointmentsFacade } from "./appointments.facade";
             "
             [loading]="appointmentsFacade.loading()"
             (editAppointment)="appointmentsFacade.editAppointment($event)"
-            (appointmentCustomerInput)="
-              appointmentsFacade.handleAppointmentCustomerInput($event)
-            "
+            (appointmentCustomerSelect)="appointmentsFacade.selectAppointmentCustomer($event)"
+            (quickCreate)="quickCreateKind = $event"
             (appointmentSelectedDateChange)="
               appointmentsFacade.setAppointmentSelectedDate($event)
             "
@@ -169,6 +165,7 @@ import { AppointmentsFacade } from "./appointments.facade";
         (close)="closeDrawer()"
         (details)="openDetails($event)"
         (edit)="editAppointmentById($event)"
+        (createOrder)="createOrder.emit($event)"
       ></barber-admin-appointments-drawer>
 
       <barber-admin-appointments-quick-reschedule-modal
@@ -185,6 +182,12 @@ import { AppointmentsFacade } from "./appointments.facade";
           appointmentsFacade.setQuickRescheduleValue($event.key, $event.value)
         "
       ></barber-admin-appointments-quick-reschedule-modal>
+      <barber-quick-create-dialog
+        *ngIf="quickCreateKind"
+        [kind]="quickCreateKind"
+        (cancel)="quickCreateKind = null"
+        (created)="onQuickCreated($event.kind, $event.entity)"
+      ></barber-quick-create-dialog>
     </section>
   `,
   styles: [
@@ -263,7 +266,14 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
   readonly appointmentsFacade = inject(AppointmentsFacade);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  @Output() createOrder = new EventEmitter<any>();
   activeTab: "calendar" | "list" = "calendar";
+  quickCreateKind: QuickCreateKind | null = null;
+
+  onQuickCreated(kind: "customer" | "service", entity: any): void {
+    this.appointmentsFacade.selectQuickCreatedEntity(kind, entity);
+    this.quickCreateKind = null;
+  }
 
   async ngOnInit(): Promise<void> {
     await this.reloadViewData();

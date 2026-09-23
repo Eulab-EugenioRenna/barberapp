@@ -50,7 +50,7 @@ Le modifiche ai file locali vengono riutilizzate dai container senza rifare l'im
 
 Nota:
 
-- `docker compose up` ora esegue automaticamente `prisma generate`, `prisma db push` e `seed:platform-demo` prima di avviare l'API.
+- `docker compose up` ora esegue automaticamente `prisma generate`, un bootstrap Prisma verificato e `seed:platform-demo` prima di avviare l'API. Il bootstrap crea lo schema da zero su un volume nuovo; su un volume legacy senza cronologia registra soltanto la baseline e poi applica le migrazioni mancanti. Se rileva uno stato non riconosciuto, si ferma senza modificare dati. Non usare `prisma db push --force-reset` su un database con dati.
 - Il seed e idempotente: ricrea in modo coerente l'accesso `platform_admin` e il tenant demo vendibile.
 
 ## Accesso unico via Nginx

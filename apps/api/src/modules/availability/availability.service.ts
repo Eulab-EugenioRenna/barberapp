@@ -102,20 +102,11 @@ export class AvailabilityService {
       }
     }
 
-    const [roomCount, stationCount] = await Promise.all([
-      service.requiresRoom
-        ? this.prisma.room.count({ where: { tenantId, isActive: true } })
-        : Promise.resolve(0),
-      service.requiresStation
-        ? this.prisma.station.count({ where: { tenantId, isActive: true } })
-        : Promise.resolve(0),
-    ]);
+    const roomCount = service.requiresRoom
+      ? await this.prisma.room.count({ where: { tenantId, isActive: true } })
+      : 0;
 
     if (service.requiresRoom && roomCount === 0) {
-      return [];
-    }
-
-    if (service.requiresStation && stationCount === 0) {
       return [];
     }
 
@@ -149,7 +140,6 @@ export class AvailabilityService {
       select: {
         collaboratorId: true,
         roomId: true,
-        stationId: true,
         startsAt: true,
         endsAt: true,
         service: {
@@ -157,7 +147,6 @@ export class AvailabilityService {
             bufferBeforeMinutes: true,
             bufferAfterMinutes: true,
             requiresRoom: true,
-            requiresStation: true,
           },
         },
       },
@@ -306,16 +295,8 @@ export class AvailabilityService {
             (appointment) =>
               appointment.roomId || appointment.service.requiresRoom,
           ).length;
-          const stationConflicts = overlappingAppointments.filter(
-            (appointment) =>
-              appointment.stationId || appointment.service.requiresStation,
-          ).length;
 
           if (service.requiresRoom && roomConflicts >= roomCount) {
-            continue;
-          }
-
-          if (service.requiresStation && stationConflicts >= stationCount) {
             continue;
           }
 

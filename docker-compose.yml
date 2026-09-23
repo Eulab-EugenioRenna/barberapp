@@ -48,7 +48,7 @@ services:
           - api
     restart: unless-stopped
     command: >-
-      sh -c "until nc -z postgres 5432; do sleep 2; done && npm run prisma:generate && npx prisma db push --accept-data-loss && npm run seed:platform-demo && npm run serve:api"
+      sh -c "until nc -z postgres 5432; do sleep 2; done && npm run prisma:generate && npm run prisma:deploy && npm run seed:platform-demo && npm run serve:api"
     volumes:
       - .:/app
       - uploads_data:/app/uploads

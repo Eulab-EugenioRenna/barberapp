@@ -5,6 +5,8 @@
 @tailwind utilities;
 
 :root {
+  --ui-scale: 0.92;
+  font-size: 14.72px;
   --ink: #14181f;
   --muted: #5f6876;
   --line: rgba(20, 24, 31, 0.08);
@@ -47,6 +49,14 @@ html,
 body {
   width: 100%;
   height: 100%;
+  overflow: hidden;
+}
+
+app-root,
+barber-public-root {
+  display: block;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
 }
 
@@ -94,7 +104,7 @@ select:focus-visible {
 }
 
 .public-shell {
-  width: 100%;
+  width: 100vw;
   height: 100vh;
   overflow: hidden;
   background:
@@ -196,6 +206,19 @@ select:focus-visible {
   font-weight: 700;
 }
 
+.required-mark {
+  margin-left: 0.15rem;
+  color: #dc2626;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.field input:user-invalid,
+.field select:user-invalid {
+  border-color: rgba(220, 38, 38, 0.6);
+  box-shadow: 0 0 0 0.2rem rgba(220, 38, 38, 0.08);
+}
+
 .field input,
 .field select {
   width: 100%;
@@ -210,6 +233,12 @@ select:focus-visible {
   outline: none;
   border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.34);
   box-shadow: 0 0 0 0.25rem rgba(var(--brand-rgb, 28, 124, 100), 0.1);
+}
+
+.field input:focus:user-invalid,
+.field select:focus:user-invalid {
+  border-color: rgba(220, 38, 38, 0.7);
+  box-shadow: 0 0 0 0.25rem rgba(220, 38, 38, 0.1);
 }
 
 .service-card {

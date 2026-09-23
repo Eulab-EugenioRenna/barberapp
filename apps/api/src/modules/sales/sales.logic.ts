@@ -21,8 +21,39 @@ export type NormalizedOrderItem = {
   discount: number;
   taxTotal: number;
   lineTotal: number;
-  stationIds: string[];
 };
+
+export type LabelResolvableItem = {
+  label?: string | null;
+  product?: { name?: string | null } | null;
+  service?: { name?: string | null } | null;
+};
+
+/**
+ * The stored `label` is only a fallback snapshot taken when the order was
+ * created. The display label must always be resolved from the linked catalog
+ * entity so renames show up immediately; the snapshot is used only when the
+ * product/service has been deleted (FK set to null).
+ */
+export function resolveSaleItemLabel(item: LabelResolvableItem): string {
+  return item.service?.name ?? item.product?.name ?? item.label ?? "Articolo";
+}
+
+export function resolveSaleItemLabels<T extends LabelResolvableItem>(
+  items: T[],
+): Array<Omit<T, "label"> & { label: string }> {
+  return items.map((item) => ({ ...item, label: resolveSaleItemLabel(item) }));
+}
+
+export function resolveSaleLabels<T extends { items?: LabelResolvableItem[] }>(
+  entity: T,
+): T {
+  if (!entity || !Array.isArray(entity.items)) {
+    return entity;
+  }
+
+  return { ...entity, items: resolveSaleItemLabels(entity.items) as T["items"] };
+}
 
 export function calculateRetroactiveAppointment(input: {
   soldAt: Date;
@@ -58,7 +89,6 @@ export function normalizeOrderItems(input: {
   items: OrderItemInput[];
   products: ProductCatalogEntry[];
   services: ServiceCatalogEntry[];
-  validStationIds: Set<string>;
 }): NormalizedOrderItem[] {
   return input.items.map((item, index) => {
     const productId =
@@ -93,16 +123,6 @@ export function normalizeOrderItems(input: {
     );
     const discount = Math.max(0, money(item["discount"]));
     const taxTotal = Math.max(0, money(item["taxTotal"]));
-    const stationIds = Array.isArray(item["stationIds"])
-      ? [
-          ...new Set(
-            item["stationIds"].filter(
-              (value): value is string =>
-                typeof value === "string" && value.length > 0,
-            ),
-          ),
-        ]
-      : [];
 
     if (unitPrice < 0) {
       throw new Error(`Riga ${index + 1}: prezzo non valido`);
@@ -112,15 +132,6 @@ export function normalizeOrderItems(input: {
         `Riga ${index + 1}: lo sconto supera il valore della riga`,
       );
     }
-    if (stationIds.some((id) => !input.validStationIds.has(id))) {
-      throw new Error(`Riga ${index + 1}: postazione non valida`);
-    }
-    if (kind === "product" && stationIds.length) {
-      throw new Error(
-        `Riga ${index + 1}: le postazioni sono disponibili solo per i servizi`,
-      );
-    }
-
     return {
       productId: product?.id,
       serviceId: service?.id,
@@ -130,7 +141,6 @@ export function normalizeOrderItems(input: {
       discount,
       taxTotal,
       lineTotal: quantity * unitPrice - discount,
-      stationIds,
     };
   });
 }

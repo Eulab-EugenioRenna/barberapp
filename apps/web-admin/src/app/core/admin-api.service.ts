@@ -7,6 +7,9 @@ import { ADMIN_API_URL } from "./api-config";
 export class AdminApiService {
   private readonly http = inject(HttpClient);
 
+  readonly listPageSize = 50;
+  readonly catalogPageSize = 200;
+
   loadAdminData(): Observable<Record<string, unknown>> {
     return forkJoin({
       tenant: this.http.get(`${ADMIN_API_URL}/tenant/settings`),
@@ -19,11 +22,11 @@ export class AdminApiService {
       ),
       serviceStats: this.http.get(`${ADMIN_API_URL}/dashboard/services`),
       appointments: this.http.get(`${ADMIN_API_URL}/appointments`),
-      sales: this.http.get(`${ADMIN_API_URL}/sales`),
-      services: this.http.get(`${ADMIN_API_URL}/services`),
-      products: this.http.get(`${ADMIN_API_URL}/products`),
-      collaborators: this.http.get(`${ADMIN_API_URL}/collaborators`),
-      customers: this.http.get(`${ADMIN_API_URL}/customers`),
+      sales: this.loadSalesPage(1),
+      services: this.loadServicesPage(1),
+      products: this.loadProductsPage(1),
+      collaborators: this.loadCollaboratorsPage(1),
+      customers: this.loadCustomersPage(1),
     });
   }
 
@@ -31,10 +34,56 @@ export class AdminApiService {
     return forkJoin({
       tenant: this.http.get(`${ADMIN_API_URL}/tenant/settings`),
       appointments: this.http.get(`${ADMIN_API_URL}/appointments`),
-      services: this.http.get(`${ADMIN_API_URL}/services`),
-      collaborators: this.http.get(`${ADMIN_API_URL}/collaborators`),
-      customers: this.http.get(`${ADMIN_API_URL}/customers`),
+      services: this.loadServicesPage(1),
+      collaborators: this.loadCollaboratorsPage(1),
+      customers: this.loadCustomersPage(1),
     });
+  }
+
+  loadCustomersPage(
+    page: number,
+    search = "",
+  ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
+    const query = new URLSearchParams({
+      page: String(page),
+      pageSize: String(this.listPageSize),
+    });
+    if (search) {
+      query.set("search", search);
+    }
+    return this.http.get<any>(`${ADMIN_API_URL}/customers?${query.toString()}`);
+  }
+
+  loadSalesPage(
+    page: number,
+  ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
+    return this.http.get<any>(
+      `${ADMIN_API_URL}/sales?page=${page}&pageSize=${this.listPageSize}`,
+    );
+  }
+
+  loadServicesPage(
+    page: number,
+  ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
+    return this.http.get<any>(
+      `${ADMIN_API_URL}/services?page=${page}&pageSize=${this.catalogPageSize}`,
+    );
+  }
+
+  loadProductsPage(
+    page: number,
+  ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
+    return this.http.get<any>(
+      `${ADMIN_API_URL}/products?page=${page}&pageSize=${this.catalogPageSize}`,
+    );
+  }
+
+  loadCollaboratorsPage(
+    page: number,
+  ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
+    return this.http.get<any>(
+      `${ADMIN_API_URL}/collaborators?page=${page}&pageSize=${this.catalogPageSize}`,
+    );
   }
 
   loadShellData(): Observable<Record<string, unknown>> {
@@ -47,9 +96,9 @@ export class AdminApiService {
     return forkJoin({
       tenant: this.http.get(`${ADMIN_API_URL}/tenant/settings`),
       appointments: this.http.get(`${ADMIN_API_URL}/appointments`),
-      services: this.http.get(`${ADMIN_API_URL}/services`),
-      collaborators: this.http.get(`${ADMIN_API_URL}/collaborators`),
-      customers: this.http.get(`${ADMIN_API_URL}/customers`),
+      services: this.loadServicesPage(1),
+      collaborators: this.loadCollaboratorsPage(1),
+      customers: this.loadCustomersPage(1),
     });
   }
 
@@ -63,8 +112,8 @@ export class AdminApiService {
         `${ADMIN_API_URL}/dashboard/collaborators`,
       ),
       serviceStats: this.http.get(`${ADMIN_API_URL}/dashboard/services`),
-      sales: this.http.get(`${ADMIN_API_URL}/sales`),
-      products: this.http.get(`${ADMIN_API_URL}/products`),
+      sales: this.loadSalesPage(1),
+      products: this.loadProductsPage(1),
     });
   }
 
@@ -240,6 +289,21 @@ export class AdminApiService {
     ).toString();
     return this.http.get(
       `${ADMIN_API_URL}/dashboard/revenue${query ? `?${query}` : ""}`,
+    );
+  }
+
+  loadDashboardActivity(
+    filters: Record<string, string>,
+    page: number,
+    pageSize = 20,
+  ): Observable<{ items: any[]; hasMore: boolean; page: number }> {
+    const query = new URLSearchParams(
+      Object.entries(filters).filter(([, value]) => Boolean(value)),
+    );
+    query.set("page", String(page));
+    query.set("pageSize", String(pageSize));
+    return this.http.get<any>(
+      `${ADMIN_API_URL}/dashboard/activity?${query.toString()}`,
     );
   }
 

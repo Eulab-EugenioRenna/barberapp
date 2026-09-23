@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from "@angular/core";
-import { firstValueFrom } from "rxjs";
+import { catchError, firstValueFrom, forkJoin, of } from "rxjs";
 import { AdminApiService } from "./admin-api.service";
 import { AuthApiService } from "./auth-api.service";
 import { SessionStore } from "./session.store";
@@ -28,6 +28,26 @@ export class AdminFacade {
   readonly platformTenants = signal<any[]>([]);
   readonly platformPlans = signal<any[]>([]);
   readonly platformSubscriptions = signal<any[]>([]);
+  readonly customersHasMore = signal(false);
+  readonly salesHasMore = signal(false);
+  readonly servicesHasMore = signal(false);
+  readonly productsHasMore = signal(false);
+  readonly collaboratorsHasMore = signal(false);
+  private readonly loadedPages = {
+    customers: 1,
+    sales: 1,
+    services: 1,
+    products: 1,
+    collaborators: 1,
+  };
+  private customerSearch = "";
+  readonly dashboardData = computed(() => ({
+    revenueMetrics: this.revenueMetrics(),
+    revenueReport: this.revenueReport(),
+    appointmentStats: this.appointmentStats(),
+    appointments: this.appointments(),
+    collaboratorStats: this.collaboratorStats(),
+  }));
 
   async refreshAll(): Promise<{
     mode: "platform" | "tenant" | "unauthenticated";
@@ -53,29 +73,20 @@ export class AdminFacade {
         return { mode: "platform" };
       }
 
-      const coreResponse: any = await firstValueFrom(
-        this.adminApi.loadAdminCoreData(),
+      const { coreResponse, statsResponse }: any = await firstValueFrom(
+        forkJoin({
+          coreResponse: this.adminApi.loadAdminCoreData(),
+          // A failed secondary report must not discard the operational data.
+          statsResponse: this.adminApi.loadAdminStatsData().pipe(
+            catchError(() => of(null)),
+          ),
+        }),
       );
-      this.tenant.set(coreResponse.tenant);
-      this.appointments.set(coreResponse.appointments as any[]);
-      this.services.set(coreResponse.services as any[]);
-      this.collaborators.set(coreResponse.collaborators as any[]);
-      this.customers.set(coreResponse.customers as any[]);
+      this.setCoreData(coreResponse);
 
-      void firstValueFrom(this.adminApi.loadAdminStatsData()).then(
-        (statsResponse: any) => {
-          this.revenueReport.set(statsResponse.revenue || null);
-          this.revenueMetrics.set(statsResponse.revenue?.metrics || []);
-          this.appointmentStats.set(statsResponse.appointmentStats);
-          this.collaboratorStats.set(statsResponse.collaboratorStats as any[]);
-          this.serviceStats.set(statsResponse.serviceStats as any[]);
-          this.sales.set(statsResponse.sales as any[]);
-          this.products.set(statsResponse.products as any[]);
-        },
-        () => {
-          // Keep core data rendered even if secondary stats fail.
-        },
-      );
+      if (statsResponse) {
+        this.setStatsData(statsResponse);
+      }
 
       return { mode: "tenant" };
     } finally {
@@ -119,7 +130,146 @@ export class AdminFacade {
     this.feedback.set(message);
   }
 
+  setRevenueReport(report: any): void {
+    this.revenueReport.set(report || null);
+    this.revenueMetrics.set(report?.metrics || []);
+  }
+
+  setCoreData(input: Record<string, any>): void {
+    this.tenant.set(input["tenant"] || null);
+    this.appointments.set(input["appointments"] || []);
+
+    const services = unwrapPage(input["services"]);
+    this.services.set(services.items);
+    this.servicesHasMore.set(services.hasMore);
+    this.loadedPages.services = 1;
+
+    const collaborators = unwrapPage(input["collaborators"]);
+    this.collaborators.set(collaborators.items);
+    this.collaboratorsHasMore.set(collaborators.hasMore);
+    this.loadedPages.collaborators = 1;
+
+    const customers = unwrapPage(input["customers"]);
+    this.customers.set(customers.items);
+    this.customersHasMore.set(customers.hasMore);
+    this.loadedPages.customers = 1;
+  }
+
+  async refreshStatsData(): Promise<void> {
+    const statsResponse: any = await firstValueFrom(
+      this.adminApi.loadAdminStatsData(),
+    );
+    this.setStatsData(statsResponse);
+  }
+
+  private setStatsData(statsResponse: any): void {
+    this.revenueReport.set(statsResponse.revenue || null);
+    this.revenueMetrics.set(statsResponse.revenue?.metrics || []);
+    this.appointmentStats.set(statsResponse.appointmentStats);
+    this.collaboratorStats.set(statsResponse.collaboratorStats || []);
+    this.serviceStats.set(statsResponse.serviceStats || []);
+
+    const sales = unwrapPage(statsResponse.sales);
+    this.sales.set(sales.items);
+    this.salesHasMore.set(sales.hasMore);
+    this.loadedPages.sales = 1;
+
+    const products = unwrapPage(statsResponse.products);
+    this.products.set(products.items);
+    this.productsHasMore.set(products.hasMore);
+    this.loadedPages.products = 1;
+  }
+
+  async reloadCustomers(search = ""): Promise<void> {
+    this.customerSearch = search;
+    const response = await firstValueFrom(
+      this.adminApi.loadCustomersPage(1, search),
+    );
+    this.customers.set(response?.items || []);
+    this.customersHasMore.set(Boolean(response?.hasMore));
+    this.loadedPages.customers = 1;
+  }
+
+  async loadMoreCustomers(): Promise<void> {
+    if (!this.customersHasMore()) {
+      return;
+    }
+    const nextPage = this.loadedPages.customers + 1;
+    const response = await firstValueFrom(
+      this.adminApi.loadCustomersPage(nextPage, this.customerSearch),
+    );
+    this.customers.update((items) => [...items, ...(response?.items || [])]);
+    this.customersHasMore.set(Boolean(response?.hasMore));
+    this.loadedPages.customers = nextPage;
+  }
+
+  async loadMoreSales(): Promise<void> {
+    if (!this.salesHasMore()) {
+      return;
+    }
+    const nextPage = this.loadedPages.sales + 1;
+    const response = await firstValueFrom(this.adminApi.loadSalesPage(nextPage));
+    this.sales.update((items) => [...items, ...(response?.items || [])]);
+    this.salesHasMore.set(Boolean(response?.hasMore));
+    this.loadedPages.sales = nextPage;
+  }
+
+  async loadMoreProducts(): Promise<void> {
+    if (!this.productsHasMore()) {
+      return;
+    }
+    const nextPage = this.loadedPages.products + 1;
+    const response = await firstValueFrom(
+      this.adminApi.loadProductsPage(nextPage),
+    );
+    this.products.update((items) => [...items, ...(response?.items || [])]);
+    this.productsHasMore.set(Boolean(response?.hasMore));
+    this.loadedPages.products = nextPage;
+  }
+
+  async loadMoreServices(): Promise<void> {
+    if (!this.servicesHasMore()) {
+      return;
+    }
+    const nextPage = this.loadedPages.services + 1;
+    const response = await firstValueFrom(
+      this.adminApi.loadServicesPage(nextPage),
+    );
+    this.services.update((items) => [...items, ...(response?.items || [])]);
+    this.servicesHasMore.set(Boolean(response?.hasMore));
+    this.loadedPages.services = nextPage;
+  }
+
+  async loadMoreCollaborators(): Promise<void> {
+    if (!this.collaboratorsHasMore()) {
+      return;
+    }
+    const nextPage = this.loadedPages.collaborators + 1;
+    const response = await firstValueFrom(
+      this.adminApi.loadCollaboratorsPage(nextPage),
+    );
+    this.collaborators.update((items) => [...items, ...(response?.items || [])]);
+    this.collaboratorsHasMore.set(Boolean(response?.hasMore));
+    this.loadedPages.collaborators = nextPage;
+  }
+
   clearSession(): void {
     this.sessionStore.clear();
   }
+}
+
+function unwrapPage(input: any): {
+  items: any[];
+  hasMore: boolean;
+  total: number;
+} {
+  if (Array.isArray(input)) {
+    return { items: input, hasMore: false, total: input.length };
+  }
+
+  return {
+    items: Array.isArray(input?.items) ? input.items : [],
+    hasMore: Boolean(input?.hasMore),
+    total: Number(input?.total ?? 0),
+  };
 }

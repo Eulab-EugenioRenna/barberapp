@@ -420,7 +420,6 @@ export class PlatformAdminService {
       await tx.notificationTemplate.deleteMany({ where: { tenantId } });
       await tx.notificationProviderConfig.deleteMany({ where: { tenantId } });
       await tx.product.deleteMany({ where: { tenantId } });
-      await tx.station.deleteMany({ where: { tenantId } });
       await tx.room.deleteMany({ where: { tenantId } });
       await tx.service.deleteMany({ where: { tenantId } });
       await tx.customer.deleteMany({ where: { tenantId } });

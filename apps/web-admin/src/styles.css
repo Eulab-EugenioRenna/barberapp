@@ -5,6 +5,8 @@
 @tailwind utilities;
 
 :root {
+  --ui-scale: 0.92;
+  font-size: 14.72px;
   --bg: #f4f1ea;
   --ink: #0f1720;
   --muted: #5f6876;
@@ -338,6 +340,8 @@ textarea:focus-visible {
 
 .sidebar-nav {
   display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
   gap: 0.5rem;
   flex: 1 1 auto;
   min-height: 0;
@@ -549,6 +553,22 @@ textarea:focus-visible {
   line-height: 1.2;
 }
 
+.required-mark {
+  margin-left: 0.15rem;
+  color: #dc2626;
+  font-style: normal;
+  font-weight: 800;
+}
+
+/* Errore di validazione coerente tra i browser: niente bordo rosso nativo
+   casuale, compare solo dopo l'interazione dell'utente. */
+.field input:user-invalid,
+.field select:user-invalid,
+.field textarea:user-invalid {
+  border-color: rgba(220, 38, 38, 0.6);
+  box-shadow: 0 0 0 0.2rem rgba(220, 38, 38, 0.08);
+}
+
 .field input,
 .field select,
 .field textarea {
@@ -588,6 +608,7 @@ textarea:focus-visible {
 .field-actions-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.75rem;
 }
 
@@ -709,6 +730,13 @@ textarea:focus-visible {
   box-shadow: 0 0 0 0.25rem rgba(28, 124, 100, 0.1);
 }
 
+.field input:focus:user-invalid,
+.field select:focus:user-invalid,
+.field textarea:focus:user-invalid {
+  border-color: rgba(220, 38, 38, 0.7);
+  box-shadow: 0 0 0 0.25rem rgba(220, 38, 38, 0.1);
+}
+
 .checkbox-field {
   grid-template-columns: auto 1fr;
   align-items: center;
@@ -724,9 +752,15 @@ textarea:focus-visible {
 .secondary-btn,
 .pill-btn,
 .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   border: 0;
   cursor: pointer;
   min-height: 2.75rem;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .primary-btn:disabled,
@@ -766,9 +800,40 @@ button:disabled {
   font-weight: 700;
 }
 
-.secondary-btn {
-  background: rgba(255, 255, 255, 0.08);
+/* Su superfici scure i pulsanti secondari devono restare leggibili. */
+.dark-panel .secondary-btn,
+.dark-panel .pill-btn,
+.hero-panel .secondary-btn,
+.hero-panel .pill-btn,
+.sidebar .secondary-btn,
+.sidebar .pill-btn {
+  background: rgba(255, 255, 255, 0.12);
   color: white;
+}
+
+.dark-panel .secondary-btn:hover,
+.dark-panel .pill-btn:hover,
+.hero-panel .secondary-btn:hover,
+.hero-panel .pill-btn:hover,
+.sidebar .secondary-btn:hover,
+.sidebar .pill-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ghost-btn {
+  border: 0.0625rem solid var(--line);
+  border-radius: 999rem;
+  background: transparent;
+  padding: 0.8rem 1rem;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+
+.ghost-btn:hover {
+  transform: translateY(-0.125rem);
+  background: rgba(15, 23, 32, 0.04);
 }
 
 .icon-btn {
@@ -779,6 +844,15 @@ button:disabled {
   border-radius: 999rem;
   background: rgba(255, 255, 255, 0.08);
   color: inherit;
+}
+
+.sidebar-toggle {
+  background: #ffffff;
+  color: #0f1720;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .list-card {

@@ -47,6 +47,7 @@ import {
         min-height: 0;
         overflow: auto;
         padding-right: 0.25rem;
+        align-content: start;
       }
 
       .drawer-card {
@@ -177,6 +178,13 @@ import {
 
       <div class="flex flex-wrap gap-3">
         <button
+          type="button"
+          class="primary-btn"
+          (click)="createOrder.emit(appointment)"
+        >
+          Registra ordine
+        </button>
+        <button
           *ngIf="mode === 'preview'"
           type="button"
           class="primary-btn"
@@ -201,6 +209,7 @@ export class AdminAppointmentsDrawerComponent {
   @Output() close = new EventEmitter<void>();
   @Output() details = new EventEmitter<string>();
   @Output() edit = new EventEmitter<string>();
+  @Output() createOrder = new EventEmitter<any>();
 
   @HostListener("document:keydown.escape")
   closeOnEscape(): void {

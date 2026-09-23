@@ -1,12 +1,13 @@
 import { Injectable, computed, inject, signal } from "@angular/core";
 import { Title } from "@angular/platform-browser";
-import { firstValueFrom } from "rxjs";
+import { Subject, catchError, firstValueFrom, of, switchMap } from "rxjs";
 import { PublicBookingApiService } from "./public-booking-api.service";
 
 @Injectable({ providedIn: "root" })
 export class PublicBookingFacade {
   private readonly api = inject(PublicBookingApiService);
   private readonly titleService = inject(Title);
+  private readonly availabilityRefresh = new Subject<void>();
 
   readonly tenantSlug = signal("default");
   readonly loading = signal(false);
@@ -25,6 +26,42 @@ export class PublicBookingFacade {
     phone: "",
     customerNotes: "",
   });
+
+  constructor() {
+    this.availabilityRefresh
+      .pipe(
+        switchMap(() => {
+          const selectedService = this.selectedService();
+          const selectedCollaboratorId = this.selectedCollaboratorId();
+
+          if (!selectedService || !selectedCollaboratorId) {
+            return of({ slots: [] });
+          }
+
+          return this.api
+            .availability(this.publicBasePath(), {
+              serviceId: selectedService.id,
+              date: this.selectedDate(),
+              collaboratorId: selectedCollaboratorId,
+            })
+            .pipe(
+              catchError((error: any) => {
+                this.feedback.set(
+                  error?.error?.message ||
+                    error?.message ||
+                    "Errore nel caricamento slot",
+                );
+                return of({ slots: [] });
+              }),
+            );
+        }),
+      )
+      .subscribe((response: any) => {
+        const slots = response?.slots || [];
+        this.slots.set(slots);
+        this.selectedSlot.set(slots[0]?.startsAt || "");
+      });
+  }
 
   readonly publicBasePath = computed(() =>
     this.api.resolveBasePath(this.tenantSlug()),
@@ -174,10 +211,12 @@ export class PublicBookingFacade {
 
   setSelectedDate(value: string): void {
     this.selectedDate.set(value);
+    this.requestAvailability();
   }
 
   setSelectedCollaboratorId(value: string): void {
     this.selectedCollaboratorId.set(value);
+    this.requestAvailability();
   }
 
   setSelectedSlot(value: string): void {
@@ -226,7 +265,7 @@ export class PublicBookingFacade {
           : availableCollaborators[0]?.id || "",
       );
 
-      await this.loadAvailability();
+      this.requestAvailability();
     } catch (error: any) {
       this.feedback.set(
         error?.error?.message ||
@@ -238,38 +277,11 @@ export class PublicBookingFacade {
     }
   }
 
-  async loadAvailability(): Promise<void> {
-    const selectedService = this.selectedService();
-    const selectedCollaboratorId = this.selectedCollaboratorId();
-
-    if (!selectedService || !selectedCollaboratorId) {
-      this.slots.set([]);
-      this.selectedSlot.set("");
-      return;
-    }
-
-    try {
-      const response: any = await firstValueFrom(
-        this.api.availability(this.publicBasePath(), {
-          serviceId: selectedService.id,
-          date: this.selectedDate(),
-          collaboratorId: selectedCollaboratorId,
-        }),
-      );
-
-      const slots = response.slots || [];
-      this.slots.set(slots);
-      this.selectedSlot.set(slots[0]?.startsAt || "");
-    } catch (error: any) {
-      this.feedback.set(
-        error?.error?.message ||
-          error?.message ||
-          "Errore nel caricamento slot",
-      );
-    }
+  requestAvailability(): void {
+    this.availabilityRefresh.next();
   }
 
-  async selectService(service: any): Promise<void> {
+  selectService(service: any): void {
     this.selectedService.set(service);
     const defaultCollaboratorId = this.settings()?.defaultCollaboratorId;
     this.selectedCollaboratorId.set(
@@ -281,7 +293,7 @@ export class PublicBookingFacade {
     );
     this.selectedSlot.set("");
     this.slots.set([]);
-    await this.loadAvailability();
+    this.requestAvailability();
   }
 
   async submitBooking(): Promise<void> {
@@ -313,7 +325,7 @@ export class PublicBookingFacade {
         phone: "",
         customerNotes: "",
       });
-      await this.loadAvailability();
+      this.requestAvailability();
     } catch (error: any) {
       this.feedback.set(
         error?.error?.message ||

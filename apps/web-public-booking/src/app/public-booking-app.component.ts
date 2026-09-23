@@ -88,7 +88,7 @@ import { CustomSelectComponent } from "./custom-select.component";
                 <h2 class="font-display text-4xl">Scegli servizio e slot</h2>
               </div>
               <label class="field public-date-field">
-                <span>Data</span>
+                <span>Data <em class="required-mark" aria-hidden="true">*</em></span>
                 <barber-calendar-input
                   [value]="selectedDateValue"
                   (valueChange)="onSelectedDateChange($event)"
@@ -213,7 +213,7 @@ import { CustomSelectComponent } from "./custom-select.component";
               class="mt-6 grid gap-4 md:grid-cols-2"
             >
               <label class="field">
-                <span>Collaboratore</span>
+                <span>Collaboratore <em class="required-mark" aria-hidden="true">*</em></span>
                 <barber-custom-select
                   [value]="selectedCollaboratorId()"
                   (valueChange)="onSelectedCollaboratorChange($event)"
@@ -223,7 +223,7 @@ import { CustomSelectComponent } from "./custom-select.component";
                 ></barber-custom-select>
               </label>
               <label class="field">
-                <span>Slot disponibili</span>
+                <span>Slot disponibili <em class="required-mark" aria-hidden="true">*</em></span>
                 <barber-custom-select
                   [value]="selectedSlot()"
                   (valueChange)="onSelectedSlotChange($event)"
@@ -244,7 +244,7 @@ import { CustomSelectComponent } from "./custom-select.component";
             <form class="mt-6 grid gap-4" (ngSubmit)="submitBooking()">
               <div class="grid gap-4 md:grid-cols-2">
                 <label class="field">
-                  <span>Nome e cognome</span>
+                  <span>Nome e cognome <em class="required-mark" aria-hidden="true">*</em></span>
                   <input
                     [ngModel]="bookingForm().customerName"
                     (ngModelChange)="
@@ -359,12 +359,10 @@ export class PublicBookingAppComponent implements OnInit {
 
   onSelectedDateChange(value: string): void {
     this.facade.setSelectedDate(value);
-    void this.loadAvailability();
   }
 
   onSelectedCollaboratorChange(value: string): void {
     this.facade.setSelectedCollaboratorId(value);
-    void this.loadAvailability();
   }
 
   onSelectedSlotChange(value: string): void {
@@ -435,12 +433,8 @@ export class PublicBookingAppComponent implements OnInit {
     await this.facade.loadInitialData();
   }
 
-  async loadAvailability(): Promise<void> {
-    await this.facade.loadAvailability();
-  }
-
-  async selectService(service: any): Promise<void> {
-    await this.facade.selectService(service);
+  selectService(service: any): void {
+    this.facade.selectService(service);
   }
 
   async submitBooking(): Promise<void> {

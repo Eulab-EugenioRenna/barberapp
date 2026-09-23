@@ -35,7 +35,7 @@ export class AvailabilityController {
         date,
         collaboratorId,
       ),
-      conflictChecks: ["collaborator", "room", "station", "buffers"],
+      conflictChecks: ["collaborator", "room", "buffers"],
     };
   }
 }

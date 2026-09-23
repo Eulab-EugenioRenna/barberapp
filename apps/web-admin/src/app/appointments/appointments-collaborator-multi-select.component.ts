@@ -376,17 +376,28 @@ export class AppointmentsCollaboratorMultiSelectComponent
       return;
     }
 
+    const scale = 1;
     const rect = trigger.getBoundingClientRect();
-    const width = Math.min(Math.max(rect.width, 256), window.innerWidth - 24);
-    const left = Math.min(rect.right - width, window.innerWidth - width - 12);
-    const top = Math.min(rect.bottom + 8, window.innerHeight - 12);
+    const width = Math.min(
+      Math.max(rect.width / scale, 256),
+      window.innerWidth / scale - 24,
+    );
+    const left = Math.min(
+      rect.right / scale - width,
+      window.innerWidth / scale - width - 12,
+    );
+    const height = popover.offsetHeight / scale;
+    const top =
+      rect.bottom / scale + 8 + height <= window.innerHeight / scale - 12
+        ? rect.bottom / scale + 8
+        : Math.max(12, rect.top / scale - 8 - height);
 
     this.popoverStyle = {
       position: "fixed",
       top: `${top}px`,
       left: `${Math.max(12, left)}px`,
       width: `${width}px`,
-      zIndex: "90",
+      zIndex: "1000",
     };
   }
 }

@@ -1,13 +1,18 @@
-import { CommonModule } from "@angular/common";
+import { CommonModule, DOCUMENT } from "@angular/common";
 import {
+  ApplicationRef,
   Component,
+  EmbeddedViewRef,
   ElementRef,
   EventEmitter,
   HostListener,
   Input,
+  OnDestroy,
   Output,
   OnChanges,
   SimpleChanges,
+  TemplateRef,
+  ViewChild,
   inject,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -55,8 +60,8 @@ type SelectOption = {
         </svg>
       </div>
 
-      <div
-        *ngIf="open"
+      <ng-template #popoverTemplate>
+        <div
         role="listbox"
         [id]="listboxId"
         class="select-popover"
@@ -72,6 +77,14 @@ type SelectOption = {
             (click)="$event.stopPropagation()"
           />
         </label>
+        <button
+          *ngIf="createLabel"
+          type="button"
+          class="select-create-action"
+          (pointerdown)="requestCreate($event)"
+        >
+          <span aria-hidden="true">+</span>{{ createLabel }}
+        </button>
         <div
           *ngFor="let option of filteredOptions"
           role="option"
@@ -91,7 +104,8 @@ type SelectOption = {
         <div *ngIf="!filteredOptions.length" class="select-empty">
           Nessun risultato
         </div>
-      </div>
+        </div>
+      </ng-template>
     </div>
   `,
   styles: [
@@ -167,10 +181,8 @@ type SelectOption = {
       }
 
       .select-popover {
-        position: absolute;
-        top: calc(100% + 0.5rem);
-        left: 0;
-        z-index: 40;
+        position: fixed;
+        z-index: 1000;
         width: 100%;
         max-height: 18rem;
         overflow: auto;
@@ -201,6 +213,24 @@ type SelectOption = {
         text-align: center;
       }
 
+      .select-create-action {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 0.5rem;
+        border: 0.0625rem dashed rgba(28, 124, 100, 0.38);
+        border-radius: 1rem;
+        background: rgba(28, 124, 100, 0.06);
+        padding: 0.72rem 0.9rem;
+        color: #176b57;
+        font-weight: 800;
+        text-align: left;
+      }
+
+      .select-create-action:hover {
+        background: rgba(28, 124, 100, 0.12);
+      }
+
       .select-option {
         display: grid;
         width: 100%;
@@ -229,9 +259,14 @@ type SelectOption = {
     `,
   ],
 })
-export class CustomSelectComponent implements OnChanges {
+export class CustomSelectComponent implements OnChanges, OnDestroy {
   private static nextId = 0;
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+  private readonly document = inject(DOCUMENT);
+  private readonly applicationRef = inject(ApplicationRef);
+  @ViewChild("popoverTemplate") private popoverTemplate?: TemplateRef<unknown>;
+  private portalView?: EmbeddedViewRef<unknown>;
+  private popoverElement?: HTMLElement;
   readonly listboxId = `select-listbox-${CustomSelectComponent.nextId++}`;
 
   @Input() value = "";
@@ -239,7 +274,9 @@ export class CustomSelectComponent implements OnChanges {
   @Input() label = "";
   @Input() placeholder = "Seleziona";
   @Input() disabled = false;
+  @Input() createLabel = "";
   @Output() valueChange = new EventEmitter<string>();
+  @Output() createRequest = new EventEmitter<void>();
 
   open = false;
   filterQuery = "";
@@ -265,18 +302,34 @@ export class CustomSelectComponent implements OnChanges {
     this.filterQuery = "";
   }
 
+  ngOnDestroy(): void {
+    this.closePopover();
+  }
+
   @HostListener("document:pointerdown", ["$event"])
   onDocumentPointerDown(event: PointerEvent): void {
     const target = event.target as Node | null;
 
-    if (target && !this.elementRef.nativeElement.contains(target)) {
-      this.open = false;
+    if (
+      target &&
+      !this.elementRef.nativeElement.contains(target) &&
+      !this.popoverElement?.contains(target)
+    ) {
+      this.closePopover();
     }
   }
 
   @HostListener("document:keydown.escape")
   closeOnEscape(): void {
-    this.open = false;
+    this.closePopover();
+  }
+
+  @HostListener("window:resize")
+  @HostListener("window:scroll")
+  repositionPopover(): void {
+    if (this.open) {
+      this.positionPopover();
+    }
   }
 
   onTriggerClick(event: Event): void {
@@ -295,10 +348,10 @@ export class CustomSelectComponent implements OnChanges {
       return;
     }
 
-    this.open = !this.open;
     if (this.open) {
-      this.filterQuery = "";
-      this.focusFilterInput();
+      this.closePopover();
+    } else {
+      this.openPopover();
     }
   }
 
@@ -311,12 +364,88 @@ export class CustomSelectComponent implements OnChanges {
     }
 
     this.valueChange.emit(option.value);
+    this.closePopover();
+  }
+
+  requestCreate(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.closePopover();
+    this.createRequest.emit();
+  }
+
+  private openPopover(): void {
+    const template = this.popoverTemplate;
+    if (!template) return;
+
+    this.open = true;
+    this.filterQuery = "";
+    this.portalView = template.createEmbeddedView({});
+    this.applicationRef.attachView(this.portalView);
+    this.portalView.detectChanges();
+    this.popoverElement = this.portalView.rootNodes.find(
+      (node): node is HTMLElement => node instanceof HTMLElement,
+    );
+
+    if (!this.popoverElement) {
+      this.closePopover();
+      return;
+    }
+
+    this.document.body.appendChild(this.popoverElement);
+    this.positionPopover();
+    this.focusFilterInput();
+  }
+
+  private closePopover(): void {
     this.open = false;
+    if (!this.portalView) return;
+
+    this.applicationRef.detachView(this.portalView);
+    this.portalView.destroy();
+    this.portalView = undefined;
+    this.popoverElement = undefined;
+  }
+
+  private positionPopover(): void {
+    const trigger = this.elementRef.nativeElement.querySelector(
+      ".select-trigger",
+    ) as HTMLElement | null;
+    const popover = this.popoverElement;
+    if (!trigger || !popover) return;
+
+    const gap = 8;
+    const viewportPadding = 8;
+    const scale = 1;
+    const triggerRect = trigger.getBoundingClientRect();
+    const width = Math.min(
+      triggerRect.width / scale,
+      window.innerWidth / scale - viewportPadding * 2,
+    );
+    const left = Math.max(
+      viewportPadding,
+      Math.min(
+        triggerRect.left / scale,
+        window.innerWidth / scale - width - viewportPadding,
+      ),
+    );
+    const popoverHeight = Math.min(popover.offsetHeight / scale, 288);
+    const top =
+      triggerRect.bottom / scale + gap + popoverHeight <=
+      window.innerHeight / scale - viewportPadding
+        ? triggerRect.bottom / scale + gap
+        : Math.max(viewportPadding, triggerRect.top / scale - gap - popoverHeight);
+
+    Object.assign(popover.style, {
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${width}px`,
+    });
   }
 
   private focusFilterInput(): void {
     setTimeout(() => {
-      const input = this.elementRef.nativeElement.querySelector(
+      const input = this.popoverElement?.querySelector(
         ".select-filter-input",
       ) as HTMLInputElement | null;
       input?.focus();

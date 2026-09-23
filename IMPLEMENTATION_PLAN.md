@@ -16,7 +16,7 @@ The PRD describes a full SaaS. This implementation establishes the foundation ne
 - Auth: login, refresh, logout, current user stubs.
 - Tenant settings: white-label settings read/update and public settings route.
 - Users and roles: base user listing and shared role/permission vocabulary.
-- Collaborators, services, rooms, stations, customers: management endpoints.
+- Collaborators, services, rooms, customers: management endpoints.
 - Appointments: internal CRUD, status update, cancellation, cancellation policy.
 - Availability: slot response with conflict-check categories.
 - Public booking: tenant settings, public services, availability, booking creation.
@@ -30,7 +30,7 @@ The PRD describes a full SaaS. This implementation establishes the foundation ne
 
 1. Replace demo responses with Prisma-backed repositories and transaction boundaries.
 2. Add JWT guards, refresh token rotation, password hashing, and RBAC/policy guards.
-3. Implement availability conflict logic with unit tests for collaborator, room, station, buffer, and blocked-time rules.
+3. Implement availability conflict logic with unit tests for collaborator, room, buffer, and blocked-time rules.
 4. Add create-tenant onboarding flow and seed script for a demo tenant.
 5. Add E2E tests for owner login, service creation, collaborator creation, public booking, and collaborator-limited access.
 6. Add notification provider adapters and async queue once the first real channel is selected.

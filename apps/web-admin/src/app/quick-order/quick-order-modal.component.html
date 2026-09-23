@@ -9,21 +9,35 @@
     class="quick-order-backdrop"
     type="button"
     aria-label="Chiudi ordine rapido"
+    [disabled]="loading"
     (click)="close.emit()"
   ></button>
   <section class="quick-order-sheet">
     <header class="quick-order-header">
       <div>
-        <p class="eyebrow text-[var(--accent)]">Touch mode</p>
+        <p class="eyebrow text-[var(--accent)]">
+          {{ isLinkedToAppointment ? "Appuntamento" : "Touch mode" }}
+        </p>
         <h2 id="quick-order-title" class="font-display text-4xl">
-          Ordine rapido
+          {{ isLinkedToAppointment ? "Conto appuntamento" : "Ordine rapido" }}
         </h2>
         <p class="mt-1 text-sm text-[var(--muted)]">
-          I servizi vengono registrati come appuntamento completato che termina
-          ora, anche in sovrapposizione al calendario.
+          <ng-container *ngIf="isLinkedToAppointment; else quickIntro">
+            L'ordine viene collegato all'appuntamento esistente e ne diventa il
+            conto finale.
+          </ng-container>
+          <ng-template #quickIntro>
+            I servizi vengono registrati come appuntamento completato che termina
+            ora, anche in sovrapposizione al calendario.
+          </ng-template>
         </p>
       </div>
-      <button type="button" class="pill-btn" (click)="close.emit()">
+      <button
+        type="button"
+        class="pill-btn"
+        [disabled]="loading"
+        (click)="close.emit()"
+      >
         Chiudi
       </button>
     </header>
@@ -38,14 +52,32 @@
             [options]="customerOptions"
             label="Cliente"
             placeholder="Seleziona il cliente"
+            createLabel="Aggiungi nuovo cliente"
+            (createRequest)="quickCreateKind = 'customer'"
+          ></barber-custom-select>
+        </label>
+        <label class="field">
+          <span>Collaboratore</span>
+          <barber-custom-select
+            [value]="collaboratorId"
+            (valueChange)="collaboratorId = $event"
+            [options]="collaboratorOptions"
+            label="Collaboratore"
+            placeholder="Collaboratore opzionale"
           ></barber-custom-select>
         </label>
 
         <div>
-          <p class="quick-order-step">2 · Tocca servizi o prodotti</p>
+          <div class="flex items-center justify-between gap-3">
+            <p class="quick-order-step">2 · Tocca servizi o prodotti</p>
+            <div class="flex gap-2">
+              <button type="button" class="pill-btn" (click)="quickCreateKind = 'service'">+ Servizio</button>
+              <button type="button" class="pill-btn" (click)="quickCreateKind = 'product'">+ Prodotto</button>
+            </div>
+          </div>
           <div class="touch-grid">
             <button
-              *ngFor="let service of services"
+              *ngFor="let service of catalogServices"
               type="button"
               class="touch-card service-card"
               (click)="addService(service)"
@@ -55,7 +87,7 @@
               <span>€{{ Number(service.basePrice || 0).toFixed(2) }}</span>
             </button>
             <button
-              *ngFor="let product of products"
+              *ngFor="let product of catalogProducts"
               type="button"
               class="touch-card product-card"
               (click)="addProduct(product)"
@@ -113,19 +145,6 @@
               />
             </label>
           </div>
-          <div *ngIf="item.kind === 'service'" class="station-picker">
-            <span>Postazioni (anche più di una)</span>
-            <div class="station-chips">
-              <button
-                *ngFor="let station of stations"
-                type="button"
-                [class.selected]="item.stationIds.includes(station.id)"
-                (click)="toggleStation(item, station.id)"
-              >
-                {{ station.name }}
-              </button>
-            </div>
-          </div>
         </article>
 
         <div
@@ -174,6 +193,14 @@
           <div class="checkout-total">
             <span>Totale</span><strong>€{{ total.toFixed(2) }}</strong>
           </div>
+          <p
+            *ngIf="appointmentWindowLabel && !isLinkedToAppointment"
+            class="text-xs text-[var(--muted)]"
+          >
+            Appuntamento a consuntivo:
+            <strong>{{ appointmentWindowLabel }}</strong>
+            (Now() − durata servizi)
+          </p>
           <button
             type="button"
             class="primary-btn"
@@ -186,4 +213,10 @@
       </aside>
     </div>
   </section>
+  <barber-quick-create-dialog
+    *ngIf="quickCreateKind"
+    [kind]="quickCreateKind"
+    (cancel)="quickCreateKind = null"
+    (created)="onQuickCreated($event)"
+  ></barber-quick-create-dialog>
 </div>

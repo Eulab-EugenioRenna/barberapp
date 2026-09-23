@@ -41,6 +41,7 @@ import { CustomSelectComponent } from "../custom-select.component";
         min-height: 0;
         overflow: auto;
         padding-right: 0.25rem;
+        align-content: start;
       }
     `,
   ],
@@ -105,20 +106,16 @@ import { CustomSelectComponent } from "../custom-select.component";
         >
           <div class="grid gap-4 md:grid-cols-2">
             <label class="field md:col-span-2">
-              <span>Cliente esistente o nuovo</span>
-              <input
-                [ngModel]="appointmentCustomerSearch"
-                (ngModelChange)="appointmentCustomerInput.emit($event)"
-                name="appointmentCustomerSearch"
-                list="appointment-customer-options"
-                placeholder="Cerca nome, email o telefono"
-              />
-              <datalist id="appointment-customer-options">
-                <option
-                  *ngFor="let customer of filteredAppointmentCustomers"
-                  [value]="appointmentCustomerOptionLabel(customer)"
-                ></option>
-              </datalist>
+              <span>Cliente <em class="required-mark" aria-hidden="true">*</em></span>
+              <barber-custom-select
+                [value]="appointmentForm.customerId"
+                (valueChange)="appointmentCustomerSelect.emit($event)"
+                [options]="appointmentCustomerOptions"
+                label="Cliente"
+                placeholder="Cerca o seleziona il cliente"
+                createLabel="Aggiungi nuovo cliente"
+                (createRequest)="quickCreate.emit('customer')"
+              ></barber-custom-select>
             </label>
           </div>
           <div
@@ -126,7 +123,7 @@ import { CustomSelectComponent } from "../custom-select.component";
             *ngIf="!appointmentForm.customerId"
           >
             <label class="field">
-              <span>Cliente</span>
+              <span>Cliente <em class="required-mark" aria-hidden="true">*</em></span>
               <input
                 [ngModel]="appointmentForm.customerName"
                 (ngModelChange)="
@@ -153,7 +150,7 @@ import { CustomSelectComponent } from "../custom-select.component";
           </div>
           <div class="grid gap-4 md:grid-cols-2">
             <label class="field">
-              <span>Servizio</span>
+              <span>Servizio <em class="required-mark" aria-hidden="true">*</em></span>
               <barber-custom-select
                 [value]="appointmentForm.serviceId"
                 (valueChange)="
@@ -165,6 +162,8 @@ import { CustomSelectComponent } from "../custom-select.component";
                 "
                 [options]="serviceSelectOptions"
                 label="Servizio"
+                createLabel="Aggiungi nuovo servizio"
+                (createRequest)="quickCreate.emit('service')"
               ></barber-custom-select>
             </label>
             <label class="field">
@@ -182,9 +181,6 @@ import { CustomSelectComponent } from "../custom-select.component";
                 label="Collaboratore"
                 placeholder="Seleziona collaboratore"
               ></barber-custom-select>
-              <small class="field-hint"
-                >Mostra solo i collaboratori assegnati al servizio</small
-              >
             </label>
           </div>
           <div class="grid gap-4 md:grid-cols-2">
@@ -202,7 +198,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               ></barber-calendar-input>
             </label>
             <label class="field">
-              <span>Ora</span>
+              <span>Ora <em class="required-mark" aria-hidden="true">*</em></span>
               <barber-custom-select
                 [value]="appointmentForm.startsAt"
                 (valueChange)="
@@ -211,14 +207,12 @@ import { CustomSelectComponent } from "../custom-select.component";
                     value: $event,
                   })
                 "
-                [disabled]="
-                  !appointmentForm.collaboratorId || !appointmentSlots.length
-                "
+                [disabled]="!appointmentSlots.length"
                 [options]="appointmentSlotOptions"
                 label="Orario"
                 [placeholder]="
                   !appointmentForm.collaboratorId
-                    ? 'Prima seleziona la postazione'
+                    ? 'Prima seleziona il collaboratore'
                     : appointmentSlots.length
                       ? 'Seleziona orario'
                       : 'Nessuno slot disponibile'
@@ -255,13 +249,18 @@ import { CustomSelectComponent } from "../custom-select.component";
             ></textarea>
           </label>
           <div class="flex flex-wrap gap-3">
-            <button type="submit" class="primary-btn" [disabled]="loading">
+            <button
+              type="submit"
+              class="primary-btn"
+              [disabled]="loading || !formValid"
+            >
               {{ appointmentForm.id ? "Salva modifiche" : "Crea appuntamento" }}
             </button>
             <button
               *ngIf="appointmentForm.id"
               type="button"
               class="pill-btn"
+              [disabled]="loading"
               (click)="remove.emit()"
             >
               Elimina appuntamento
@@ -270,11 +269,17 @@ import { CustomSelectComponent } from "../custom-select.component";
               *ngIf="appointmentForm.id"
               type="button"
               class="pill-btn"
+              [disabled]="loading"
               (click)="cancel.emit()"
             >
               Annulla appuntamento
             </button>
-            <button type="button" class="secondary-btn" (click)="reset.emit()">
+            <button
+              type="button"
+              class="secondary-btn"
+              [disabled]="loading"
+              (click)="reset.emit()"
+            >
               Nuova prenotazione
             </button>
           </div>
@@ -286,8 +291,7 @@ import { CustomSelectComponent } from "../custom-select.component";
 export class AdminAppointmentsPageComponent {
   @Input() appointments: any[] = [];
   @Input() appointmentForm: any = {};
-  @Input() appointmentCustomerSearch = "";
-  @Input() filteredAppointmentCustomers: any[] = [];
+  @Input() appointmentCustomerOptions: Array<{ value: string; label: string }> = [];
   @Input() serviceSelectOptions: Array<{ value: string; label: string }> = [];
   @Input() appointmentCollaboratorOptions: Array<{
     value: string;
@@ -301,7 +305,8 @@ export class AdminAppointmentsPageComponent {
   @Input() loading = false;
 
   @Output() editAppointment = new EventEmitter<any>();
-  @Output() appointmentCustomerInput = new EventEmitter<string>();
+  @Output() appointmentCustomerSelect = new EventEmitter<string>();
+  @Output() quickCreate = new EventEmitter<"customer" | "service">();
   @Output() appointmentValueChange = new EventEmitter<{
     key: string;
     value: string;
@@ -312,15 +317,17 @@ export class AdminAppointmentsPageComponent {
   @Output() remove = new EventEmitter<void>();
   @Output() cancel = new EventEmitter<void>();
   @Output() reset = new EventEmitter<void>();
-  appointmentCustomerOptionLabel(customer: any): string {
-    const segments = [`${customer.firstName} ${customer.lastName}`.trim()];
-    if (customer.email) {
-      segments.push(customer.email);
-    }
-    if (customer.phone) {
-      segments.push(customer.phone);
-    }
-    return segments.join(" · ");
+
+  get formValid(): boolean {
+    const customer = Boolean(
+      this.appointmentForm.customerId ||
+        (typeof this.appointmentForm.customerName === "string" &&
+          this.appointmentForm.customerName.trim()),
+    );
+
+    return Boolean(
+      customer && this.appointmentForm.serviceId && this.appointmentForm.startsAt,
+    );
   }
 
   formatDateTime(value: string): string {

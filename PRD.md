@@ -2,9 +2,9 @@
 
 ## 1. Sintesi prodotto
 
-Il prodotto è una piattaforma web fullstack SaaS white label per aziende che gestiscono prenotazioni, servizi, collaboratori, postazioni, sale, clienti, vendite di prodotti e dashboard economiche. Il sistema deve poter funzionare in due modalità principali:
+Il prodotto è una piattaforma web fullstack SaaS white label per aziende che gestiscono prenotazioni, servizi, collaboratori, sale, clienti, vendite di prodotti e dashboard economiche. Il sistema deve poter funzionare in due modalità principali:
 
-1. **Modalità pubblica aperta ai clienti**: i clienti possono prenotare online tramite pagina pubblica brandizzata, scegliendo servizio, data, orario, collaboratore/postazione/sala se consentito, e lasciando dati di contatto.
+1. **Modalità pubblica aperta ai clienti**: i clienti possono prenotare online tramite pagina pubblica brandizzata, scegliendo servizio, data, orario, collaboratore/sala se consentito, e lasciando dati di contatto.
 2. **Modalità aziendale chiusa**: nessuna prenotazione pubblica; il titolare o il personale autorizzato gestiscono manualmente appuntamenti, clienti, vendite, calendario e storico.
 
 Il sistema deve essere progettato come SaaS multi-tenant, con isolamento dati per azienda, configurazione white label, gestione ruoli e policy per titolare, collaboratori e personale amministrativo.
@@ -60,7 +60,7 @@ Questi elementi possono diventare moduli successivi.
 
 ### 4.1 Titolare azienda
 
-È l’utente principale. Configura azienda, servizi, collaboratori, sale, postazioni, prodotti, listini, calendario e policy. Ha accesso completo a dashboard, fatturato, storico e audit.
+È l’utente principale. Configura azienda, servizi, collaboratori, sale, prodotti, listini, calendario e policy. Ha accesso completo a dashboard, fatturato, storico e audit.
 
 ### 4.2 Collaboratore
 
@@ -91,9 +91,9 @@ Funzionalità richieste:
 * URL pubblico per azienda.
 * Supporto white label: logo, nome, colori, cover, descrizione.
 * Lista servizi pubblicabili.
-* Disponibilità calcolata da calendario aziendale, collaboratori, sale, postazioni e durata servizio.
+* Disponibilità calcolata da calendario aziendale, collaboratori, sale e durata servizio.
 * Opzione scelta collaboratore: obbligatoria, opzionale o nascosta.
-* Opzione scelta sala/postazione: configurabile.
+* Opzione scelta sala: configurabile.
 * Form cliente configurabile.
 * Conferma immediata o richiesta da approvare.
 * Stato prenotazione: richiesta, confermata, annullata, completata, no-show.
@@ -112,7 +112,7 @@ Funzionalità richieste:
 * Calendario titolare globale.
 * Calendari per collaboratore.
 * Creazione appuntamento da backend gestionale.
-* Assegnazione cliente, servizio, collaboratore, sala, postazione.
+* Assegnazione cliente, servizio, collaboratore, sala.
 * Blocco orari non disponibili.
 * Storico attività e appuntamenti.
 * Dashboard interna.
@@ -195,7 +195,6 @@ Esempi:
 * `services.manage`
 * `collaborators.manage`
 * `rooms.manage`
-* `stations.manage`
 * `products.manage`
 * `sales.create`
 * `dashboard.revenue.read`
@@ -204,7 +203,7 @@ Esempi:
 
 ---
 
-## 6.3 Gestione collaboratori e postazioni
+## 6.3 Gestione collaboratori
 
 ### Collaboratori
 
@@ -217,36 +216,14 @@ Ogni collaboratore ha:
 * calendario personale;
 * orari di lavoro;
 * ferie/assenze/blocchi;
-* sale o postazioni assegnabili;
+* sale assegnabili;
 * colore calendario;
-* stato attivo/non attivo.
-
-### Postazioni
-
-Le postazioni sono risorse configurabili associate a servizi o sale.
-
-Esempi:
-
-* poltrona 1;
-* cabina 2;
-* scrivania consulenza;
-* macchinario specifico;
-* postazione trattamento.
-
-Ogni postazione ha:
-
-* nome;
-* codice opzionale;
-* sala associata opzionale;
-* servizi compatibili;
-* disponibilità;
 * stato attivo/non attivo.
 
 ### Regole
 
-* Un appuntamento può richiedere uno o più vincoli: collaboratore, sala, postazione.
+* Un appuntamento può richiedere uno o più vincoli: collaboratore, sala.
 * Il sistema deve evitare overbooking della stessa risorsa.
-* Se un servizio richiede una specifica postazione, la disponibilità deve considerarla.
 
 ---
 
@@ -257,7 +234,6 @@ Ogni sala ha:
 * nome;
 * capacità;
 * servizi compatibili;
-* postazioni contenute;
 * disponibilità;
 * note interne;
 * stato attivo/non attivo.
@@ -283,7 +259,7 @@ Ogni servizio ha:
 * IVA opzionale;
 * categoria;
 * servizi compatibili con collaboratori;
-* risorse richieste: sala, postazione, collaboratore;
+* risorse richieste: sala, collaboratore;
 * visibilità pubblica;
 * prenotabile online sì/no;
 * colore calendario;
@@ -307,7 +283,7 @@ Funzionalità:
 * vista giorno, settimana, mese, agenda;
 * filtro per collaboratore;
 * filtro per servizio;
-* filtro per sala/postazione;
+* filtro per sala;
 * drag & drop appuntamenti;
 * resize appuntamento;
 * creazione rapida slot;
@@ -356,7 +332,6 @@ Policy esempi:
 * servizio;
 * collaboratore;
 * sala;
-* postazione;
 * data/ora inizio;
 * data/ora fine;
 * stato;
@@ -386,7 +361,6 @@ Il sistema deve verificare:
 * orari azienda;
 * orari collaboratore;
 * disponibilità sala;
-* disponibilità postazione;
 * assenze e blocchi;
 * buffer servizio;
 * appuntamenti già esistenti;
@@ -592,7 +566,6 @@ Filtri dashboard:
 * metodo pagamento;
 * sede futura;
 * sala;
-* postazione;
 * origine prenotazione;
 * canale di vendita;
 * confronto periodo precedente.
@@ -793,7 +766,6 @@ Voci principali:
 * Clienti;
 * Collaboratori;
 * Sale;
-* Postazioni;
 * Servizi;
 * Prodotti;
 * Vendite;
@@ -874,7 +846,6 @@ libs/
 * CollaboratorModule
 * ServiceModule
 * RoomModule
-* StationModule
 * CustomerModule
 * AppointmentModule
 * AvailabilityModule
@@ -901,7 +872,6 @@ libs/
 * customers
 * services
 * rooms
-* stations
 * appointments
 * appointment_status_history
 * availability_rules
@@ -946,7 +916,6 @@ Appointment
 - service_id
 - collaborator_id nullable
 - room_id nullable
-- station_id nullable
 - starts_at
 - ends_at
 - status
@@ -977,7 +946,6 @@ Service
 - category_id
 - requires_collaborator
 - requires_room
-- requires_station
 - is_public
 - is_bookable_online
 - color
@@ -1051,7 +1019,7 @@ AuditLog
 * `POST /public/:tenantSlug/bookings`
 * `GET /public/:tenantSlug/availability`
 
-## 10.4 Collaboratori, sale, postazioni
+## 10.4 Collaboratori e sale
 
 * `GET /collaborators`
 * `POST /collaborators`
@@ -1059,9 +1027,6 @@ AuditLog
 * `GET /rooms`
 * `POST /rooms`
 * `PATCH /rooms/:id`
-* `GET /stations`
-* `POST /stations`
-* `PATCH /stations/:id`
 
 ## 10.5 Clienti e storico
 
@@ -1239,7 +1204,7 @@ AuditLog
 2. Clicca slot o pulsante nuova prenotazione.
 3. Cerca o crea cliente.
 4. Seleziona servizio.
-5. Seleziona collaboratore/sala/postazione.
+5. Seleziona collaboratore/sala.
 6. Sistema valida conflitti.
 7. Utente conferma.
 8. Appuntamento appare in calendario.
@@ -1269,7 +1234,6 @@ AuditLog
 * CollaboratorCard.
 * ServiceCard.
 * RoomCard.
-* StationCard.
 * ProductConfigurator.
 * SalesCheckoutPanel.
 * RevenueDashboardCards.
@@ -1406,7 +1370,6 @@ nx affected:lint
 ## Fase 4 — Risorse e vendite
 
 * Sale.
-* Postazioni.
 * Prodotti configurabili.
 * Vendite.
 * Storico cliente/collaboratore/servizio.
@@ -1496,4 +1459,4 @@ Per una prima versione solida, conviene costruire un MVP con:
 * dashboard fatturato base con filtri;
 * audit log completo sulle azioni principali.
 
-Sale, postazioni, prodotti configurabili avanzati e dashboard dettagliate possono essere implementati subito nella struttura dati, ma rilasciati progressivamente nell’interfaccia.
+Sale, prodotti configurabili avanzati e dashboard dettagliate possono essere implementati subito nella struttura dati, ma rilasciati progressivamente nell’interfaccia.

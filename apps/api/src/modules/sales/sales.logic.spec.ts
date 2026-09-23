@@ -1,6 +1,7 @@
 import {
   calculateRetroactiveAppointment,
   normalizeOrderItems,
+  resolveSaleItemLabels,
 } from "./sales.logic";
 
 describe("normalizeOrderItems", () => {
@@ -9,18 +10,15 @@ describe("normalizeOrderItems", () => {
     { id: "p-open", name: "Prodotto libero", price: null },
   ];
   const services = [{ id: "s-cut", name: "Taglio", basePrice: 25 }];
-  const validStationIds = new Set(["chair-1", "chair-2"]);
 
   it("crea nello stesso ordine righe servizio e prodotto senza prenotazione", () => {
     const result = normalizeOrderItems({
       products,
       services,
-      validStationIds,
       items: [
         {
           kind: "service",
           serviceId: "s-cut",
-          stationIds: ["chair-1", "chair-2"],
         },
         { kind: "product", productId: "p-priced", quantity: 2 },
       ],
@@ -30,7 +28,6 @@ describe("normalizeOrderItems", () => {
       expect.objectContaining({
         serviceId: "s-cut",
         unitPrice: 25,
-        stationIds: ["chair-1", "chair-2"],
       }),
       expect.objectContaining({
         productId: "p-priced",
@@ -45,7 +42,6 @@ describe("normalizeOrderItems", () => {
       normalizeOrderItems({
         products,
         services,
-        validStationIds,
         items: [{ productId: "p-open" }],
       }),
     ).toThrow("inserisci il prezzo");
@@ -54,7 +50,6 @@ describe("normalizeOrderItems", () => {
       normalizeOrderItems({
         products,
         services,
-        validStationIds,
         items: [{ productId: "p-open", unitPrice: 18.5 }],
       })[0].unitPrice,
     ).toBe(18.5);
@@ -65,7 +60,6 @@ describe("normalizeOrderItems", () => {
       normalizeOrderItems({
         products,
         services,
-        validStationIds,
         items: [{ productId: "p-priced", unitPrice: 12, discount: 13 }],
       }),
     ).toThrow("sconto supera");
@@ -76,8 +70,7 @@ describe("normalizeOrderItems", () => {
     const items = normalizeOrderItems({
       products,
       services,
-      validStationIds,
-      items: [{ serviceId: "s-cut", quantity: 2, stationIds: ["chair-1"] }],
+      items: [{ serviceId: "s-cut", quantity: 2 }],
     });
     const appointment = calculateRetroactiveAppointment({
       soldAt,
@@ -88,5 +81,25 @@ describe("normalizeOrderItems", () => {
     expect(appointment.endsAt).toEqual(soldAt);
     expect(appointment.startsAt.toISOString()).toBe("2026-09-22T11:00:00.000Z");
     expect(appointment.durationMinutes).toBe(60);
+  });
+});
+
+describe("resolveSaleItemLabels", () => {
+  it("usa il nome corrente del servizio/prodotto associato", () => {
+    const [serviceItem, productItem] = resolveSaleItemLabels([
+      { label: "Taglio (vecchio)", service: { name: "Taglio nuovo" } },
+      { label: "Shampoo (vecchio)", product: { name: "Shampoo nuovo" } },
+    ]);
+
+    expect(serviceItem.label).toBe("Taglio nuovo");
+    expect(productItem.label).toBe("Shampoo nuovo");
+  });
+
+  it("mantiene lo snapshot quando l'articolo è stato eliminato", () => {
+    const [item] = resolveSaleItemLabels([
+      { label: "Prodotto eliminato", product: null, service: null },
+    ]);
+
+    expect(item.label).toBe("Prodotto eliminato");
   });
 });

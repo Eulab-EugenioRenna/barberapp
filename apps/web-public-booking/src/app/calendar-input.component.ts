@@ -1,13 +1,16 @@
-import { CommonModule } from "@angular/common";
+import { CommonModule, DOCUMENT } from "@angular/common";
 import {
+  AfterViewChecked,
   Component,
   ElementRef,
   EventEmitter,
   HostListener,
   Input,
   OnChanges,
+  OnDestroy,
   Output,
   SimpleChanges,
+  ViewChild,
   inject,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -36,6 +39,7 @@ type CalendarCell = {
       [class.disabled]="disabled"
     >
       <button
+        #trigger
         type="button"
         class="calendar-trigger"
         [disabled]="disabled"
@@ -80,7 +84,12 @@ type CalendarCell = {
         </span>
       </button>
 
-      <div *ngIf="open" class="calendar-popover">
+      <div
+        *ngIf="open"
+        #popover
+        class="calendar-popover"
+        [ngStyle]="popoverStyle"
+      >
         <div class="calendar-popover-head">
           <div>
             <p class="calendar-kicker">
@@ -442,8 +451,18 @@ type CalendarCell = {
     `,
   ],
 })
-export class CalendarInputComponent implements OnChanges {
+export class CalendarInputComponent
+  implements OnChanges, AfterViewChecked, OnDestroy
+{
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+  private readonly document = inject(DOCUMENT);
+  private popoverMounted = false;
+
+  @ViewChild("trigger", { read: ElementRef })
+  private readonly triggerRef?: ElementRef<HTMLElement>;
+
+  @ViewChild("popover", { read: ElementRef })
+  private readonly popoverRef?: ElementRef<HTMLElement>;
 
   @Input() value = "";
   @Input() label = "Selezione";
@@ -454,6 +473,7 @@ export class CalendarInputComponent implements OnChanges {
   @Output() valueChange = new EventEmitter<string>();
 
   open = false;
+  popoverStyle: Record<string, string> = {};
   visibleMonth = this.startOfMonth(new Date());
   selectedDate: Date | null = null;
   selectedHour = "09";
@@ -514,9 +534,28 @@ export class CalendarInputComponent implements OnChanges {
 
     const target = event.target as Node | null;
 
-    if (target && !this.elementRef.nativeElement.contains(target)) {
-      this.open = false;
+    if (
+      target &&
+      !this.elementRef.nativeElement.contains(target) &&
+      !this.popoverRef?.nativeElement.contains(target)
+    ) {
+      this.closePopover();
     }
+  }
+
+  @HostListener("window:resize")
+  @HostListener("window:scroll")
+  onViewportChange(): void {
+    if (this.open) this.syncPopoverPosition();
+  }
+
+  ngAfterViewChecked(): void {
+    if (this.open && !this.popoverMounted) this.mountPopover();
+    if (this.open && this.popoverMounted) this.syncPopoverPosition();
+  }
+
+  ngOnDestroy(): void {
+    this.unmountPopover();
   }
 
   toggleOpen(): void {
@@ -528,6 +567,8 @@ export class CalendarInputComponent implements OnChanges {
 
     if (this.open) {
       this.syncFromValue();
+    } else {
+      this.unmountPopover();
     }
   }
 
@@ -559,7 +600,7 @@ export class CalendarInputComponent implements OnChanges {
 
     if (this.mode === "date") {
       this.emitValue(this.selectedDate);
-      this.open = false;
+      this.closePopover();
     }
   }
 
@@ -587,7 +628,7 @@ export class CalendarInputComponent implements OnChanges {
 
     if (this.mode === "date") {
       this.emitValue(nextValue);
-      this.open = false;
+      this.closePopover();
     }
   }
 
@@ -601,14 +642,70 @@ export class CalendarInputComponent implements OnChanges {
     );
     this.selectedDate = nextValue;
     this.emitValue(nextValue);
-    this.open = false;
+    this.closePopover();
   }
 
   clearValue(): void {
     this.valueChange.emit("");
     this.selectedDate = null;
-    this.open = false;
+    this.closePopover();
     this.buildCalendar();
+  }
+
+  private closePopover(): void {
+    this.open = false;
+    this.unmountPopover();
+  }
+
+  private mountPopover(): void {
+    const popover = this.popoverRef?.nativeElement;
+    if (!popover || this.popoverMounted) return;
+
+    this.document.body.appendChild(popover);
+    this.popoverMounted = true;
+    this.syncPopoverPosition();
+  }
+
+  private unmountPopover(): void {
+    const popover = this.popoverRef?.nativeElement;
+    if (!popover || !this.popoverMounted) return;
+
+    if (popover.parentElement === this.document.body) {
+      this.document.body.removeChild(popover);
+    }
+    this.popoverMounted = false;
+  }
+
+  private syncPopoverPosition(): void {
+    const trigger = this.triggerRef?.nativeElement;
+    const popover = this.popoverRef?.nativeElement;
+    if (!trigger || !popover) return;
+
+    const scale = 1;
+    const viewportPadding = 8;
+    const triggerRect = trigger.getBoundingClientRect();
+    const width = Math.min(352, window.innerWidth / scale - viewportPadding * 2);
+    const left = Math.max(
+      viewportPadding,
+      Math.min(
+        triggerRect.left / scale,
+        window.innerWidth / scale - width - viewportPadding,
+      ),
+    );
+    const height = popover.offsetHeight / scale;
+    const top =
+      triggerRect.bottom / scale + 10 + height <=
+      window.innerHeight / scale - viewportPadding
+        ? triggerRect.bottom / scale + 10
+        : Math.max(viewportPadding, triggerRect.top / scale - 10 - height);
+
+    this.popoverStyle = {
+      position: "fixed",
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${width}px`,
+      zIndex: "1000",
+    };
   }
 
   private syncFromValue(): void {

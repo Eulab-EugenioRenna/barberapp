@@ -119,7 +119,7 @@ import { CustomSelectComponent } from "../custom-select.component";
 
               <div class="mt-5 grid gap-4 md:grid-cols-2">
                 <div class="field">
-                  <span>Postazione</span>
+                  <span>Collaboratore</span>
                   <div class="public-editor-field-surface">
                     {{ publicPreviewCollaboratorLabel }}
                   </div>
@@ -164,8 +164,11 @@ import { CustomSelectComponent } from "../custom-select.component";
         <h3 class="font-display text-3xl">Configurazione</h3>
         <form class="mt-5 grid gap-4" (ngSubmit)="save.emit()">
           <label class="field"
-            ><span>Nome attivita</span
-            ><input [(ngModel)]="settingsForm.name" name="settingsName"
+            ><span>Nome attivita <em class="required-mark" aria-hidden="true">*</em></span
+            ><input
+              [(ngModel)]="settingsForm.name"
+              name="settingsName"
+              required
           /></label>
           <label class="field">
             <span>Public domain</span>
@@ -406,7 +409,38 @@ import { CustomSelectComponent } from "../custom-select.component";
               </p>
             </div>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-sm font-semibold">Interfaccia</p>
+                <p class="mt-1 text-xs text-[var(--muted)]">
+                  Dimensione locale di testi, controlli e spazi su questo dispositivo.
+                </p>
+              </div>
+              <strong class="text-sm text-[var(--accent)]">{{ uiScale }}%</strong>
+            </div>
+            <label class="field mt-4">
+              <span>Scala interfaccia</span>
+              <input
+                [ngModel]="uiScale"
+                (ngModelChange)="uiScaleChange.emit($event)"
+                name="settingsUiScale"
+                type="range"
+                min="85"
+                max="110"
+                step="1"
+              />
+              <small class="field-hint"
+                >Preferenza di questo dispositivo: 92% e il valore consigliato.</small
+              >
+            </label>
+          </section>
+          <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4">
+            <p class="text-sm font-semibold">Booking pubblico</p>
+            <p class="mt-1 text-xs text-[var(--muted)]">
+              Controlla se i clienti possono inviare prenotazioni dal link pubblico.
+            </p>
+            <div class="mt-4">
             <label class="field checkbox-field"
               ><input
                 [(ngModel)]="settingsForm.publicEnabled"
@@ -414,8 +448,13 @@ import { CustomSelectComponent } from "../custom-select.component";
                 type="checkbox"
               /><span>Booking pubblico abilitato</span></label
             >
-          </div>
-          <button type="submit" class="primary-btn" [disabled]="loading">
+            </div>
+          </section>
+          <button
+            type="submit"
+            class="primary-btn"
+            [disabled]="loading || !formValid"
+          >
             Salva impostazioni
           </button>
           <button
@@ -451,10 +490,12 @@ export class AdminSettingsPageComponent {
     highlighted: boolean;
   }> = [];
   @Input() publicPreviewCollaboratorLabel = "";
+  @Input() uiScale = 92;
   @Input() loading = false;
   @Input() assetUrlResolver: ((path: string) => string) | null = null;
 
   @Output() save = new EventEmitter<void>();
+  @Output() uiScaleChange = new EventEmitter<number>();
   @Output() resetDefaults = new EventEmitter<void>();
   @Output() mediaSelected = new EventEmitter<{
     event: Event;
@@ -478,5 +519,12 @@ export class AdminSettingsPageComponent {
 
   resolveAssetUrl(path: string): string {
     return this.assetUrlResolver ? this.assetUrlResolver(path) : path;
+  }
+
+  get formValid(): boolean {
+    return Boolean(
+      typeof this.settingsForm.name === "string" &&
+        this.settingsForm.name.trim(),
+    );
   }
 }

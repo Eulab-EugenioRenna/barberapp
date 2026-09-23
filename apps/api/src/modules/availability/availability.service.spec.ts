@@ -13,7 +13,6 @@ describe("AvailabilityService", () => {
             bufferAfterMinutes: 15,
             requiresCollaborator: true,
             requiresRoom: false,
-            requiresStation: false,
             color: "#111111",
           }),
         },
@@ -35,20 +34,17 @@ describe("AvailabilityService", () => {
             {
               collaboratorId: "collaborator-1",
               roomId: null,
-              stationId: null,
               startsAt: new Date(2026, 4, 14, 9, 0, 0, 0),
               endsAt: new Date(2026, 4, 14, 9, 30, 0, 0),
               service: {
                 bufferBeforeMinutes: 0,
                 bufferAfterMinutes: 15,
                 requiresRoom: false,
-                requiresStation: false,
               },
             },
           ]),
         },
         room: { count: jest.fn() },
-        station: { count: jest.fn() },
       } as never,
       {
         getOrSet: jest.fn(

@@ -1,22 +1,40 @@
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 
 @Component({
   selector: "barber-admin-collaborators-page",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, InfiniteScrollDirective],
   template: `
-    <section class="grid gap-4 xl:grid-cols-2">
+    <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-5">
-        <p class="eyebrow text-[var(--accent)]">Team</p>
-        <h3 class="font-display text-3xl">Collaboratori</h3>
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="eyebrow text-[var(--accent)]">Team</p>
+            <h3 class="font-display text-3xl">Collaboratori</h3>
+          </div>
+          <button type="button" class="primary-btn" (click)="openNew()">
+            + Nuovo collaboratore
+          </button>
+        </div>
+        <label class="field mt-5">
+          <span>Cerca collaboratore</span>
+          <input
+            [(ngModel)]="collaboratorQuery"
+            name="collaboratorSearch"
+            type="search"
+            autocomplete="off"
+            placeholder="Nome, email o telefono"
+          />
+        </label>
         <div class="mt-5 grid gap-3 md:grid-cols-2">
           <button
-            *ngFor="let collaborator of collaborators"
+            *ngFor="let collaborator of filteredCollaborators"
             type="button"
             class="list-card text-left"
-            (click)="edit.emit(collaborator)"
+            (click)="openEdit(collaborator)"
           >
             <div>
               <strong
@@ -42,27 +60,61 @@ import { FormsModule } from "@angular/forms";
             </div>
           </button>
           <article
-            *ngIf="!collaborators.length"
+            *ngIf="!filteredCollaborators.length"
             class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)] md:col-span-2"
           >
-            Nessun collaboratore. Crea il primo membro del team dal modulo.
+            Nessun collaboratore. Usa “+ Nuovo collaboratore” per creare il
+            primo membro del team.
           </article>
+          <div
+            *ngIf="hasMore"
+            class="h-px w-full md:col-span-2"
+            barberInfiniteScroll
+            (loadMore)="loadMore.emit()"
+          ></div>
         </div>
       </article>
+    </section>
 
-      <article class="dark-panel rounded-[2rem] p-5 text-white">
-        <p class="eyebrow text-white/45">CRUD collaboratori</p>
-        <h3 class="font-display text-3xl">
-          {{
-            collaboratorForm.id
-              ? "Modifica collaboratore"
-              : "Nuovo collaboratore"
-          }}
-        </h3>
-        <form class="mt-5 grid gap-4" (ngSubmit)="save.emit()">
+    <div *ngIf="formOpen" class="confirm-overlay">
+      <button
+        type="button"
+        class="confirm-backdrop"
+        (click)="formOpen = false"
+        aria-label="Chiudi modulo collaboratore"
+      ></button>
+      <article
+        class="confirm-dialog panel max-h-[85vh] overflow-auto !w-[min(64rem,100%)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="collaborator-form-title"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="eyebrow text-[var(--accent)]">Collaboratore</p>
+            <h2
+              id="collaborator-form-title"
+              class="mt-2 font-display text-3xl"
+            >
+              {{
+                collaboratorForm.id
+                  ? "Modifica collaboratore"
+                  : "Nuovo collaboratore"
+              }}
+            </h2>
+          </div>
+          <button type="button" class="pill-btn" (click)="formOpen = false">
+            Chiudi
+          </button>
+        </div>
+
+        <form class="mt-5 grid gap-4 lg:grid-cols-2" (ngSubmit)="submit()">
+          <div class="grid content-start gap-4">
           <div class="grid gap-4 md:grid-cols-2">
             <label class="field">
-              <span>Nome</span>
+              <span
+                >Nome <em class="required-mark" aria-hidden="true">*</em></span
+              >
               <input
                 [(ngModel)]="collaboratorForm.firstName"
                 name="collaboratorFirstName"
@@ -71,7 +123,10 @@ import { FormsModule } from "@angular/forms";
               />
             </label>
             <label class="field">
-              <span>Cognome</span>
+              <span
+                >Cognome
+                <em class="required-mark" aria-hidden="true">*</em></span
+              >
               <input
                 [(ngModel)]="collaboratorForm.lastName"
                 name="collaboratorLastName"
@@ -118,15 +173,17 @@ import { FormsModule } from "@angular/forms";
               <span>Visibile nel booking pubblico</span>
             </label>
           </div>
-          <div class="rounded-[1.4rem] border border-white/10 p-4">
-            <p class="text-sm font-semibold text-white">Orari feriali</p>
+          </div>
+          <div class="grid content-start gap-4">
+          <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
+            <p class="text-sm font-semibold">Orari feriali</p>
             <div class="mt-4 grid gap-3">
               <article
                 *ngFor="
                   let schedule of collaboratorForm.weeklySchedules;
                   let i = index
                 "
-                class="rounded-[1rem] border border-white/10 p-3"
+                class="rounded-[1rem] border border-[var(--line)] p-3"
               >
                 <div
                   class="grid gap-3 md:grid-cols-[1.1fr_0.8fr_0.8fr_auto] md:items-center"
@@ -156,11 +213,9 @@ import { FormsModule } from "@angular/forms";
               </article>
             </div>
           </div>
-          <div class="rounded-[1.4rem] border border-white/10 p-4">
+          <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
             <div class="flex items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-white">
-                Eccezioni giornaliere
-              </p>
+              <p class="text-sm font-semibold">Eccezioni giornaliere</p>
               <button type="button" class="pill-btn" (click)="addDayOverride()">
                 Aggiungi giorno
               </button>
@@ -171,7 +226,7 @@ import { FormsModule } from "@angular/forms";
                   let override of collaboratorForm.dayOverrides;
                   let i = index
                 "
-                class="rounded-[1rem] border border-white/10 p-3"
+                class="rounded-[1rem] border border-[var(--line)] p-3"
               >
                 <div class="grid gap-3 md:grid-cols-2">
                   <label class="field">
@@ -233,13 +288,14 @@ import { FormsModule } from "@angular/forms";
               </article>
               <p
                 *ngIf="!collaboratorForm.dayOverrides?.length"
-                class="text-sm text-white/60"
+                class="text-sm text-[var(--muted)]"
               >
                 Nessuna eccezione configurata.
               </p>
             </div>
           </div>
-          <div class="flex flex-wrap gap-3">
+          </div>
+          <div class="flex flex-wrap gap-3 lg:col-span-2">
             <button
               type="submit"
               class="primary-btn"
@@ -258,6 +314,7 @@ import { FormsModule } from "@angular/forms";
               "
               type="button"
               class="secondary-btn"
+              [disabled]="loading"
               (click)="setDefault.emit(collaboratorForm.id)"
             >
               Imposta come default
@@ -267,7 +324,7 @@ import { FormsModule } from "@angular/forms";
               type="button"
               class="pill-btn"
               [disabled]="isDefaultCollaborator(collaboratorForm.id)"
-              (click)="remove.emit()"
+              (click)="removeCollaborator()"
             >
               Elimina
             </button>
@@ -280,13 +337,18 @@ import { FormsModule } from "@angular/forms";
             >
               Collaboratore default: impostane un altro prima di eliminarlo
             </span>
-            <button type="button" class="secondary-btn" (click)="reset.emit()">
+            <button
+              type="button"
+              class="secondary-btn"
+              [disabled]="loading"
+              (click)="openNew()"
+            >
               Nuovo collaboratore
             </button>
           </div>
         </form>
       </article>
-    </section>
+    </div>
   `,
 })
 export class AdminCollaboratorsPageComponent {
@@ -294,12 +356,56 @@ export class AdminCollaboratorsPageComponent {
   @Input() collaboratorForm: any = {};
   @Input() defaultCollaboratorId = "";
   @Input() loading = false;
+  @Input() hasMore = false;
 
   @Output() edit = new EventEmitter<any>();
   @Output() save = new EventEmitter<void>();
   @Output() setDefault = new EventEmitter<string>();
   @Output() remove = new EventEmitter<void>();
   @Output() reset = new EventEmitter<void>();
+  @Output() loadMore = new EventEmitter<void>();
+
+  formOpen = false;
+  collaboratorQuery = "";
+
+  get filteredCollaborators(): any[] {
+    const query = this.collaboratorQuery.trim().toLowerCase();
+    if (!query) {
+      return this.collaborators;
+    }
+    return this.collaborators.filter((collaborator) =>
+      [
+        collaborator.firstName,
+        collaborator.lastName,
+        collaborator.email,
+        collaborator.phone,
+      ]
+        .filter((value): value is string => typeof value === "string")
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }
+
+  openEdit(collaborator: any): void {
+    this.edit.emit(collaborator);
+    this.formOpen = true;
+  }
+
+  openNew(): void {
+    this.reset.emit();
+    this.formOpen = true;
+  }
+
+  submit(): void {
+    this.save.emit();
+    this.formOpen = false;
+  }
+
+  removeCollaborator(): void {
+    this.formOpen = false;
+    this.remove.emit();
+  }
 
   get formValid(): boolean {
     return Boolean(

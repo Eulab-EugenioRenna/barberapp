@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
 import { CacheInvalidationService } from "../../cache/cache-invalidation.service";
@@ -17,6 +18,10 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
+import {
+  buildPaginatedResult,
+  parsePagination,
+} from "../../common/pagination";
 
 @Controller("collaborators")
 export class CollaboratorsController {
@@ -29,6 +34,7 @@ export class CollaboratorsController {
   @Get()
   async findAll(
     @Req() request: { headers: { authorization?: string } },
+    @Query() query: Record<string, string> = {},
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -36,23 +42,34 @@ export class CollaboratorsController {
     );
 
     const tenantId = requireTenantId(session);
+    const { page, pageSize, skip, take } = parsePagination(query, {
+      defaultPageSize: 50,
+    });
 
     return this.cacheService.getOrSet(
-      cacheKeys.collaboratorsList(tenantId),
+      `${cacheKeys.collaboratorsList(tenantId)}:p${page}:s${pageSize}`,
       CACHE_TTL_SECONDS.lists,
-      () =>
-        this.prisma.collaborator.findMany({
-          where: { tenantId },
-          orderBy: [{ isActive: "desc" }, { firstName: "asc" }],
-          include: {
-            weeklySchedules: {
-              orderBy: { weekday: "asc" },
+      async () => {
+        const [items, total] = await Promise.all([
+          this.prisma.collaborator.findMany({
+            where: { tenantId },
+            orderBy: [{ isActive: "desc" }, { firstName: "asc" }],
+            skip,
+            take,
+            include: {
+              weeklySchedules: {
+                orderBy: { weekday: "asc" },
+              },
+              dayOverrides: {
+                orderBy: { date: "asc" },
+              },
             },
-            dayOverrides: {
-              orderBy: { date: "asc" },
-            },
-          },
-        }),
+          }),
+          this.prisma.collaborator.count({ where: { tenantId } }),
+        ]);
+
+        return buildPaginatedResult(items, total, page, pageSize);
+      },
     );
   }
 

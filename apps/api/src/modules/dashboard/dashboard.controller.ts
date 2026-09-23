@@ -6,6 +6,7 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
+import { parsePagination } from "../../common/pagination";
 import {
   calculateRevenueKpis,
   getRevenueRange,
@@ -49,12 +50,12 @@ export class DashboardController {
         ? { gte: range.start, lte: range.end }
         : undefined;
     const customerId = filters["customerId"] || undefined;
-    const stationId = filters["stationId"] || undefined;
+    const collaboratorId = filters["collaboratorId"] || undefined;
     const cacheToken = [
       period,
       reference ?? "now",
       customerId ?? "all",
-      stationId ?? "all",
+      collaboratorId ?? "all",
       tenant?.timezone ?? "Europe/Rome",
     ].join(":");
 
@@ -62,24 +63,37 @@ export class DashboardController {
       cacheKeys.dashboardRevenue(tenantId, cacheToken),
       CACHE_TTL_SECONDS.dashboard,
       async () => {
-        const [sales, completedAppointments, appointmentCount, customerCount] =
-          await Promise.all([
+        const [
+          sales,
+          completedAppointments,
+          appointmentCount,
+          completedAppointmentCount,
+          customerCount,
+        ] = await Promise.all([
             this.prisma.sale.findMany({
               where: {
                 tenantId,
                 soldAt: rangeFilter,
                 customerId,
                 paymentStatus: { in: ["paid", "partial"] },
-                ...(stationId
-                  ? { items: { some: { stations: { some: { stationId } } } } }
-                  : {}),
+                ...(collaboratorId ? { collaboratorId } : {}),
               },
               include: {
                 customer: {
                   select: { id: true, firstName: true, lastName: true },
                 },
+                collaborator: {
+                  select: { id: true, firstName: true, lastName: true },
+                },
+                appointment: {
+                  select: {
+                    collaborator: {
+                      select: { id: true, firstName: true, lastName: true },
+                    },
+                  },
+                },
                 items: {
-                  include: { stations: { include: { station: true } } },
+                  select: { productId: true, lineTotal: true, taxTotal: true },
                 },
               },
             }),
@@ -89,7 +103,7 @@ export class DashboardController {
                 status: "completed",
                 startsAt: rangeFilter,
                 customerId,
-                stationId,
+                ...(collaboratorId ? { collaboratorId } : {}),
                 // An appointment linked to any sale is represented by that
                 // sale only. This prevents cancelled/refunded/unpaid orders
                 // from falling back to appointment revenue.
@@ -99,7 +113,9 @@ export class DashboardController {
                 customer: {
                   select: { id: true, firstName: true, lastName: true },
                 },
-                station: { select: { id: true, name: true } },
+                collaborator: {
+                  select: { id: true, firstName: true, lastName: true },
+                },
               },
             }),
             this.prisma.appointment.count({
@@ -107,26 +123,23 @@ export class DashboardController {
                 tenantId,
                 startsAt: rangeFilter,
                 customerId,
-                stationId,
+                ...(collaboratorId ? { collaboratorId } : {}),
+              },
+            }),
+            this.prisma.appointment.count({
+              where: {
+                tenantId,
+                status: "completed",
+                startsAt: rangeFilter,
+                customerId,
+                ...(collaboratorId ? { collaboratorId } : {}),
               },
             }),
             this.prisma.customer.count({ where: { tenantId } }),
           ]);
 
         const saleRevenue = (sale: (typeof sales)[number]) =>
-          stationId
-            ? sale.items
-                .filter((item) =>
-                  item.stations.some(
-                    (assignment) => assignment.stationId === stationId,
-                  ),
-                )
-                .reduce(
-                  (total, item) =>
-                    total + Number(item.lineTotal) + Number(item.taxTotal),
-                  0,
-                )
-            : Number(sale.total);
+          Number(sale.total);
         const appointmentValues = completedAppointments.map((appointment) =>
           Number(appointment.finalPrice ?? appointment.estimatedPrice ?? 0),
         );
@@ -134,14 +147,7 @@ export class DashboardController {
           (total, sale) =>
             total +
             sale.items
-              .filter(
-                (item) =>
-                  item.productId &&
-                  (!stationId ||
-                    item.stations.some(
-                      (assignment) => assignment.stationId === stationId,
-                    )),
-              )
+              .filter((item) => item.productId)
               .reduce(
                 (sum, item) =>
                   sum + Number(item.lineTotal) + Number(item.taxTotal),
@@ -160,10 +166,15 @@ export class DashboardController {
           string,
           { id: string; label: string; revenue: number }
         >();
-        const stationRevenue = new Map<
+        const collaboratorRevenue = new Map<
           string,
           { id: string; label: string; revenue: number }
         >();
+        const collaboratorLabel = (collaborator: {
+          id: string;
+          firstName: string;
+          lastName: string;
+        }) => `${collaborator.firstName} ${collaborator.lastName}`.trim();
         for (const sale of sales) {
           if (sale.customer) {
             const current = customerRevenue.get(sale.customer.id) ?? {
@@ -175,24 +186,17 @@ export class DashboardController {
             current.revenue += saleRevenue(sale);
             customerRevenue.set(current.id, current);
           }
-          for (const item of sale.items) {
-            const assignedStations = item.stations;
-            const stationShare = assignedStations.length
-              ? (Number(item.lineTotal) + Number(item.taxTotal)) /
-                assignedStations.length
-              : 0;
-            for (const assignment of assignedStations) {
-              if (stationId && assignment.station.id !== stationId) {
-                continue;
-              }
-              const current = stationRevenue.get(assignment.station.id) ?? {
-                id: assignment.station.id,
-                label: assignment.station.name,
-                revenue: 0,
-              };
-              current.revenue += stationShare;
-              stationRevenue.set(current.id, current);
-            }
+          const attributedCollaborator =
+            sale.collaborator ?? sale.appointment?.collaborator ?? null;
+          if (attributedCollaborator) {
+            const collaborator = attributedCollaborator;
+            const current = collaboratorRevenue.get(collaborator.id) ?? {
+              id: collaborator.id,
+              label: collaboratorLabel(collaborator) || "Collaboratore",
+              revenue: 0,
+            };
+            current.revenue += saleRevenue(sale);
+            collaboratorRevenue.set(current.id, current);
           }
         }
         for (const appointment of completedAppointments) {
@@ -207,16 +211,20 @@ export class DashboardController {
           };
           currentCustomer.revenue += value;
           customerRevenue.set(currentCustomer.id, currentCustomer);
-          if (appointment.station) {
-            const currentStation = stationRevenue.get(
-              appointment.station.id,
+          if (appointment.collaborator) {
+            const collaborator = appointment.collaborator;
+            const currentCollaborator = collaboratorRevenue.get(
+              collaborator.id,
             ) ?? {
-              id: appointment.station.id,
-              label: appointment.station.name,
+              id: collaborator.id,
+              label: collaboratorLabel(collaborator) || "Collaboratore",
               revenue: 0,
             };
-            currentStation.revenue += value;
-            stationRevenue.set(currentStation.id, currentStation);
+            currentCollaborator.revenue += value;
+            collaboratorRevenue.set(
+              currentCollaborator.id,
+              currentCollaborator,
+            );
           }
         }
 
@@ -236,7 +244,7 @@ export class DashboardController {
             {
               label: "Prenotazioni",
               value: String(appointmentCount),
-              trend: `${completedAppointments.length} completate`,
+              trend: `${completedAppointmentCount} completate`,
             },
             {
               label: "Ticket medio",
@@ -252,12 +260,175 @@ export class DashboardController {
           byCustomer: [...customerRevenue.values()].sort(
             (a, b) => b.revenue - a.revenue,
           ),
-          byStation: [...stationRevenue.values()].sort(
+          byCollaborator: [...collaboratorRevenue.values()].sort(
             (a, b) => b.revenue - a.revenue,
           ),
         };
       },
     );
+  }
+
+  @Get("activity")
+  async activity(
+    @Req() request: { headers: { authorization?: string } },
+    @Query() filters: Record<string, string>,
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    const period = (
+      ["day", "week", "month", "year", "all"].includes(filters["period"])
+        ? filters["period"]
+        : "month"
+    ) as RevenuePeriod;
+    const reference = filters["date"] ?? filters["month"];
+    const range = getRevenueRange(
+      period,
+      reference,
+      tenant?.timezone ?? "Europe/Rome",
+    );
+    const rangeFilter =
+      range.start && range.end
+        ? { gte: range.start, lte: range.end }
+        : undefined;
+    const customerId = filters["customerId"] || undefined;
+    const collaboratorId =
+      filters["collaboratorId"] || undefined;
+    const { page, pageSize } = parsePagination(filters, {
+      defaultPageSize: 20,
+    });
+    const take = page * pageSize + 1;
+
+    const [sales, appointments] = await Promise.all([
+      this.prisma.sale.findMany({
+        where: {
+          tenantId,
+          soldAt: rangeFilter,
+          customerId,
+          ...(collaboratorId ? { collaboratorId } : {}),
+        },
+        orderBy: { soldAt: "desc" },
+        take,
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true } },
+          collaborator: {
+            select: { id: true, firstName: true, lastName: true },
+          },
+          items: { select: { id: true } },
+        },
+      }),
+      this.prisma.appointment.findMany({
+        where: {
+          tenantId,
+          startsAt: rangeFilter,
+          customerId,
+          ...(collaboratorId ? { collaboratorId } : {}),
+        },
+        orderBy: { startsAt: "desc" },
+        take,
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true } },
+          service: { select: { id: true, name: true } },
+          collaborator: {
+            select: { id: true, firstName: true, lastName: true },
+          },
+          sales: {
+            select: {
+              id: true,
+              total: true,
+              paymentStatus: true,
+              items: { select: { id: true } },
+            },
+            orderBy: { soldAt: "desc" },
+          },
+        },
+      }),
+    ]);
+
+    const nameOf = (value?: {
+      firstName: string;
+      lastName: string;
+    } | null) =>
+      value ? `${value.firstName} ${value.lastName}`.trim() : "";
+
+    // Un ordine collegato a una prenotazione (chiave esterna appointmentId)
+    // viene mostrato come un unico movimento, usando data/ora della
+    // prenotazione (così si aggiorna se l'appuntamento viene spostato).
+    const appointmentIds = new Set(
+      appointments.map((appointment) => appointment.id),
+    );
+    const appointmentEntries = appointments.map((appointment) => {
+      const linkedSales = appointment.sales;
+      const serviceName = appointment.service?.name ?? "Prenotazione";
+      if (linkedSales.length) {
+        const latestSale = linkedSales[0];
+        const articleCount = linkedSales.reduce(
+          (total, sale) => total + sale.items.length,
+          0,
+        );
+        const amount = linkedSales.reduce(
+          (total, sale) => total + Number(sale.total),
+          0,
+        );
+        return {
+          kind: "combined" as const,
+          id: appointment.id,
+          occurredAt: appointment.startsAt,
+          customerName: nameOf(appointment.customer) || "Cliente",
+          collaboratorName: nameOf(appointment.collaborator),
+          detail: `${serviceName} · ${articleCount} articoli`,
+          amount,
+          status: latestSale.paymentStatus,
+          appointmentId: appointment.id,
+        };
+      }
+      return {
+        kind: "appointment" as const,
+        id: appointment.id,
+        occurredAt: appointment.startsAt,
+        customerName: nameOf(appointment.customer) || "Cliente",
+        collaboratorName: nameOf(appointment.collaborator),
+        detail: serviceName,
+        amount: Number(
+          appointment.finalPrice ?? appointment.estimatedPrice ?? 0,
+        ),
+        status: appointment.status,
+        appointmentId: appointment.id,
+      };
+    });
+    const saleEntries = sales
+      .filter(
+        (sale) =>
+          !sale.appointmentId || !appointmentIds.has(sale.appointmentId),
+      )
+      .map((sale) => ({
+        kind: "sale" as const,
+        id: sale.id,
+        occurredAt: sale.soldAt,
+        customerName: nameOf(sale.customer) || "Vendita senza cliente",
+        collaboratorName: nameOf(sale.collaborator),
+        detail: `${sale.items.length} articoli`,
+        amount: Number(sale.total),
+        status: sale.paymentStatus,
+        appointmentId: sale.appointmentId ?? null,
+      }));
+    const merged = [...appointmentEntries, ...saleEntries].sort(
+      (left, right) =>
+        new Date(right.occurredAt).getTime() -
+        new Date(left.occurredAt).getTime(),
+    );
+
+    const start = (page - 1) * pageSize;
+    const items = merged.slice(start, start + pageSize);
+    const hasMore = merged.length > start + pageSize;
+
+    return { items, page, pageSize, hasMore };
   }
 
   @Get("appointments")
