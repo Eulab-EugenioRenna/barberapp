@@ -1,6 +1,14 @@
 import { CommonModule, DOCUMENT, DatePipe, DecimalPipe, NgClass } from "@angular/common";
 import { HttpClient } from "@angular/common/http";
-import { Component, OnInit, ViewChild, computed, inject } from "@angular/core";
+import {
+  Component,
+  HostListener,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  computed,
+  inject,
+} from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { firstValueFrom } from "rxjs";
@@ -455,6 +463,7 @@ type ViewKey =
             <barber-admin-appointments-feature-page
               *ngIf="activeView === 'appointments'"
               (createOrder)="openQuickOrder($event)"
+              (dataChanged)="refreshAfterDataChange($event)"
             ></barber-admin-appointments-feature-page>
 
             <barber-admin-sales-page
@@ -597,7 +606,7 @@ type ViewKey =
     </main>
   `,
 })
-export class AdminAppComponent implements OnInit {
+export class AdminAppComponent implements OnInit, OnDestroy {
   @ViewChild(AdminAppointmentsFeaturePageComponent)
   private readonly appointmentsFeaturePage?: AdminAppointmentsFeaturePageComponent;
 
@@ -665,6 +674,8 @@ export class AdminAppComponent implements OnInit {
   dashboardActivityHasMore = false;
   dashboardActivityLoading = false;
   private dashboardActivityPage = 1;
+  private dashboardActivityRequestId = 0;
+  private dashboardRefreshTimer: ReturnType<typeof setInterval> | null = null;
   platformTenants: any[] = [];
   selectedPlatformTenant: any = null;
   platformPlans: any[] = [];
@@ -1004,6 +1015,36 @@ export class AdminAppComponent implements OnInit {
         void this.refreshAll();
       }
     }
+    this.dashboardRefreshTimer = setInterval(() => {
+      if (this.canAutoRefreshDashboard()) {
+        void this.refreshDashboardQueries();
+      }
+    }, 15_000);
+  }
+
+  @HostListener("document:visibilitychange")
+  onDocumentVisibilityChange(): void {
+    if (this.canAutoRefreshDashboard()) {
+      void this.refreshDashboardQueries();
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.dashboardRefreshTimer) {
+      clearInterval(this.dashboardRefreshTimer);
+      this.dashboardRefreshTimer = null;
+    }
+  }
+
+  private canAutoRefreshDashboard(): boolean {
+    return (
+      this.activeView === "dashboard" &&
+      this.sessionStore.isAuthenticated() &&
+      this.currentUser?.role !== "platform_admin" &&
+      !this.document.hidden &&
+      !this.adminFacade.loading() &&
+      !this.dashboardActivityLoading
+    );
   }
 
   async loadMoreCustomers(): Promise<void> {
@@ -1239,7 +1280,7 @@ export class AdminAppComponent implements OnInit {
 
   async refreshAll(): Promise<void> {
     try {
-      const state = await this.adminFacade.refreshAll();
+      const state = await this.adminFacade.refreshAll(this.revenueFilters);
       this.loading = this.adminFacade.loading();
       this.feedback = this.adminFacade.feedback();
       this.currentUser = this.adminFacade.currentUser();
@@ -1299,7 +1340,7 @@ export class AdminAppComponent implements OnInit {
         this.appointmentForm.serviceId = this.services[0].id;
       }
 
-      void this.loadDashboardActivity(true);
+      await this.loadDashboardActivity(true);
     } catch (error: any) {
       if (error?.status === 401) {
         this.rememberRequestedUrl();
@@ -1402,6 +1443,9 @@ export class AdminAppComponent implements OnInit {
     }
     if (window.innerWidth < 1024) {
       this.sidebarOpen = false;
+    }
+    if (view === "dashboard") {
+      void this.refreshDashboardQueries();
     }
   }
 
@@ -2443,10 +2487,11 @@ export class AdminAppComponent implements OnInit {
   }
 
   async loadDashboardActivity(reset = false): Promise<void> {
-    if (this.dashboardActivityLoading) {
+    if (!reset && this.dashboardActivityLoading) {
       return;
     }
 
+    const requestId = ++this.dashboardActivityRequestId;
     this.dashboardActivityLoading = true;
     if (reset) {
       this.dashboardActivityPage = 1;
@@ -2460,17 +2505,52 @@ export class AdminAppComponent implements OnInit {
           this.dashboardActivityPage,
         ),
       );
+      if (requestId !== this.dashboardActivityRequestId) {
+        return;
+      }
       const items = Array.isArray(response?.items) ? response.items : [];
       this.dashboardActivity = reset
         ? items
         : [...this.dashboardActivity, ...items];
       this.dashboardActivityHasMore = Boolean(response?.hasMore);
     } catch (error: any) {
+      if (requestId !== this.dashboardActivityRequestId) {
+        return;
+      }
       this.feedback =
         error?.error?.message || "Caricamento movimenti non riuscito";
     } finally {
-      this.dashboardActivityLoading = false;
+      if (requestId === this.dashboardActivityRequestId) {
+        this.dashboardActivityLoading = false;
+      }
     }
+  }
+
+  async refreshDashboardQueries(): Promise<void> {
+    try {
+      await Promise.all([
+        this.adminFacade.refreshStatsData(this.revenueFilters),
+        this.loadDashboardActivity(true),
+      ]);
+      this.revenueReport = this.adminFacade.revenueReport();
+      this.revenueMetrics = this.adminFacade.revenueMetrics();
+      this.appointmentStats = this.adminFacade.appointmentStats();
+      this.collaboratorStats = this.adminFacade.collaboratorStats();
+      this.serviceStats = this.adminFacade.serviceStats();
+    } catch (error: any) {
+      this.feedback =
+        error?.error?.message ||
+        error?.message ||
+        "Aggiornamento dashboard non riuscito";
+    }
+  }
+
+  async refreshAfterDataChange(scope: "dashboard" | "all"): Promise<void> {
+    if (scope === "all") {
+      await this.refreshAll();
+      return;
+    }
+    await this.refreshDashboardQueries();
   }
 
   async loadMoreDashboardActivity(): Promise<void> {
@@ -2499,7 +2579,6 @@ export class AdminAppComponent implements OnInit {
       this.closeQuickOrder();
       this.feedback = "Ordine registrato";
       await this.refreshAll();
-      await this.loadRevenueReport();
     } catch (error: any) {
       this.feedback =
         error?.error?.message || "Registrazione ordine non riuscita";

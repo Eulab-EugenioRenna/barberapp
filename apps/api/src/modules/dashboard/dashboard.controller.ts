@@ -519,6 +519,32 @@ export class DashboardController {
     );
   }
 
+  @Get("upcoming-appointments")
+  async upcomingAppointments(
+    @Req() request: { headers: { authorization?: string } },
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+
+    return this.prisma.appointment.findMany({
+      where: {
+        tenantId,
+        startsAt: { gte: new Date() },
+        status: { in: ["requested", "confirmed", "checked_in", "rescheduled"] },
+      },
+      orderBy: { startsAt: "asc" },
+      take: 6,
+      include: {
+        customer: true,
+        service: true,
+        collaborator: true,
+      },
+    });
+  }
+
   @Get("collaborators")
   async collaborators(
     @Req() request: { headers: { authorization?: string } },

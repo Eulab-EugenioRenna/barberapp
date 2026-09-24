@@ -109,6 +109,7 @@ export class CustomersController {
         marketingConsent: Boolean(body["marketingConsent"]),
       },
     });
+    await this.cacheInvalidationService.invalidateDashboard(tenantId);
 
     await this.customersAlignmentService.alignCustomer(tenantId, created.id);
 
@@ -117,7 +118,6 @@ export class CustomersController {
       created.id,
       "customer_updated",
     );
-
     return this.prisma.customer.findUnique({ where: { id: created.id } });
   }
 
@@ -170,6 +170,7 @@ export class CustomersController {
           typeof body["isActive"] === "boolean" ? body["isActive"] : undefined,
       },
     });
+    await this.cacheInvalidationService.invalidateDashboard(tenantId);
 
     await this.customersAlignmentService.alignCustomer(tenantId, updated.id);
 
@@ -178,7 +179,6 @@ export class CustomersController {
       updated.id,
       "customer_updated",
     );
-
     return this.prisma.customer.findUnique({ where: { id: updated.id } });
   }
 
@@ -255,7 +255,10 @@ export class CustomersController {
 
     await this.prisma.customer.delete({ where: { id } });
 
-    await this.cacheInvalidationService.invalidateCustomers(tenantId);
+    await Promise.all([
+      this.cacheInvalidationService.invalidateCustomers(tenantId),
+      this.cacheInvalidationService.invalidateDashboard(tenantId),
+    ]);
 
     return { id, removed: true };
   }

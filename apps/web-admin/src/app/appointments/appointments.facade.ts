@@ -463,12 +463,6 @@ export class AppointmentsFacade {
         customers: response.customers || [],
         tenant: response.tenant || null,
       });
-      try {
-        await this.adminFacade.refreshStatsData();
-      } catch {
-        // The agenda state is already current; keep it visible if a secondary
-        // dashboard metric cannot be refreshed.
-      }
     } catch (error: any) {
       this.feedback.set(
         error?.error?.message ||

@@ -267,12 +267,14 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   @Output() createOrder = new EventEmitter<any>();
+  @Output() dataChanged = new EventEmitter<"dashboard" | "all">();
   activeTab: "calendar" | "list" = "calendar";
   quickCreateKind: QuickCreateKind | null = null;
 
   onQuickCreated(kind: "customer" | "service", entity: any): void {
     this.appointmentsFacade.selectQuickCreatedEntity(kind, entity);
     this.quickCreateKind = null;
+    this.dataChanged.emit("all");
   }
 
   async ngOnInit(): Promise<void> {
@@ -304,6 +306,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
     try {
       await this.appointmentsFacade.saveAppointment();
       await this.appointmentsFacade.loadViewData();
+      this.dataChanged.emit("dashboard");
     } catch {
       // The facade exposes user-facing feedback for request failures.
     }
@@ -313,6 +316,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
     try {
       await this.appointmentsFacade.cancelAppointment();
       await this.appointmentsFacade.loadViewData();
+      this.dataChanged.emit("dashboard");
     } catch {
       // The facade exposes user-facing feedback for request failures.
     }
@@ -322,6 +326,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
     try {
       await this.appointmentsFacade.removeAppointment();
       await this.appointmentsFacade.loadViewData();
+      this.dataChanged.emit("dashboard");
       await this.router.navigate([], {
         queryParams: { detail: null },
         queryParamsHandling: "merge",
@@ -339,6 +344,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
     try {
       await this.appointmentsFacade.moveAppointment(event);
       await this.appointmentsFacade.loadViewData();
+      this.dataChanged.emit("dashboard");
     } catch {
       // The facade exposes user-facing feedback for request failures.
     }
@@ -398,6 +404,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
     try {
       await this.appointmentsFacade.confirmQuickReschedule();
       await this.appointmentsFacade.loadViewData();
+      this.dataChanged.emit("dashboard");
     } catch {
       // The facade exposes request feedback.
     }

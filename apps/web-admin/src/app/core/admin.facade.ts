@@ -17,6 +17,7 @@ export class AdminFacade {
   readonly revenueMetrics = signal<any[]>([]);
   readonly revenueReport = signal<any>(null);
   readonly appointmentStats = signal<any>(null);
+  readonly dashboardAppointments = signal<any[]>([]);
   readonly collaboratorStats = signal<any[]>([]);
   readonly serviceStats = signal<any[]>([]);
   readonly appointments = signal<any[]>([]);
@@ -41,15 +42,18 @@ export class AdminFacade {
     collaborators: 1,
   };
   private customerSearch = "";
+  private statsRequestId = 0;
   readonly dashboardData = computed(() => ({
     revenueMetrics: this.revenueMetrics(),
     revenueReport: this.revenueReport(),
     appointmentStats: this.appointmentStats(),
-    appointments: this.appointments(),
+    appointments: this.dashboardAppointments(),
     collaboratorStats: this.collaboratorStats(),
   }));
 
-  async refreshAll(): Promise<{
+  async refreshAll(
+    revenueFilters: Record<string, string> = {},
+  ): Promise<{
     mode: "platform" | "tenant" | "unauthenticated";
   }> {
     if (!this.sessionStore.isAuthenticated()) {
@@ -73,18 +77,19 @@ export class AdminFacade {
         return { mode: "platform" };
       }
 
+      const statsRequestId = ++this.statsRequestId;
       const { coreResponse, statsResponse }: any = await firstValueFrom(
         forkJoin({
           coreResponse: this.adminApi.loadAdminCoreData(),
           // A failed secondary report must not discard the operational data.
-          statsResponse: this.adminApi.loadAdminStatsData().pipe(
+          statsResponse: this.adminApi.loadAdminStatsData(revenueFilters).pipe(
             catchError(() => of(null)),
           ),
         }),
       );
       this.setCoreData(coreResponse);
 
-      if (statsResponse) {
+      if (statsResponse && statsRequestId === this.statsRequestId) {
         this.setStatsData(statsResponse);
       }
 
@@ -138,6 +143,7 @@ export class AdminFacade {
   setCoreData(input: Record<string, any>): void {
     this.tenant.set(input["tenant"] || null);
     this.appointments.set(input["appointments"] || []);
+    this.dashboardAppointments.set(input["appointments"] || []);
 
     const services = unwrapPage(input["services"]);
     this.services.set(services.items);
@@ -155,17 +161,23 @@ export class AdminFacade {
     this.loadedPages.customers = 1;
   }
 
-  async refreshStatsData(): Promise<void> {
+  async refreshStatsData(
+    revenueFilters: Record<string, string> = {},
+  ): Promise<void> {
+    const requestId = ++this.statsRequestId;
     const statsResponse: any = await firstValueFrom(
-      this.adminApi.loadAdminStatsData(),
+      this.adminApi.loadAdminStatsData(revenueFilters),
     );
-    this.setStatsData(statsResponse);
+    if (requestId === this.statsRequestId) {
+      this.setStatsData(statsResponse);
+    }
   }
 
   private setStatsData(statsResponse: any): void {
     this.revenueReport.set(statsResponse.revenue || null);
     this.revenueMetrics.set(statsResponse.revenue?.metrics || []);
     this.appointmentStats.set(statsResponse.appointmentStats);
+    this.dashboardAppointments.set(statsResponse.upcomingAppointments || []);
     this.collaboratorStats.set(statsResponse.collaboratorStats || []);
     this.serviceStats.set(statsResponse.serviceStats || []);
 

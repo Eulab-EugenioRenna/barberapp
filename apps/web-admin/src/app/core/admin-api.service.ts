@@ -33,11 +33,15 @@ export class AdminApiService {
   loadAdminCoreData(): Observable<Record<string, unknown>> {
     return forkJoin({
       tenant: this.http.get(`${ADMIN_API_URL}/tenant/settings`),
-      appointments: this.http.get(`${ADMIN_API_URL}/appointments`),
+      appointments: this.loadAppointments(),
       services: this.loadServicesPage(1),
       collaborators: this.loadCollaboratorsPage(1),
       customers: this.loadCustomersPage(1),
     });
+  }
+
+  loadAppointments(): Observable<any[]> {
+    return this.http.get<any[]>(`${ADMIN_API_URL}/appointments`);
   }
 
   loadCustomersPage(
@@ -102,9 +106,14 @@ export class AdminApiService {
     });
   }
 
-  loadAdminStatsData(): Observable<Record<string, unknown>> {
+  loadAdminStatsData(
+    revenueFilters: Record<string, string> = {},
+  ): Observable<Record<string, unknown>> {
     return forkJoin({
-      revenue: this.http.get(`${ADMIN_API_URL}/dashboard/revenue`),
+      revenue: this.loadRevenueReport(revenueFilters),
+      upcomingAppointments: this.http.get(
+        `${ADMIN_API_URL}/dashboard/upcoming-appointments`,
+      ),
       appointmentStats: this.http.get(
         `${ADMIN_API_URL}/dashboard/appointments`,
       ),
