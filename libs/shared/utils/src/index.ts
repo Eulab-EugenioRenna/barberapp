@@ -21,6 +21,15 @@ export function slugify(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+export function toLocalDateKey(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 export function formatCurrency(amount: number, currency = 'EUR', locale = 'it-IT'): string {
   return new Intl.NumberFormat(locale, {
     style: 'currency',

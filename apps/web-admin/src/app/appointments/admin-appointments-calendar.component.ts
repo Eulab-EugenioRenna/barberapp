@@ -11,6 +11,8 @@ import {
   ViewChild,
 } from "@angular/core";
 import { CalendarInputComponent } from "../calendar-input.component";
+import { toLocalDateKey } from "@barber/shared/utils";
+import { buildDayListingEvent } from "./calendar-date";
 
 @Component({
   selector: "barber-admin-appointments-calendar",
@@ -904,7 +906,7 @@ export class AdminAppointmentsCalendarComponent
     if (Number.isNaN(date.getTime())) {
       return "";
     }
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return toLocalDateKey(date);
   }
 
   selectDateKey(value: string): void {
@@ -1141,7 +1143,7 @@ export class AdminAppointmentsCalendarComponent
     target.setHours(original.getHours(), original.getMinutes(), 0, 0);
     this.appointmentRescheduleRequest.emit({
       appointmentId: payload.appointmentId,
-      targetDate: target.toISOString().slice(0, 10),
+      targetDate: toLocalDateKey(target),
       suggestedStartsAt: this.toLocalDateTimeValue(target),
       suggestedCollaboratorId: payload.originalCollaboratorId,
       sourceView: "week",
@@ -1161,7 +1163,7 @@ export class AdminAppointmentsCalendarComponent
     target.setHours(original.getHours(), original.getMinutes(), 0, 0);
     this.appointmentRescheduleRequest.emit({
       appointmentId: payload.appointmentId,
-      targetDate: target.toISOString().slice(0, 10),
+      targetDate: toLocalDateKey(target),
       suggestedStartsAt: this.toLocalDateTimeValue(target),
       suggestedCollaboratorId: payload.originalCollaboratorId,
       sourceView: "month",
@@ -1169,10 +1171,7 @@ export class AdminAppointmentsCalendarComponent
   }
 
   openDayListing(date: Date, sourceView: "week" | "month"): void {
-    this.showDayAppointments.emit({
-      date: date.toISOString().slice(0, 10),
-      sourceView,
-    });
+    this.showDayAppointments.emit(buildDayListingEvent(date, sourceView));
   }
 
   private buildDropDateTime(

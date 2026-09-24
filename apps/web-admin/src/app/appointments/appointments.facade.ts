@@ -2,6 +2,7 @@ import { Injectable, computed, signal, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 import { AdminApiService } from "../core/admin-api.service";
 import { AdminFacade } from "../core/admin.facade";
+import { toLocalDateKey } from "@barber/shared/utils";
 import { AppointmentsService } from "./appointments.service";
 
 type CalendarView = "day" | "week" | "month";
@@ -42,7 +43,7 @@ export class AppointmentsFacade {
   readonly appointmentCustomerSearch = signal("");
   readonly filteredAppointmentCustomers = signal<any[]>([]);
   readonly appointmentSelectedDate = signal(
-    new Date().toISOString().slice(0, 10),
+    toLocalDateKey(new Date()),
   );
   readonly appointmentSlots = signal<
     Array<{ startsAt: string; label: string }>
@@ -390,7 +391,7 @@ export class AppointmentsFacade {
           (!selectedCollaboratorIds.length ||
             selectedCollaboratorIds.includes(appointment.collaboratorId)) &&
           (!this.listFilterDate() ||
-            appointment.startsAt.slice(0, 10) === this.listFilterDate()),
+            toLocalDateKey(appointment.startsAt) === this.listFilterDate()),
       )
       .sort(
         (left, right) =>
@@ -551,7 +552,7 @@ export class AppointmentsFacade {
     this.appointmentForm.set(this.emptyAppointmentForm());
     this.appointmentCustomerSearch.set("");
     this.filteredAppointmentCustomers.set([...this.customers()]);
-    this.appointmentSelectedDate.set(new Date().toISOString().slice(0, 10));
+    this.appointmentSelectedDate.set(toLocalDateKey(new Date()));
     this.appointmentSlots.set([]);
     if (this.services()[0]) {
       this.appointmentForm.update((form) => ({
@@ -1033,7 +1034,7 @@ export class AppointmentsFacade {
     startTime: string;
     endTime: string;
   } {
-    const dateKey = day.toISOString().slice(0, 10);
+    const dateKey = toLocalDateKey(day);
     const override = (collaborator.dayOverrides || []).find(
       (entry: any) =>
         new Date(entry.date).toISOString().slice(0, 10) === dateKey,
