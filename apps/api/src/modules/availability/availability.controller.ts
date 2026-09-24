@@ -3,6 +3,7 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
+import { resolveZonedDateKey } from "../../common/zoned-time";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AvailabilityService } from "./availability.service";
 
@@ -25,10 +26,15 @@ export class AvailabilityController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    const timezone = tenant?.timezone || "Europe/Rome";
 
     return {
       serviceId,
-      date: date ?? new Date().toISOString().slice(0, 10),
+      date: resolveZonedDateKey(date, timezone),
       slots: await this.availabilityService.getCachedAvailability(
         tenantId,
         serviceId,

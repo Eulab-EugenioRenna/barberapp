@@ -21,6 +21,18 @@ export class PublicBookingApiService {
     return this.http.get(`${basePath}/availability`, { params });
   }
 
+  availabilityRange(
+    basePath: string,
+    params: {
+      serviceId: string;
+      from: string;
+      to: string;
+      collaboratorId: string;
+    },
+  ): Observable<any> {
+    return this.http.get(`${basePath}/availability-range`, { params });
+  }
+
   createBooking(
     basePath: string,
     payload: Record<string, unknown>,

@@ -34,8 +34,8 @@ describe("AvailabilityService", () => {
             {
               collaboratorId: "collaborator-1",
               roomId: null,
-              startsAt: new Date(2026, 4, 14, 9, 0, 0, 0),
-              endsAt: new Date(2026, 4, 14, 9, 30, 0, 0),
+              startsAt: new Date(Date.UTC(2026, 4, 14, 9, 0, 0, 0)),
+              endsAt: new Date(Date.UTC(2026, 4, 14, 9, 30, 0, 0)),
               service: {
                 bufferBeforeMinutes: 0,
                 bufferAfterMinutes: 15,
@@ -45,6 +45,11 @@ describe("AvailabilityService", () => {
           ]),
         },
         room: { count: jest.fn() },
+        tenant: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ timezone: "UTC" }),
+        },
       } as never,
       {
         getOrSet: jest.fn(

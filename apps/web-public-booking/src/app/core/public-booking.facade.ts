@@ -9,6 +9,7 @@ export class PublicBookingFacade {
   private readonly api = inject(PublicBookingApiService);
   private readonly titleService = inject(Title);
   private readonly availabilityRefresh = new Subject<void>();
+  private readonly rangeRefresh = new Subject<void>();
 
   readonly tenantSlug = signal("default");
   readonly loading = signal(false);
@@ -20,6 +21,7 @@ export class PublicBookingFacade {
   readonly selectedSlot = signal("");
   readonly slots = signal<any[]>([]);
   readonly bookingResult = signal<any>(null);
+  readonly availabilityByDate = signal<Record<string, boolean>>({});
   readonly selectedDate = signal(toLocalDateKey(new Date()));
   readonly bookingForm = signal({
     customerName: "",
@@ -61,6 +63,38 @@ export class PublicBookingFacade {
         const slots = response?.slots || [];
         this.slots.set(slots);
         this.selectedSlot.set(slots[0]?.startsAt || "");
+      });
+
+    this.rangeRefresh
+      .pipe(
+        switchMap(() => {
+          const selectedService = this.selectedService();
+          const selectedCollaboratorId = this.selectedCollaboratorId();
+
+          if (!selectedService || !selectedCollaboratorId) {
+            return of({ days: [] });
+          }
+
+          const { from, to } = this.resolveAvailabilityRange();
+          return this.api
+            .availabilityRange(this.publicBasePath(), {
+              serviceId: selectedService.id,
+              from,
+              to,
+              collaboratorId: selectedCollaboratorId,
+            })
+            .pipe(catchError(() => of({ days: [] })));
+        }),
+      )
+      .subscribe((response: any) => {
+        const days = Array.isArray(response?.days) ? response.days : [];
+        const map: Record<string, boolean> = {};
+        for (const day of days) {
+          if (day?.date) {
+            map[day.date] = Boolean(day.hasSlots);
+          }
+        }
+        this.availabilityByDate.set(map);
       });
   }
 
@@ -147,6 +181,7 @@ export class PublicBookingFacade {
       const current = new Date(start);
       current.setDate(current.getDate() + index);
       const key = toLocalDateKey(current);
+      const known = this.availabilityByDate()[key];
       return {
         key,
         label: current.toLocaleDateString("it-IT", {
@@ -156,16 +191,9 @@ export class PublicBookingFacade {
         isToday: key === toLocalDateKey(new Date()),
         isPast: key < toLocalDateKey(new Date()),
         isSelected: key === this.selectedDate(),
-        isUnavailable:
-          key === this.selectedDate() &&
-          Boolean(this.selectedCollaboratorId()) &&
-          this.slots().length === 0,
+        isUnavailable: known === false,
         statusLabel:
-          key === this.selectedDate() &&
-          Boolean(this.selectedCollaboratorId()) &&
-          this.slots().length === 0
-            ? "Bloccato"
-            : "Disponibile",
+          known === false ? "Bloccato" : known === true ? "Disponibile" : "—",
       };
     });
   });
@@ -181,6 +209,7 @@ export class PublicBookingFacade {
       const current = new Date(gridStart);
       current.setDate(current.getDate() + index);
       const key = toLocalDateKey(current);
+      const known = this.availabilityByDate()[key];
       return {
         key,
         dayNumber: current.getDate(),
@@ -188,16 +217,9 @@ export class PublicBookingFacade {
         isToday: key === toLocalDateKey(new Date()),
         isPast: key < toLocalDateKey(new Date()),
         isSelected: key === this.selectedDate(),
-        isUnavailable:
-          key === this.selectedDate() &&
-          Boolean(this.selectedCollaboratorId()) &&
-          this.slots().length === 0,
+        isUnavailable: known === false,
         statusLabel:
-          key === this.selectedDate() &&
-          Boolean(this.selectedCollaboratorId()) &&
-          this.slots().length === 0
-            ? "Bloccato"
-            : "Disponibile",
+          known === false ? "Bloccato" : known === true ? "Disponibile" : "—",
       };
     });
   });
@@ -282,6 +304,29 @@ export class PublicBookingFacade {
 
   requestAvailability(): void {
     this.availabilityRefresh.next();
+    this.rangeRefresh.next();
+  }
+
+  private resolveAvailabilityRange(): { from: string; to: string } {
+    const selected = new Date(`${this.selectedDate()}T00:00:00`);
+    const monthStart = new Date(selected.getFullYear(), selected.getMonth(), 1);
+    const gridStart = new Date(monthStart);
+    const gridWeekday = gridStart.getDay();
+    const gridDiff = gridWeekday === 0 ? -6 : 1 - gridWeekday;
+    gridStart.setDate(gridStart.getDate() + gridDiff);
+
+    const weekStart = new Date(selected);
+    const weekWeekday = weekStart.getDay();
+    const weekDiff = weekWeekday === 0 ? -6 : 1 - weekWeekday;
+    weekStart.setDate(weekStart.getDate() + weekDiff);
+
+    const start = gridStart < weekStart ? gridStart : weekStart;
+    const end = new Date(gridStart);
+    end.setDate(end.getDate() + 41);
+    const today = toLocalDateKey(new Date());
+    const from = toLocalDateKey(start) < today ? today : toLocalDateKey(start);
+
+    return { from, to: toLocalDateKey(end) };
   }
 
   selectService(service: any): void {

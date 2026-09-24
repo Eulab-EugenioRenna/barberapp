@@ -28,6 +28,7 @@ import {
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
 import { NotificationsEventsService } from "../notifications/notifications.events.service";
 import { CollaboratorScheduleService } from "../availability/collaborator-schedule.service";
+import { parseZonedDateTime } from "../../common/zoned-time";
 
 type AppointmentPayload = Record<string, unknown>;
 
@@ -41,6 +42,15 @@ export class AppointmentsController {
     private readonly customersAlignmentService: CustomersAlignmentService,
     private readonly collaboratorScheduleService: CollaboratorScheduleService,
   ) {}
+
+  private async resolveTenantTimezone(tenantId: string): Promise<string> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+
+    return tenant?.timezone || "Europe/Rome";
+  }
 
   private async ensureWorkingWindow(input: {
     tenantId: string;
@@ -231,9 +241,13 @@ export class AppointmentsController {
     const user = requireUser(session);
     const tenantId = requireTenantId(session);
     const serviceId = String(body["serviceId"] ?? "");
-    const startsAt = new Date(String(body["startsAt"] ?? ""));
+    const timezone = await this.resolveTenantTimezone(tenantId);
+    const startsAt = parseZonedDateTime(
+      String(body["startsAt"] ?? ""),
+      timezone,
+    );
 
-    if (!serviceId || Number.isNaN(startsAt.getTime())) {
+    if (!serviceId || !startsAt) {
       throw new BadRequestException("serviceId and startsAt are required");
     }
 
@@ -404,9 +418,20 @@ export class AppointmentsController {
       throw new BadRequestException("Service not found");
     }
 
-    const startsAt = body["startsAt"]
-      ? new Date(String(body["startsAt"]))
-      : current.startsAt;
+    const timezone = await this.resolveTenantTimezone(
+      requireTenantId(session),
+    );
+    let startsAt = current.startsAt;
+    if (body["startsAt"]) {
+      const parsedStartsAt = parseZonedDateTime(
+        String(body["startsAt"]),
+        timezone,
+      );
+      if (!parsedStartsAt) {
+        throw new BadRequestException("Invalid startsAt");
+      }
+      startsAt = parsedStartsAt;
+    }
     const endsAt = new Date(
       startsAt.getTime() + service.durationMinutes * 60000,
     );

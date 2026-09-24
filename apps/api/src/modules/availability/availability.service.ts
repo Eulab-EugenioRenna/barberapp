@@ -2,6 +2,10 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { CACHE_TTL_SECONDS, cacheKeys } from "../../cache/cache.constants";
 import { normalizeCacheToken } from "../../cache/cache.helpers";
 import { AppCacheService } from "../../cache/cache.service";
+import {
+  resolveZonedDateKey,
+  zonedTimeToUtc,
+} from "../../common/zoned-time";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CollaboratorScheduleService } from "./collaborator-schedule.service";
 
@@ -110,31 +114,42 @@ export class AvailabilityService {
       return [];
     }
 
-    const baseDate = dateInput ? new Date(dateInput) : new Date();
-
-    if (Number.isNaN(baseDate.getTime())) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    const timezone = tenant?.timezone || "Europe/Rome";
+    const dateKey = resolveZonedDateKey(dateInput, timezone);
+    const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+    if (!dateMatch) {
       throw new BadRequestException("Invalid date");
     }
+    const year = Number(dateMatch[1]);
+    const month = Number(dateMatch[2]);
+    const dayOfMonth = Number(dateMatch[3]);
 
-    const day = new Date(
-      baseDate.getFullYear(),
-      baseDate.getMonth(),
-      baseDate.getDate(),
+    // Server-local date used only for weekday/schedule resolution.
+    const localDay = new Date(year, month - 1, dayOfMonth);
+    // Tenant day boundaries expressed as UTC instants for conflict queries.
+    const dayStart = zonedTimeToUtc(
+      { year, month, day: dayOfMonth },
+      timezone,
     );
-    const endOfDay = new Date(
-      day.getFullYear(),
-      day.getMonth(),
-      day.getDate(),
-      23,
-      59,
-      59,
-      999,
+    const nextCalendarDay = new Date(Date.UTC(year, month - 1, dayOfMonth + 1));
+    const nextDayStart = zonedTimeToUtc(
+      {
+        year: nextCalendarDay.getUTCFullYear(),
+        month: nextCalendarDay.getUTCMonth() + 1,
+        day: nextCalendarDay.getUTCDate(),
+      },
+      timezone,
     );
+    const endOfDay = new Date(nextDayStart.getTime() - 1);
     const appointments = await this.prisma.appointment.findMany({
       where: {
         tenantId,
         startsAt: { lte: endOfDay },
-        endsAt: { gte: day },
+        endsAt: { gte: dayStart },
         status: { notIn: ["cancelled", "no_show"] },
       },
       select: {
@@ -192,32 +207,27 @@ export class AvailabilityService {
         await this.collaboratorScheduleService.resolveWorkingWindow(
           tenantId,
           collaborator.id,
-          day,
+          localDay,
         ),
       );
     }
 
     for (let hour = 9; hour < 19; hour += 1) {
       for (const minute of [0, 30]) {
-        const startsAt = new Date(
-          day.getFullYear(),
-          day.getMonth(),
-          day.getDate(),
-          hour,
-          minute,
-          0,
-          0,
+        const slotStartMinutes = hour * 60 + minute;
+        const slotEndMinutes = slotStartMinutes + service.durationMinutes;
+
+        if (slotEndMinutes > 19 * 60) {
+          continue;
+        }
+
+        const startsAt = zonedTimeToUtc(
+          { year, month, day: dayOfMonth, hour, minute },
+          timezone,
         );
         const endsAt = new Date(
           startsAt.getTime() + service.durationMinutes * 60000,
         );
-
-        if (
-          endsAt.getHours() > 19 ||
-          (endsAt.getHours() === 19 && endsAt.getMinutes() > 0)
-        ) {
-          continue;
-        }
 
         const slotBlockedStart = new Date(
           startsAt.getTime() - service.bufferBeforeMinutes * 60000,
@@ -225,8 +235,6 @@ export class AvailabilityService {
         const slotBlockedEnd = new Date(
           endsAt.getTime() + service.bufferAfterMinutes * 60000,
         );
-        const slotStartMinutes = hour * 60 + minute;
-        const slotEndMinutes = slotStartMinutes + service.durationMinutes;
 
         for (const collaborator of availableCollaborators) {
           const workingWindow = collaboratorWindows.get(collaborator.id);

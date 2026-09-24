@@ -17,6 +17,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { AvailabilityService } from "../availability/availability.service";
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
 import { NotificationsEventsService } from "../notifications/notifications.events.service";
+import { resolveZonedDateKey } from "../../common/zoned-time";
 
 @Controller()
 export class PublicBookingController {
@@ -225,10 +226,15 @@ export class PublicBookingController {
     host?: string,
   ) {
     const tenant = await this.resolveTenant(tenantSlug, host);
+    const tenantRecord = await this.prisma.tenant.findUnique({
+      where: { id: tenant.id },
+      select: { timezone: true },
+    });
+    const timezone = tenantRecord?.timezone || "Europe/Rome";
 
     return {
       serviceId,
-      date: date ?? new Date().toISOString().slice(0, 10),
+      date: resolveZonedDateKey(date, timezone),
       slots: await this.availabilityService.getCachedAvailability(
         tenant.id,
         serviceId,
@@ -237,6 +243,57 @@ export class PublicBookingController {
         { requireExplicitCollaborator: true, publicOnly: true },
       ),
     };
+  }
+
+  private async getAvailabilityRangeResponse(
+    serviceId: string,
+    from: string | undefined,
+    to: string | undefined,
+    collaboratorId: string | undefined,
+    tenantSlug?: string,
+    host?: string,
+  ) {
+    const tenant = await this.resolveTenant(tenantSlug, host);
+    const start = this.parseDateKey(from);
+    const end = this.parseDateKey(to);
+
+    if (!start || !end) {
+      throw new BadRequestException("from and to are required");
+    }
+    if (end < start) {
+      throw new BadRequestException("Invalid date range");
+    }
+
+    const maxDays = 62;
+    const days: Array<{ date: string; hasSlots: boolean }> = [];
+    const cursor = new Date(start);
+
+    while (cursor.getTime() <= end && days.length < maxDays) {
+      const dateKey = this.formatDateKey(cursor);
+      const slots = await this.availabilityService.getCachedAvailability(
+        tenant.id,
+        serviceId,
+        dateKey,
+        collaboratorId,
+        { requireExplicitCollaborator: true, publicOnly: true },
+      );
+      days.push({ date: dateKey, hasSlots: slots.length > 0 });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    return { serviceId, days };
+  }
+
+  private parseDateKey(value?: string): number | null {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return null;
+    }
+    const [year, month, day] = value.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  }
+
+  private formatDateKey(value: Date): string {
+    return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")}`;
   }
 
   private async createBookingResponse(
@@ -422,6 +479,24 @@ export class PublicBookingController {
     );
   }
 
+  @Get("public/availability-range")
+  getHostAvailabilityRange(
+    @Req() request: { headers: { host?: string } },
+    @Query("serviceId") serviceId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("collaboratorId") collaboratorId?: string,
+  ): Promise<unknown> {
+    return this.getAvailabilityRangeResponse(
+      serviceId,
+      from,
+      to,
+      collaboratorId,
+      undefined,
+      request.headers.host,
+    );
+  }
+
   @Post("public/bookings")
   createHostBooking(
     @Req()
@@ -469,6 +544,25 @@ export class PublicBookingController {
     return this.getAvailabilityResponse(
       serviceId,
       date,
+      collaboratorId,
+      tenantSlug,
+      request.headers.host,
+    );
+  }
+
+  @Get("public/:tenantSlug/availability-range")
+  getAvailabilityRange(
+    @Param("tenantSlug") tenantSlug: string,
+    @Req() request: { headers: { host?: string } },
+    @Query("serviceId") serviceId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("collaboratorId") collaboratorId?: string,
+  ): Promise<unknown> {
+    return this.getAvailabilityRangeResponse(
+      serviceId,
+      from,
+      to,
       collaboratorId,
       tenantSlug,
       request.headers.host,
