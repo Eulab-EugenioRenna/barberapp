@@ -63,6 +63,53 @@ Nota:
 PostgreSQL, Redis, SMTP/MailHog, le app Angular e l'API sono raggiungibili
 solo dalla rete Docker `app`; l'unico endpoint pubblicato sull'host è Nginx.
 
+## Account demo in produzione
+
+`scripts/create-demo-account.ts` crea un account demo **completo** su un database
+reale, in modo **idempotente e non distruttivo**: aggiunge un nuovo tenant con
+servizi, prodotti, collaboratori (con orari), clienti, appuntamenti, ordini,
+abbonamento e coda conferme, senza toccare altri tenant o dati esistenti.
+
+Prima che il tenant esista, lancia (dentro il container API, che ha gia
+`DATABASE_URL`):
+
+```bash
+docker compose exec api npm run demo:create
+```
+
+Se lanciato due volte con lo stesso slug non cambia nulla. Le credenziali e la
+password vengono stampate a fine esecuzione.
+
+Personalizzazione tramite variabili d'ambiente:
+
+| Variabile | Default | Note |
+| --- | --- | --- |
+| `DEMO_TENANT_NAME` | `Demo Barber Studio` | Nome del tenant |
+| `DEMO_TENANT_SLUG` | `demo-barber-studio` | Deve essere unico |
+| `DEMO_PUBLIC_DOMAIN` | – | Dominio pubblico opzionale (unico) |
+| `DEMO_OWNER_EMAIL` | `demo@barber.test` | Login owner |
+| `DEMO_OWNER_PASSWORD` | generata | Stampa la password se non impostata |
+| `DEMO_OWNER_FIRST_NAME` | `Demo` | |
+| `DEMO_OWNER_LAST_NAME` | `Owner` | |
+| `DEMO_TIMEZONE` | `Europe/Rome` | |
+
+Esempio su produzione:
+
+```bash
+docker compose exec \
+  -e DEMO_OWNER_EMAIL=cliente.demo@example.com \
+  -e DEMO_OWNER_PASSWORD='UnaPasswordSicura!' \
+  api npm run demo:create
+```
+
+Reset (cancella e ricrea **solo** il tenant demo identificato dallo slug):
+
+```bash
+DEMO_RESET_CONFIRM=yes npm run demo:create -- --reset
+```
+
+`npm run demo:create -- --help` mostra tutte le opzioni.
+
 ## Notes
 
 This is a production-oriented foundation, not the complete SaaS. The API now includes a Redis-backed notification pipeline with BullMQ, tenant/user notification preferences, a notification inbox center, SMTP/webhook/in-app providers, and appointment/public-booking event triggers.

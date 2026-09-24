@@ -17,7 +17,8 @@
     "prisma:deploy": "node scripts/prisma-bootstrap.js",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed:platform-demo": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' prisma/seed.ts"
+    "seed:platform-demo": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' prisma/seed.ts",
+    "demo:create": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/create-demo-account.ts"
   },
   "dependencies": {
     "@angular/animations": "^18.2.0",
