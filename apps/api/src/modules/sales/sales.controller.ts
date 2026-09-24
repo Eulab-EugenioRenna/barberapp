@@ -122,7 +122,7 @@ export class SalesController {
       throw new BadRequestException("Aggiungi almeno un servizio o prodotto");
     }
 
-    const [products, services, customer, collaborator, appointment] =
+    const [products, services, customer, collaborator, appointment, tenant] =
       await Promise.all([
         this.prisma.product.findMany({ where: { tenantId, isActive: true } }),
         this.prisma.service.findMany({ where: { tenantId, isActive: true } }),
@@ -144,6 +144,10 @@ export class SalesController {
               select: { id: true },
             })
           : Promise.resolve(null),
+        this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { defaultCollaboratorId: true },
+        }),
       ]);
 
     if (customerId && !customer) {
@@ -167,6 +171,51 @@ export class SalesController {
       throw new BadRequestException(
         error instanceof Error ? error.message : "Ordine non valido",
       );
+    }
+
+    normalizedItems = normalizedItems.map((item) => {
+      const service = item.serviceId
+        ? services.find((entry) => entry.id === item.serviceId)
+        : undefined;
+      return {
+        ...item,
+        collaboratorId:
+          item.collaboratorId ||
+          (service?.requiresCollaborator
+            ? tenant?.defaultCollaboratorId ?? undefined
+            : undefined),
+      };
+    });
+
+    const serviceItemsWithoutCollaborator = normalizedItems.filter((item) => {
+      const service = item.serviceId
+        ? services.find((entry) => entry.id === item.serviceId)
+        : undefined;
+      return service?.requiresCollaborator && !item.collaboratorId;
+    });
+    if (serviceItemsWithoutCollaborator.length) {
+      throw new BadRequestException(
+        "Imposta un collaboratore per ogni servizio che lo richiede",
+      );
+    }
+
+    const itemCollaboratorIds = [
+      ...new Set(
+        normalizedItems
+          .map((item) => item.collaboratorId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (itemCollaboratorIds.length) {
+      const validCollaborators = await this.prisma.collaborator.findMany({
+        where: { tenantId, isActive: true, id: { in: itemCollaboratorIds } },
+        select: { id: true },
+      });
+      if (validCollaborators.length !== itemCollaboratorIds.length) {
+        throw new BadRequestException(
+          "Collaboratore non valido in una riga servizio",
+        );
+      }
     }
 
     const subtotal = normalizedItems.reduce(
@@ -197,6 +246,8 @@ export class SalesController {
       services,
     });
     const serviceItems = retroactiveAppointment.serviceItems;
+    const primaryCollaboratorId =
+      serviceItems[0]?.collaboratorId ?? collaboratorId;
 
     if (serviceItems.length && !customerId) {
       throw new BadRequestException(
@@ -214,7 +265,7 @@ export class SalesController {
             tenantId,
             customerId,
             serviceId: firstServiceItem.serviceId as string,
-            collaboratorId,
+            collaboratorId: primaryCollaboratorId,
             startsAt: retroactiveAppointment.startsAt,
             endsAt: retroactiveAppointment.endsAt,
             status: "completed",
@@ -236,7 +287,7 @@ export class SalesController {
         data: {
           tenantId,
           customerId,
-          collaboratorId,
+          collaboratorId: primaryCollaboratorId,
           appointmentId: resolvedAppointmentId,
           subtotal,
           discountTotal,
@@ -258,6 +309,7 @@ export class SalesController {
             include: {
               product: true,
               service: true,
+              collaborator: true,
             },
           },
           customer: true,

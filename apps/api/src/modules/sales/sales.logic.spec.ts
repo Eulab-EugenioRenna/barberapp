@@ -82,6 +82,20 @@ describe("normalizeOrderItems", () => {
     expect(appointment.startsAt.toISOString()).toBe("2026-09-22T11:00:00.000Z");
     expect(appointment.durationMinutes).toBe(60);
   });
+
+  it("mantiene il collaboratore sulla sola riga servizio", () => {
+    const [service, product] = normalizeOrderItems({
+      products,
+      services,
+      items: [
+        { serviceId: "s-cut", collaboratorId: "c-marco" },
+        { productId: "p-priced", collaboratorId: "c-marco" },
+      ],
+    });
+
+    expect(service.collaboratorId).toBe("c-marco");
+    expect(product.collaboratorId).toBeUndefined();
+  });
 });
 
 describe("resolveSaleItemLabels", () => {

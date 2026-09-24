@@ -76,7 +76,14 @@ export class DashboardController {
                 soldAt: rangeFilter,
                 customerId,
                 paymentStatus: { in: ["paid", "partial"] },
-                ...(collaboratorId ? { collaboratorId } : {}),
+                ...(collaboratorId
+                  ? {
+                      OR: [
+                        { collaboratorId },
+                        { items: { some: { collaboratorId } } },
+                      ],
+                    }
+                  : {}),
               },
               include: {
                 customer: {
@@ -93,7 +100,15 @@ export class DashboardController {
                   },
                 },
                 items: {
-                  select: { productId: true, lineTotal: true, taxTotal: true },
+                  select: {
+                    productId: true,
+                    lineTotal: true,
+                    taxTotal: true,
+                    collaboratorId: true,
+                    collaborator: {
+                      select: { id: true, firstName: true, lastName: true },
+                    },
+                  },
                 },
               },
             }),
@@ -138,8 +153,14 @@ export class DashboardController {
             this.prisma.customer.count({ where: { tenantId } }),
           ]);
 
+        const lineValue = (item: (typeof sales)[number]["items"][number]) =>
+          Number(item.lineTotal) + Number(item.taxTotal);
         const saleRevenue = (sale: (typeof sales)[number]) =>
-          Number(sale.total);
+          collaboratorId
+            ? sale.items
+                .filter((item) => item.collaboratorId === collaboratorId)
+                .reduce((sum, item) => sum + lineValue(item), 0)
+            : Number(sale.total);
         const appointmentValues = completedAppointments.map((appointment) =>
           Number(appointment.finalPrice ?? appointment.estimatedPrice ?? 0),
         );
@@ -147,10 +168,14 @@ export class DashboardController {
           (total, sale) =>
             total +
             sale.items
-              .filter((item) => item.productId)
+              .filter(
+                (item) =>
+                  item.productId &&
+                  (!collaboratorId || item.collaboratorId === collaboratorId),
+              )
               .reduce(
                 (sum, item) =>
-                  sum + Number(item.lineTotal) + Number(item.taxTotal),
+                  sum + lineValue(item),
                 0,
               ),
           0,
@@ -186,10 +211,26 @@ export class DashboardController {
             current.revenue += saleRevenue(sale);
             customerRevenue.set(current.id, current);
           }
-          const attributedCollaborator =
-            sale.collaborator ?? sale.appointment?.collaborator ?? null;
-          if (attributedCollaborator) {
-            const collaborator = attributedCollaborator;
+          const serviceItemsWithCollaborator = sale.items.filter(
+            (item) =>
+              item.collaborator &&
+              (!collaboratorId || item.collaboratorId === collaboratorId),
+          );
+          if (serviceItemsWithCollaborator.length) {
+            for (const item of serviceItemsWithCollaborator) {
+              if (!item.collaborator) continue;
+              const collaborator = item.collaborator;
+              const current = collaboratorRevenue.get(collaborator.id) ?? {
+                id: collaborator.id,
+                label: collaboratorLabel(collaborator) || "Collaboratore",
+                revenue: 0,
+              };
+              current.revenue += lineValue(item);
+              collaboratorRevenue.set(current.id, current);
+            }
+          } else {
+            const collaborator = sale.collaborator ?? sale.appointment?.collaborator;
+            if (!collaborator) continue;
             const current = collaboratorRevenue.get(collaborator.id) ?? {
               id: collaborator.id,
               label: collaboratorLabel(collaborator) || "Collaboratore",

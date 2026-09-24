@@ -56,17 +56,6 @@
             (createRequest)="quickCreateKind = 'customer'"
           ></barber-custom-select>
         </label>
-        <label class="field">
-          <span>Collaboratore</span>
-          <barber-custom-select
-            [value]="collaboratorId"
-            (valueChange)="collaboratorId = $event"
-            [options]="collaboratorOptions"
-            label="Collaboratore"
-            placeholder="Collaboratore opzionale"
-          ></barber-custom-select>
-        </label>
-
         <div>
           <div class="flex items-center justify-between gap-3">
             <p class="quick-order-step">2 · Tocca servizi o prodotti</p>
@@ -143,6 +132,16 @@
                 inputmode="decimal"
                 (focus)="pricePadIndex = i"
               />
+            </label>
+            <label *ngIf="item.kind === 'service'" class="cart-collaborator">
+              <span>Collaboratore</span>
+              <barber-custom-select
+                [value]="item.collaboratorId"
+                (valueChange)="item.collaboratorId = $event"
+                [options]="collaboratorOptions"
+                [label]="'Collaboratore per ' + item.label"
+                placeholder="Seleziona collaboratore"
+              ></barber-custom-select>
             </label>
           </div>
         </article>

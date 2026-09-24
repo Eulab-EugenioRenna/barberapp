@@ -15,6 +15,7 @@ export type ServiceCatalogEntry = {
 export type NormalizedOrderItem = {
   productId?: string;
   serviceId?: string;
+  collaboratorId?: string;
   label: string;
   quantity: number;
   unitPrice: number;
@@ -135,6 +136,10 @@ export function normalizeOrderItems(input: {
     return {
       productId: product?.id,
       serviceId: service?.id,
+      collaboratorId:
+        kind === "service" && typeof item["collaboratorId"] === "string"
+          ? item["collaboratorId"]
+          : undefined,
       label: (service ?? product)?.name ?? "Articolo",
       quantity,
       unitPrice,

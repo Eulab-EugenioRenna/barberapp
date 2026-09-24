@@ -62,6 +62,7 @@ type ViewKey =
         [services]="adminData().services"
         [products]="adminData().products"
         [collaborators]="adminData().collaborators"
+        [defaultCollaboratorId]="adminData().tenant?.defaultCollaboratorId || ''"
         [appointment]="quickOrderAppointment"
         [loading]="loading"
         (close)="closeQuickOrder()"

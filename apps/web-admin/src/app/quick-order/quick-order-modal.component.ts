@@ -24,6 +24,7 @@ export class QuickOrderModalComponent implements OnInit {
   @Input() services: any[] = [];
   @Input() products: any[] = [];
   @Input() collaborators: any[] = [];
+  @Input() defaultCollaboratorId = "";
   @Input() appointment: any = null;
   @Input() loading = false;
 
@@ -32,7 +33,6 @@ export class QuickOrderModalComponent implements OnInit {
   @Output() catalogChanged = new EventEmitter<void>();
 
   customerId = "";
-  collaboratorId = "";
   appointmentId = "";
   paymentMethod = "cash";
   items: any[] = [];
@@ -54,10 +54,6 @@ export class QuickOrderModalComponent implements OnInit {
     this.appointmentId = this.appointment.id;
     this.customerId =
       this.appointment.customerId || this.appointment.customer?.id || "";
-    this.collaboratorId =
-      this.appointment.collaboratorId ||
-      this.appointment.collaborator?.id ||
-      "";
     if (this.appointment.service) {
       this.addService(this.appointment.service);
     }
@@ -71,9 +67,17 @@ export class QuickOrderModalComponent implements OnInit {
   }
 
   get collaboratorOptions() {
-    return this.collaborators.map((collaborator) => ({
+    return [...this.collaborators].sort((left, right) => {
+      if (left.id === this.defaultCollaboratorId) return -1;
+      if (right.id === this.defaultCollaboratorId) return 1;
+      return `${left.firstName} ${left.lastName}`.localeCompare(
+        `${right.firstName} ${right.lastName}`,
+        "it",
+      );
+    }).map((collaborator) => ({
       value: collaborator.id,
-      label: `${collaborator.firstName} ${collaborator.lastName}`.trim(),
+      label: `${collaborator.firstName} ${collaborator.lastName}`.trim() +
+        (collaborator.id === this.defaultCollaboratorId ? " · default" : ""),
     }));
   }
 
@@ -153,6 +157,12 @@ export class QuickOrderModalComponent implements OnInit {
       label: service.name,
       quantity: 1,
       unitPrice: Number(service.basePrice || 0),
+      collaboratorId:
+        this.appointment?.collaboratorId ||
+        this.appointment?.collaborator?.id ||
+        this.defaultCollaboratorId ||
+        this.collaborators[0]?.id ||
+        "",
     });
   }
 
@@ -194,7 +204,9 @@ export class QuickOrderModalComponent implements OnInit {
       this.items.length &&
       this.items.every(
         (item) =>
-          item.unitPrice !== "" && Number(item.unitPrice) >= 0,
+          item.unitPrice !== "" &&
+          Number(item.unitPrice) >= 0 &&
+          (item.kind !== "service" || Boolean(item.collaboratorId)),
       ),
     );
   }
@@ -203,7 +215,6 @@ export class QuickOrderModalComponent implements OnInit {
     if (!this.canSubmit()) return;
     this.submitOrder.emit({
       customerId: this.customerId,
-      collaboratorId: this.collaboratorId || undefined,
       appointmentId: this.appointmentId || undefined,
       paymentStatus: "paid",
       paymentMethod: this.paymentMethod,
@@ -211,6 +222,8 @@ export class QuickOrderModalComponent implements OnInit {
         kind: item.kind,
         productId: item.productId,
         serviceId: item.serviceId,
+        collaboratorId:
+          item.kind === "service" ? item.collaboratorId || undefined : undefined,
         quantity: Number(item.quantity || 1),
         unitPrice: Number(item.unitPrice),
       })),

@@ -146,8 +146,11 @@
 }
 .cart-line-fields {
   display: grid;
-  grid-template-columns: 90px 1fr;
+  grid-template-columns: 90px minmax(0, 1fr);
   gap: 0.75rem;
+}
+.cart-line-fields .cart-collaborator {
+  grid-column: 1 / -1;
 }
 .cart-line-fields label {
   display: grid;

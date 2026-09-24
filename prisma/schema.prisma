@@ -177,6 +177,7 @@ model Collaborator {
   isPublic        Boolean                      @default(false)
   isActive        Boolean                      @default(true)
   appointments    Appointment[]
+  saleItems       SaleItem[]
   sales           Sale[]
   weeklySchedules CollaboratorWeeklySchedule[]
   dayOverrides    CollaboratorDayOverride[]
@@ -355,7 +356,7 @@ model Sale {
   customerId     String?
   customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
   collaboratorId String?
-  collaborator   Collaborator? @relation(fields: [collaboratorId], references: [id], onDelete: SetNull)
+  collaborator   Collaborator?     @relation(fields: [collaboratorId], references: [id], onDelete: SetNull)
   appointmentId  String?
   appointment    Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   subtotal       Decimal       @db.Decimal(10, 2)
@@ -380,6 +381,8 @@ model SaleItem {
   product   Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
   serviceId String?
   service   Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  collaboratorId String?
+  collaborator   Collaborator? @relation(fields: [collaboratorId], references: [id], onDelete: SetNull)
   label     String
   quantity  Int
   unitPrice Decimal           @db.Decimal(10, 2)
@@ -389,6 +392,7 @@ model SaleItem {
 
   @@index([productId])
   @@index([serviceId])
+  @@index([collaboratorId])
 }
 
 model AppointmentCancellation {
