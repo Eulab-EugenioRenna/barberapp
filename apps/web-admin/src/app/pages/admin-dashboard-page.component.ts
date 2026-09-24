@@ -6,6 +6,8 @@ import { CustomSelectComponent } from "../custom-select.component";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
 
+const BALANCE_STORAGE_KEY = "barber.balance-hidden";
+
 @Component({
   selector: "barber-admin-dashboard-page",
   standalone: true,
@@ -313,10 +315,18 @@ export class AdminDashboardPageComponent {
   @Output() loadMoreActivity = new EventEmitter<void>();
   @Output() openQuickOrder = new EventEmitter<void>();
 
-  balanceHidden = false;
+  balanceHidden = readStoredBalanceHidden();
 
   toggleBalance(): void {
     this.balanceHidden = !this.balanceHidden;
+    try {
+      window.localStorage.setItem(
+        BALANCE_STORAGE_KEY,
+        this.balanceHidden ? "1" : "0",
+      );
+    } catch {
+      // Storage can be unavailable (private mode); the toggle still works.
+    }
   }
 
   money(value: number | string | null | undefined): string {
@@ -425,5 +435,13 @@ export class AdminDashboardPageComponent {
       default:
         return "status-pill-neutral";
     }
+  }
+}
+
+function readStoredBalanceHidden(): boolean {
+  try {
+    return window.localStorage.getItem(BALANCE_STORAGE_KEY) === "1";
+  } catch {
+    return false;
   }
 }
