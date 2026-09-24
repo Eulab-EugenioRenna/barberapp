@@ -7,7 +7,9 @@ import {
   OnInit,
   ViewChild,
   computed,
+  effect,
   inject,
+  signal,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -29,6 +31,7 @@ import { AdminPlatformPageComponent } from "./pages/admin-platform-page.componen
 import { AdminSalesPageComponent } from "./pages/admin-sales-page.component";
 import { AdminServicesPageComponent } from "./pages/admin-services-page.component";
 import { AdminSettingsPageComponent } from "./pages/admin-settings-page.component";
+import { PendingOrdersModalComponent } from "./pending-orders/pending-orders-modal.component";
 import { QuickOrderModalComponent } from "./quick-order/quick-order-modal.component";
 
 type ViewKey =
@@ -61,6 +64,7 @@ type ViewKey =
     AdminCollaboratorsPageComponent,
     AdminPlatformPageComponent,
     AdminSettingsPageComponent,
+    PendingOrdersModalComponent,
     QuickOrderModalComponent,
   ],
   template: `
@@ -79,6 +83,16 @@ type ViewKey =
         (submitOrder)="saveQuickOrder($event)"
         (catalogChanged)="refreshAll()"
       ></barber-quick-order-modal>
+      <barber-pending-orders-modal
+        *ngIf="pendingOrdersOpen()"
+        [appointments]="appointmentOrderAlerts()"
+        [unlinkedSales]="unlinkedSales"
+        [loading]="loading"
+        (close)="closePendingOrders()"
+        (confirmOrder)="confirmPendingOrder($event)"
+        (linkOrder)="linkPendingOrder($event)"
+        (dismiss)="dismissPendingOrder($event)"
+      ></barber-pending-orders-modal>
       <div *ngIf="confirmDialog" class="confirm-overlay">
         <button
           type="button"
@@ -712,6 +726,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   quickOrderOpen = false;
   quickOrderAppointment: any = null;
   quickOrderSale: any = null;
+  readonly pendingOrdersOpen = signal(false);
+  pendingOrdersDismissed = false;
   customerHistory: any = null;
   customerHistoryLoading = false;
   revenueFilters = {
@@ -1049,6 +1065,30 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     }
 
     return `${this.apiUrl}${path}`;
+  }
+
+  get unlinkedSales(): any[] {
+    return (this.sales || []).filter((sale) => !sale?.appointmentId);
+  }
+
+  constructor() {
+    // Open the confirm/link prompt automatically as soon as a past
+    // appointment without an order shows up in the SSE stream.
+    effect(
+      () => {
+        const alerts = this.appointmentOrderAlerts();
+        if (!alerts.length) {
+          this.pendingOrdersDismissed = false;
+          this.pendingOrdersOpen.set(false);
+          return;
+        }
+        if (this.pendingOrdersDismissed || this.quickOrderOpen) {
+          return;
+        }
+        this.pendingOrdersOpen.set(true);
+      },
+      { allowSignalWrites: true },
+    );
   }
 
   ngOnInit(): void {
@@ -2650,9 +2690,47 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   openQuickOrder(appointment: any = null, sale: any = null): void {
+    this.pendingOrdersOpen.set(false);
     this.quickOrderAppointment = appointment;
     this.quickOrderSale = sale;
     this.quickOrderOpen = true;
+  }
+
+  closePendingOrders(): void {
+    this.pendingOrdersDismissed = true;
+    this.pendingOrdersOpen.set(false);
+  }
+
+  confirmPendingOrder(appointment: any): void {
+    this.openQuickOrder(appointment);
+  }
+
+  dismissPendingOrder(appointmentId: string): void {
+    this.appointmentOrderNotifications.dismiss(appointmentId);
+  }
+
+  async linkPendingOrder(event: {
+    appointment: any;
+    saleId: string;
+  }): Promise<void> {
+    if (!event?.appointment?.id || !event.saleId) return;
+    this.loading = true;
+    try {
+      await firstValueFrom(
+        this.adminApi.linkSaleToAppointment(
+          event.saleId,
+          event.appointment.id,
+        ),
+      );
+      this.appointmentOrderNotifications.dismiss(event.appointment.id);
+      this.feedback = "Ordine collegato alla prenotazione";
+      await this.refreshAll();
+    } catch (error: any) {
+      this.feedback =
+        error?.error?.message || "Collegamento ordine non riuscito";
+    } finally {
+      this.loading = false;
+    }
   }
 
   closeQuickOrder(): void {

@@ -2,7 +2,7 @@ import { NotificationChannel } from "@prisma/client";
 import { NotificationsService } from "./notifications.service";
 
 describe("NotificationsService", () => {
-  it("lists only ended appointments without an order", async () => {
+  it("lists started appointments without an order", async () => {
     const findMany = jest.fn().mockResolvedValue([{ id: "appointment-1" }]);
     const service = new NotificationsService(
       { appointment: { findMany } } as never,
@@ -17,7 +17,6 @@ describe("NotificationsService", () => {
       where: {
         tenantId: "tenant-1",
         startsAt: { lte: now },
-        endsAt: { lte: now },
         status: {
           in: [
             "requested",

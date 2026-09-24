@@ -567,6 +567,88 @@ export class SalesController {
     return resolveSaleLabels(updated);
   }
 
+  @Patch(":id/link-appointment")
+  async linkAppointment(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const appointmentId =
+      typeof body["appointmentId"] === "string" && body["appointmentId"]
+        ? body["appointmentId"]
+        : "";
+    if (!appointmentId) {
+      throw new BadRequestException("Seleziona una prenotazione");
+    }
+
+    const [sale, appointment, existingOrder] = await Promise.all([
+      this.prisma.sale.findFirst({
+        where: { id, tenantId },
+        select: { id: true, appointmentId: true },
+      }),
+      this.prisma.appointment.findFirst({
+        where: { id: appointmentId, tenantId },
+        select: { id: true },
+      }),
+      this.prisma.sale.findFirst({
+        where: { tenantId, appointmentId, NOT: { id } },
+        select: { id: true },
+      }),
+    ]);
+    if (!sale) {
+      throw new NotFoundException("Ordine non trovato");
+    }
+    if (!appointment) {
+      throw new BadRequestException("Prenotazione non valida");
+    }
+    if (existingOrder) {
+      throw new ConflictException(
+        "Un ordine e gia collegato a questa prenotazione",
+      );
+    }
+
+    const updated = await this.prisma.$transaction(async (transaction) => {
+      if (sale.appointmentId && sale.appointmentId !== appointmentId) {
+        await transaction.appointment.update({
+          where: { id: sale.appointmentId },
+          data: { finalPrice: null },
+        });
+      }
+      const linked = await transaction.sale.update({
+        where: { id },
+        data: { appointmentId },
+        include: {
+          items: {
+            include: { product: true, service: true, collaborator: true },
+          },
+          customer: true,
+          collaborator: true,
+          appointment: {
+            include: { customer: true, service: true, collaborator: true },
+          },
+        },
+      });
+      await transaction.appointment.update({
+        where: { id: appointmentId },
+        data: { finalPrice: linked.total, status: "completed" },
+      });
+      return linked;
+    });
+
+    await Promise.all([
+      this.cacheInvalidationService.invalidateSales(tenantId),
+      this.cacheInvalidationService.invalidateDashboard(tenantId),
+      this.cacheInvalidationService.invalidateCustomers(tenantId),
+      this.cacheInvalidationService.invalidateAppointments(tenantId),
+    ]);
+    return resolveSaleLabels(updated);
+  }
+
   @Delete(":id")
   async remove(
     @Req() request: { headers: { authorization?: string } },

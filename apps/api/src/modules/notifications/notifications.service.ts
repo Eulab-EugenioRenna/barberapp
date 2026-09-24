@@ -50,7 +50,6 @@ export class NotificationsService {
       where: {
         tenantId,
         startsAt: { lte: now },
-        endsAt: { lte: now },
         status: {
           in: [
             "requested",

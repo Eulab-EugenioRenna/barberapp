@@ -287,6 +287,15 @@ export class AdminApiService {
     return this.http.delete(`${ADMIN_API_URL}/sales/${id}`);
   }
 
+  linkSaleToAppointment(
+    saleId: string,
+    appointmentId: string,
+  ): Observable<any> {
+    return this.http.patch(`${ADMIN_API_URL}/sales/${saleId}/link-appointment`, {
+      appointmentId,
+    });
+  }
+
   createOrUpdateProduct(
     id: string,
     payload: Record<string, unknown>,

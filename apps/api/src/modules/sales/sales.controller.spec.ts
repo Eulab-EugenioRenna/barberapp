@@ -106,6 +106,47 @@ describe("SalesController order CRUD", () => {
     );
   });
 
+  it("links an existing order to a past appointment", async () => {
+    const transaction = {
+      sale: {
+        update: jest
+          .fn()
+          .mockResolvedValue({ id: "sale-1", total: 42, items: [] }),
+      },
+      appointment: { update: jest.fn() },
+    };
+    const prisma = {
+      sale: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce({ id: "sale-1", appointmentId: null })
+          .mockResolvedValueOnce(null),
+      },
+      appointment: {
+        findFirst: jest.fn().mockResolvedValue({ id: "appointment-1" }),
+      },
+      $transaction: jest.fn((callback) => callback(transaction)),
+    };
+    const { controller } = controllerWith(prisma);
+
+    await controller.linkAppointment(
+      { headers: { authorization: "Bearer token" } },
+      "sale-1",
+      { appointmentId: "appointment-1" },
+    );
+
+    expect(transaction.sale.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "sale-1" },
+        data: { appointmentId: "appointment-1" },
+      }),
+    );
+    expect(transaction.appointment.update).toHaveBeenCalledWith({
+      where: { id: "appointment-1" },
+      data: { finalPrice: 42, status: "completed" },
+    });
+  });
+
   it("deletes the order without deleting its appointment", async () => {
     const transaction = {
       sale: { delete: jest.fn() },
