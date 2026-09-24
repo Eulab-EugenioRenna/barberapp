@@ -7,9 +7,7 @@ import {
   OnInit,
   ViewChild,
   computed,
-  effect,
   inject,
-  signal,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -31,13 +29,14 @@ import { AdminPlatformPageComponent } from "./pages/admin-platform-page.componen
 import { AdminSalesPageComponent } from "./pages/admin-sales-page.component";
 import { AdminServicesPageComponent } from "./pages/admin-services-page.component";
 import { AdminSettingsPageComponent } from "./pages/admin-settings-page.component";
-import { PendingOrdersModalComponent } from "./pending-orders/pending-orders-modal.component";
+import { PendingOrdersQueueComponent } from "./pending-orders/pending-orders-queue.component";
 import { QuickOrderModalComponent } from "./quick-order/quick-order-modal.component";
 
 type ViewKey =
   | "platform"
   | "dashboard"
   | "appointments"
+  | "confirmations"
   | "sales"
   | "customers"
   | "services"
@@ -64,7 +63,7 @@ type ViewKey =
     AdminCollaboratorsPageComponent,
     AdminPlatformPageComponent,
     AdminSettingsPageComponent,
-    PendingOrdersModalComponent,
+    PendingOrdersQueueComponent,
     QuickOrderModalComponent,
   ],
   template: `
@@ -83,16 +82,6 @@ type ViewKey =
         (submitOrder)="saveQuickOrder($event)"
         (catalogChanged)="refreshAll()"
       ></barber-quick-order-modal>
-      <barber-pending-orders-modal
-        *ngIf="pendingOrdersOpen()"
-        [appointments]="appointmentOrderAlerts()"
-        [unlinkedSales]="unlinkedSales"
-        [loading]="loading"
-        (close)="closePendingOrders()"
-        (confirmOrder)="confirmPendingOrder($event)"
-        (linkOrder)="linkPendingOrder($event)"
-        (dismiss)="dismissPendingOrder($event)"
-      ></barber-pending-orders-modal>
       <div *ngIf="confirmDialog" class="confirm-overlay">
         <button
           type="button"
@@ -354,7 +343,11 @@ type ViewKey =
               [attr.aria-label]="item.label"
               [title]="sidebarCollapsed ? item.label : null"
             >
-              <span class="nav-icon">{{ item.icon }}</span>
+              <span class="nav-icon">{{
+                item.key === "confirmations" && appointmentOrderAlerts().length
+                  ? appointmentOrderAlerts().length
+                  : item.icon
+              }}</span>
               <span class="nav-copy">
                 <span>{{ item.label }}</span>
                 <small>{{ item.hint }}</small>
@@ -449,43 +442,27 @@ type ViewKey =
 
           <main class="content-scroll">
             <article
-              *ngIf="appointmentOrderAlerts().length"
-              class="panel mb-4 rounded-[2rem] border border-amber-300 bg-amber-50 p-4"
+              *ngIf="
+                appointmentOrderAlerts().length &&
+                activeView !== 'confirmations'
+              "
+              class="panel mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3"
               aria-live="polite"
             >
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p class="eyebrow text-amber-700">Appuntamenti trascorsi</p>
-                  <h3 class="font-display text-2xl">Ordini da confermare</h3>
-                </div>
-                <span class="status-pill status-pill-amber">
-                  {{ appointmentOrderAlerts().length }} in attesa
-                </span>
+              <div>
+                <p class="eyebrow text-amber-700">Appuntamenti trascorsi</p>
+                <p class="text-sm font-semibold text-amber-900">
+                  {{ appointmentOrderAlerts().length }} ordini in attesa di
+                  conferma
+                </p>
               </div>
-              <div class="mt-3 grid gap-2">
-                <div
-                  *ngFor="let appointment of appointmentOrderAlerts().slice(0, 3)"
-                  class="list-card items-center"
-                >
-                  <div>
-                    <strong>
-                      {{ appointment.customer.firstName }}
-                      {{ appointment.customer.lastName }}
-                    </strong>
-                    <p class="text-sm text-[var(--muted)]">
-                      {{ appointment.service.name }} ·
-                      {{ appointment.startsAt | date: "dd/MM HH:mm" }}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    class="primary-btn"
-                    (click)="openQuickOrder(appointment)"
-                  >
-                    Conferma ordine
-                  </button>
-                </div>
-              </div>
+              <button
+                type="button"
+                class="primary-btn"
+                (click)="selectView('confirmations')"
+              >
+                Apri coda
+              </button>
             </article>
 
             <p
@@ -515,6 +492,15 @@ type ViewKey =
               (loadMoreActivity)="loadMoreDashboardActivity()"
               (openQuickOrder)="openQuickOrder()"
             ></barber-admin-dashboard-page>
+
+            <barber-pending-orders-queue
+              *ngIf="activeView === 'confirmations'"
+              [appointments]="appointmentOrderAlerts()"
+              [unlinkedSales]="unlinkedSales"
+              [loading]="loading"
+              (confirmOrder)="confirmPendingOrder($event)"
+              (linkOrder)="linkPendingOrder($event)"
+            ></barber-pending-orders-queue>
 
             <barber-admin-appointments-feature-page
               *ngIf="activeView === 'appointments'"
@@ -726,8 +712,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   quickOrderOpen = false;
   quickOrderAppointment: any = null;
   quickOrderSale: any = null;
-  readonly pendingOrdersOpen = signal(false);
-  pendingOrdersDismissed = false;
   customerHistory: any = null;
   customerHistoryLoading = false;
   revenueFilters = {
@@ -825,6 +809,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     [
       { key: "dashboard", label: "Dashboard", hint: "metriche", icon: "D" },
       { key: "appointments", label: "Prenotazioni", hint: "agenda", icon: "P" },
+      {
+        key: "confirmations",
+        label: "Conferme",
+        hint: "ordini in coda",
+        icon: "!",
+      },
       { key: "sales", label: "Sales", hint: "cassa", icon: "V" },
       { key: "customers", label: "Clienti", hint: "crm", icon: "C" },
       { key: "services", label: "Servizi", hint: "catalogo", icon: "S" },
@@ -1069,26 +1059,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   get unlinkedSales(): any[] {
     return (this.sales || []).filter((sale) => !sale?.appointmentId);
-  }
-
-  constructor() {
-    // Open the confirm/link prompt automatically as soon as a past
-    // appointment without an order shows up in the SSE stream.
-    effect(
-      () => {
-        const alerts = this.appointmentOrderAlerts();
-        if (!alerts.length) {
-          this.pendingOrdersDismissed = false;
-          this.pendingOrdersOpen.set(false);
-          return;
-        }
-        if (this.pendingOrdersDismissed || this.quickOrderOpen) {
-          return;
-        }
-        this.pendingOrdersOpen.set(true);
-      },
-      { allowSignalWrites: true },
-    );
   }
 
   ngOnInit(): void {
@@ -2690,23 +2660,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   openQuickOrder(appointment: any = null, sale: any = null): void {
-    this.pendingOrdersOpen.set(false);
     this.quickOrderAppointment = appointment;
     this.quickOrderSale = sale;
     this.quickOrderOpen = true;
   }
 
-  closePendingOrders(): void {
-    this.pendingOrdersDismissed = true;
-    this.pendingOrdersOpen.set(false);
-  }
-
   confirmPendingOrder(appointment: any): void {
     this.openQuickOrder(appointment);
-  }
-
-  dismissPendingOrder(appointmentId: string): void {
-    this.appointmentOrderNotifications.dismiss(appointmentId);
   }
 
   async linkPendingOrder(event: {

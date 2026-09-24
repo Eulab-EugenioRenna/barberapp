@@ -1,41 +1,27 @@
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
 
 @Component({
-  selector: "barber-pending-orders-modal",
+  selector: "barber-pending-orders-queue",
   standalone: true,
-  imports: [CommonModule, FormsModule, AutofocusFirstDirective, UiIconComponent],
+  imports: [CommonModule, FormsModule, UiIconComponent],
   template: `
-    <div class="confirm-overlay" barberAutofocusFirst>
-      <button
-        type="button"
-        class="confirm-backdrop"
-        (click)="close.emit()"
-        aria-label="Chiudi ordini da confermare"
-      ></button>
-      <article
-        class="confirm-dialog panel max-h-[85vh] overflow-auto !w-[min(52rem,100%)]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pending-orders-title"
-      >
-        <div class="flex items-start justify-between gap-4">
+    <section class="grid gap-4">
+      <article class="panel rounded-[2rem] p-5">
+        <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Appuntamenti trascorsi</p>
-            <h2 id="pending-orders-title" class="mt-2 font-display text-3xl">
-              Ordini da confermare
-            </h2>
-            <p class="mt-2 text-sm text-[var(--muted)]">
-              Conferma l'ordine per collegarlo alla prenotazione, oppure collega
-              un ordine gia registrato senza appuntamento.
+            <p class="eyebrow text-[var(--accent)]">Notifiche</p>
+            <h3 class="font-display text-3xl">Ordini da confermare</h3>
+            <p class="mt-1 text-sm text-[var(--muted)]">
+              Gli appuntamenti restano in coda finché non confermi un nuovo
+              ordine o ne colleghi uno esistente.
             </p>
           </div>
-          <button type="button" class="pill-btn" (click)="close.emit()">
-            Piu tardi
-          </button>
+          <span class="status-pill status-pill-amber"
+            >{{ appointments.length }} in attesa</span
+          >
         </div>
 
         <div class="mt-5 grid gap-3">
@@ -80,14 +66,11 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 (click)="toggleLink(appointment.id)"
               >
                 <barber-ui-icon name="link"></barber-ui-icon>
-                {{ linkOpenFor === appointment.id ? "Chiudi collegamento" : "Collega ordine" }}
-              </button>
-              <button
-                type="button"
-                class="ghost-btn"
-                (click)="dismiss.emit(appointment.id)"
-              >
-                Ignora
+                {{
+                  linkOpenFor === appointment.id
+                    ? "Chiudi collegamento"
+                    : "Collega ordine"
+                }}
               </button>
             </div>
 
@@ -118,24 +101,22 @@ import { UiIconComponent } from "../shared/ui-icon.component";
 
           <p
             *ngIf="!appointments.length"
-            class="rounded-2xl border border-dashed border-[var(--line)] p-4 text-sm text-[var(--muted)]"
+            class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
           >
-            Nessun appuntamento in attesa di ordine.
+            Nessun appuntamento in attesa di ordine. La coda è vuota.
           </p>
         </div>
       </article>
-    </div>
+    </section>
   `,
 })
-export class PendingOrdersModalComponent {
+export class PendingOrdersQueueComponent {
   @Input() appointments: any[] = [];
   @Input() unlinkedSales: any[] = [];
   @Input() loading = false;
 
-  @Output() close = new EventEmitter<void>();
   @Output() confirmOrder = new EventEmitter<any>();
   @Output() linkOrder = new EventEmitter<{ appointment: any; saleId: string }>();
-  @Output() dismiss = new EventEmitter<string>();
 
   linkOpenFor = "";
   selectedSaleId = "";

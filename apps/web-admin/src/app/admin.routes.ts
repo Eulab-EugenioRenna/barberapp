@@ -16,6 +16,7 @@ export const adminRoutes: Routes = [
   { path: "signup", component: AdminAuthPageComponent },
   shellRoute("dashboard", "dashboard"),
   shellRoute("appointments", "appointments"),
+  shellRoute("confirmations", "confirmations"),
   shellRoute("sales", "sales"),
   shellRoute("customers", "customers"),
   shellRoute("services", "services"),
