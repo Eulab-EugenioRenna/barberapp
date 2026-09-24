@@ -72,6 +72,9 @@ function buildAutoTags(input: {
 
 async function removeTenantTree(tenantId: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
+    await tx.collaboratorWeeklySchedule.deleteMany({
+      where: { collaborator: { tenantId } },
+    });
     await tx.saleItem.deleteMany({ where: { sale: { tenantId } } });
     await tx.sale.deleteMany({ where: { tenantId } });
     await tx.appointmentCancellation.deleteMany({
@@ -180,6 +183,9 @@ async function createDemoData(
   ]);
 
   const allCollaborators = [ownerCollaborator, marco, nina, sara];
+  // weekday index follows resolveWorkingWindow: 0 = Monday ... 6 = Sunday.
+  // The demo works Monday to Saturday and is closed on Sunday.
+  const workingDays = new Set([0, 1, 2, 3, 4, 5]);
   await Promise.all(
     allCollaborators.flatMap((collaborator) =>
       Array.from({ length: 7 }, (_, weekday) => weekday).map((weekday) =>
@@ -187,9 +193,9 @@ async function createDemoData(
           data: {
             collaboratorId: collaborator.id,
             weekday,
-            isWorkingDay: weekday >= 1 && weekday <= 6,
-            startTime: weekday >= 1 && weekday <= 6 ? "09:00" : null,
-            endTime: weekday >= 1 && weekday <= 6 ? "19:00" : null,
+            isWorkingDay: workingDays.has(weekday),
+            startTime: workingDays.has(weekday) ? "09:00" : null,
+            endTime: workingDays.has(weekday) ? "19:00" : null,
           },
         }),
       ),
@@ -688,6 +694,32 @@ async function createDemoData(
   );
 }
 
+async function clearPublicLookupCache(slug: string): Promise<void> {
+  const host = process.env.REDIS_HOST;
+  if (!host) return;
+  let client: {
+    del: (key: string) => Promise<unknown>;
+    disconnect: () => void;
+  } | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const imported = require("ioredis");
+    const RedisCtor = imported?.default ?? imported;
+    client = new RedisCtor({
+      host,
+      port: Number(process.env.REDIS_PORT || 6379),
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => null,
+      connectTimeout: 2000,
+    });
+    await client.del(`app:public-tenant:slug:${slug}`);
+  } catch {
+    // Best-effort: the API repopulates this cache on the next request.
+  } finally {
+    client?.disconnect();
+  }
+}
+
 async function main(): Promise<void> {
   if (args.has("--help") || args.has("-h")) {
     console.log(`
@@ -823,6 +855,8 @@ Opzioni:
   const publicUrl = config.publicDomain
     ? `http://${config.publicDomain}`
     : `/${config.tenantSlug}`;
+
+  await clearPublicLookupCache(config.tenantSlug);
 
   console.log("");
   console.log("========================================");

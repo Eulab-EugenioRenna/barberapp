@@ -11,6 +11,7 @@ import {
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
+import { toLocalDateKey } from "@barber/shared/utils";
 import { firstValueFrom } from "rxjs";
 import { CalendarInputComponent } from "./calendar-input.component";
 import { ADMIN_API_URL } from "./core/api-config";
@@ -717,7 +718,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   customerHistoryLoading = false;
   revenueFilters = {
     period: "month",
-    date: new Date().toISOString().slice(0, 10),
+    date: toLocalDateKey(new Date()),
     customerId: "",
     collaboratorId: "",
   };
@@ -803,7 +804,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   appointmentForm = this.emptyAppointmentForm();
   appointmentCustomerSearch = "";
   filteredAppointmentCustomers: any[] = [];
-  appointmentSelectedDate = new Date().toISOString().slice(0, 10);
+  appointmentSelectedDate = toLocalDateKey(new Date());
   appointmentSlots: Array<{ startsAt: string; label: string }> = [];
 
   navItems: Array<{ key: ViewKey; label: string; hint: string; icon: string }> =
@@ -1522,7 +1523,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.appointmentForm = this.emptyAppointmentForm();
     this.appointmentCustomerSearch = "";
     this.filteredAppointmentCustomers = [...this.customers];
-    this.appointmentSelectedDate = new Date().toISOString().slice(0, 10);
+    this.appointmentSelectedDate = toLocalDateKey(new Date());
     this.appointmentSlots = [];
     if (this.services[0]) {
       this.appointmentForm.serviceId = this.services[0].id;
@@ -2629,7 +2630,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   resetRevenueFilters(): void {
     this.revenueFilters = {
       period: "month",
-      date: new Date().toISOString().slice(0, 10),
+      date: toLocalDateKey(new Date()),
       customerId: "",
       collaboratorId: "",
     };

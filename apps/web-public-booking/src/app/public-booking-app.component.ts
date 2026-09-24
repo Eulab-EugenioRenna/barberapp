@@ -2,6 +2,7 @@ import { CommonModule, DecimalPipe, NgClass } from "@angular/common";
 import { Component, OnInit, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
+import { toLocalDateKey } from "@barber/shared/utils";
 import { CalendarInputComponent } from "./calendar-input.component";
 import { PublicBookingFacade } from "./core/public-booking.facade";
 import { CustomSelectComponent } from "./custom-select.component";
@@ -92,6 +93,7 @@ import { CustomSelectComponent } from "./custom-select.component";
                 <barber-calendar-input
                   [value]="selectedDateValue"
                   (valueChange)="onSelectedDateChange($event)"
+                  [min]="todayKey"
                   label="Data"
                   name="selectedDate"
                   placeholder="Scegli il giorno"
@@ -112,8 +114,10 @@ import { CustomSelectComponent } from "./custom-select.component";
                   'border-amber-200 bg-amber-50 text-amber-900':
                     day.isUnavailable,
                   'border-[var(--line)]/70 bg-white/80':
-                    !day.isSelected && !day.isUnavailable,
+                    !day.isSelected && !day.isUnavailable && !day.isPast,
+                  'opacity-40': day.isPast,
                 }"
+                [disabled]="day.isPast"
                 (click)="onSelectedDateChange(day.key)"
               >
                 <strong class="block">{{ day.label }}</strong>
@@ -138,8 +142,10 @@ import { CustomSelectComponent } from "./custom-select.component";
                   'border-[var(--line)]/60 bg-slate-50/70 text-slate-400':
                     !day.inMonth,
                   'border-[var(--line)]/70 bg-white/80':
-                    day.inMonth && !day.isSelected && !day.isUnavailable,
+                    day.inMonth && !day.isSelected && !day.isUnavailable && !day.isPast,
+                  'opacity-40': day.isPast,
                 }"
+                [disabled]="day.isPast"
                 (click)="onSelectedDateChange(day.key)"
               >
                 <strong class="block">{{ day.dayNumber }}</strong>
@@ -357,7 +363,12 @@ export class PublicBookingAppComponent implements OnInit {
     return this.facade.selectedDate();
   }
 
+  protected readonly todayKey = toLocalDateKey(new Date());
+
   onSelectedDateChange(value: string): void {
+    if (!value || value < this.todayKey) {
+      return;
+    }
     this.facade.setSelectedDate(value);
   }
 

@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from "@angular/core";
 import { Title } from "@angular/platform-browser";
+import { toLocalDateKey } from "@barber/shared/utils";
 import { Subject, catchError, firstValueFrom, of, switchMap } from "rxjs";
 import { PublicBookingApiService } from "./public-booking-api.service";
 
@@ -19,7 +20,7 @@ export class PublicBookingFacade {
   readonly selectedSlot = signal("");
   readonly slots = signal<any[]>([]);
   readonly bookingResult = signal<any>(null);
-  readonly selectedDate = signal(new Date().toISOString().slice(0, 10));
+  readonly selectedDate = signal(toLocalDateKey(new Date()));
   readonly bookingForm = signal({
     customerName: "",
     email: "",
@@ -145,14 +146,15 @@ export class PublicBookingFacade {
     return Array.from({ length: 7 }, (_, index) => {
       const current = new Date(start);
       current.setDate(current.getDate() + index);
-      const key = current.toISOString().slice(0, 10);
+      const key = toLocalDateKey(current);
       return {
         key,
         label: current.toLocaleDateString("it-IT", {
           weekday: "short",
           day: "2-digit",
         }),
-        isToday: key === new Date().toISOString().slice(0, 10),
+        isToday: key === toLocalDateKey(new Date()),
+        isPast: key < toLocalDateKey(new Date()),
         isSelected: key === this.selectedDate(),
         isUnavailable:
           key === this.selectedDate() &&
@@ -178,12 +180,13 @@ export class PublicBookingFacade {
     return Array.from({ length: 42 }, (_, index) => {
       const current = new Date(gridStart);
       current.setDate(current.getDate() + index);
-      const key = current.toISOString().slice(0, 10);
+      const key = toLocalDateKey(current);
       return {
         key,
         dayNumber: current.getDate(),
         inMonth: current.getMonth() === selected.getMonth(),
-        isToday: key === new Date().toISOString().slice(0, 10),
+        isToday: key === toLocalDateKey(new Date()),
+        isPast: key < toLocalDateKey(new Date()),
         isSelected: key === this.selectedDate(),
         isUnavailable:
           key === this.selectedDate() &&
