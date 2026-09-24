@@ -9,13 +9,56 @@ export type UiIconName =
   | "receipt"
   | "link"
   | "clock"
-  | "ban";
+  | "ban"
+  | "eye"
+  | "eye-off";
 
 @Component({
   selector: "barber-ui-icon",
   standalone: true,
   imports: [CommonModule],
-  host: { "aria-hidden": "true" },
+  host: {
+    "aria-hidden": "true",
+    "[class.ui-icon-animated]": "animated",
+  },
+  styles: [
+    `
+      :host {
+        display: inline-flex;
+        line-height: 0;
+      }
+
+      :host(.ui-icon-animated) svg {
+        transform-origin: center;
+        animation: ui-eye-blink 3.6s ease-in-out infinite;
+      }
+
+      :host(.ui-icon-animated:hover) svg {
+        animation: none;
+        transform: scale(1.15);
+      }
+
+      @keyframes ui-eye-blink {
+        0%,
+        88%,
+        100% {
+          transform: scaleY(1);
+        }
+        92% {
+          transform: scaleY(0.12);
+        }
+        96% {
+          transform: scaleY(1);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        :host(.ui-icon-animated) svg {
+          animation: none;
+        }
+      }
+    `,
+  ],
   template: `
     <svg
       viewBox="0 0 24 24"
@@ -41,10 +84,20 @@ export type UiIconName =
           *ngSwitchCase="'ban'"
           d="M4.9 4.9l14.2 14.2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
         />
+        <path
+          *ngSwitchCase="'eye'"
+          d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"
+        />
+        <circle *ngSwitchCase="'eye'" cx="12" cy="12" r="3" />
+        <path
+          *ngSwitchCase="'eye-off'"
+          d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.9 5.7A10 10 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16.5 16.5 0 0 1-3.1 3.9M6.4 6.4A16.6 16.6 0 0 0 2.5 12S6 18.5 12 18.5c1.1 0 2.2-.2 3.2-.6"
+        />
       </ng-container>
     </svg>
   `,
 })
 export class UiIconComponent {
   @Input({ required: true }) name!: UiIconName;
+  @Input() animated = false;
 }

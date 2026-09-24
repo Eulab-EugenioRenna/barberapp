@@ -15,7 +15,7 @@ import { Component, Input } from "@angular/core";
           {{ metric.label }}
         </p>
         <strong class="mt-3 block font-display text-4xl">{{
-          metric.value
+          displayValue(metric)
         }}</strong>
         <span class="status-pill status-pill-neutral mt-3">{{
           metric.trend
@@ -26,4 +26,13 @@ import { Component, Input } from "@angular/core";
 })
 export class AdminMetricsGridComponent {
   @Input() metrics: Array<{ label: string; value: string; trend: string }> = [];
+  @Input() masked = false;
+
+  displayValue(metric: { value: string }): string {
+    if (this.masked && /EUR|€/.test(metric.value)) {
+      return "**,**";
+    }
+
+    return metric.value;
+  }
 }

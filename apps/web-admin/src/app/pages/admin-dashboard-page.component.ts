@@ -4,6 +4,7 @@ import { AdminMetricsGridComponent } from "../shared/admin-metrics-grid.componen
 import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
+import { UiIconComponent } from "../shared/ui-icon.component";
 
 @Component({
   selector: "barber-admin-dashboard-page",
@@ -14,6 +15,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
     CalendarInputComponent,
     CustomSelectComponent,
     InfiniteScrollDirective,
+    UiIconComponent,
   ],
   template: `
     <section class="grid gap-4">
@@ -24,6 +26,20 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
             <h3 class="font-display text-3xl">Fatturato</h3>
           </div>
           <div class="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              class="ghost-btn balance-toggle"
+              (click)="toggleBalance()"
+              [attr.aria-pressed]="balanceHidden"
+              [attr.aria-label]="balanceHidden ? 'Mostra saldo' : 'Nascondi saldo'"
+              [title]="balanceHidden ? 'Mostra saldo' : 'Nascondi saldo'"
+            >
+              <barber-ui-icon
+                [name]="balanceHidden ? 'eye-off' : 'eye'"
+                [animated]="!balanceHidden"
+              ></barber-ui-icon>
+              {{ balanceHidden ? "Mostra saldo" : "Nascondi saldo" }}
+            </button>
             <button
               type="button"
               class="ghost-btn"
@@ -85,6 +101,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 
       <barber-admin-metrics-grid
         [metrics]="revenueMetrics"
+        [masked]="balanceHidden"
       ></barber-admin-metrics-grid>
 
       <div class="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
@@ -133,7 +150,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
                 </p>
               </div>
               <div class="text-right">
-                <strong>€{{ entry.amount | number: "1.2-2" }}</strong>
+                <strong>{{ money(entry.amount) }}</strong>
                 <p class="text-sm text-[var(--muted)]">
                   {{ formatActivityStatus(entry.status) }}
                 </p>
@@ -170,7 +187,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
                 class="list-card"
               >
                 <strong>{{ row.label }}</strong
-                ><span>€{{ row.revenue | number: "1.2-2" }}</span>
+                ><span>{{ money(row.revenue) }}</span>
               </div>
               <p
                 *ngIf="!revenueReport?.byCustomer?.length"
@@ -189,7 +206,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
                 class="list-card"
               >
                 <strong>{{ row.label }}</strong
-                ><span>€{{ row.revenue | number: "1.2-2" }}</span>
+                ><span>{{ money(row.revenue) }}</span>
               </div>
               <p
                 *ngIf="!revenueReport?.byCollaborator?.length"
@@ -260,7 +277,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
                 >
               </div>
               <p class="mt-2 text-sm text-white/65">
-                Ricavi: €{{ collaborator.revenue | number: "1.0-2" }} ·
+                Ricavi: {{ money(collaborator.revenue) }} ·
                 Ordini: {{ collaborator.orderCount || 0 }} ·
                 Upcoming:
                 {{ collaborator.upcoming }}
@@ -295,6 +312,21 @@ export class AdminDashboardPageComponent {
   @Output() resetRevenueFilters = new EventEmitter<void>();
   @Output() loadMoreActivity = new EventEmitter<void>();
   @Output() openQuickOrder = new EventEmitter<void>();
+
+  balanceHidden = false;
+
+  toggleBalance(): void {
+    this.balanceHidden = !this.balanceHidden;
+  }
+
+  money(value: number | string | null | undefined): string {
+    if (this.balanceHidden) {
+      return "**,**";
+    }
+
+    const amount = Number(value ?? 0);
+    return `€${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
+  }
 
   get customerFilterOptions(): Array<{ value: string; label: string }> {
     return [{ value: "", label: "Tutti i clienti" }, ...this.customerOptions];
