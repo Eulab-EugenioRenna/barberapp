@@ -10,11 +10,12 @@ import {
 import { FormsModule } from "@angular/forms";
 import { CustomSelectComponent } from "../custom-select.component";
 import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dialog.component";
+import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 
 @Component({
   selector: "barber-quick-order-modal",
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent, QuickCreateDialogComponent],
+  imports: [CommonModule, FormsModule, CustomSelectComponent, QuickCreateDialogComponent, AutofocusFirstDirective],
   templateUrl: "./quick-order-modal.component.html",
   styleUrl: "./quick-order-modal.component.css",
 })

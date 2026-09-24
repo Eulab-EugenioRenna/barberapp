@@ -2,11 +2,12 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
+import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 
 @Component({
   selector: "barber-admin-customers-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, InfiniteScrollDirective],
+  imports: [CommonModule, FormsModule, InfiniteScrollDirective, AutofocusFirstDirective],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-5">
@@ -95,6 +96,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
         aria-label="Chiudi modulo cliente"
       ></button>
       <article
+        barberAutofocusFirst
         class="confirm-dialog panel max-h-[85vh] overflow-auto"
         role="dialog"
         aria-modal="true"

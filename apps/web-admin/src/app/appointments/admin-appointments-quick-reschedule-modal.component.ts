@@ -8,11 +8,17 @@ import {
 } from "@angular/core";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
+import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 
 @Component({
   selector: "barber-admin-appointments-quick-reschedule-modal",
   standalone: true,
-  imports: [CommonModule, CalendarInputComponent, CustomSelectComponent],
+  imports: [
+    CommonModule,
+    CalendarInputComponent,
+    CustomSelectComponent,
+    AutofocusFirstDirective,
+  ],
   styles: [
     `
       :host {
@@ -35,6 +41,7 @@ import { CustomSelectComponent } from "../custom-select.component";
       (click)="cancel.emit()"
     ></div>
     <section
+      barberAutofocusFirst
       role="dialog"
       aria-modal="true"
       aria-labelledby="quick-reschedule-title"

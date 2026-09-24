@@ -3,15 +3,16 @@ import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 import { AdminApiService } from "./core/admin-api.service";
+import { AutofocusFirstDirective } from "./shared/autofocus-first.directive";
 
 export type QuickCreateKind = "customer" | "service" | "product";
 
 @Component({
   selector: "barber-quick-create-dialog",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AutofocusFirstDirective],
   template: `
-    <div class="quick-create-overlay" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId">
+    <div barberAutofocusFirst class="quick-create-overlay" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId">
       <button type="button" class="quick-create-backdrop" aria-label="Chiudi" [disabled]="saving" (click)="cancel.emit()"></button>
       <form class="quick-create-dialog" (ngSubmit)="save()">
         <p class="eyebrow text-[var(--accent)]">Creazione rapida</p>

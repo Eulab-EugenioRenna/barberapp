@@ -3,6 +3,7 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CustomSelectComponent } from "../custom-select.component";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
+import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 
 @Component({
   selector: "barber-admin-services-page",
@@ -12,6 +13,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
     FormsModule,
     CustomSelectComponent,
     InfiniteScrollDirective,
+    AutofocusFirstDirective,
   ],
   template: `
     <section class="grid gap-4 xl:grid-cols-2">
@@ -142,6 +144,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
         aria-label="Chiudi modulo servizio"
       ></button>
       <article
+        barberAutofocusFirst
         class="confirm-dialog panel max-h-[85vh] overflow-auto"
         role="dialog"
         aria-modal="true"
@@ -348,6 +351,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
         aria-label="Chiudi modulo prodotto"
       ></button>
       <article
+        barberAutofocusFirst
         class="confirm-dialog panel max-h-[85vh] overflow-auto"
         role="dialog"
         aria-modal="true"
