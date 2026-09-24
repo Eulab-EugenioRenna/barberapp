@@ -8,7 +8,8 @@ export type UiIconName =
   | "save"
   | "receipt"
   | "link"
-  | "clock";
+  | "clock"
+  | "ban";
 
 @Component({
   selector: "barber-ui-icon",
@@ -36,6 +37,10 @@ export type UiIconName =
           d="M10 13a4 4 0 0 0 5.66 0l2.83-2.83a4 4 0 0 0-5.66-5.66L11 6.34m2 4.66a4 4 0 0 0-5.66 0L4.5 13.83a4 4 0 0 0 5.66 5.66L12 17.66"
         />
         <path *ngSwitchCase="'clock'" d="M12 7v5l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        <path
+          *ngSwitchCase="'ban'"
+          d="M4.9 4.9l14.2 14.2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+        />
       </ng-container>
     </svg>
   `,

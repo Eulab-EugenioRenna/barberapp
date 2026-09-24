@@ -72,6 +72,14 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                     : "Collega ordine"
                 }}
               </button>
+              <button
+                type="button"
+                class="ghost-btn text-red-700"
+                [disabled]="loading"
+                (click)="cancelAppointment.emit(appointment)"
+              >
+                <barber-ui-icon name="ban"></barber-ui-icon> Annulla appuntamento
+              </button>
             </div>
 
             <div
@@ -117,6 +125,7 @@ export class PendingOrdersQueueComponent {
 
   @Output() confirmOrder = new EventEmitter<any>();
   @Output() linkOrder = new EventEmitter<{ appointment: any; saleId: string }>();
+  @Output() cancelAppointment = new EventEmitter<any>();
 
   linkOpenFor = "";
   selectedSaleId = "";

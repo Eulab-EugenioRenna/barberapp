@@ -500,6 +500,7 @@ type ViewKey =
               [loading]="loading"
               (confirmOrder)="confirmPendingOrder($event)"
               (linkOrder)="linkPendingOrder($event)"
+              (cancelAppointment)="cancelPendingAppointment($event)"
             ></barber-pending-orders-queue>
 
             <barber-admin-appointments-feature-page
@@ -2667,6 +2668,39 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   confirmPendingOrder(appointment: any): void {
     this.openQuickOrder(appointment);
+  }
+
+  cancelPendingAppointment(appointment: any): void {
+    if (!appointment?.id) return;
+    const customer = `${appointment.customer?.firstName || ""} ${
+      appointment.customer?.lastName || ""
+    }`.trim();
+    this.openDeleteDialog(
+      "Annulla appuntamento",
+      `Vuoi annullare l'appuntamento${
+        customer ? ` di ${customer}` : ""
+      }? La notifica sparirà dalla coda di conferma.`,
+      "Annulla appuntamento",
+      async () => {
+        this.loading = true;
+        try {
+          await firstValueFrom(
+            this.adminApi.cancelAppointment(appointment.id, {
+              reason: "Annullato dalla coda conferme",
+            }),
+          );
+          this.feedback = "Appuntamento annullato";
+          this.appointmentOrderNotifications.dismiss(appointment.id);
+          await this.refreshAll();
+        } catch (error: any) {
+          this.feedback =
+            error?.error?.message || "Annullamento non riuscito";
+          throw error;
+        } finally {
+          this.loading = false;
+        }
+      },
+    );
   }
 
   async linkPendingOrder(event: {
