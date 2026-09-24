@@ -182,7 +182,7 @@ import {
           class="primary-btn"
           (click)="createOrder.emit(appointment)"
         >
-          Registra ordine
+          Conferma ordine
         </button>
         <button
           *ngIf="mode === 'preview'"

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   Param,
@@ -283,6 +284,18 @@ export class SalesController {
         resolvedAppointmentId = generatedAppointment.id;
       }
 
+      if (resolvedAppointmentId) {
+        const existingOrder = await transaction.sale.findFirst({
+          where: { tenantId, appointmentId: resolvedAppointmentId },
+          select: { id: true },
+        });
+        if (existingOrder) {
+          throw new ConflictException(
+            "Un ordine è già stato confermato per questa prenotazione",
+          );
+        }
+      }
+
       const createdSale = await transaction.sale.create({
         data: {
           tenantId,
@@ -329,6 +342,19 @@ export class SalesController {
       }
 
       return createdSale;
+    }).catch((error: unknown) => {
+      if (
+        appointmentId &&
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException(
+          "Un ordine è già stato confermato per questa prenotazione",
+        );
+      }
+      throw error;
     });
 
     await Promise.all([

@@ -371,6 +371,7 @@ model Sale {
 
   @@index([tenantId, soldAt])
   @@index([tenantId, paymentStatus])
+  @@index([appointmentId])
 }
 
 model SaleItem {

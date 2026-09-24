@@ -259,6 +259,15 @@ import { CustomSelectComponent } from "../custom-select.component";
             <button
               *ngIf="appointmentForm.id"
               type="button"
+              class="primary-btn"
+              [disabled]="loading"
+              (click)="confirmOrder.emit()"
+            >
+              Conferma ordine
+            </button>
+            <button
+              *ngIf="appointmentForm.id"
+              type="button"
               class="pill-btn"
               [disabled]="loading"
               (click)="remove.emit()"
@@ -314,6 +323,7 @@ export class AdminAppointmentsPageComponent {
   @Output() appointmentSelectedDateChange = new EventEmitter<string>();
   @Output() updateAppointmentSlots = new EventEmitter<void>();
   @Output() save = new EventEmitter<void>();
+  @Output() confirmOrder = new EventEmitter<void>();
   @Output() remove = new EventEmitter<void>();
   @Output() cancel = new EventEmitter<void>();
   @Output() reset = new EventEmitter<void>();

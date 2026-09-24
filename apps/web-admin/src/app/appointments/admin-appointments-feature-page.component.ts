@@ -151,6 +151,7 @@ import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dia
               appointmentsFacade.updateAppointmentSlots()
             "
             (save)="saveAppointment()"
+            (confirmOrder)="confirmOrderFromEditor()"
             (remove)="removeAppointment()"
             (cancel)="cancelAppointment()"
             (reset)="appointmentsFacade.prepareNewAppointment()"
@@ -309,6 +310,26 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
       this.dataChanged.emit("dashboard");
     } catch {
       // The facade exposes user-facing feedback for request failures.
+    }
+  }
+
+  async confirmOrderFromEditor(): Promise<void> {
+    const appointmentId = this.appointmentsFacade.appointmentForm().id;
+    if (!appointmentId) {
+      return;
+    }
+    try {
+      await this.appointmentsFacade.saveAppointment();
+      await this.appointmentsFacade.loadViewData();
+      this.dataChanged.emit("dashboard");
+    } catch {
+      return;
+    }
+    const appointment = this.appointmentsFacade
+      .appointments()
+      .find((item) => item.id === appointmentId);
+    if (appointment) {
+      this.createOrder.emit(appointment);
     }
   }
 

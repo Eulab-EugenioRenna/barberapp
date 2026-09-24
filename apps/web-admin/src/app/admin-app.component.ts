@@ -16,6 +16,7 @@ import { CalendarInputComponent } from "./calendar-input.component";
 import { ADMIN_API_URL } from "./core/api-config";
 import { AdminApiService } from "./core/admin-api.service";
 import { AdminFacade } from "./core/admin.facade";
+import { AppointmentOrderNotificationsService } from "./core/appointment-order-notifications.service";
 import { AuthApiService } from "./core/auth-api.service";
 import { SessionStore } from "./core/session.store";
 import { AdminAppointmentsFeaturePageComponent } from "./appointments/admin-appointments-feature-page.component";
@@ -432,6 +433,46 @@ type ViewKey =
           </header>
 
           <main class="content-scroll">
+            <article
+              *ngIf="appointmentOrderAlerts().length"
+              class="panel mb-4 rounded-[2rem] border border-amber-300 bg-amber-50 p-4"
+              aria-live="polite"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p class="eyebrow text-amber-700">Appuntamenti trascorsi</p>
+                  <h3 class="font-display text-2xl">Ordini da confermare</h3>
+                </div>
+                <span class="status-pill status-pill-amber">
+                  {{ appointmentOrderAlerts().length }} in attesa
+                </span>
+              </div>
+              <div class="mt-3 grid gap-2">
+                <div
+                  *ngFor="let appointment of appointmentOrderAlerts().slice(0, 3)"
+                  class="list-card items-center"
+                >
+                  <div>
+                    <strong>
+                      {{ appointment.customer.firstName }}
+                      {{ appointment.customer.lastName }}
+                    </strong>
+                    <p class="text-sm text-[var(--muted)]">
+                      {{ appointment.service.name }} ·
+                      {{ appointment.startsAt | date: "dd/MM HH:mm" }}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="primary-btn"
+                    (click)="openQuickOrder(appointment)"
+                  >
+                    Conferma ordine
+                  </button>
+                </div>
+              </div>
+            </article>
+
             <p
               *ngIf="feedback"
               class="panel mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
@@ -613,6 +654,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly adminFacade = inject(AdminFacade);
   private readonly adminApi = inject(AdminApiService);
+  private readonly appointmentOrderNotifications = inject(
+    AppointmentOrderNotificationsService,
+  );
   private readonly authApi = inject(AuthApiService);
   private readonly sessionStore = inject(SessionStore);
   private readonly router = inject(Router);
@@ -625,6 +669,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   readonly servicesHasMore = this.adminFacade.servicesHasMore;
   readonly productsHasMore = this.adminFacade.productsHasMore;
   readonly collaboratorsHasMore = this.adminFacade.collaboratorsHasMore;
+  readonly appointmentOrderAlerts =
+    this.appointmentOrderNotifications.appointments;
   readonly adminData = computed(() => {
     const tenant = this.adminFacade.tenant();
     return {
@@ -1034,6 +1080,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       clearInterval(this.dashboardRefreshTimer);
       this.dashboardRefreshTimer = null;
     }
+    this.appointmentOrderNotifications.stop();
   }
 
   private canAutoRefreshDashboard(): boolean {
@@ -1300,6 +1347,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       }
 
       this.tenant = this.adminFacade.tenant();
+      this.appointmentOrderNotifications.connect(this.sessionStore.token());
       this.revenueMetrics = this.adminFacade.revenueMetrics();
       this.revenueReport = this.adminFacade.revenueReport();
       this.appointmentStats = this.adminFacade.appointmentStats();
@@ -1395,6 +1443,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       }
 
       this.tenant = this.adminFacade.tenant();
+      this.appointmentOrderNotifications.connect(this.sessionStore.token());
     } catch (error: any) {
       if (error?.status === 401) {
         this.rememberRequestedUrl();
@@ -2575,7 +2624,11 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   async saveQuickOrder(payload: Record<string, unknown>): Promise<void> {
     this.loading = true;
     try {
+      const appointmentId = String(payload["appointmentId"] ?? "");
       await firstValueFrom(this.adminApi.createSale(payload));
+      if (appointmentId) {
+        this.appointmentOrderNotifications.dismiss(appointmentId);
+      }
       this.closeQuickOrder();
       this.feedback = "Ordine registrato";
       await this.refreshAll();
@@ -3019,6 +3072,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.sessionToken = "";
     this.currentUser = null;
     this.adminFacade.clearSession();
+    this.appointmentOrderNotifications.stop();
     this.feedback = "";
     this.sidebarOpen = false;
     void this.router.navigate(["/login"]);

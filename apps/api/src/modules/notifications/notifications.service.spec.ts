@@ -2,6 +2,61 @@ import { NotificationChannel } from "@prisma/client";
 import { NotificationsService } from "./notifications.service";
 
 describe("NotificationsService", () => {
+  it("lists only ended appointments without an order", async () => {
+    const findMany = jest.fn().mockResolvedValue([{ id: "appointment-1" }]);
+    const service = new NotificationsService(
+      { appointment: { findMany } } as never,
+      {} as never,
+    );
+    const now = new Date("2026-09-24T14:00:00.000Z");
+
+    await expect(
+      service.listAppointmentsAwaitingOrder("tenant-1", now),
+    ).resolves.toEqual([{ id: "appointment-1" }]);
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant-1",
+        startsAt: { lte: now },
+        endsAt: { lte: now },
+        status: {
+          in: [
+            "requested",
+            "confirmed",
+            "checked_in",
+            "rescheduled",
+            "completed",
+          ],
+        },
+        sales: { none: {} },
+      },
+      orderBy: { startsAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        customerId: true,
+        serviceId: true,
+        collaboratorId: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        customer: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        service: {
+          select: {
+            id: true,
+            name: true,
+            basePrice: true,
+            durationMinutes: true,
+          },
+        },
+        collaborator: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    });
+  });
+
   it("creates default tenant preferences and providers", async () => {
     const prisma = {
       notificationTemplate: {

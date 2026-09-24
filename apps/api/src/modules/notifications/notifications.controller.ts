@@ -1,5 +1,21 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  MessageEvent,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Sse,
+} from "@nestjs/common";
 import { NotificationChannel } from "@prisma/client";
+import {
+  Observable,
+  exhaustMap,
+  map,
+  timer,
+} from "rxjs";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   requireTenantId,
@@ -17,6 +33,35 @@ export class NotificationsController {
     private readonly notificationsService: NotificationsService,
     private readonly notificationsEventsService: NotificationsEventsService,
   ) {}
+
+  @Sse("stream")
+  stream(
+    @Req() request: { headers: { authorization?: string } },
+  ): Observable<MessageEvent> {
+    return timer(0, 15_000).pipe(
+      exhaustMap(async () => {
+        const session = await resolveRequestSession(
+          this.prisma,
+          request.headers.authorization,
+        );
+        const tenantId = requireTenantId(session);
+        const now = new Date();
+        const appointments =
+          await this.notificationsService.listAppointmentsAwaitingOrder(
+            tenantId,
+            now,
+          );
+        return { appointments, now };
+      }),
+      map(({ appointments, now }) => ({
+        type: "appointment.awaiting_order",
+        data: {
+          appointments,
+          generatedAt: now.toISOString(),
+        },
+      })),
+    );
+  }
 
   @Get("preferences")
   async preferences(

@@ -1,4 +1,5 @@
 import { NotificationChannel } from "@prisma/client";
+import { firstValueFrom } from "rxjs";
 import { NotificationsController } from "./notifications.controller";
 
 jest.mock("../../common/request-session", () => ({
@@ -25,6 +26,34 @@ jest.mock("../../common/request-session", () => ({
 }));
 
 describe("NotificationsController", () => {
+  it("streams appointments that crossed now and await order confirmation", async () => {
+    const notificationsService = {
+      listAppointmentsAwaitingOrder: jest
+        .fn()
+        .mockResolvedValue([{ id: "appointment-1" }]),
+    };
+    const controller = new NotificationsController(
+      {} as never,
+      notificationsService as never,
+      {} as never,
+    );
+
+    await expect(
+      firstValueFrom(
+        controller.stream({ headers: { authorization: "Bearer token" } }),
+      ),
+    ).resolves.toEqual({
+      type: "appointment.awaiting_order",
+      data: {
+        appointments: [{ id: "appointment-1" }],
+        generatedAt: expect.any(String),
+      },
+    });
+    expect(
+      notificationsService.listAppointmentsAwaitingOrder,
+    ).toHaveBeenCalledWith("tenant-1", expect.any(Date));
+  });
+
   it("delegates unread count to the service", async () => {
     const controller = new NotificationsController(
       {} as never,

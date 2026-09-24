@@ -42,6 +42,54 @@ export class NotificationsService {
     private readonly cacheManager: AppCacheService,
   ) {}
 
+  async listAppointmentsAwaitingOrder(
+    tenantId: string,
+    now = new Date(),
+  ): Promise<unknown[]> {
+    return this.prisma.appointment.findMany({
+      where: {
+        tenantId,
+        startsAt: { lte: now },
+        endsAt: { lte: now },
+        status: {
+          in: [
+            "requested",
+            "confirmed",
+            "checked_in",
+            "rescheduled",
+            "completed",
+          ],
+        },
+        sales: { none: {} },
+      },
+      orderBy: { startsAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        customerId: true,
+        serviceId: true,
+        collaboratorId: true,
+        startsAt: true,
+        endsAt: true,
+        status: true,
+        customer: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        service: {
+          select: {
+            id: true,
+            name: true,
+            basePrice: true,
+            durationMinutes: true,
+          },
+        },
+        collaborator: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    });
+  }
+
   async listPreferences(tenantId: string, userId: string): Promise<unknown> {
     await this.ensureTenantNotificationDefaults(tenantId);
 
