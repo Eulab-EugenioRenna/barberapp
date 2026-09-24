@@ -112,13 +112,18 @@ export function calculateRevenueKpis(input: {
   const totalRevenue = salesRevenue + appointmentRevenue;
   const revenueEvents =
     input.salesValues.length + input.appointmentValues.length;
+  // Products are a subset of sales revenue; everything else (service sale
+  // rows plus standalone completed appointments) is service revenue.
+  const productRevenue = input.productRevenue;
+  const serviceRevenue = totalRevenue - productRevenue;
 
   return {
     salesRevenue,
     appointmentRevenue,
     totalRevenue,
     averageTicket: revenueEvents ? totalRevenue / revenueEvents : 0,
-    productRevenue: input.productRevenue,
+    serviceRevenue,
+    productRevenue,
     appointmentCount: input.appointmentCount,
     revenueEvents,
   };

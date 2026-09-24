@@ -27,6 +27,7 @@ export class QuickOrderModalComponent implements OnInit {
   @Input() collaborators: any[] = [];
   @Input() defaultCollaboratorId = "";
   @Input() appointment: any = null;
+  @Input() sale: any = null;
   @Input() loading = false;
 
   @Output() close = new EventEmitter<void>();
@@ -36,6 +37,7 @@ export class QuickOrderModalComponent implements OnInit {
   customerId = "";
   appointmentId = "";
   paymentMethod = "cash";
+  paymentStatus = "paid";
   items: any[] = [];
   pricePadIndex = -1;
   quickCreateKind: QuickCreateKind | null = null;
@@ -49,6 +51,22 @@ export class QuickOrderModalComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.sale) {
+      this.customerId = this.sale.customerId || this.sale.customer?.id || "";
+      this.appointmentId = this.sale.appointmentId || "";
+      this.paymentMethod = this.sale.paymentMethod || "cash";
+      this.paymentStatus = this.sale.paymentStatus || "paid";
+      this.items = (this.sale.items || []).map((item: any) => ({
+        kind: item.serviceId ? "service" : "product",
+        serviceId: item.serviceId || undefined,
+        productId: item.productId || undefined,
+        label: item.service?.name || item.product?.name || item.label,
+        quantity: Number(item.quantity || 1),
+        unitPrice: Number(item.unitPrice || 0),
+        collaboratorId: item.collaboratorId || item.collaborator?.id || "",
+      }));
+      return;
+    }
     if (!this.appointment) {
       return;
     }
@@ -151,6 +169,10 @@ export class QuickOrderModalComponent implements OnInit {
     return Boolean(this.appointmentId);
   }
 
+  get isEditing(): boolean {
+    return Boolean(this.sale?.id);
+  }
+
   addService(service: any): void {
     this.items.push({
       kind: "service",
@@ -217,7 +239,7 @@ export class QuickOrderModalComponent implements OnInit {
     this.submitOrder.emit({
       customerId: this.customerId,
       appointmentId: this.appointmentId || undefined,
-      paymentStatus: "paid",
+      paymentStatus: this.paymentStatus,
       paymentMethod: this.paymentMethod,
       items: this.items.map((item) => ({
         kind: item.kind,

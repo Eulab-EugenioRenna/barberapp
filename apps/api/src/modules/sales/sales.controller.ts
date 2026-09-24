@@ -3,8 +3,11 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
+  NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -65,11 +68,14 @@ export class SalesController {
                 include: {
                   product: true,
                   service: true,
+                  collaborator: true,
                 },
               },
               customer: true,
               collaborator: true,
-              appointment: true,
+              appointment: {
+                include: { customer: true, service: true, collaborator: true },
+              },
             },
           }),
           this.prisma.sale.count({ where: { tenantId } }),
@@ -327,7 +333,9 @@ export class SalesController {
           },
           customer: true,
           collaborator: true,
-          appointment: true,
+          appointment: {
+            include: { customer: true, service: true, collaborator: true },
+          },
         },
       });
 
@@ -378,6 +386,225 @@ export class SalesController {
     return created;
   }
 
+  @Patch(":id")
+  async update(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const itemsInput = Array.isArray(body["items"])
+      ? (body["items"] as Array<Record<string, unknown>>)
+      : [];
+    if (!itemsInput.length) {
+      throw new BadRequestException("Aggiungi almeno un servizio o prodotto");
+    }
+
+    const sale = await this.prisma.sale.findFirst({
+      where: { id, tenantId },
+      select: { id: true, appointmentId: true, customerId: true },
+    });
+    if (!sale) {
+      throw new NotFoundException("Ordine non trovato");
+    }
+
+    const customerId =
+      typeof body["customerId"] === "string" && body["customerId"]
+        ? body["customerId"]
+        : undefined;
+    const [products, services, customer, tenant] = await Promise.all([
+      this.prisma.product.findMany({ where: { tenantId } }),
+      this.prisma.service.findMany({ where: { tenantId } }),
+      customerId
+        ? this.prisma.customer.findFirst({
+            where: { id: customerId, tenantId },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { defaultCollaboratorId: true },
+      }),
+    ]);
+    if (customerId && !customer) {
+      throw new BadRequestException("Cliente non valido");
+    }
+
+    let normalizedItems;
+    try {
+      normalizedItems = normalizeOrderItems({
+        items: itemsInput,
+        products,
+        services,
+      });
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "Ordine non valido",
+      );
+    }
+    normalizedItems = normalizedItems.map((item) => {
+      const service = item.serviceId
+        ? services.find((entry) => entry.id === item.serviceId)
+        : undefined;
+      return {
+        ...item,
+        collaboratorId:
+          item.collaboratorId ||
+          (service?.requiresCollaborator
+            ? tenant?.defaultCollaboratorId ?? undefined
+            : undefined),
+      };
+    });
+
+    const serviceItemsWithoutCollaborator = normalizedItems.filter((item) => {
+      const service = item.serviceId
+        ? services.find((entry) => entry.id === item.serviceId)
+        : undefined;
+      return service?.requiresCollaborator && !item.collaboratorId;
+    });
+    if (serviceItemsWithoutCollaborator.length) {
+      throw new BadRequestException(
+        "Imposta un collaboratore per ogni servizio che lo richiede",
+      );
+    }
+    const itemCollaboratorIds = [
+      ...new Set(
+        normalizedItems
+          .map((item) => item.collaboratorId)
+          .filter((collaboratorId): collaboratorId is string =>
+            Boolean(collaboratorId),
+          ),
+      ),
+    ];
+    if (itemCollaboratorIds.length) {
+      const validCollaborators = await this.prisma.collaborator.findMany({
+        where: { tenantId, id: { in: itemCollaboratorIds } },
+        select: { id: true },
+      });
+      if (validCollaborators.length !== itemCollaboratorIds.length) {
+        throw new BadRequestException(
+          "Collaboratore non valido in una riga servizio",
+        );
+      }
+    }
+
+    const subtotal = normalizedItems.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
+    );
+    const discountTotal = normalizedItems.reduce(
+      (sum, item) => sum + item.discount,
+      0,
+    );
+    const taxTotal = normalizedItems.reduce(
+      (sum, item) => sum + item.taxTotal,
+      0,
+    );
+    const total = normalizedItems.reduce(
+      (sum, item) => sum + item.lineTotal + item.taxTotal,
+      0,
+    );
+    const primaryCollaboratorId =
+      normalizedItems.find((item) => Boolean(item.serviceId))?.collaboratorId ??
+      undefined;
+
+    const updated = await this.prisma.$transaction(async (transaction) => {
+      await transaction.saleItem.deleteMany({ where: { saleId: id } });
+      const updatedSale = await transaction.sale.update({
+        where: { id },
+        data: {
+          customerId,
+          collaboratorId: primaryCollaboratorId,
+          subtotal,
+          discountTotal,
+          taxTotal,
+          total,
+          paymentStatus:
+            typeof body["paymentStatus"] === "string" &&
+            ["unpaid", "paid", "partial", "refunded", "cancelled"].includes(
+              body["paymentStatus"],
+            )
+              ? (body["paymentStatus"] as never)
+              : undefined,
+          paymentMethod:
+            typeof body["paymentMethod"] === "string"
+              ? body["paymentMethod"]
+              : undefined,
+          items: { create: normalizedItems },
+        },
+        include: {
+          items: {
+            include: { product: true, service: true, collaborator: true },
+          },
+          customer: true,
+          collaborator: true,
+          appointment: {
+            include: { customer: true, service: true, collaborator: true },
+          },
+        },
+      });
+      if (sale.appointmentId) {
+        await transaction.appointment.update({
+          where: { id: sale.appointmentId },
+          data: { finalPrice: total },
+        });
+      }
+      return updatedSale;
+    });
+
+    await Promise.all([
+      this.cacheInvalidationService.invalidateSales(tenantId),
+      this.cacheInvalidationService.invalidateDashboard(tenantId),
+      this.cacheInvalidationService.invalidateCustomers(tenantId),
+      ...(sale.appointmentId
+        ? [this.cacheInvalidationService.invalidateAppointments(tenantId)]
+        : []),
+    ]);
+    return resolveSaleLabels(updated);
+  }
+
+  @Delete(":id")
+  async remove(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const sale = await this.prisma.sale.findFirst({
+      where: { id, tenantId },
+      select: { id: true, appointmentId: true, customerId: true },
+    });
+    if (!sale) {
+      throw new NotFoundException("Ordine non trovato");
+    }
+
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.sale.delete({ where: { id } });
+      if (sale.appointmentId) {
+        await transaction.appointment.update({
+          where: { id: sale.appointmentId },
+          data: { finalPrice: null },
+        });
+      }
+    });
+    await Promise.all([
+      this.cacheInvalidationService.invalidateSales(tenantId),
+      this.cacheInvalidationService.invalidateDashboard(tenantId),
+      this.cacheInvalidationService.invalidateCustomers(tenantId),
+      ...(sale.appointmentId
+        ? [this.cacheInvalidationService.invalidateAppointments(tenantId)]
+        : []),
+    ]);
+    return { deleted: true };
+  }
+
   @Get(":id")
   async findOne(
     @Req() request: { headers: { authorization?: string } },
@@ -400,11 +627,18 @@ export class SalesController {
               include: {
                 product: true,
                 service: true,
+                collaborator: true,
               },
             },
             customer: true,
             collaborator: true,
-            appointment: true,
+            appointment: {
+              include: {
+                customer: true,
+                service: true,
+                collaborator: true,
+              },
+            },
           },
         });
 

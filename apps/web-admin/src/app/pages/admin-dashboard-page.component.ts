@@ -261,6 +261,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
               </div>
               <p class="mt-2 text-sm text-white/65">
                 Ricavi: €{{ collaborator.revenue | number: "1.0-2" }} ·
+                Ordini: {{ collaborator.orderCount || 0 }} ·
                 Upcoming:
                 {{ collaborator.upcoming }}
               </p>

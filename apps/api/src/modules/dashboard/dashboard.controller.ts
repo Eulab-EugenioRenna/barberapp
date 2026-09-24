@@ -102,6 +102,7 @@ export class DashboardController {
                 items: {
                   select: {
                     productId: true,
+                    serviceId: true,
                     lineTotal: true,
                     taxTotal: true,
                     collaboratorId: true,
@@ -164,20 +165,25 @@ export class DashboardController {
         const appointmentValues = completedAppointments.map((appointment) =>
           Number(appointment.finalPrice ?? appointment.estimatedPrice ?? 0),
         );
-        const productRevenue = sales.reduce(
+        const productItems = sales.flatMap((sale) =>
+          sale.items.filter(
+            (item) =>
+              item.productId &&
+              (!collaboratorId || item.collaboratorId === collaboratorId),
+          ),
+        );
+        const productRevenue = productItems.reduce(
+          (sum, item) => sum + lineValue(item),
+          0,
+        );
+        const serviceItemCount = sales.reduce(
           (total, sale) =>
             total +
-            sale.items
-              .filter(
-                (item) =>
-                  item.productId &&
-                  (!collaboratorId || item.collaboratorId === collaboratorId),
-              )
-              .reduce(
-                (sum, item) =>
-                  sum + lineValue(item),
-                0,
-              ),
+            sale.items.filter(
+              (item) =>
+                item.serviceId &&
+                (!collaboratorId || item.collaboratorId === collaboratorId),
+            ).length,
           0,
         );
         const kpis = calculateRevenueKpis({
@@ -283,6 +289,16 @@ export class DashboardController {
               trend: `${sales.length} vendite`,
             },
             {
+              label: "Fatturato servizi",
+              value: `EUR ${kpis.serviceRevenue.toFixed(2)}`,
+              trend: `${serviceItemCount} servizi · ${completedAppointments.length} appuntamenti`,
+            },
+            {
+              label: "Fatturato prodotti",
+              value: `EUR ${kpis.productRevenue.toFixed(2)}`,
+              trend: `${productItems.length} prodotti`,
+            },
+            {
               label: "Prenotazioni",
               value: String(appointmentCount),
               trend: `${completedAppointmentCount} completate`,
@@ -291,11 +307,6 @@ export class DashboardController {
               label: "Ticket medio",
               value: `EUR ${kpis.averageTicket.toFixed(2)}`,
               trend: `${kpis.revenueEvents} operazioni · ${customerCount} clienti`,
-            },
-            {
-              label: "Ricavi da prodotti",
-              value: `EUR ${kpis.productRevenue.toFixed(2)}`,
-              trend: `${sales.reduce((sum, sale) => sum + sale.items.filter((item) => item.productId).length, 0)} prodotti`,
             },
           ],
           byCustomer: [...customerRevenue.values()].sort(
@@ -352,7 +363,14 @@ export class DashboardController {
           tenantId,
           soldAt: rangeFilter,
           customerId,
-          ...(collaboratorId ? { collaboratorId } : {}),
+          ...(collaboratorId
+            ? {
+                OR: [
+                  { collaboratorId },
+                  { items: { some: { collaboratorId } } },
+                ],
+              }
+            : {}),
         },
         orderBy: { soldAt: "desc" },
         take,
@@ -361,7 +379,14 @@ export class DashboardController {
           collaborator: {
             select: { id: true, firstName: true, lastName: true },
           },
-          items: { select: { id: true } },
+          items: {
+            select: {
+              id: true,
+              collaborator: {
+                select: { id: true, firstName: true, lastName: true },
+              },
+            },
+          },
         },
       }),
       this.prisma.appointment.findMany({
@@ -369,7 +394,18 @@ export class DashboardController {
           tenantId,
           startsAt: rangeFilter,
           customerId,
-          ...(collaboratorId ? { collaboratorId } : {}),
+          ...(collaboratorId
+            ? {
+                OR: [
+                  { collaboratorId },
+                  {
+                    sales: {
+                      some: { items: { some: { collaboratorId } } },
+                    },
+                  },
+                ],
+              }
+            : {}),
         },
         orderBy: { startsAt: "desc" },
         take,
@@ -384,7 +420,14 @@ export class DashboardController {
               id: true,
               total: true,
               paymentStatus: true,
-              items: { select: { id: true } },
+              items: {
+                select: {
+                  id: true,
+                  collaborator: {
+                    select: { id: true, firstName: true, lastName: true },
+                  },
+                },
+              },
             },
             orderBy: { soldAt: "desc" },
           },
@@ -397,6 +440,24 @@ export class DashboardController {
       lastName: string;
     } | null) =>
       value ? `${value.firstName} ${value.lastName}`.trim() : "";
+
+    const contributorNames = (
+      primary?: { firstName: string; lastName: string } | null,
+      items: Array<{
+        collaborator?: { firstName: string; lastName: string } | null;
+      }> = [],
+    ): string => {
+      const labels = new Map<string, string>();
+      const add = (
+        value?: { firstName: string; lastName: string } | null,
+      ) => {
+        const label = nameOf(value);
+        if (label) labels.set(label, label);
+      };
+      add(primary);
+      for (const item of items) add(item.collaborator);
+      return [...labels.keys()].join(" / ");
+    };
 
     // Un ordine collegato a una prenotazione (chiave esterna appointmentId)
     // viene mostrato come un unico movimento, usando data/ora della
@@ -422,7 +483,10 @@ export class DashboardController {
           id: appointment.id,
           occurredAt: appointment.startsAt,
           customerName: nameOf(appointment.customer) || "Cliente",
-          collaboratorName: nameOf(appointment.collaborator),
+          collaboratorName: contributorNames(
+            appointment.collaborator,
+            linkedSales.flatMap((sale) => sale.items),
+          ),
           detail: `${serviceName} · ${articleCount} articoli`,
           amount,
           status: latestSale.paymentStatus,
@@ -434,7 +498,7 @@ export class DashboardController {
         id: appointment.id,
         occurredAt: appointment.startsAt,
         customerName: nameOf(appointment.customer) || "Cliente",
-        collaboratorName: nameOf(appointment.collaborator),
+        collaboratorName: contributorNames(appointment.collaborator),
         detail: serviceName,
         amount: Number(
           appointment.finalPrice ?? appointment.estimatedPrice ?? 0,
@@ -453,7 +517,7 @@ export class DashboardController {
         id: sale.id,
         occurredAt: sale.soldAt,
         customerName: nameOf(sale.customer) || "Vendita senza cliente",
-        collaboratorName: nameOf(sale.collaborator),
+        collaboratorName: contributorNames(sale.collaborator, sale.items),
         detail: `${sale.items.length} articoli`,
         amount: Number(sale.total),
         status: sale.paymentStatus,
@@ -566,16 +630,25 @@ export class DashboardController {
                 sales: { select: { id: true } },
               },
             },
-            sales: {
-              where: { paymentStatus: { in: ["paid", "partial"] } },
+            // An order can include service rows for several collaborators.
+            // Every collaborator receives the revenue generated by their own
+            // rows, not just the primary collaborator stored on the sale.
+            saleItems: {
+              where: { sale: { paymentStatus: { in: ["paid", "partial"] } } },
+              select: { saleId: true, lineTotal: true, taxTotal: true },
             },
           },
         });
 
         return rows.map((row) => ({
           collaboratorName: `${row.firstName} ${row.lastName}`,
+          orderCount: new Set(row.saleItems.map((item) => item.saleId)).size,
           revenue:
-            row.sales.reduce((total, sale) => total + Number(sale.total), 0) +
+            row.saleItems.reduce(
+              (total, item) =>
+                total + Number(item.lineTotal) + Number(item.taxTotal),
+              0,
+            ) +
             row.appointments
               .filter(
                 (appointment) =>
@@ -584,7 +657,10 @@ export class DashboardController {
               )
               .reduce(
                 (total, appointment) =>
-                  total + Number(appointment.estimatedPrice ?? 0),
+                  total +
+                  Number(
+                    appointment.finalPrice ?? appointment.estimatedPrice ?? 0,
+                  ),
                 0,
               ),
           completed: row.appointments.filter(

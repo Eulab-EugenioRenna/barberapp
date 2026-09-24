@@ -17,10 +17,10 @@
     <header class="quick-order-header">
       <div>
         <p class="eyebrow text-[var(--accent)]">
-          {{ isLinkedToAppointment ? "Appuntamento" : "Touch mode" }}
+          {{ isEditing ? "Modifica ordine" : isLinkedToAppointment ? "Appuntamento" : "Touch mode" }}
         </p>
         <h2 id="quick-order-title" class="font-display text-4xl">
-          {{ isLinkedToAppointment ? "Conto appuntamento" : "Ordine rapido" }}
+          {{ isEditing ? "Modifica ordine" : isLinkedToAppointment ? "Conto appuntamento" : "Ordine rapido" }}
         </h2>
         <p class="mt-1 text-sm text-[var(--muted)]">
           <ng-container *ngIf="isLinkedToAppointment; else quickIntro">
@@ -190,6 +190,16 @@
               <option value="mixed">Misto</option>
             </select>
           </label>
+          <label class="field">
+            <span>Stato</span>
+            <select [(ngModel)]="paymentStatus" name="quickPaymentStatus">
+              <option value="paid">Pagato</option>
+              <option value="unpaid">Da pagare</option>
+              <option value="partial">Parziale</option>
+              <option value="refunded">Rimborsato</option>
+              <option value="cancelled">Annullato</option>
+            </select>
+          </label>
           <div class="checkout-total">
             <span>Totale</span><strong>€{{ total.toFixed(2) }}</strong>
           </div>
@@ -207,7 +217,7 @@
             [disabled]="loading || !canSubmit()"
             (click)="submit()"
           >
-            {{ loading ? "Registrazione..." : "Conferma ordine" }}
+            {{ loading ? "Salvataggio..." : isEditing ? "Salva ordine" : "Conferma ordine" }}
           </button>
         </div>
       </aside>

@@ -3,11 +3,12 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
+import { UiIconComponent } from "../shared/ui-icon.component";
 
 @Component({
   selector: "barber-admin-collaborators-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, InfiniteScrollDirective, AutofocusFirstDirective],
+  imports: [CommonModule, FormsModule, InfiniteScrollDirective, AutofocusFirstDirective, UiIconComponent],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-5">
@@ -17,7 +18,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
             <h3 class="font-display text-3xl">Collaboratori</h3>
           </div>
           <button type="button" class="primary-btn" (click)="openNew()">
-            + Nuovo collaboratore
+            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo collaboratore
           </button>
         </div>
         <label class="field mt-5">
@@ -98,6 +99,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
               id="collaborator-form-title"
               class="mt-2 font-display text-3xl"
             >
+              <barber-ui-icon name="save"></barber-ui-icon>
               {{
                 collaboratorForm.id
                   ? "Modifica collaboratore"
@@ -328,7 +330,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
               [disabled]="isDefaultCollaborator(collaboratorForm.id)"
               (click)="removeCollaborator()"
             >
-              Elimina
+              <barber-ui-icon name="trash"></barber-ui-icon> Elimina
             </button>
             <span
               *ngIf="
@@ -345,7 +347,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
               [disabled]="loading"
               (click)="openNew()"
             >
-              Nuovo collaboratore
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo collaboratore
             </button>
           </div>
         </form>

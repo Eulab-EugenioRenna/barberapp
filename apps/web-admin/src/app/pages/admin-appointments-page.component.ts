@@ -3,6 +3,7 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
+import { UiIconComponent } from "../shared/ui-icon.component";
 
 @Component({
   selector: "barber-admin-appointments-page",
@@ -12,6 +13,7 @@ import { CustomSelectComponent } from "../custom-select.component";
     FormsModule,
     CalendarInputComponent,
     CustomSelectComponent,
+    UiIconComponent,
   ],
   styles: [
     `
@@ -254,6 +256,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               class="primary-btn"
               [disabled]="loading || !formValid"
             >
+              <barber-ui-icon name="save"></barber-ui-icon>
               {{ appointmentForm.id ? "Salva modifiche" : "Crea appuntamento" }}
             </button>
             <button
@@ -263,7 +266,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               [disabled]="loading"
               (click)="confirmOrder.emit()"
             >
-              Conferma ordine
+              <barber-ui-icon name="receipt"></barber-ui-icon> Conferma ordine
             </button>
             <button
               *ngIf="appointmentForm.id"
@@ -272,7 +275,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               [disabled]="loading"
               (click)="remove.emit()"
             >
-              Elimina appuntamento
+              <barber-ui-icon name="trash"></barber-ui-icon> Elimina appuntamento
             </button>
             <button
               *ngIf="appointmentForm.id"
@@ -289,7 +292,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               [disabled]="loading"
               (click)="reset.emit()"
             >
-              Nuova prenotazione
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuova prenotazione
             </button>
           </div>
         </form>

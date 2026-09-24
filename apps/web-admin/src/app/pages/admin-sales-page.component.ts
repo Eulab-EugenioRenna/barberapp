@@ -2,11 +2,12 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
+import { UiIconComponent } from "../shared/ui-icon.component";
 
 @Component({
   selector: "barber-admin-sales-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, InfiniteScrollDirective],
+  imports: [CommonModule, FormsModule, InfiniteScrollDirective, UiIconComponent],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-5">
@@ -21,7 +22,7 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
               class="primary-btn"
               (click)="openQuickOrder.emit()"
             >
-              + Nuovo ordine
+              <barber-ui-icon name="receipt"></barber-ui-icon> Nuovo ordine
             </button>
             <span class="status-pill status-pill-neutral"
               >{{ sales.length }} records</span
@@ -112,10 +113,32 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
               {{ formatDateTime(selectedSale.soldAt) }} ·
               {{ selectedSale.paymentMethod || "-" }}
             </p>
+            <p class="mt-1 text-xs text-[var(--muted)]">
+              ID {{ selectedSale.id }}
+            </p>
           </div>
           <button type="button" class="pill-btn" (click)="closeSaleDetail()">
             Chiudi
           </button>
+        </div>
+
+        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+          <article class="rounded-2xl border border-[var(--line)] p-4">
+            <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Cliente</p>
+            <strong class="mt-2 block">
+              {{ selectedSale.customer?.firstName || "Vendita" }}
+              {{ selectedSale.customer?.lastName || "senza cliente" }}
+            </strong>
+            <p class="mt-1 text-sm text-[var(--muted)]">
+              {{ selectedSale.customer?.email || "Email non disponibile" }}
+              <span *ngIf="selectedSale.customer?.phone"> · {{ selectedSale.customer.phone }}</span>
+            </p>
+          </article>
+          <article class="rounded-2xl border border-[var(--line)] p-4">
+            <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Pagamento</p>
+            <strong class="mt-2 block">{{ selectedSale.paymentStatus }}</strong>
+            <p class="mt-1 text-sm text-[var(--muted)]">Metodo: {{ selectedSale.paymentMethod || "non indicato" }}</p>
+          </article>
         </div>
 
         <article
@@ -130,11 +153,17 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
           </strong>
           <p class="mt-1 text-sm text-[var(--muted)]">
             {{ formatDateTime(selectedSale.appointment.startsAt) }}
+            <span *ngIf="selectedSale.appointment.endsAt">
+              → {{ formatDateTime(selectedSale.appointment.endsAt) }}
+            </span>
             <span *ngIf="selectedSale.appointment.collaborator">
               ·
               {{ selectedSale.appointment.collaborator?.firstName || "Staff" }}
               {{ selectedSale.appointment.collaborator?.lastName || "" }}
             </span>
+          </p>
+          <p class="mt-2 text-xs text-[var(--muted)]">
+            Stato: {{ selectedSale.appointment.status }} · ID {{ selectedSale.appointment.id }}
           </p>
         </article>
 
@@ -153,6 +182,9 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
                   <span *ngIf="Number(item.discount || 0) > 0">
                     · sconto €{{ Number(item.discount).toFixed(2) }}
                   </span>
+                </p>
+                <p *ngIf="item.collaborator" class="mt-1 text-xs text-[var(--muted)]">
+                  Collaboratore: {{ item.collaborator.firstName }} {{ item.collaborator.lastName }}
                 </p>
               </div>
               <strong>€{{ Number(item.lineTotal || 0).toFixed(2) }}</strong>
@@ -192,6 +224,14 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
             <span>{{ selectedSale.paymentStatus }}</span>
           </div>
         </div>
+        <div class="mt-5 flex flex-wrap gap-3">
+          <button type="button" class="primary-btn" (click)="editSelectedSale()">
+            <barber-ui-icon name="edit"></barber-ui-icon> Modifica ordine
+          </button>
+          <button type="button" class="pill-btn" (click)="deleteSelectedSale()">
+            <barber-ui-icon name="trash"></barber-ui-icon> Elimina ordine
+          </button>
+        </div>
       </article>
     </div>
   `,
@@ -203,6 +243,8 @@ export class AdminSalesPageComponent {
 
   @Output() loadMore = new EventEmitter<void>();
   @Output() openQuickOrder = new EventEmitter<void>();
+  @Output() editOrder = new EventEmitter<any>();
+  @Output() deleteOrder = new EventEmitter<any>();
 
   protected readonly Number = Number;
   selectedSale: any = null;
@@ -241,6 +283,20 @@ export class AdminSalesPageComponent {
 
   closeSaleDetail(): void {
     this.selectedSale = null;
+  }
+
+  editSelectedSale(): void {
+    if (!this.selectedSale) return;
+    const sale = this.selectedSale;
+    this.closeSaleDetail();
+    this.editOrder.emit(sale);
+  }
+
+  deleteSelectedSale(): void {
+    if (!this.selectedSale) return;
+    const sale = this.selectedSale;
+    this.closeSaleDetail();
+    this.deleteOrder.emit(sale);
   }
 
   saleItemLabel(item: any): string {

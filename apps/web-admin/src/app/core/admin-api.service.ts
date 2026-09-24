@@ -279,6 +279,14 @@ export class AdminApiService {
     return this.http.post(`${ADMIN_API_URL}/sales`, payload);
   }
 
+  updateSale(id: string, payload: Record<string, unknown>): Observable<any> {
+    return this.http.patch(`${ADMIN_API_URL}/sales/${id}`, payload);
+  }
+
+  deleteSale(id: string): Observable<any> {
+    return this.http.delete(`${ADMIN_API_URL}/sales/${id}`);
+  }
+
   createOrUpdateProduct(
     id: string,
     payload: Record<string, unknown>,

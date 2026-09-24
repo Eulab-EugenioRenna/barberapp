@@ -4,6 +4,7 @@ import { FormsModule } from "@angular/forms";
 import { CustomSelectComponent } from "../custom-select.component";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
+import { UiIconComponent } from "../shared/ui-icon.component";
 
 @Component({
   selector: "barber-admin-services-page",
@@ -14,6 +15,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
     CustomSelectComponent,
     InfiniteScrollDirective,
     AutofocusFirstDirective,
+    UiIconComponent,
   ],
   template: `
     <section class="grid gap-4 xl:grid-cols-2">
@@ -24,7 +26,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
             <h3 class="font-display text-3xl">Servizi</h3>
           </div>
           <button type="button" class="primary-btn" (click)="openNewService()">
-            + Nuovo servizio
+            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo servizio
           </button>
         </div>
         <label class="field mt-5">
@@ -87,7 +89,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
               class="primary-btn"
               (click)="openNewProduct()"
             >
-              + Nuovo prodotto
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo prodotto
             </button>
             <span class="status-pill status-pill-neutral">{{
               products.length
@@ -325,6 +327,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
               class="primary-btn"
               [disabled]="loading || !serviceFormValid"
             >
+              <barber-ui-icon name="save"></barber-ui-icon>
               {{ serviceForm.id ? "Salva servizio" : "Crea servizio" }}
             </button>
             <button
@@ -333,10 +336,10 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
               class="pill-btn"
               (click)="removeService()"
             >
-              Elimina
+              <barber-ui-icon name="trash"></barber-ui-icon> Elimina
             </button>
             <button type="button" class="secondary-btn" (click)="openNewService()">
-              Nuovo servizio
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo servizio
             </button>
           </div>
         </form>
@@ -406,6 +409,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
               class="primary-btn"
               [disabled]="loading || !productFormValid"
             >
+              <barber-ui-icon name="save"></barber-ui-icon>
               {{ productForm.id ? "Salva prodotto" : "Crea prodotto" }}
             </button>
             <button
@@ -414,14 +418,14 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
               class="pill-btn"
               (click)="removeProductItem()"
             >
-              Elimina prodotto
+              <barber-ui-icon name="trash"></barber-ui-icon> Elimina prodotto
             </button>
             <button
               type="button"
               class="secondary-btn"
               (click)="openNewProduct()"
             >
-              Nuovo prodotto
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo prodotto
             </button>
           </div>
         </form>

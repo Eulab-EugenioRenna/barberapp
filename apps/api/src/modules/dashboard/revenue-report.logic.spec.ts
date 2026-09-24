@@ -29,5 +29,7 @@ describe("getRevenueRange", () => {
     expect(result.averageTicket).toBe(30);
     expect(result.revenueEvents).toBe(3);
     expect(result.productRevenue).toBe(20);
+    // 60 (sales) + 30 (appointment) - 20 (products) = 70
+    expect(result.serviceRevenue).toBe(70);
   });
 });

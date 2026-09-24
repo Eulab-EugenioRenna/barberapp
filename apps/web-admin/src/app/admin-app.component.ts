@@ -73,6 +73,7 @@ type ViewKey =
         [collaborators]="adminData().collaborators"
         [defaultCollaboratorId]="adminData().tenant?.defaultCollaboratorId || ''"
         [appointment]="quickOrderAppointment"
+        [sale]="quickOrderSale"
         [loading]="loading"
         (close)="closeQuickOrder()"
         (submitOrder)="saveQuickOrder($event)"
@@ -514,6 +515,8 @@ type ViewKey =
               [hasMore]="salesHasMore()"
               (loadMore)="loadMoreSales()"
               (openQuickOrder)="openQuickOrder()"
+              (editOrder)="openQuickOrder(null, $event)"
+              (deleteOrder)="deleteSale($event)"
             ></barber-admin-sales-page>
 
             <barber-admin-customers-page
@@ -708,6 +711,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   customers: any[] = [];
   quickOrderOpen = false;
   quickOrderAppointment: any = null;
+  quickOrderSale: any = null;
   customerHistory: any = null;
   customerHistoryLoading = false;
   revenueFilters = {
@@ -2625,12 +2629,17 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.loading = true;
     try {
       const appointmentId = String(payload["appointmentId"] ?? "");
-      await firstValueFrom(this.adminApi.createSale(payload));
+      const isEditing = Boolean(this.quickOrderSale?.id);
+      await firstValueFrom(
+        this.quickOrderSale?.id
+          ? this.adminApi.updateSale(this.quickOrderSale.id, payload)
+          : this.adminApi.createSale(payload),
+      );
       if (appointmentId) {
         this.appointmentOrderNotifications.dismiss(appointmentId);
       }
       this.closeQuickOrder();
-      this.feedback = "Ordine registrato";
+      this.feedback = isEditing ? "Ordine aggiornato" : "Ordine registrato";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
@@ -2640,14 +2649,39 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     }
   }
 
-  openQuickOrder(appointment: any = null): void {
+  openQuickOrder(appointment: any = null, sale: any = null): void {
     this.quickOrderAppointment = appointment;
+    this.quickOrderSale = sale;
     this.quickOrderOpen = true;
   }
 
   closeQuickOrder(): void {
     this.quickOrderOpen = false;
     this.quickOrderAppointment = null;
+    this.quickOrderSale = null;
+  }
+
+  deleteSale(sale: any): void {
+    if (!sale?.id) return;
+    this.openDeleteDialog(
+      "Elimina ordine",
+      "L'ordine e tutte le sue righe verranno eliminati. L'appuntamento collegato resterà disponibile.",
+      "Elimina ordine",
+      async () => {
+        this.loading = true;
+        try {
+          await firstValueFrom(this.adminApi.deleteSale(sale.id));
+          this.feedback = "Ordine eliminato";
+          await this.refreshAll();
+        } catch (error: any) {
+          this.feedback =
+            error?.error?.message || "Eliminazione ordine non riuscita";
+          throw error;
+        } finally {
+          this.loading = false;
+        }
+      },
+    );
   }
 
   resetServiceProductForm(): void {

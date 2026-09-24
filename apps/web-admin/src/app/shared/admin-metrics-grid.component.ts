@@ -6,7 +6,7 @@ import { Component, Input } from "@angular/core";
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="grid gap-4 xl:grid-cols-4">
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <article
         *ngFor="let metric of metrics"
         class="metric-card panel rounded-[1.7rem] p-5"
