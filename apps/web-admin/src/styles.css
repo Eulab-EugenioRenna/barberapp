@@ -1092,6 +1092,68 @@ button:disabled {
   color: inherit;
 }
 
+/* Azioni del topbar: solo icone, con tooltip al hover/focus. */
+.topbar-actions .icon-btn {
+  position: relative;
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 0.0625rem solid var(--line);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+}
+
+.topbar-actions .icon-btn:hover {
+  transform: translateY(-0.125rem);
+  background: #fff;
+  box-shadow: 0 0.5rem 1.25rem rgba(15, 23, 32, 0.1);
+}
+
+.topbar-actions .icon-btn-accent {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--brand), #123b33);
+  color: #fff;
+  box-shadow: 0 0.85rem 1.9rem rgba(28, 124, 100, 0.28);
+}
+
+.topbar-actions .icon-btn-accent:hover {
+  background: linear-gradient(135deg, #1f8a70, #123b33);
+  box-shadow: 0 1rem 2.1rem rgba(28, 124, 100, 0.34);
+}
+
+.topbar-actions .icon-btn[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 30;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.6rem;
+  background: #0f1720;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-0.25rem);
+  pointer-events: none;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.topbar-actions .icon-btn[data-tooltip]:hover::after,
+.topbar-actions .icon-btn[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-actions .icon-btn[data-tooltip]::after {
+    transition: none;
+  }
+}
+
 .sidebar-toggle {
   background: #ffffff;
   color: #0f1720;
@@ -1168,6 +1230,8 @@ button:disabled {
 }
 
 .topbar {
+  position: relative;
+  z-index: 20;
   flex: 0 0 auto;
 }
 

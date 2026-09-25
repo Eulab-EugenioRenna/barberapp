@@ -33,6 +33,7 @@ import { PendingOrdersQueueComponent } from "./pending-orders/pending-orders-que
 import { QuickOrderModalComponent } from "./quick-order/quick-order-modal.component";
 import { AdminAuthPanelComponent } from "./auth/admin-auth-panel.component";
 import { AdminPwaBannerComponent } from "./shared/admin-pwa-banner.component";
+import { UiIconComponent } from "./shared/ui-icon.component";
 import { appointmentStatusLabel, bookingModeLabel } from "./shared/presentation-copy";
 
 type ViewKey =
@@ -70,6 +71,7 @@ type ViewKey =
     QuickOrderModalComponent,
     AdminPwaBannerComponent,
     AdminAuthPanelComponent,
+    UiIconComponent,
   ],
   template: `
     <main class="admin-shell min-h-screen">
@@ -258,36 +260,27 @@ type ViewKey =
             <div
               class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
             >
-              <div class="flex min-w-0 items-center gap-3">
-                <button
-                  type="button"
-                  class="icon-btn lg:hidden"
-                  (click)="sidebarOpen = true"
-                >
-                  ☰
-                </button>
-                <div class="min-w-0">
-                  <p class="eyebrow text-[var(--accent)]">
-                    {{ activeViewLabel }}
-                  </p>
-                  <h2
-                    class="truncate font-display text-xl sm:text-3xl md:text-5xl"
-                  >
-                    {{
-                      currentUser?.role === "platform_admin"
-                        ? "Gestione attività"
-                        : tenant?.name || "Panoramica"
-                    }}
-                  </h2>
-                </div>
+              <div class="min-w-0">
+                <p class="eyebrow text-[var(--accent)]">
+                  {{ activeViewLabel }}
+                </p>
+                <h2 class="truncate font-display text-xl sm:text-3xl md:text-5xl">
+                  {{
+                    currentUser?.role === "platform_admin"
+                      ? "Gestione attività"
+                      : tenant?.name || "Panoramica"
+                  }}
+                </h2>
               </div>
-              <div class="topbar-actions flex flex-wrap gap-2 sm:gap-3">
+              <div class="topbar-actions flex flex-wrap items-center gap-2 sm:gap-3">
                 <button
                   type="button"
-                  class="ghost-btn"
+                  class="icon-btn"
                   (click)="refreshCurrentView()"
+                  aria-label="Aggiorna i dati"
+                  data-tooltip="Aggiorna i dati"
                 >
-                  Aggiorna
+                  <barber-ui-icon name="refresh"></barber-ui-icon>
                 </button>
                 <button
                   *ngIf="
@@ -295,18 +288,22 @@ type ViewKey =
                     activeView !== 'sales'
                   "
                   type="button"
-                  class="pill-btn"
+                  class="icon-btn"
                   (click)="openQuickOrder()"
+                  aria-label="Nuova vendita"
+                  data-tooltip="Nuova vendita"
                 >
-                  Nuova vendita
+                  <barber-ui-icon name="receipt"></barber-ui-icon>
                 </button>
                 <button
                   *ngIf="currentUser?.role !== 'platform_admin'"
                   type="button"
-                  class="primary-btn !px-5 !py-3"
+                  class="icon-btn icon-btn-accent"
                   (click)="startAppointmentFlow()"
+                  aria-label="Nuova prenotazione"
+                  data-tooltip="Nuova prenotazione"
                 >
-                  Nuova prenotazione
+                  <barber-ui-icon name="calendar-plus"></barber-ui-icon>
                 </button>
               </div>
             </div>

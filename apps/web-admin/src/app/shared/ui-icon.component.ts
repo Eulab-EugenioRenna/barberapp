@@ -11,7 +11,9 @@ export type UiIconName =
   | "clock"
   | "ban"
   | "eye"
-  | "eye-off";
+  | "eye-off"
+  | "refresh"
+  | "calendar-plus";
 
 @Component({
   selector: "barber-ui-icon",
@@ -92,6 +94,12 @@ export type UiIconName =
         <path
           *ngSwitchCase="'eye-off'"
           d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.9 5.7A10 10 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16.5 16.5 0 0 1-3.1 3.9M6.4 6.4A16.6 16.6 0 0 0 2.5 12S6 18.5 12 18.5c1.1 0 2.2-.2 3.2-.6"
+        />
+        <path *ngSwitchCase="'refresh'" d="M20.5 12a8.5 8.5 0 1 1-2.7-6.1" />
+        <path *ngSwitchCase="'refresh'" d="M21 3.5V10h-6.5" />
+        <path
+          *ngSwitchCase="'calendar-plus'"
+          d="M7.5 3.5V7M16.5 3.5V7M3.5 9.5H20.5M5.5 5h13A2 2 0 0 1 20.5 7v12a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2ZM12 12v5M9.5 14.5h5"
         />
       </ng-container>
     </svg>
