@@ -9,7 +9,6 @@ import {
   OnDestroy,
   Output,
   ViewChild,
-  computed,
   inject,
   signal,
 } from "@angular/core";
@@ -37,9 +36,9 @@ type MultiSelectOption = {
           <span class="multi-label">Collaboratori</span>
           <span
             class="multi-value"
-            [class.placeholder]="!selectedLabels().length"
+            [class.placeholder]="!selectedLabels.length"
           >
-            {{ triggerLabel() }}
+            {{ triggerLabel }}
           </span>
         </span>
         <svg viewBox="0 0 20 20" fill="none" class="multi-chevron">
@@ -75,7 +74,7 @@ type MultiSelectOption = {
         </button>
 
         <button
-          *ngFor="let option of filteredOptions()"
+          *ngFor="let option of filteredOptions"
           type="button"
           class="multi-option"
           [class.active]="isSelected(option.value)"
@@ -87,7 +86,7 @@ type MultiSelectOption = {
           }}</span>
         </button>
 
-        <div *ngIf="!filteredOptions().length" class="multi-empty">
+        <div *ngIf="!filteredOptions.length" class="multi-empty">
           Nessun risultato
         </div>
       </div>
@@ -245,7 +244,7 @@ export class AppointmentsCollaboratorMultiSelectComponent
   filterQuery = "";
   popoverStyle: Record<string, string> = {};
 
-  readonly filteredOptions = computed(() => {
+  get filteredOptions(): MultiSelectOption[] {
     const query = this.filterQuery.trim().toLowerCase();
 
     if (!query) {
@@ -255,16 +254,16 @@ export class AppointmentsCollaboratorMultiSelectComponent
     return this.options.filter((option) =>
       option.label.toLowerCase().includes(query),
     );
-  });
+  }
 
-  readonly selectedLabels = computed(() =>
-    this.options
+  get selectedLabels(): string[] {
+    return this.options
       .filter((option) => this.values.includes(option.value))
-      .map((option) => option.label),
-  );
+      .map((option) => option.label);
+  }
 
-  readonly triggerLabel = computed(() => {
-    const labels = this.selectedLabels();
+  get triggerLabel(): string {
+    const labels = this.selectedLabels;
 
     if (!labels.length) {
       return "Tutti i collaboratori";
@@ -275,7 +274,7 @@ export class AppointmentsCollaboratorMultiSelectComponent
     }
 
     return `${labels.length} collaboratori selezionati`;
-  });
+  }
 
   @HostListener("document:pointerdown", ["$event"])
   onDocumentPointerDown(event: PointerEvent): void {

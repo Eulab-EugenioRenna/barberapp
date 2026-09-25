@@ -722,6 +722,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     customerId: "",
     collaboratorId: "",
   };
+  // Tracks the auto-managed reference date so it rolls over at midnight
+  // without clobbering a date the user picked on purpose.
+  private autoRevenueDate = this.revenueFilters.date;
   dashboardActivity: any[] = [];
   dashboardActivityHasMore = false;
   dashboardActivityLoading = false;
@@ -1342,6 +1345,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async refreshAll(): Promise<void> {
+    this.syncAutoRevenueDate();
     try {
       const state = await this.adminFacade.refreshAll(this.revenueFilters);
       this.loading = this.adminFacade.loading();
@@ -1425,7 +1429,16 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // The global refresh is an explicit "go to today": reset the dashboard
+    // reference date even if the user had picked another day.
+    this.goToTodayRevenue();
     await this.refreshAll();
+  }
+
+  private goToTodayRevenue(): void {
+    const today = toLocalDateKey(new Date());
+    this.revenueFilters.date = today;
+    this.autoRevenueDate = today;
   }
 
   startAppointmentFlow(): void {
@@ -2534,6 +2547,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async loadRevenueReport(): Promise<void> {
+    this.syncAutoRevenueDate();
     this.loading = true;
     try {
       const [report] = await Promise.all([
@@ -2592,6 +2606,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async refreshDashboardQueries(): Promise<void> {
+    this.syncAutoRevenueDate();
     try {
       await Promise.all([
         this.adminFacade.refreshStatsData(this.revenueFilters),
@@ -2634,7 +2649,23 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       customerId: "",
       collaboratorId: "",
     };
+    this.autoRevenueDate = this.revenueFilters.date;
     void this.loadRevenueReport();
+  }
+
+  /**
+   * Keeps the reference date current across midnight. When the user has not
+   * overridden it, the filter follows the new day; a manually chosen date is
+   * left untouched.
+   */
+  private syncAutoRevenueDate(): void {
+    const today = toLocalDateKey(new Date());
+
+    if (this.revenueFilters.date === this.autoRevenueDate) {
+      this.revenueFilters.date = today;
+    }
+
+    this.autoRevenueDate = today;
   }
 
   async saveQuickOrder(payload: Record<string, unknown>): Promise<void> {

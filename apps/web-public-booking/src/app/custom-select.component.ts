@@ -9,8 +9,6 @@ import {
   Input,
   OnDestroy,
   Output,
-  OnChanges,
-  SimpleChanges,
   TemplateRef,
   ViewChild,
   inject,
@@ -233,7 +231,7 @@ type SelectOption = {
     `,
   ],
 })
-export class CustomSelectComponent implements OnChanges, OnDestroy {
+export class CustomSelectComponent implements OnDestroy {
   private static nextId = 0;
   private readonly elementRef = inject(ElementRef<HTMLElement>);
   private readonly document = inject(DOCUMENT);
@@ -268,10 +266,6 @@ export class CustomSelectComponent implements OnChanges, OnDestroy {
       const haystack = `${option.label} ${option.hint || ""}`.toLowerCase();
       return haystack.includes(query);
     });
-  }
-
-  ngOnChanges(_: SimpleChanges): void {
-    this.filterQuery = "";
   }
 
   ngOnDestroy(): void {
