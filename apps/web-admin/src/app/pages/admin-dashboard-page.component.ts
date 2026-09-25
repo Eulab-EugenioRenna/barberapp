@@ -123,8 +123,8 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               *ngFor="let entry of activity"
               class="list-card items-center"
             >
-              <div class="min-w-0">
-                <div class="flex items-center gap-2">
+              <div class="min-w-0 flex-1">
+                <div class="activity-head flex min-w-0 flex-wrap items-center gap-2">
                   <span
                     class="status-pill"
                     [ngClass]="
@@ -140,7 +140,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                           : "Vendita"
                     }}</span
                   >
-                  <strong class="truncate">{{ entry.customerName }}</strong>
+                  <strong class="min-w-0 truncate">{{
+                    entry.customerName
+                  }}</strong>
                 </div>
                 <p class="mt-1 text-sm text-[var(--muted)]">
                   {{ formatDateTime(entry.occurredAt) }} · {{ entry.detail }}
@@ -152,7 +154,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                   {{ entry.collaboratorName }}
                 </p>
               </div>
-              <div class="text-right">
+              <div class="shrink-0 text-right">
                 <strong>{{ money(entry.amount) }}</strong>
                 <p class="text-sm text-[var(--muted)]">
                   {{ formatActivityStatus(entry.status) }}

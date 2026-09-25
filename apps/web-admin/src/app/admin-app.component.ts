@@ -18,7 +18,6 @@ import { ADMIN_API_URL } from "./core/api-config";
 import { AdminApiService } from "./core/admin-api.service";
 import { AdminFacade } from "./core/admin.facade";
 import { AppointmentOrderNotificationsService } from "./core/appointment-order-notifications.service";
-import { AuthApiService } from "./core/auth-api.service";
 import { SessionStore } from "./core/session.store";
 import { AdminAppointmentsFeaturePageComponent } from "./appointments/admin-appointments-feature-page.component";
 import { CustomSelectComponent } from "./custom-select.component";
@@ -32,6 +31,7 @@ import { AdminServicesPageComponent } from "./pages/admin-services-page.componen
 import { AdminSettingsPageComponent } from "./pages/admin-settings-page.component";
 import { PendingOrdersQueueComponent } from "./pending-orders/pending-orders-queue.component";
 import { QuickOrderModalComponent } from "./quick-order/quick-order-modal.component";
+import { AdminAuthPanelComponent } from "./auth/admin-auth-panel.component";
 import { AdminPwaBannerComponent } from "./shared/admin-pwa-banner.component";
 import { appointmentStatusLabel, bookingModeLabel } from "./shared/presentation-copy";
 
@@ -69,6 +69,7 @@ type ViewKey =
     PendingOrdersQueueComponent,
     QuickOrderModalComponent,
     AdminPwaBannerComponent,
+    AdminAuthPanelComponent,
   ],
   template: `
     <main class="admin-shell min-h-screen">
@@ -133,159 +134,9 @@ type ViewKey =
         </article>
       </div>
 
-      <section
+      <barber-admin-auth-panel
         *ngIf="!sessionToken"
-        class="auth-scroll mx-auto grid max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
-      >
-        <aside class="hero-panel min-w-0 rounded-[2rem] p-6 text-white lg:p-10">
-          <p class="eyebrow">Direzione salone</p>
-          <h1
-            class="mt-4 font-display text-5xl font-semibold leading-none md:text-7xl"
-          >
-            Il tuo salone, sempre sotto controllo.
-          </h1>
-          <p class="mt-6 max-w-xl text-base text-white/72 md:text-lg">
-            Organizza appuntamenti, squadra, clienti e incassi con una visione
-            chiara della giornata e dell'andamento del salone.
-          </p>
-          <div class="mt-8 grid min-w-0 gap-3 md:grid-cols-3 lg:grid-cols-1">
-            <article class="glass-tile min-w-0 rounded-[1.4rem] p-4">
-              <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                Agenda
-              </p>
-              <strong class="mt-3 block break-words text-2xl md:text-3xl">
-                Ordinata
-              </strong>
-              <span class="text-sm text-white/70"
-                >Ogni appuntamento al suo posto</span
-              >
-            </article>
-            <article class="glass-tile min-w-0 rounded-[1.4rem] p-4">
-              <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                Squadra
-              </p>
-              <strong class="mt-3 block break-words text-2xl md:text-3xl">
-                Coordinata
-              </strong>
-              <span class="text-sm text-white/70"
-                >Orari e carichi sempre visibili</span
-              >
-            </article>
-            <article class="glass-tile min-w-0 rounded-[1.4rem] p-4">
-              <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                Risultati
-              </p>
-              <strong class="mt-3 block break-words text-2xl md:text-3xl">
-                Chiari
-              </strong>
-              <span class="text-sm text-white/70"
-                >Incassi e clienti in primo piano</span
-              >
-            </article>
-          </div>
-        </aside>
-
-        <section class="panel min-w-0 rounded-[2rem] p-5 md:p-8">
-          <div
-            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p class="eyebrow text-[var(--accent)]">Accesso</p>
-              <h2 class="mt-2 font-display text-4xl">
-                {{ authMode === "login" ? "Bentornato nel tuo salone" : "Apri il tuo spazio" }}
-              </h2>
-            </div>
-            <button
-              type="button"
-              class="pill-btn"
-              (click)="authMode = authMode === 'login' ? 'signup' : 'login'"
-            >
-              {{ authMode === "login" ? "Crea un account" : "Ho già un account" }}
-            </button>
-          </div>
-
-          <form class="mt-8 grid gap-4" (ngSubmit)="submitAuth()">
-            <div
-              *ngIf="authMode === 'signup'"
-              class="grid gap-4 md:grid-cols-2"
-            >
-              <label class="field">
-                <span>Nome</span>
-                <input
-                  [(ngModel)]="signupForm.firstName"
-                  name="signupFirstName"
-                  placeholder="Giulia"
-                />
-              </label>
-              <label class="field">
-                <span>Cognome</span>
-                <input
-                  [(ngModel)]="signupForm.lastName"
-                  name="signupLastName"
-                  placeholder="Riva"
-                />
-              </label>
-            </div>
-
-            <label *ngIf="authMode === 'signup'" class="field">
-              <span>Nome del salone o boutique</span>
-              <input
-                [(ngModel)]="signupForm.companyName"
-                name="companyName"
-                placeholder="Atelier Milano"
-              />
-            </label>
-
-            <label class="field">
-              <span>Email</span>
-              <input
-                [(ngModel)]="loginForm.email"
-                name="loginEmail"
-                placeholder="direzione@atelier.it"
-              />
-            </label>
-
-            <label class="field">
-              <span>Password</span>
-              <input
-                [(ngModel)]="loginForm.password"
-                name="loginPassword"
-                type="password"
-                placeholder="••••••••"
-              />
-            </label>
-
-            <label *ngIf="authMode === 'signup'" class="field">
-              <span>Ripeti password</span>
-              <input
-                [(ngModel)]="signupPasswordConfirm"
-                name="signupPasswordConfirm"
-                type="password"
-                placeholder="••••••••"
-              />
-            </label>
-
-            <p
-              *ngIf="feedback"
-              role="status"
-              aria-live="polite"
-              class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-            >
-              {{ feedback }}
-            </p>
-
-            <button type="submit" class="primary-btn" [disabled]="loading">
-              {{
-                loading
-                  ? "Un momento..."
-                  : authMode === "login"
-                    ? "Entra nel salone"
-                    : "Configura il mio salone"
-              }}
-            </button>
-          </form>
-        </section>
-      </section>
+      ></barber-admin-auth-panel>
 
       <section *ngIf="sessionToken" class="app-frame">
         <button
@@ -688,7 +539,7 @@ type ViewKey =
                 >{{ appointmentOrderAlerts().length }}</span
               >
             </span>
-            <span class="mobile-nav-label">{{ item.label }}</span>
+            <span class="mobile-nav-label">{{ item.short || item.label }}</span>
           </button>
           <button
             type="button"
@@ -715,7 +566,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   private readonly appointmentOrderNotifications = inject(
     AppointmentOrderNotificationsService,
   );
-  private readonly authApi = inject(AuthApiService);
   private readonly sessionStore = inject(SessionStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -742,7 +592,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     };
   });
 
-  authMode: "login" | "signup" = "signup";
   sessionToken = this.sessionStore.token();
   sidebarOpen = false;
   sidebarCollapsed = false;
@@ -825,15 +674,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   platformPlanForm = this.emptyPlatformPlanForm();
   platformSubscriptionForm = this.emptyPlatformSubscriptionForm();
 
-  loginForm = { email: "", password: "" };
-  signupForm = {
-    companyName: "",
-    firstName: "",
-    lastName: "",
-    email: "",
-    password: "",
-  };
-  signupPasswordConfirm = "";
   settingsForm = {
     name: "",
     publicDomain: "",
@@ -863,8 +703,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   appointmentSelectedDate = toLocalDateKey(new Date());
   appointmentSlots: Array<{ startsAt: string; label: string }> = [];
 
-  navItems: Array<{ key: ViewKey; label: string; hint: string; icon: string }> =
-    [
+  navItems: Array<{
+    key: ViewKey;
+    label: string;
+    hint: string;
+    icon: string;
+    short?: string;
+  }> = [
       { key: "dashboard", label: "Panoramica", hint: "andamento", icon: "P" },
       { key: "appointments", label: "Agenda", hint: "appuntamenti", icon: "A" },
       {
@@ -872,6 +717,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         label: "Conti da chiudere",
         hint: "fine servizio",
         icon: "!",
+        short: "Conferme",
       },
       { key: "sales", label: "Cassa", hint: "vendite", icon: "C" },
       { key: "customers", label: "Clienti", hint: "relazioni", icon: "R" },
@@ -896,6 +742,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     label: string;
     hint: string;
     icon: string;
+    short?: string;
   }> {
     return this.currentUser?.role === "platform_admin" ? [] : this.navItems;
   }
@@ -906,6 +753,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     label: string;
     hint: string;
     icon: string;
+    short?: string;
   }> {
     const keys: ViewKey[] = [
       "dashboard",
@@ -1369,48 +1217,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       planId: "",
       status: "active",
     };
-  }
-
-  async submitAuth(): Promise<void> {
-    this.loading = true;
-    this.feedback = "";
-
-    try {
-      if (this.authMode === "signup") {
-        if (this.loginForm.password !== this.signupPasswordConfirm) {
-          throw new Error("Le password non coincidono");
-        }
-
-        const response: any = await firstValueFrom(
-          this.authApi.signup({
-            companyName: this.signupForm.companyName,
-            firstName: this.signupForm.firstName,
-            lastName: this.signupForm.lastName,
-            email: this.loginForm.email,
-            password: this.loginForm.password,
-          }),
-        );
-
-        this.sessionStore.setToken(response.accessToken);
-      } else {
-        const response: any = await firstValueFrom(
-          this.authApi.login(this.loginForm),
-        );
-        this.sessionStore.setToken(response.accessToken);
-      }
-
-      const requestedUrl = this.consumeRequestedUrl();
-      if (requestedUrl) {
-        this.navigateTo(requestedUrl);
-      }
-
-      await this.refreshAll();
-    } catch (error: any) {
-      this.feedback =
-        error?.error?.message || error?.message || "Non siamo riusciti a completare l'accesso. Riprova.";
-    } finally {
-      this.loading = false;
-    }
   }
 
   async refreshAll(): Promise<void> {

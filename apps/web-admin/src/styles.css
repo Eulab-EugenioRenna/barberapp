@@ -1214,21 +1214,41 @@ button:disabled {
     font-size: 16px;
   }
 
-  /* Azioni del topbar sempre raggiungibili senza andare a capo. */
+  /* Azioni del topbar: vanno a capo invece di essere tagliate. */
   .topbar-actions {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 0.15rem;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .topbar-actions::-webkit-scrollbar {
-    display: none;
+    flex-wrap: wrap;
   }
 
   .topbar-actions > * {
     flex: 0 0 auto;
+  }
+
+  /*
+   * Card lista (movimenti, clienti, ecc.): il valore a destra resta sempre
+   * visibile, il contenuto di sinistra si adatta senza sbordare.
+   */
+  .list-card {
+    gap: 0.75rem;
+    padding: 0.9rem;
+  }
+
+  .list-card > :first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .list-card > :last-child {
+    flex: 0 0 auto;
+  }
+
+  .activity-head {
+    flex-wrap: wrap;
+  }
+
+  .status-pill {
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    padding: 0.34rem 0.58rem;
   }
 
   .pwa-banner {
