@@ -13,7 +13,7 @@ import { SessionStore } from "../core/session.store";
   template: `
     <main class="admin-shell min-h-screen">
       <section
-        class="mx-auto grid min-h-screen max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
+        class="auth-scroll mx-auto grid max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
       >
         <aside class="hero-panel min-w-0 rounded-[2rem] p-6 text-white lg:p-10">
           <p class="eyebrow">Direzione salone</p>

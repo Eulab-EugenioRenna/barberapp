@@ -135,7 +135,7 @@ type ViewKey =
 
       <section
         *ngIf="!sessionToken"
-        class="mx-auto grid min-h-screen max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
+        class="auth-scroll mx-auto grid max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
       >
         <aside class="hero-panel min-w-0 rounded-[2rem] p-6 text-white lg:p-10">
           <p class="eyebrow">Direzione salone</p>
@@ -375,15 +375,15 @@ type ViewKey =
             <p class="text-xs uppercase tracking-[0.28em] text-white/40">
               Prenotazioni online
             </p>
-            <p class="mt-2 text-sm sidebar-footer-copy">
-              Pagina clienti:
-              <strong>{{
+            <p class="mt-3 sidebar-footer-copy">
+              <span class="sidebar-footer-label">Pagina clienti</span>
+              <strong class="sidebar-footer-value">{{
                 computedPublicUrl || "non configurata"
               }}</strong>
             </p>
-            <p class="mt-1 text-sm sidebar-footer-copy">
-              Apertura prenotazioni:
-              <strong>{{
+            <p class="mt-2 sidebar-footer-copy">
+              <span class="sidebar-footer-label">Apertura prenotazioni</span>
+              <strong class="sidebar-footer-value">{{
                 formatBookingMode(tenant?.bookingMode)
               }}</strong>
             </p>

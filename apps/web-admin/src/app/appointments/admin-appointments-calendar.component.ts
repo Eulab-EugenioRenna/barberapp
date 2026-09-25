@@ -263,6 +263,7 @@ import { buildDayListingEvent } from "./calendar-date";
 
       .calendar-week-grid {
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
         gap: 0.75rem;
         min-height: 0;
         overflow: auto;
@@ -346,9 +347,26 @@ import { buildDayListingEvent } from "./calendar-date";
 
       .calendar-month-grid {
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
         gap: 0.75rem;
         min-height: 0;
         overflow: auto;
+      }
+
+      .calendar-month-cell {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      /*
+       * Su mobile la griglia del mese diventa una lista a una colonna:
+       * l'intestazione dei giorni della settimana (7 colonne) non ha piu
+       * senso e va nascosta.
+       */
+      @media (max-width: 47.99rem) {
+        .calendar-month-weekdays {
+          display: none;
+        }
       }
     `,
   ],
@@ -735,14 +753,14 @@ import { buildDayListingEvent } from "./calendar-date";
                     cell.date.getDate()
                   }}</strong>
                 </header>
-                <div class="grid gap-2">
+                <div class="grid min-w-0 gap-2">
                   <button
                     *ngFor="
-                      let appointment of cell.visibleAppointments;
+                      let appointment of cell.appointments;
                       trackBy: trackByAppointment
                     "
                     type="button"
-                    class="rounded-[0.9rem] px-2 py-1 text-left text-xs text-white"
+                    class="w-full min-w-0 truncate rounded-[0.9rem] px-2 py-1 text-left text-xs text-white"
                     [style.background]="appointment.color"
                     draggable="true"
                     (dragstart)="handleDragStart($event, appointment.id)"

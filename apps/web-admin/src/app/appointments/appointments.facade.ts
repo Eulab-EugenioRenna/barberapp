@@ -357,13 +357,13 @@ export class AppointmentsFacade {
               appointment.collaborator?.calendarColor || "#1c7c64",
             ),
           )
-          .slice(0, 3),
+          .slice(0, 1),
         hiddenCount: Math.max(
           0,
           this.visibleAppointments().filter((appointment) => {
             const startsAt = new Date(appointment.startsAt);
             return startsAt >= dayStart && startsAt < dayEnd;
-          }).length - 3,
+          }).length - 1,
         ),
       };
     });

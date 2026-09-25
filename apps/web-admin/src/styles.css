@@ -553,6 +553,25 @@ textarea:focus-visible {
   flex: 0 0 auto;
 }
 
+.sidebar-footer-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.sidebar-footer-label {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.sidebar-footer-value {
+  font-size: 0.85rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
 .eyebrow {
   font-size: 0.72rem;
   font-weight: 800;
@@ -603,16 +622,23 @@ textarea:focus-visible {
 .nav-copy {
   display: flex;
   flex: 1 1 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.15rem;
   min-width: 0;
+}
+
+.nav-copy > span {
+  line-height: 1.2;
 }
 
 .nav-copy small {
   color: rgba(255, 255, 255, 0.42);
+  font-size: 0.66rem;
+  line-height: 1.2;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
 }
 
 .nav-btn.active,
@@ -1139,7 +1165,26 @@ button:disabled {
   display: none;
 }
 
+/*
+ * La pagina di accesso e l'unica route "documento": la shell blocca lo scroll
+ * per le viste gestionali, quindi qui serve un contenitore scrollabile a
+ * tutta altezza (altrimenti su mobile il form viene tagliato).
+ */
+.auth-scroll {
+  height: 100vh;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (max-width: 63.99rem) {
+  .auth-scroll {
+    padding-top: calc(2rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  }
+
   /* Rispetta notch e barre di sistema su mobile/standalone. */
   .app-frame {
     padding-top: calc(var(--shell-pad) + env(safe-area-inset-top, 0px));
