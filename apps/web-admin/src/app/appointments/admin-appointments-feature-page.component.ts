@@ -21,7 +21,6 @@ import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dia
     AppointmentsCollaboratorMultiSelectComponent,
     QuickCreateDialogComponent,
   ],
-  providers: [AppointmentsFacade],
   template: `
     <section class="appointments-shell">
       <div class="appointments-header panel rounded-[2rem] p-4 md:p-5">
@@ -120,41 +119,10 @@ import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dia
 
         <article class="appointments-list-shell">
           <barber-admin-appointments-page
+            [listOnly]="true"
             [appointments]="appointmentsFacade.listAppointments()"
-            [appointmentForm]="appointmentsFacade.appointmentForm()"
-            [appointmentCustomerOptions]="appointmentsFacade.appointmentCustomerOptions()"
-            (appointmentValueChange)="
-              appointmentsFacade.setAppointmentValue($event.key, $event.value)
-            "
-            [serviceSelectOptions]="appointmentsFacade.serviceSelectOptions()"
-            [appointmentCollaboratorOptions]="
-              appointmentsFacade.appointmentCollaboratorOptions()
-            "
-            [appointmentSelectedDate]="
-              appointmentsFacade.appointmentSelectedDate()
-            "
-            [appointmentSlots]="appointmentsFacade.appointmentSlots()"
-            [appointmentSlotOptions]="
-              appointmentsFacade.appointmentSlotOptions()
-            "
-            [appointmentStatusOptions]="
-              appointmentsFacade.appointmentStatusOptions()
-            "
             [loading]="appointmentsFacade.loading()"
-            (editAppointment)="appointmentsFacade.editAppointment($event)"
-            (appointmentCustomerSelect)="appointmentsFacade.selectAppointmentCustomer($event)"
-            (quickCreate)="quickCreateKind = $event"
-            (appointmentSelectedDateChange)="
-              appointmentsFacade.setAppointmentSelectedDate($event)
-            "
-            (updateAppointmentSlots)="
-              appointmentsFacade.updateAppointmentSlots()
-            "
-            (save)="saveAppointment()"
-            (confirmOrder)="confirmOrderFromEditor()"
-            (remove)="removeAppointment()"
-            (cancel)="cancelAppointment()"
-            (reset)="appointmentsFacade.prepareNewAppointment()"
+            (editAppointment)="openEditor.emit($event)"
           ></barber-admin-appointments-page>
         </article>
       </div>
@@ -294,6 +262,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
   private readonly router = inject(Router);
   @Output() createOrder = new EventEmitter<any>();
   @Output() dataChanged = new EventEmitter<"dashboard" | "all">();
+  @Output() openEditor = new EventEmitter<any>();
   activeTab: "calendar" | "list" = "calendar";
   quickCreateKind: QuickCreateKind | null = null;
 
@@ -401,9 +370,8 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
       .appointments()
       .find((item) => item.id === appointmentId);
     if (appointment) {
-      this.activeTab = "list";
-      this.appointmentsFacade.editAppointment(appointment);
       this.appointmentsFacade.closeDrawer();
+      this.openEditor.emit(appointment);
     }
   }
 

@@ -787,13 +787,12 @@ export class AppointmentsFacade {
     return slots;
   }
 
-  async saveAppointment(): Promise<string> {
-    await this.appointmentsService.saveAppointment(this.appointmentForm());
-    const message = this.appointmentForm().id
-      ? "Appuntamento aggiornato"
-      : "Appuntamento creato";
+  async saveAppointment(): Promise<any> {
+    const saved = await this.appointmentsService.saveAppointment(
+      this.appointmentForm(),
+    );
     this.prepareNewAppointment();
-    return message;
+    return saved;
   }
 
   async cancelAppointment(): Promise<string> {

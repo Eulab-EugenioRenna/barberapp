@@ -6,7 +6,7 @@ import { AdminApiService } from "../core/admin-api.service";
 export class AppointmentsService {
   private readonly adminApi = inject(AdminApiService);
 
-  async saveAppointment(form: any): Promise<void> {
+  async saveAppointment(form: any): Promise<any> {
     const payload = {
       customerId: form.customerId || undefined,
       customerName: form.customerName,
@@ -20,11 +20,10 @@ export class AppointmentsService {
     };
 
     if (form.id) {
-      await firstValueFrom(this.adminApi.updateAppointment(form.id, payload));
-      return;
+      return firstValueFrom(this.adminApi.updateAppointment(form.id, payload));
     }
 
-    await firstValueFrom(this.adminApi.createAppointment(payload));
+    return firstValueFrom(this.adminApi.createAppointment(payload));
   }
 
   async cancelAppointment(id: string): Promise<void> {

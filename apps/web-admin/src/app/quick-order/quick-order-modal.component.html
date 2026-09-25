@@ -93,6 +93,7 @@
       </div>
 
       <aside class="quick-order-cart">
+        <div class="quick-order-cart-scroll">
         <p class="quick-order-step">3 · Riepilogo vendita</p>
         <div class="cart-empty" *ngIf="!items.length">
           Tocca un servizio o un prodotto per iniziare.
@@ -177,6 +178,7 @@
             </button>
             <button type="button" (click)="clearPrice()">C</button>
           </div>
+        </div>
         </div>
 
         <div class="checkout-bar">

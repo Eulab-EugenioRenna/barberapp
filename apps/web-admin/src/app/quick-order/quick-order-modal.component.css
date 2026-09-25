@@ -19,6 +19,8 @@
 }
 .quick-order-sheet {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(1180px, 100%);
   height: min(780px, 100%);
   max-height: 100%;
@@ -46,6 +48,8 @@
 }
 .quick-order-layout {
   display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
   grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
 }
 .quick-order-catalog,
@@ -54,11 +58,25 @@
   align-content: start;
   gap: 1.25rem;
   padding: 1.5rem;
+  min-height: 0;
+}
+.quick-order-catalog {
+  overflow-y: auto;
 }
 .quick-order-cart {
-  min-height: 34rem;
+  display: flex;
+  flex-direction: column;
   color: #fff;
   background: #111b1a;
+}
+.quick-order-cart-scroll {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: start;
+  min-height: 0;
+  gap: 1.25rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 .quick-order-step {
   font-size: 0.72rem;
@@ -189,6 +207,7 @@
 .checkout-bar {
   position: sticky;
   bottom: 0;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.8rem;
@@ -235,8 +254,12 @@
   .quick-order-header h2 {
     font-size: 1.65rem;
   }
+  /* Su mobile tutto scorre in un unico flusso, niente colonne fisse. */
+  .quick-order-sheet {
+    display: block;
+  }
   .quick-order-layout {
-    grid-template-columns: 1fr;
+    display: block;
   }
   .quick-order-catalog,
   .quick-order-cart {
@@ -246,6 +269,10 @@
   .quick-order-cart {
     min-height: auto;
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .quick-order-cart-scroll {
+    overflow: visible;
+    padding-right: 0;
   }
   .touch-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

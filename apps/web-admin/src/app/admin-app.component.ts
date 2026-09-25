@@ -20,6 +20,8 @@ import { AdminFacade } from "./core/admin.facade";
 import { AppointmentOrderNotificationsService } from "./core/appointment-order-notifications.service";
 import { SessionStore } from "./core/session.store";
 import { AdminAppointmentsFeaturePageComponent } from "./appointments/admin-appointments-feature-page.component";
+import { AdminAppointmentsEditorModalComponent } from "./appointments/admin-appointments-editor-modal.component";
+import { AppointmentsFacade } from "./appointments/appointments.facade";
 import { CustomSelectComponent } from "./custom-select.component";
 import { AdminAppointmentsPageComponent } from "./pages/admin-appointments-page.component";
 import { AdminCollaboratorsPageComponent } from "./pages/admin-collaborators-page.component";
@@ -59,6 +61,7 @@ type ViewKey =
     CalendarInputComponent,
     CustomSelectComponent,
     AdminAppointmentsFeaturePageComponent,
+    AdminAppointmentsEditorModalComponent,
     AdminDashboardPageComponent,
     AdminAppointmentsPageComponent,
     AdminSalesPageComponent,
@@ -73,6 +76,7 @@ type ViewKey =
     AdminAuthPanelComponent,
     UiIconComponent,
   ],
+  providers: [AppointmentsFacade],
   template: `
     <main class="admin-shell min-h-screen">
       <barber-quick-order-modal
@@ -89,6 +93,13 @@ type ViewKey =
         (submitOrder)="saveQuickOrder($event)"
         (catalogChanged)="refreshAll()"
       ></barber-quick-order-modal>
+      <barber-admin-appointments-editor-modal
+        *ngIf="appointmentsEditorOpen"
+        [appointment]="appointmentsEditorAppointment"
+        (close)="closeAppointmentsEditor()"
+        (saved)="refreshAfterAppointmentChange()"
+        (createOrder)="openQuickOrder($event)"
+      ></barber-admin-appointments-editor-modal>
       <div *ngIf="confirmDialog" class="confirm-overlay">
         <button
           type="button"
@@ -369,6 +380,7 @@ type ViewKey =
             <barber-admin-appointments-feature-page
               *ngIf="activeView === 'appointments'"
               (createOrder)="openQuickOrder($event)"
+              (openEditor)="openAppointmentsEditor($event)"
               (dataChanged)="refreshAfterDataChange($event)"
             ></barber-admin-appointments-feature-page>
 
@@ -617,6 +629,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   quickOrderOpen = false;
   quickOrderAppointment: any = null;
   quickOrderSale: any = null;
+  appointmentsEditorOpen = false;
+  appointmentsEditorAppointment: any = null;
   customerHistory: any = null;
   customerHistoryLoading = false;
   revenueFilters = {
@@ -1318,12 +1332,22 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   startAppointmentFlow(): void {
-    if (this.activeView === "appointments") {
-      this.appointmentsFeaturePage?.prepareNewAppointment();
-      return;
-    }
+    this.openAppointmentsEditor(null);
+  }
 
-    this.prepareNewAppointment();
+  openAppointmentsEditor(appointment: any = null): void {
+    this.appointmentsEditorAppointment = appointment;
+    this.appointmentsEditorOpen = true;
+  }
+
+  closeAppointmentsEditor(): void {
+    this.appointmentsEditorOpen = false;
+    this.appointmentsEditorAppointment = null;
+  }
+
+  async refreshAfterAppointmentChange(): Promise<void> {
+    await this.refreshAll();
+    await this.appointmentsFeaturePage?.reloadViewData();
   }
 
   private async refreshShell(): Promise<void> {
@@ -1592,26 +1616,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   editAppointment(appointment: any): void {
-    const startsAt = new Date(appointment.startsAt);
-    this.activeView = "appointments";
-    this.appointmentForm = {
-      id: appointment.id,
-      customerId: appointment.customerId || "",
-      customerName: `${appointment.customer.firstName} ${appointment.customer.lastName}`,
-      email: appointment.customer.email || "",
-      phone: appointment.customer.phone || "",
-      serviceId: appointment.serviceId,
-      collaboratorId: appointment.collaboratorId || "",
-      startsAt: this.toLocalDateTimeValue(startsAt),
-      status: appointment.status,
-      customerNotes: appointment.customerNotes || "",
-    };
-    this.appointmentCustomerSearch = this.appointmentCustomerOptionLabel(
-      appointment.customer,
-    );
-    this.filteredAppointmentCustomers = [...this.customers];
-    this.appointmentSelectedDate = this.toDateInputValue(startsAt);
-    this.updateAppointmentSlots();
+    this.openAppointmentsEditor(appointment);
   }
 
   filterAppointmentCustomers(): void {
