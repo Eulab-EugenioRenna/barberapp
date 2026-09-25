@@ -266,7 +266,7 @@ type ViewKey =
                   {{
                     currentUser?.role === "platform_admin"
                       ? "Gestione attività"
-                      : tenant?.name || "Panoramica"
+                      : tenant?.name || "Attività"
                   }}
                 </h2>
               </div>
