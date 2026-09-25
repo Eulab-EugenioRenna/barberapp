@@ -57,7 +57,7 @@ export class PublicBookingController {
 
     if (ipAttempts > PublicBookingController.PUBLIC_BOOKING_MAX_BY_IP) {
       throw new BadRequestException(
-        "Too many booking attempts. Please wait a few minutes.",
+        "Hai inviato troppe richieste. Attendi qualche minuto e riprova.",
       );
     }
 
@@ -73,7 +73,7 @@ export class PublicBookingController {
 
     if (emailAttempts > PublicBookingController.PUBLIC_BOOKING_MAX_BY_EMAIL) {
       throw new BadRequestException(
-        "Too many booking attempts for this contact. Please wait a few minutes.",
+        "Hai già inviato diverse richieste per questo contatto. Attendi qualche minuto e riprova.",
       );
     }
   }
@@ -138,7 +138,7 @@ export class PublicBookingController {
     );
 
     if (!tenant) {
-      throw new BadRequestException("Public tenant not found");
+      throw new BadRequestException("Questa pagina di prenotazione non è disponibile");
     }
 
     return tenant;
@@ -258,10 +258,10 @@ export class PublicBookingController {
     const end = this.parseDateKey(to);
 
     if (!start || !end) {
-      throw new BadRequestException("from and to are required");
+      throw new BadRequestException("Indica il periodo da consultare");
     }
     if (end < start) {
-      throw new BadRequestException("Invalid date range");
+      throw new BadRequestException("Il periodo scelto non è valido");
     }
 
     const maxDays = 62;
@@ -306,7 +306,7 @@ export class PublicBookingController {
 
     if (tenant.bookingMode === BookingMode.Closed) {
       throw new BadRequestException(
-        "Public booking is disabled for this tenant",
+        "Il salone al momento non accetta prenotazioni online",
       );
     }
 
@@ -318,7 +318,7 @@ export class PublicBookingController {
 
     if (!serviceId || !firstName || Number.isNaN(startsAt.getTime())) {
       throw new BadRequestException(
-        "serviceId, startsAt and customerName are required",
+        "Scegli servizio e orario e indica il tuo nome",
       );
     }
 
@@ -332,7 +332,7 @@ export class PublicBookingController {
     });
 
     if (!service) {
-      throw new BadRequestException("Service not found");
+      throw new BadRequestException("Il servizio scelto non è più disponibile");
     }
 
     const email =
@@ -353,7 +353,7 @@ export class PublicBookingController {
     });
 
     if (service.requiresCollaborator && !requestedCollaboratorId) {
-      throw new BadRequestException("collaboratorId is required");
+      throw new BadRequestException("Scegli il professionista");
     }
 
     const endsAt = new Date(
@@ -376,7 +376,7 @@ export class PublicBookingController {
     );
 
     if (!matchedSlot) {
-      throw new BadRequestException("Selected slot is not available anymore");
+      throw new BadRequestException("L'orario scelto non è più disponibile. Scegline un altro.");
     }
 
     const collaboratorId =

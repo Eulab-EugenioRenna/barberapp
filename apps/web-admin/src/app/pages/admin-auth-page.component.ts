@@ -16,41 +16,37 @@ import { SessionStore } from "../core/session.store";
         class="mx-auto grid min-h-screen max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
       >
         <aside class="hero-panel rounded-[2rem] p-6 text-white lg:p-10">
-          <p class="eyebrow">Platforma booking</p>
+          <p class="eyebrow">Direzione salone</p>
           <h1
             class="mt-4 font-display text-5xl font-semibold leading-none md:text-7xl"
           >
-            Un gestionale davvero operativo, non una demo.
+            Il tuo salone, sempre sotto controllo.
           </h1>
           <p class="mt-6 max-w-xl text-base text-white/72 md:text-lg">
-            Onboarding tenant, dashboard con valori DB, agenda modificabile,
-            white label e booking pubblico in una UI piu moderna e mobile-first.
+            Organizza appuntamenti, squadra, clienti e incassi con una visione
+            chiara della giornata e dell'andamento del salone.
           </p>
           <div class="mt-8 grid gap-3 md:grid-cols-3">
             <article class="glass-tile rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                Dashboard
+                Agenda
               </p>
-              <strong class="mt-3 block text-3xl">Live</strong>
-              <span class="text-sm text-white/70">Metriche dal database</span>
+              <strong class="mt-3 block text-3xl">Ordinata</strong>
+              <span class="text-sm text-white/70">Ogni appuntamento al suo posto</span>
             </article>
             <article class="glass-tile rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                Booking
+                Squadra
               </p>
-              <strong class="mt-3 block text-3xl">CRUD</strong>
-              <span class="text-sm text-white/70"
-                >Crea e modifica appuntamenti</span
-              >
+              <strong class="mt-3 block text-3xl">Coordinata</strong>
+              <span class="text-sm text-white/70">Orari e carichi sempre visibili</span>
             </article>
             <article class="glass-tile rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                White label
+                Risultati
               </p>
-              <strong class="mt-3 block text-3xl">Hybrid</strong>
-              <span class="text-sm text-white/70"
-                >Tenant pubblico o chiuso</span
-              >
+              <strong class="mt-3 block text-3xl">Chiari</strong>
+              <span class="text-sm text-white/70">Incassi e clienti in primo piano</span>
             </article>
           </div>
         </aside>
@@ -60,11 +56,11 @@ import { SessionStore } from "../core/session.store";
             <div>
               <p class="eyebrow text-[var(--accent)]">Accesso</p>
               <h2 class="mt-2 font-display text-4xl">
-                {{ authMode === "login" ? "Accedi" : "Crea il tuo tenant" }}
+                {{ authMode === "login" ? "Bentornato nel tuo salone" : "Apri il tuo spazio" }}
               </h2>
             </div>
             <button type="button" class="pill-btn" (click)="toggleMode()">
-              {{ authMode === "login" ? "Signup" : "Login" }}
+              {{ authMode === "login" ? "Crea un account" : "Ho già un account" }}
             </button>
           </div>
 
@@ -94,11 +90,11 @@ import { SessionStore } from "../core/session.store";
             </div>
 
             <label *ngIf="authMode === 'signup'" class="field">
-              <span>Nome attivita <em class="required-mark" aria-hidden="true">*</em></span>
+              <span>Nome del salone o boutique <em class="required-mark" aria-hidden="true">*</em></span>
               <input
                 [(ngModel)]="signupForm.companyName"
                 name="companyName"
-                placeholder="Atelier Barberia Milano"
+                placeholder="Atelier Milano"
                 autocomplete="organization"
                 required
               />
@@ -110,7 +106,7 @@ import { SessionStore } from "../core/session.store";
                 [(ngModel)]="loginForm.email"
                 name="loginEmail"
                 type="email"
-                placeholder="owner@atelier.it"
+                placeholder="direzione@atelier.it"
                 autocomplete="email"
                 required
             /></label>
@@ -151,10 +147,10 @@ import { SessionStore } from "../core/session.store";
             <button type="submit" class="primary-btn" [disabled]="loading || !formValid">
               {{
                 loading
-                  ? "Caricamento..."
+                  ? "Un momento..."
                   : authMode === "login"
-                    ? "Accedi alla dashboard"
-                    : "Crea account e tenant"
+                    ? "Entra nel salone"
+                    : "Configura il mio salone"
               }}
             </button>
           </form>
@@ -245,7 +241,7 @@ export class AdminAuthPageComponent implements OnInit {
       );
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Operazione non riuscita";
+        error?.error?.message || error?.message || "Non siamo riusciti a completare l'accesso. Riprova.";
     } finally {
       this.loading = false;
     }

@@ -660,7 +660,7 @@ export class NotificationsService {
     });
 
     if (!history) {
-      throw new NotFoundException("Notification history not found");
+      throw new NotFoundException("La comunicazione richiesta non è stata trovata");
     }
 
     return history;
@@ -813,7 +813,7 @@ export class NotificationsService {
 
     if (!appointment) {
       throw new NotFoundException(
-        "Appointment not found for notification event",
+        "L'appuntamento collegato alla comunicazione non è stato trovato",
       );
     }
 
@@ -925,7 +925,7 @@ export class NotificationsService {
 
     if (!template) {
       throw new NotFoundException(
-        `Template not found for ${eventType}/${channel}`,
+        "Il messaggio richiesto non è disponibile",
       );
     }
 

@@ -356,7 +356,7 @@ import { buildDayListingEvent } from "./calendar-date";
     <article class="calendar-shell panel rounded-[2rem] p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="eyebrow text-[var(--accent)]">Calendario agenda</p>
+          <p class="eyebrow text-[var(--accent)]">Agenda del salone</p>
           <h3 class="font-display text-3xl">{{ title }}</h3>
         </div>
         <div class="ml-auto flex w-full flex-col gap-2 sm:w-auto sm:min-w-[16rem]">
@@ -371,10 +371,10 @@ import { buildDayListingEvent } from "./calendar-date";
               Oggi
             </button>
             <button type="button" class="pill-btn" (click)="navigate.emit(-1)">
-              Prev
+              Indietro
             </button>
             <button type="button" class="pill-btn" (click)="navigate.emit(1)">
-              Next
+              Avanti
             </button>
           </div>
         </div>
@@ -444,7 +444,7 @@ import { buildDayListingEvent } from "./calendar-date";
             *ngIf="!dayColumns.length"
             class="rounded-[1.4rem] border border-[var(--line)]/70 bg-white/80 p-5 text-sm text-[var(--muted)]"
           >
-            Nessun collaboratore disponibile per il giorno selezionato o dati
+            Nessun professionista disponibile per il giorno selezionato o dati
             ancora in caricamento.
           </article>
 
@@ -677,7 +677,7 @@ import { buildDayListingEvent } from "./calendar-date";
                         $event.stopPropagation()
                       "
                     >
-                      +{{ day.hiddenCount }} more
+                      +{{ day.hiddenCount }} altri
                     </button>
                   </div>
                 </div>
@@ -759,7 +759,7 @@ import { buildDayListingEvent } from "./calendar-date";
                       $event.stopPropagation()
                     "
                   >
-                    +{{ cell.hiddenCount }} more
+                    +{{ cell.hiddenCount }} altri
                   </button>
                 </div>
               </article>

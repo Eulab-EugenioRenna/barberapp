@@ -129,7 +129,7 @@ export class PlatformAdminService {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
-    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (!tenant) throw new NotFoundException("Attività non trovata");
 
     const [
       users,
@@ -231,7 +231,7 @@ export class PlatformAdminService {
         }),
     );
 
-    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (!tenant) throw new NotFoundException("Attività non trovata");
     return tenant;
   }
 
@@ -251,7 +251,7 @@ export class PlatformAdminService {
           },
         });
 
-        if (!tenant) throw new NotFoundException("Tenant not found");
+        if (!tenant) throw new NotFoundException("Attività non trovata");
 
         const [users, collaborators, customers, services, appointments, sales] =
           await Promise.all([
@@ -442,7 +442,7 @@ export class PlatformAdminService {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
-    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (!tenant) throw new NotFoundException("Attività non trovata");
 
     await this.resetTenantData(tenantId);
     await this.prisma.$transaction(async (tx) => {
@@ -494,7 +494,7 @@ export class PlatformAdminService {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
-    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (!tenant) throw new NotFoundException("Attività non trovata");
 
     if (mode === "replace") {
       await this.resetTenantData(tenantId);
@@ -654,7 +654,7 @@ export class PlatformAdminService {
   ): Promise<unknown> {
     const files = bundle["files"] as Record<string, string> | undefined;
     if (!files) {
-      throw new NotFoundException("CSV bundle files missing");
+      throw new NotFoundException("La copia tabellare non contiene tutti i dati necessari");
     }
 
     const snapshot: Record<string, any> = {};

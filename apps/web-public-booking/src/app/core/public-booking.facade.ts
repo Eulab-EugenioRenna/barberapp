@@ -52,7 +52,7 @@ export class PublicBookingFacade {
                 this.feedback.set(
                   error?.error?.message ||
                     error?.message ||
-                    "Errore nel caricamento slot",
+                    "Non riusciamo a caricare gli orari. Riprova tra poco.",
                 );
                 return of({ slots: [] });
               }),
@@ -126,7 +126,7 @@ export class PublicBookingFacade {
     return configured.map((line: string) => {
       const [title, caption] = line.split("|");
       return {
-        title: title?.trim() || "Step",
+        title: title?.trim() || "Passaggio",
         caption: caption?.trim() || "",
       };
     });
@@ -160,7 +160,7 @@ export class PublicBookingFacade {
       .map((collaborator: any) => ({
         value: collaborator.id,
         label: `${collaborator.firstName} ${collaborator.lastName}${
-          collaborator.id === defaultCollaboratorId ? " · default" : ""
+          collaborator.id === defaultCollaboratorId ? " · consigliato" : ""
         }`,
       }));
   });
@@ -193,7 +193,7 @@ export class PublicBookingFacade {
         isSelected: key === this.selectedDate(),
         isUnavailable: known === false,
         statusLabel:
-          known === false ? "Bloccato" : known === true ? "Disponibile" : "—",
+          known === false ? "Completo" : known === true ? "Disponibile" : "—",
       };
     });
   });
@@ -219,15 +219,15 @@ export class PublicBookingFacade {
         isSelected: key === this.selectedDate(),
         isUnavailable: known === false,
         statusLabel:
-          known === false ? "Bloccato" : known === true ? "Disponibile" : "—",
+          known === false ? "Completo" : known === true ? "Disponibile" : "—",
       };
     });
   });
 
   readonly steps = [
-    { title: "Servizio", caption: "Catalogo reale dal tenant" },
-    { title: "Slot", caption: "Disponibilita per data e collaboratore" },
-    { title: "Conferma", caption: "Prenotazione persistita su DB" },
+    { title: "Scegli", caption: "Trova il servizio che desideri" },
+    { title: "Prenota", caption: "Scegli professionista, giorno e orario" },
+    { title: "Conferma", caption: "Invia la richiesta al salone" },
   ];
 
   setTenantSlug(slug: string): void {
@@ -295,7 +295,7 @@ export class PublicBookingFacade {
       this.feedback.set(
         error?.error?.message ||
           error?.message ||
-          "Impossibile caricare il booking pubblico",
+          "Al momento non riusciamo ad aprire le prenotazioni. Riprova tra poco.",
       );
     } finally {
       this.loading.set(false);
@@ -366,7 +366,11 @@ export class PublicBookingFacade {
       );
 
       this.bookingResult.set(result);
-      this.feedback.set("Prenotazione inviata correttamente");
+      this.feedback.set(
+        result?.status === "confirmed"
+          ? "Appuntamento confermato. Ti aspettiamo in salone!"
+          : "Richiesta inviata. Il salone ti comunicherà la conferma.",
+      );
       this.bookingForm.set({
         customerName: "",
         email: "",
@@ -378,7 +382,7 @@ export class PublicBookingFacade {
       this.feedback.set(
         error?.error?.message ||
           error?.message ||
-          "Invio prenotazione non riuscito",
+          "Non siamo riusciti a inviare la richiesta. Controlla i dati e riprova.",
       );
     } finally {
       this.loading.set(false);

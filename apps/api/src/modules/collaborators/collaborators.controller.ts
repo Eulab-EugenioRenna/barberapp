@@ -270,7 +270,7 @@ export class CollaboratorsController {
 
     if (tenant?.defaultCollaboratorId === id) {
       throw new BadRequestException(
-        "Questo collaboratore e il default del tenant. Cambialo nelle impostazioni prima di eliminarlo.",
+        "Questo è il professionista di riferimento. Scegline un altro prima di eliminarlo.",
       );
     }
 

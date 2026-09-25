@@ -5,6 +5,7 @@ import { CustomSelectComponent } from "../custom-select.component";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import { serviceProductModeLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-services-page",
@@ -22,8 +23,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       <article class="panel rounded-[2rem] p-5">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Catalogo</p>
-            <h3 class="font-display text-3xl">Servizi</h3>
+            <p class="eyebrow text-[var(--accent)]">Listino</p>
+            <h3 class="font-display text-3xl">Servizi e trattamenti</h3>
           </div>
           <button type="button" class="primary-btn" (click)="openNewService()">
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo servizio
@@ -51,7 +52,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               <p class="mt-1 text-sm text-[var(--muted)]">
                 {{
                   service.publicDescription ||
-                    "Descrizione interna non impostata"
+                    "Descrizione non ancora inserita"
                 }}
               </p>
             </div>
@@ -80,7 +81,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       <article class="panel rounded-[2rem] p-5">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Retail</p>
+            <p class="eyebrow text-[var(--accent)]">Vendita in salone</p>
             <h3 class="font-display text-3xl">Prodotti</h3>
           </div>
           <div class="flex items-center gap-2">
@@ -218,7 +219,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                   name="serviceIsPublic"
                   type="checkbox"
                 />
-                <span>Visibile nel public</span>
+                <span>Visibile ai clienti online</span>
               </label>
               <label class="field checkbox-field">
                 <input
@@ -231,7 +232,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             </div>
           </div>
           <div class="field">
-            <span>Catalogo prodotti collegato</span>
+            <span>Prodotti consigliati con il servizio</span>
             <div
               class="mt-3 grid gap-3"
               *ngIf="
@@ -247,7 +248,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                   <div>
                     <strong>{{ serviceProduct.product?.name }}</strong>
                     <p class="text-sm text-[var(--muted)]">
-                      {{ serviceProduct.mode }} · qta
+                      {{ formatServiceProductMode(serviceProduct.mode) }} · quantità
                       {{ serviceProduct.quantity }}
                       <span *ngIf="serviceProduct.priceLocked"
                         >· prezzo bloccato</span
@@ -281,16 +282,16 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 ></barber-custom-select>
               </label>
               <label class="field">
-                <span>Modalita</span>
+                <span>Modalità</span>
                 <barber-custom-select
                   [value]="serviceProductForm.mode"
                   (valueChange)="serviceProductForm.mode = $event"
                   [options]="serviceProductModeOptions"
-                  label="Modalita"
+                  label="Modalità"
                 ></barber-custom-select>
               </label>
               <label class="field">
-                <span>Quantita</span>
+                <span>Quantità</span>
                 <input
                   [(ngModel)]="serviceProductForm.quantity"
                   name="serviceProductQuantity"
@@ -387,14 +388,14 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 required
             /></label>
             <label class="field"
-              ><span>Prezzo opzionale</span
+              ><span>Prezzo di vendita</span
               ><input
                 [(ngModel)]="productForm.price"
                 name="productPrice"
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Da inserire in cassa"
+                placeholder="Puoi definirlo anche al momento della vendita"
             /></label>
           </div>
           <label class="field"
@@ -435,6 +436,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
 })
 export class AdminServicesPageComponent {
   protected readonly Number = Number;
+  formatServiceProductMode = serviceProductModeLabel;
   @Input() services: any[] = [];
   @Input() products: any[] = [];
   @Input() serviceForm: any = {};

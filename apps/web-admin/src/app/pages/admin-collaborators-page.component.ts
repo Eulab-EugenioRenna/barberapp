@@ -14,15 +14,15 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       <article class="panel rounded-[2rem] p-5">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Team</p>
-            <h3 class="font-display text-3xl">Collaboratori</h3>
+            <p class="eyebrow text-[var(--accent)]">Squadra</p>
+            <h3 class="font-display text-3xl">Professionisti</h3>
           </div>
           <button type="button" class="primary-btn" (click)="openNew()">
-            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo collaboratore
+            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo professionista
           </button>
         </div>
         <label class="field mt-5">
-          <span>Cerca collaboratore</span>
+          <span>Cerca nella squadra</span>
           <input
             [(ngModel)]="collaboratorQuery"
             name="collaboratorSearch"
@@ -51,13 +51,13 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               <span
                 *ngIf="isDefaultCollaborator(collaborator.id)"
                 class="status-pill status-pill-amber"
-                >default</span
+                >riferimento</span
               >
               <span
                 class="status-pill"
                 [ngClass]="collaboratorStatusClass(collaborator.isPublic)"
               >
-                {{ collaborator.isPublic ? "visibile online" : "interno" }}
+                {{ collaborator.isPublic ? "prenotabile online" : "solo interno" }}
               </span>
             </div>
           </button>
@@ -65,8 +65,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             *ngIf="!filteredCollaborators.length"
             class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)] md:col-span-2"
           >
-            Nessun collaboratore. Usa “+ Nuovo collaboratore” per creare il
-            primo membro del team.
+            La squadra è ancora vuota. Aggiungi il primo professionista.
           </article>
           <div
             *ngIf="hasMore"
@@ -83,7 +82,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
         type="button"
         class="confirm-backdrop"
         (click)="formOpen = false"
-        aria-label="Chiudi modulo collaboratore"
+        aria-label="Chiudi scheda professionista"
       ></button>
       <article
         barberAutofocusFirst
@@ -94,7 +93,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       >
         <div class="flex items-start justify-between gap-4">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Collaboratore</p>
+            <p class="eyebrow text-[var(--accent)]">Squadra</p>
             <h2
               id="collaborator-form-title"
               class="mt-2 font-display text-3xl"
@@ -102,8 +101,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               <barber-ui-icon name="save"></barber-ui-icon>
               {{
                 collaboratorForm.id
-                  ? "Modifica collaboratore"
-                  : "Nuovo collaboratore"
+                  ? "Modifica professionista"
+                  : "Nuovo professionista"
               }}
             </h2>
           </div>
@@ -174,13 +173,13 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 name="collaboratorIsPublic"
                 type="checkbox"
               />
-              <span>Visibile nel booking pubblico</span>
+              <span>Prenotabile dai clienti online</span>
             </label>
           </div>
           </div>
           <div class="grid content-start gap-4">
           <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
-            <p class="text-sm font-semibold">Orari feriali</p>
+            <p class="text-sm font-semibold">Orario settimanale</p>
             <div class="mt-4 grid gap-3">
               <article
                 *ngFor="
@@ -307,8 +306,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             >
               {{
                 collaboratorForm.id
-                  ? "Salva collaboratore"
-                  : "Crea collaboratore"
+                  ? "Salva professionista"
+                  : "Aggiungi professionista"
               }}
             </button>
             <button
@@ -321,7 +320,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               [disabled]="loading"
               (click)="setDefault.emit(collaboratorForm.id)"
             >
-              Imposta come default
+              Imposta come riferimento
             </button>
             <button
               *ngIf="collaboratorForm.id"
@@ -339,7 +338,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               "
               class="status-pill status-pill-amber"
             >
-              Collaboratore default: impostane un altro prima di eliminarlo
+              Professionista di riferimento: scegline un altro prima di eliminarlo
             </span>
             <button
               type="button"
@@ -347,7 +346,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               [disabled]="loading"
               (click)="openNew()"
             >
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo collaboratore
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo professionista
             </button>
           </div>
         </form>
@@ -419,10 +418,10 @@ export class AdminCollaboratorsPageComponent {
   }
 
   readonly weekdayLabels = [
-    "Lunedi",
-    "Martedi",
-    "Mercoledi",
-    "Giovedi",
+    "Lunedì",
+    "Martedì",
+    "Mercoledì",
+    "Giovedì",
     "Venerdi",
     "Sabato",
     "Domenica",

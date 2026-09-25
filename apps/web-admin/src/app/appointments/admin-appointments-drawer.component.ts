@@ -6,6 +6,7 @@ import {
   Input,
   Output,
 } from "@angular/core";
+import { appointmentStatusLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-appointments-drawer",
@@ -35,6 +36,8 @@ import {
         flex-direction: column;
         gap: 1rem;
         padding: 1rem;
+        padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
         background: rgba(244, 241, 234, 0.96);
         backdrop-filter: blur(16px);
         border-right: 1px solid rgba(15, 23, 32, 0.08);
@@ -122,10 +125,10 @@ import {
           <div class="drawer-summary-grid">
             <div>
               <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-                Collaboratore
+                Professionista
               </p>
               <strong class="mt-2 block">
-                {{ appointment?.collaborator?.firstName || "Staff" }}
+                {{ appointment?.collaborator?.firstName || "Da assegnare" }}
                 {{ appointment?.collaborator?.lastName || "" }}
               </strong>
             </div>
@@ -133,7 +136,7 @@ import {
               <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
                 Stato
               </p>
-              <strong class="mt-2 block">{{ appointment?.status }}</strong>
+              <strong class="mt-2 block">{{ formatStatus(appointment?.status) }}</strong>
             </div>
             <div>
               <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
@@ -148,7 +151,7 @@ import {
               <strong class="mt-2 block">{{
                 appointment?.customer?.email ||
                   appointment?.customer?.phone ||
-                  "N/D"
+                  "Non indicato"
               }}</strong>
             </div>
           </div>
@@ -182,7 +185,7 @@ import {
           class="primary-btn"
           (click)="createOrder.emit(appointment)"
         >
-          Conferma ordine
+          Chiudi il conto
         </button>
         <button
           *ngIf="mode === 'preview'"
@@ -228,7 +231,7 @@ export class AdminAppointmentsDrawerComponent {
 
   durationLabel(): string {
     if (!this.appointment?.startsAt || !this.appointment?.endsAt) {
-      return "N/D";
+      return "Non indicata";
     }
     const minutes = Math.round(
       (new Date(this.appointment.endsAt).getTime() -
@@ -239,6 +242,6 @@ export class AdminAppointmentsDrawerComponent {
   }
 
   formatStatus(status?: string): string {
-    return (status || "").replace(/_/g, " ");
+    return appointmentStatusLabel(status);
   }
 }

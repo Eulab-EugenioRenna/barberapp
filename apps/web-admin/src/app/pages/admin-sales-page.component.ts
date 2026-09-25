@@ -3,6 +3,11 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import {
+  appointmentStatusLabel,
+  paymentMethodLabel,
+  paymentStatusLabel,
+} from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-sales-page",
@@ -14,7 +19,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
         <div class="flex items-center justify-between gap-3">
           <div>
             <p class="eyebrow text-[var(--accent)]">Cassa</p>
-            <h3 class="font-display text-3xl">Vendite</h3>
+            <h3 class="font-display text-3xl">Vendite e incassi</h3>
           </div>
           <div class="flex items-center gap-2">
             <button
@@ -22,15 +27,15 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               class="primary-btn"
               (click)="openQuickOrder.emit()"
             >
-              <barber-ui-icon name="receipt"></barber-ui-icon> Nuovo ordine
+              <barber-ui-icon name="receipt"></barber-ui-icon> Nuova vendita
             </button>
             <span class="status-pill status-pill-neutral"
-              >{{ sales.length }} records</span
+              >{{ sales.length }} vendite</span
             >
           </div>
         </div>
         <label class="field mt-5">
-          <span>Cerca ordine</span>
+          <span>Cerca vendita</span>
           <input
             [(ngModel)]="saleQuery"
             name="saleSearch"
@@ -62,7 +67,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             <div class="text-right">
               <strong>€{{ Number(sale.total || 0).toFixed(2) }}</strong>
               <p class="text-sm text-[var(--muted)]">
-                {{ sale.paymentMethod || "-" }}
+                {{ formatPaymentMethod(sale.paymentMethod) }}
               </p>
             </div>
           </button>
@@ -70,14 +75,14 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             *ngIf="!filteredSales.length && !loading"
             class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
           >
-            Nessun ordine trovato. Usa “+ Nuovo ordine” per registrare il
-            primo ordine.
+            Nessuna vendita trovata. Usa “+ Nuova vendita” per registrare il
+            primo incasso.
           </article>
           <p
             *ngIf="hasMore"
             class="text-center text-xs uppercase tracking-wider text-[var(--muted)]"
           >
-            Scorri per caricare altri ordini
+            Scorri per caricare altre vendite
           </p>
           <div
             *ngIf="hasMore"
@@ -94,7 +99,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
         type="button"
         class="confirm-backdrop"
         (click)="closeSaleDetail()"
-        aria-label="Chiudi dettaglio ordine"
+        aria-label="Chiudi dettaglio vendita"
       ></button>
       <article
         class="confirm-dialog panel max-h-[85vh] overflow-auto"
@@ -104,17 +109,17 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       >
         <div class="flex items-start justify-between gap-4">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Ordine</p>
+            <p class="eyebrow text-[var(--accent)]">Vendita</p>
             <h2 id="sale-detail-title" class="mt-2 font-display text-3xl">
               {{ selectedSale.customer?.firstName || "Vendita" }}
               {{ selectedSale.customer?.lastName || "senza cliente" }}
             </h2>
             <p class="mt-1 text-sm text-[var(--muted)]">
               {{ formatDateTime(selectedSale.soldAt) }} ·
-              {{ selectedSale.paymentMethod || "-" }}
+              {{ formatPaymentMethod(selectedSale.paymentMethod) }}
             </p>
             <p class="mt-1 text-xs text-[var(--muted)]">
-              ID {{ selectedSale.id }}
+              Riferimento {{ selectedSale.id }}
             </p>
           </div>
           <button type="button" class="pill-btn" (click)="closeSaleDetail()">
@@ -136,8 +141,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
           </article>
           <article class="rounded-2xl border border-[var(--line)] p-4">
             <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Pagamento</p>
-            <strong class="mt-2 block">{{ selectedSale.paymentStatus }}</strong>
-            <p class="mt-1 text-sm text-[var(--muted)]">Metodo: {{ selectedSale.paymentMethod || "non indicato" }}</p>
+            <strong class="mt-2 block">{{ formatPaymentStatus(selectedSale.paymentStatus) }}</strong>
+            <p class="mt-1 text-sm text-[var(--muted)]">Metodo: {{ formatPaymentMethod(selectedSale.paymentMethod) }}</p>
           </article>
         </div>
 
@@ -158,12 +163,12 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             </span>
             <span *ngIf="selectedSale.appointment.collaborator">
               ·
-              {{ selectedSale.appointment.collaborator?.firstName || "Staff" }}
+              {{ selectedSale.appointment.collaborator?.firstName || "Da assegnare" }}
               {{ selectedSale.appointment.collaborator?.lastName || "" }}
             </span>
           </p>
           <p class="mt-2 text-xs text-[var(--muted)]">
-            Stato: {{ selectedSale.appointment.status }} · ID {{ selectedSale.appointment.id }}
+            {{ formatAppointmentStatus(selectedSale.appointment.status) }}
           </p>
         </article>
 
@@ -184,7 +189,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                   </span>
                 </p>
                 <p *ngIf="item.collaborator" class="mt-1 text-xs text-[var(--muted)]">
-                  Collaboratore: {{ item.collaborator.firstName }} {{ item.collaborator.lastName }}
+                  Professionista: {{ item.collaborator.firstName }} {{ item.collaborator.lastName }}
                 </p>
               </div>
               <strong>€{{ Number(item.lineTotal || 0).toFixed(2) }}</strong>
@@ -221,15 +226,15 @@ import { UiIconComponent } from "../shared/ui-icon.component";
           </div>
           <div class="flex justify-between">
             <span class="text-[var(--muted)]">Stato pagamento</span>
-            <span>{{ selectedSale.paymentStatus }}</span>
+            <span>{{ formatPaymentStatus(selectedSale.paymentStatus) }}</span>
           </div>
         </div>
         <div class="mt-5 flex flex-wrap gap-3">
           <button type="button" class="primary-btn" (click)="editSelectedSale()">
-            <barber-ui-icon name="edit"></barber-ui-icon> Modifica ordine
+            <barber-ui-icon name="edit"></barber-ui-icon> Modifica vendita
           </button>
           <button type="button" class="pill-btn" (click)="deleteSelectedSale()">
-            <barber-ui-icon name="trash"></barber-ui-icon> Elimina ordine
+            <barber-ui-icon name="trash"></barber-ui-icon> Elimina vendita
           </button>
         </div>
       </article>
@@ -249,6 +254,10 @@ export class AdminSalesPageComponent {
   protected readonly Number = Number;
   selectedSale: any = null;
   saleQuery = "";
+
+  formatAppointmentStatus = appointmentStatusLabel;
+  formatPaymentMethod = paymentMethodLabel;
+  formatPaymentStatus = paymentStatusLabel;
 
   get filteredSales(): any[] {
     const query = this.saleQuery.trim().toLowerCase();

@@ -49,7 +49,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
     >
       <p class="eyebrow text-[var(--accent)]">Sposta appuntamento</p>
       <h3 id="quick-reschedule-title" class="mt-2 font-display text-3xl">
-        Conferma nuova collocazione
+        Scegli il nuovo orario
       </h3>
       <p class="mt-2 text-sm text-[var(--muted)]">
         {{ appointment?.customer?.firstName }}
@@ -60,7 +60,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
         <div class="grid gap-3 md:grid-cols-2">
           <div>
             <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-              Vista origine
+              Vista di partenza
             </p>
             <strong class="mt-2 block capitalize">{{
               state?.sourceView
@@ -89,7 +89,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
             fieldChange.emit({ key: 'collaboratorId', value: $event })
           "
           [options]="collaboratorOptions"
-          label="Collaboratore"
+          label="Professionista"
         ></barber-custom-select>
 
         <barber-custom-select
@@ -101,8 +101,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
         ></barber-custom-select>
 
         <p *ngIf="!slotOptions.length" class="text-sm text-amber-800">
-          Nessuno slot disponibile con la configurazione corrente. Cambia data o
-          collaboratore.
+          Nessun orario disponibile. Prova un'altra data o un altro professionista.
         </p>
       </div>
 
@@ -141,7 +140,7 @@ export class AdminAppointmentsQuickRescheduleModalComponent {
 
   originalTimeLabel(): string {
     if (!this.appointment?.startsAt) {
-      return "N/D";
+      return "Non indicato";
     }
     return new Date(this.appointment.startsAt).toLocaleTimeString("it-IT", {
       hour: "2-digit",

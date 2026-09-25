@@ -96,7 +96,7 @@ export class QuickOrderModalComponent implements OnInit {
     }).map((collaborator) => ({
       value: collaborator.id,
       label: `${collaborator.firstName} ${collaborator.lastName}`.trim() +
-        (collaborator.id === this.defaultCollaboratorId ? " · default" : ""),
+        (collaborator.id === this.defaultCollaboratorId ? " · riferimento" : ""),
     }));
   }
 

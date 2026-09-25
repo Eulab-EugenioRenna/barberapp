@@ -31,12 +31,12 @@ import { CustomSelectComponent } from "./custom-select.component";
           class="booking-hero public-hero text-white"
           [style.background]="publicHeroBackground"
         >
-          <p class="eyebrow text-white/55">Booking experience</p>
+          <p class="eyebrow text-white/55">Il tuo momento</p>
           <div class="mt-5 flex flex-wrap items-center gap-4 md:gap-6">
             <img
               *ngIf="settings()?.logoUrl"
               [src]="absoluteAssetUrl(settings()?.logoUrl)"
-              alt="Logo tenant"
+              alt="Logo del salone"
               class="h-auto w-auto max-h-28 max-w-[24rem] object-contain md:max-h-36 md:max-w-[30rem]"
             />
             <h1 class="font-display text-5xl leading-none md:text-7xl">
@@ -48,7 +48,7 @@ import { CustomSelectComponent } from "./custom-select.component";
           <p class="mt-5 max-w-xl text-base text-white/74 md:text-lg">
             {{
               settings()?.publicDescription ||
-                "Flusso pubblico reale con servizi dal DB, disponibilita dinamica, scelta collaboratore e creazione prenotazione persistita."
+                "Scegli il servizio, trova il momento giusto e invia la tua richiesta al salone."
             }}
           </p>
 
@@ -79,14 +79,14 @@ import { CustomSelectComponent } from "./custom-select.component";
               aria-live="polite"
               class="rounded-2xl bg-white/70 p-4 text-sm text-[var(--muted)]"
             >
-              Caricamento disponibilità...
+              Stiamo preparando gli orari disponibili...
             </p>
             <div
               class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"
             >
               <div>
                 <p class="eyebrow text-[var(--accent)]">Prenotazione</p>
-                <h2 class="font-display text-4xl">Scegli servizio e slot</h2>
+                <h2 class="font-display text-4xl">Scegli servizio e orario</h2>
               </div>
               <label class="field public-date-field">
                 <span>Data <em class="required-mark" aria-hidden="true">*</em></span>
@@ -185,7 +185,7 @@ import { CustomSelectComponent } from "./custom-select.component";
                   </p>
                   <div class="mt-3 flex flex-wrap gap-2">
                     <span class="status-pill status-pill-neutral"
-                      >{{ service.collaborators?.length || 0 }} barber</span
+                      >{{ service.collaborators?.length || 0 }} professionisti</span
                     >
                     <span
                       *ngFor="
@@ -219,17 +219,17 @@ import { CustomSelectComponent } from "./custom-select.component";
               class="mt-6 grid gap-4 md:grid-cols-2"
             >
               <label class="field">
-                <span>Collaboratore <em class="required-mark" aria-hidden="true">*</em></span>
+                <span>Professionista <em class="required-mark" aria-hidden="true">*</em></span>
                 <barber-custom-select
                   [value]="selectedCollaboratorId()"
                   (valueChange)="onSelectedCollaboratorChange($event)"
                   [options]="collaboratorSelectOptions"
-                  label="Collaboratore"
-                  placeholder="Seleziona collaboratore"
+                  label="Professionista"
+                  placeholder="Scegli chi si prenderà cura di te"
                 ></barber-custom-select>
               </label>
               <label class="field">
-                <span>Slot disponibili <em class="required-mark" aria-hidden="true">*</em></span>
+                <span>Orari disponibili <em class="required-mark" aria-hidden="true">*</em></span>
                 <barber-custom-select
                   [value]="selectedSlot()"
                   (valueChange)="onSelectedSlotChange($event)"
@@ -238,10 +238,10 @@ import { CustomSelectComponent } from "./custom-select.component";
                   label="Orario"
                   [placeholder]="
                     !selectedCollaboratorId()
-                      ? 'Prima seleziona il collaboratore'
+                      ? 'Prima scegli il professionista'
                       : slots().length
                         ? 'Seleziona orario'
-                        : 'Nessuno slot disponibile'
+                        : 'Nessun orario disponibile'
                   "
                 ></barber-custom-select>
               </label>
@@ -294,7 +294,7 @@ import { CustomSelectComponent } from "./custom-select.component";
                       onBookingFieldChange('customerNotes', $event)
                     "
                     name="customerNotes"
-                    placeholder="Preferenza orario o note utili"
+                    placeholder="Preferenze o richieste utili al salone"
                   />
                 </label>
               </div>
@@ -318,7 +318,7 @@ import { CustomSelectComponent } from "./custom-select.component";
                   !bookingForm().customerName.trim()
                 "
               >
-                {{ loading() ? "Invio in corso..." : "Conferma prenotazione" }}
+                {{ loading() ? "Stiamo inviando la richiesta..." : "Richiedi la prenotazione" }}
               </button>
             </form>
 
@@ -326,15 +326,25 @@ import { CustomSelectComponent } from "./custom-select.component";
               *ngIf="bookingResult()"
               class="success-card mt-6 rounded-[1.8rem] p-5"
             >
-              <p class="eyebrow text-emerald-700">Prenotazione registrata</p>
+              <p class="eyebrow text-emerald-700">
+                {{
+                  bookingResult().status === "confirmed"
+                    ? "Appuntamento confermato"
+                    : "Richiesta inviata"
+                }}
+              </p>
               <h3 class="mt-2 font-display text-3xl text-emerald-950">
                 {{ bookingResult().customer.firstName }}
                 {{ bookingResult().customer.lastName }}
               </h3>
               <p class="mt-2 text-sm text-emerald-900/76">
                 {{ bookingResult().service.name }} ·
-                {{ formatDateTime(bookingResult().startsAt) }} · Stato
-                {{ bookingResult().status }}
+                {{ formatDateTime(bookingResult().startsAt) }}.
+                {{
+                  bookingResult().status === "confirmed"
+                    ? "Ti aspettiamo in salone."
+                    : "Il salone ti comunicherà la conferma."
+                }}
               </p>
             </article>
           </div>

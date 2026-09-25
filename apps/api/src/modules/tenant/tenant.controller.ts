@@ -114,7 +114,9 @@ export class TenantController {
       });
 
       if (!collaborator) {
-        return { error: "Invalid default collaborator" };
+        throw new BadRequestException(
+          "Il professionista di riferimento non è disponibile",
+        );
       }
     }
 
@@ -239,7 +241,9 @@ export class TenantController {
     const tenantId = requireTenantId(session);
 
     if (!file?.buffer || !file.mimetype.startsWith("image/")) {
-      throw new BadRequestException("File immagine non valido per il logo");
+      throw new BadRequestException(
+        "Scegli un'immagine valida per il logo del salone",
+      );
     }
 
     const relativeUrl = this.saveTenantImage(tenantId, file, "logo");
@@ -273,7 +277,7 @@ export class TenantController {
     const tenantId = requireTenantId(session);
 
     if (!file?.buffer || !file.mimetype.startsWith("image/")) {
-      throw new BadRequestException("File immagine non valido per la cover");
+      throw new BadRequestException("Scegli un'immagine valida per la copertina");
     }
 
     const relativeUrl = this.saveTenantImage(tenantId, file, "cover");

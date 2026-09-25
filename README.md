@@ -110,6 +110,31 @@ DEMO_RESET_CONFIRM=yes npm run demo:create -- --reset
 
 `npm run demo:create -- --help` mostra tutte le opzioni.
 
+## Admin PWA e mobile
+
+L'admin e installabile come PWA (`apps/web-admin/public/manifest.webmanifest`).
+
+La cache e volutamente **non aggressiva**: il service worker
+(`apps/web-admin/public/service-worker.js`) lavora **network-first**, non fa
+precache dei bundle e non intercetta mai `/api/**`. La cache serve solo come
+fallback offline.
+
+Quando viene pubblicato un nuovo deploy, l'app confronta il build in esecuzione
+con `index.html` remoto e mostra il banner "Nuova versione disponibile". Il
+pulsante **Aggiorna** invalida le cache del service worker e ricarica, cosi il
+browser non continua a servire file vecchi.
+
+Perche l'invalidazione funzioni:
+
+- l'admin e compilato con `outputHashing: "all"`, quindi i bundle hanno nomi
+  con hash e cambiano ad ogni build;
+- Nginx non mette in cache `index.html`, `service-worker.js` e
+  `manifest.webmanifest` (`docker/nginx.conf`).
+
+Su mobile la shell usa `100dvh`, rispetta le safe area del dispositivo, espone
+una bottom navigation con le sezioni principali e impedisce lo zoom automatico
+di iOS sui campi di input.
+
 ## Notes
 
 This is a production-oriented foundation, not the complete SaaS. The API now includes a Redis-backed notification pipeline with BullMQ, tenant/user notification preferences, a notification inbox center, SMTP/webhook/in-app providers, and appointment/public-booking event triggers.

@@ -9,7 +9,7 @@
   <button
     class="quick-order-backdrop"
     type="button"
-    aria-label="Chiudi ordine rapido"
+    aria-label="Chiudi vendita veloce"
     [disabled]="loading"
     (click)="close.emit()"
   ></button>
@@ -17,19 +17,17 @@
     <header class="quick-order-header">
       <div>
         <p class="eyebrow text-[var(--accent)]">
-          {{ isEditing ? "Modifica ordine" : isLinkedToAppointment ? "Appuntamento" : "Touch mode" }}
+          {{ isEditing ? "Modifica vendita" : isLinkedToAppointment ? "Fine servizio" : "Vendita al banco" }}
         </p>
         <h2 id="quick-order-title" class="font-display text-4xl">
-          {{ isEditing ? "Modifica ordine" : isLinkedToAppointment ? "Conto appuntamento" : "Ordine rapido" }}
+          {{ isEditing ? "Modifica vendita" : isLinkedToAppointment ? "Chiudi il conto" : "Vendita veloce" }}
         </h2>
         <p class="mt-1 text-sm text-[var(--muted)]">
           <ng-container *ngIf="isLinkedToAppointment; else quickIntro">
-            L'ordine viene collegato all'appuntamento esistente e ne diventa il
-            conto finale.
+            La vendita verrà collegata all'appuntamento e chiuderà il conto del cliente.
           </ng-container>
           <ng-template #quickIntro>
-            I servizi vengono registrati come appuntamento completato che termina
-            ora, anche in sovrapposizione al calendario.
+            Registra in pochi tocchi servizi e prodotti acquistati senza prenotazione.
           </ng-template>
         </p>
       </div>
@@ -95,7 +93,7 @@
       </div>
 
       <aside class="quick-order-cart">
-        <p class="quick-order-step">3 · Riepilogo ordine</p>
+        <p class="quick-order-step">3 · Riepilogo vendita</p>
         <div class="cart-empty" *ngIf="!items.length">
           Tocca un servizio o un prodotto per iniziare.
         </div>
@@ -135,13 +133,13 @@
               />
             </label>
             <label *ngIf="item.kind === 'service'" class="cart-collaborator">
-              <span>Collaboratore</span>
+              <span>Professionista</span>
               <barber-custom-select
                 [value]="item.collaboratorId"
                 (valueChange)="item.collaboratorId = $event"
                 [options]="collaboratorOptions"
-                [label]="'Collaboratore per ' + item.label"
-                placeholder="Seleziona collaboratore"
+                [label]="'Professionista per ' + item.label"
+                placeholder="Scegli il professionista"
               ></barber-custom-select>
             </label>
           </div>
@@ -207,9 +205,9 @@
             *ngIf="appointmentWindowLabel && !isLinkedToAppointment"
             class="text-xs text-[var(--muted)]"
           >
-            Appuntamento a consuntivo:
+            Orario attribuito al servizio:
             <strong>{{ appointmentWindowLabel }}</strong>
-            (Now() − durata servizi)
+            (calcolato in base alla durata dei servizi)
           </p>
           <button
             type="button"
@@ -217,7 +215,7 @@
             [disabled]="loading || !canSubmit()"
             (click)="submit()"
           >
-            {{ loading ? "Salvataggio..." : isEditing ? "Salva ordine" : "Conferma ordine" }}
+            {{ loading ? "Salvataggio..." : isEditing ? "Salva vendita" : "Registra vendita" }}
           </button>
         </div>
       </aside>

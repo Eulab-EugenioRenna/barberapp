@@ -52,18 +52,18 @@ export class AuthController {
     });
 
     if (!user || !(await compare(body.password, user.passwordHash))) {
-      throw new UnauthorizedException("Invalid email or password");
+      throw new UnauthorizedException("Email o password non corretti");
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException("User account is inactive");
+      throw new UnauthorizedException("Questo account non è attivo");
     }
 
     if (
       user.role !== UserRole.PlatformAdmin &&
       (!user.tenant || !user.tenant.isActive || user.tenant.isSuspended)
     ) {
-      throw new ForbiddenException("Tenant access is suspended");
+      throw new ForbiddenException("L'accesso a questa attività è sospeso");
     }
 
     const token = buildSessionToken(user.id);
@@ -105,7 +105,7 @@ export class AuthController {
     const lastName = body.lastName?.trim();
 
     if (!companyName || !email || !password || !firstName || !lastName) {
-      throw new BadRequestException("All signup fields are required");
+      throw new BadRequestException("Completa tutti i campi richiesti");
     }
 
     const existingUser = await this.prisma.user.findUnique({
@@ -113,7 +113,7 @@ export class AuthController {
     });
 
     if (existingUser) {
-      throw new BadRequestException("Email already in use");
+      throw new BadRequestException("Questa email è già associata a un account");
     }
 
     const baseSlug = slugify(companyName) || "atelier";

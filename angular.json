@@ -17,7 +17,14 @@
             "polyfills": ["zone.js"],
             "tsConfig": "apps/web-admin/tsconfig.app.json",
             "inlineStyleLanguage": "css",
-            "assets": [],
+            "outputHashing": "all",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "apps/web-admin/public",
+                "output": ""
+              }
+            ],
             "styles": ["apps/web-admin/src/styles.css"]
           }
         },

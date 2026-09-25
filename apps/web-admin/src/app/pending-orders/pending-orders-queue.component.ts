@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import { appointmentStatusLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-pending-orders-queue",
@@ -12,11 +13,11 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       <article class="panel rounded-[2rem] p-5">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Notifiche</p>
-            <h3 class="font-display text-3xl">Ordini da confermare</h3>
+            <p class="eyebrow text-[var(--accent)]">Fine servizio</p>
+            <h3 class="font-display text-3xl">Conti da chiudere</h3>
             <p class="mt-1 text-sm text-[var(--muted)]">
-              Gli appuntamenti restano in coda finché non confermi un nuovo
-              ordine o ne colleghi uno esistente.
+              Qui trovi gli appuntamenti conclusi che non hanno ancora una
+              vendita registrata.
             </p>
           </div>
           <span class="status-pill status-pill-amber"
@@ -44,10 +45,10 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                   </span>
                 </p>
                 <p class="mt-1 text-xs text-[var(--muted)]">
-                  Stato: {{ appointment.status }}
+                  {{ formatAppointmentStatus(appointment.status) }}
                 </p>
               </div>
-              <span class="status-pill status-pill-amber">Ordine mancante</span>
+              <span class="status-pill status-pill-amber">Conto da chiudere</span>
             </div>
 
             <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -57,7 +58,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 [disabled]="loading"
                 (click)="confirmOrder.emit(appointment)"
               >
-                <barber-ui-icon name="receipt"></barber-ui-icon> Conferma ordine
+                <barber-ui-icon name="receipt"></barber-ui-icon> Registra vendita
               </button>
               <button
                 type="button"
@@ -69,7 +70,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 {{
                   linkOpenFor === appointment.id
                     ? "Chiudi collegamento"
-                    : "Collega ordine"
+                    : "Collega vendita"
                 }}
               </button>
               <button
@@ -91,7 +92,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 [(ngModel)]="selectedSaleId"
                 [ngModelOptions]="{ standalone: true }"
               >
-                <option value="">Seleziona un ordine senza appuntamento</option>
+                <option value="">Seleziona una vendita senza appuntamento</option>
                 <option *ngFor="let sale of unlinkedSales" [value]="sale.id">
                   {{ saleLabel(sale) }}
                 </option>
@@ -111,7 +112,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             *ngIf="!appointments.length"
             class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
           >
-            Nessun appuntamento in attesa di ordine. La coda è vuota.
+            Tutti i conti sono chiusi.
           </p>
         </div>
       </article>
@@ -119,6 +120,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
   `,
 })
 export class PendingOrdersQueueComponent {
+  formatAppointmentStatus = appointmentStatusLabel;
   @Input() appointments: any[] = [];
   @Input() unlinkedSales: any[] = [];
   @Input() loading = false;

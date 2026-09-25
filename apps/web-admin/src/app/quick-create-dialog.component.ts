@@ -15,9 +15,9 @@ export type QuickCreateKind = "customer" | "service" | "product";
     <div barberAutofocusFirst class="quick-create-overlay" role="dialog" aria-modal="true" [attr.aria-labelledby]="titleId">
       <button type="button" class="quick-create-backdrop" aria-label="Chiudi" [disabled]="saving" (click)="cancel.emit()"></button>
       <form class="quick-create-dialog" (ngSubmit)="save()">
-        <p class="eyebrow text-[var(--accent)]">Creazione rapida</p>
+        <p class="eyebrow text-[var(--accent)]">Aggiunta veloce</p>
         <h2 [id]="titleId" class="font-display text-3xl">{{ title }}</h2>
-        <p class="mt-2 text-sm text-[var(--muted)]">I dettagli completi restano modificabili dalla relativa scheda.</p>
+        <p class="mt-2 text-sm text-[var(--muted)]">Potrai completare i dettagli in seguito.</p>
         <label class="field mt-5">
           <span
             >{{ kind === "customer" ? "Nome cliente" : "Nome" }}

@@ -33,7 +33,7 @@ type MultiSelectOption = {
         (click)="toggle()"
       >
         <span class="multi-copy">
-          <span class="multi-label">Collaboratori</span>
+          <span class="multi-label">Squadra</span>
           <span
             class="multi-value"
             [class.placeholder]="!selectedLabels.length"
@@ -63,14 +63,14 @@ type MultiSelectOption = {
           <input
             [(ngModel)]="filterQuery"
             class="multi-filter-input"
-            placeholder="Filtra collaboratori"
+            placeholder="Cerca professionisti"
             (pointerdown)="$event.stopPropagation()"
             (click)="$event.stopPropagation()"
           />
         </label>
 
         <button type="button" class="multi-clear" (click)="clearAll()">
-          Tutti i collaboratori
+          Tutta la squadra
         </button>
 
         <button
@@ -266,14 +266,14 @@ export class AppointmentsCollaboratorMultiSelectComponent
     const labels = this.selectedLabels;
 
     if (!labels.length) {
-      return "Tutti i collaboratori";
+      return "Tutta la squadra";
     }
 
     if (labels.length <= 2) {
       return labels.join(", ");
     }
 
-    return `${labels.length} collaboratori selezionati`;
+    return `${labels.length} professionisti selezionati`;
   }
 
   @HostListener("document:pointerdown", ["$event"])

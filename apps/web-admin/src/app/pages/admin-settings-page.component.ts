@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CustomSelectComponent } from "../custom-select.component";
+import { bookingModeLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-settings-page",
@@ -10,23 +11,22 @@ import { CustomSelectComponent } from "../custom-select.component";
   template: `
     <section class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
       <article class="dark-panel rounded-[2rem] p-5 text-white">
-        <p class="eyebrow text-white/45">Brand</p>
-        <h3 class="font-display text-3xl">Editor live public</h3>
+        <p class="eyebrow text-white/45">Vetrina online</p>
+        <h3 class="font-display text-3xl">Anteprima per i clienti</h3>
         <p class="mt-3 text-sm text-white/70">
-          Questa anteprima replica il layout reale del public booking con i dati
-          correnti del tenant.
+          Guarda come apparirà la pagina di prenotazione del tuo salone.
         </p>
         <div class="public-editor-preview mt-5">
           <aside
             class="public-editor-hero"
             [style.background]="publicPreviewHeroBackground"
           >
-            <p class="eyebrow text-white/55">Booking experience</p>
+            <p class="eyebrow text-white/55">Il tuo momento</p>
             <div class="mt-4 flex flex-wrap items-center gap-3 md:gap-4">
               <img
                 *ngIf="logoPreviewUrl || settingsForm.logoUrl"
                 [src]="resolveAssetUrl(logoPreviewUrl || settingsForm.logoUrl)"
-                alt="Logo tenant"
+                alt="Logo del salone"
                 class="h-auto w-auto max-h-20 max-w-[16rem] object-contain md:max-h-24 md:max-w-[20rem]"
               />
               <h4 class="font-display text-4xl leading-none">
@@ -42,7 +42,7 @@ import { CustomSelectComponent } from "../custom-select.component";
             <p class="mt-4 text-sm text-white/72">
               {{
                 settingsForm.publicDescription ||
-                  "Esperienza pubblica tenant-aware con palette servizi, catalogo reale e disponibilita dinamica per collaboratore."
+                  "Scegli il servizio, trova il momento giusto e invia la tua richiesta al salone."
               }}
             </p>
 
@@ -70,15 +70,15 @@ import { CustomSelectComponent } from "../custom-select.component";
               class="mt-6 rounded-[1.4rem] border border-white/10 bg-white/8 p-4 text-sm"
             >
               <p class="text-xs uppercase tracking-[0.28em] text-white/45">
-                Tenant
+                Pagina del salone
               </p>
               <p class="mt-2">
-                Slug pubblico:
-                <strong>{{ tenant?.slug || "demo-barber-studio" }}</strong>
+                Pagina clienti:
+                <strong>{{ computedPublicUrl || "non configurata" }}</strong>
               </p>
               <p class="mt-1">
-                Modalita:
-                <strong>{{ settingsForm.bookingMode || "hybrid" }}</strong>
+                Prenotazioni:
+                <strong>{{ formatBookingMode(settingsForm.bookingMode) }}</strong>
               </p>
             </div>
           </aside>
@@ -90,7 +90,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                   Prenotazione
                 </p>
                 <h4 class="font-display text-3xl text-[var(--ink)]">
-                  Scegli servizio e slot
+                  Scegli servizio e orario
                 </h4>
               </div>
 
@@ -119,13 +119,13 @@ import { CustomSelectComponent } from "../custom-select.component";
 
               <div class="mt-5 grid gap-4 md:grid-cols-2">
                 <div class="field">
-                  <span>Collaboratore</span>
+                  <span>Professionista</span>
                   <div class="public-editor-field-surface">
                     {{ publicPreviewCollaboratorLabel }}
                   </div>
                 </div>
                 <div class="field">
-                  <span>Slot disponibili</span>
+                  <span>Orari disponibili</span>
                   <div class="public-editor-field-surface">09:30</div>
                 </div>
               </div>
@@ -160,18 +160,18 @@ import { CustomSelectComponent } from "../custom-select.component";
       </article>
 
       <article class="panel rounded-[2rem] p-5">
-        <p class="eyebrow text-[var(--accent)]">Tenant settings</p>
-        <h3 class="font-display text-3xl">Configurazione</h3>
+        <p class="eyebrow text-[var(--accent)]">Identità del salone</p>
+        <h3 class="font-display text-3xl">Immagine e prenotazioni</h3>
         <form class="mt-5 grid gap-4" (ngSubmit)="save.emit()">
           <label class="field"
-            ><span>Nome attivita <em class="required-mark" aria-hidden="true">*</em></span
+            ><span>Nome del salone o boutique <em class="required-mark" aria-hidden="true">*</em></span
             ><input
               [(ngModel)]="settingsForm.name"
               name="settingsName"
               required
           /></label>
           <label class="field">
-            <span>Public domain</span>
+            <span>Indirizzo web per le prenotazioni</span>
             <input
               [(ngModel)]="settingsForm.publicDomain"
               name="settingsPublicDomain"
@@ -183,7 +183,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               [href]="computedPublicUrl"
               target="_blank"
               rel="noreferrer"
-              >Apri public: {{ computedPublicUrl }}</a
+              >Apri la pagina clienti: {{ computedPublicUrl }}</a
             >
           </label>
           <div class="field">
@@ -247,7 +247,7 @@ import { CustomSelectComponent } from "../custom-select.component";
             </div>
           </div>
           <div class="field">
-            <span>Cover hero</span>
+            <span>Immagine di copertina</span>
             <input
               #coverInput
               class="upload-input"
@@ -261,7 +261,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               (click)="coverInput.click()"
             >
               {{
-                selectedCoverFile ? selectedCoverFile.name : "Seleziona cover"
+                selectedCoverFile ? selectedCoverFile.name : "Seleziona copertina"
               }}
             </button>
             <div
@@ -285,7 +285,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                   uploadFeedback?.target === "cover" &&
                   uploadFeedback?.pending
                     ? "Caricamento..."
-                    : "Carica cover"
+                    : "Carica copertina"
                 }}
               </button>
               <button
@@ -295,7 +295,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                 [disabled]="loading"
                 (click)="deleteMedia.emit('cover')"
               >
-                Rimuovi cover
+                Rimuovi copertina
               </button>
             </div>
             <div
@@ -310,14 +310,14 @@ import { CustomSelectComponent } from "../custom-select.component";
           </div>
           <div class="grid gap-4 md:grid-cols-2">
             <label class="field"
-              ><span>Primary color</span
+              ><span>Colore principale</span
               ><input
                 [(ngModel)]="settingsForm.primaryColor"
                 name="settingsPrimaryColor"
                 type="color"
             /></label>
             <label class="field"
-              ><span>Accent color</span
+              ><span>Colore in evidenza</span
               ><input
                 [(ngModel)]="settingsForm.accentColor"
                 name="settingsAccentColor"
@@ -326,19 +326,16 @@ import { CustomSelectComponent } from "../custom-select.component";
           </div>
           <div class="grid gap-4 md:grid-cols-2">
             <label class="field">
-              <span>Booking mode</span>
+              <span>Come accetti le prenotazioni</span>
               <barber-custom-select
                 [value]="settingsForm.bookingMode"
                 (valueChange)="settingsForm.bookingMode = $event"
                 [options]="bookingModeOptions"
               ></barber-custom-select>
-              <small class="field-hint"
-                >"public": prenotazione dal sito. "hybrid": sito + admin.
-                "closed": solo inserimento interno da admin.</small
-              >
+              <small class="field-hint">Scegli se ricevere richieste online, inserirle dal salone o usare entrambe le modalità.</small>
             </label>
             <label class="field"
-              ><span>Titolo public</span
+              ><span>Titolo della pagina clienti</span
               ><input
                 [(ngModel)]="settingsForm.publicTitle"
                 name="settingsPublicTitle"
@@ -346,7 +343,7 @@ import { CustomSelectComponent } from "../custom-select.component";
             /></label>
           </div>
           <label class="field"
-            ><span>Descrizione public</span
+            ><span>Messaggio di benvenuto</span
             ><textarea
               [(ngModel)]="settingsForm.publicDescription"
               name="settingsPublicDescription"
@@ -354,24 +351,23 @@ import { CustomSelectComponent } from "../custom-select.component";
             ></textarea>
           </label>
           <label class="field">
-            <span>Step public</span>
+            <span>Come funziona la prenotazione</span>
             <textarea
               [(ngModel)]="settingsForm.publicStepsText"
               name="settingsPublicStepsText"
               rows="4"
-              placeholder="Servizio|Palette e catalogo reale dal tenant&#10;Collaboratore|Disponibilita live del team&#10;Conferma|Prenotazione persistita e notificata"
+              placeholder="Scegli|Trova il servizio che desideri&#10;Prenota|Scegli professionista, giorno e orario&#10;Conferma|Invia la richiesta al salone"
             ></textarea>
             <small class="field-hint"
-              >Una riga per step, formato: Titolo|Descrizione</small
+              >Una riga per passaggio, nel formato Titolo|Descrizione</small
             >
           </label>
           <div class="rounded-[1.4rem] border border-[var(--line)]/80 p-4">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <p class="text-sm font-semibold">Festivi globali tenant</p>
+                <p class="text-sm font-semibold">Chiusure del salone</p>
                 <p class="mt-1 text-xs text-[var(--muted)]">
-                  Questi giorni bloccano disponibilita e prenotazioni per tutti
-                  i collaboratori.
+                  In questi giorni nessun professionista risulterà disponibile.
                 </p>
               </div>
               <button type="button" class="pill-btn" (click)="addHoliday()">
@@ -405,7 +401,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                 *ngIf="!settingsForm.holidays?.length"
                 class="text-sm text-[var(--muted)]"
               >
-                Nessun festivo globale configurato.
+                Nessuna chiusura programmata.
               </p>
             </div>
           </div>
@@ -431,12 +427,12 @@ import { CustomSelectComponent } from "../custom-select.component";
                 step="1"
               />
               <small class="field-hint"
-                >Preferenza di questo dispositivo: 92% e il valore consigliato.</small
+                >Preferenza di questo dispositivo: 92% è il valore consigliato.</small
               >
             </label>
           </section>
           <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4">
-            <p class="text-sm font-semibold">Booking pubblico</p>
+            <p class="text-sm font-semibold">Prenotazioni online</p>
             <p class="mt-1 text-xs text-[var(--muted)]">
               Controlla se i clienti possono inviare prenotazioni dal link pubblico.
             </p>
@@ -446,7 +442,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                 [(ngModel)]="settingsForm.publicEnabled"
                 name="settingsPublicEnabled"
                 type="checkbox"
-              /><span>Booking pubblico abilitato</span></label
+              /><span>Permetti ai clienti di prenotare online</span></label
             >
             </div>
           </section>
@@ -463,7 +459,7 @@ import { CustomSelectComponent } from "../custom-select.component";
             [disabled]="loading"
             (click)="resetDefaults.emit()"
           >
-            Reset default
+            Ripristina impostazioni consigliate
           </button>
         </form>
       </article>
@@ -471,6 +467,7 @@ import { CustomSelectComponent } from "../custom-select.component";
   `,
 })
 export class AdminSettingsPageComponent {
+  formatBookingMode = bookingModeLabel;
   @Input() tenant: any = null;
   @Input() settingsForm: any = {};
   @Input() bookingModeOptions: Array<{ value: string; label: string }> = [];

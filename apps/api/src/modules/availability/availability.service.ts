@@ -85,7 +85,7 @@ export class AvailabilityService {
     });
 
     if (!service) {
-      throw new BadRequestException("Service not found");
+      throw new BadRequestException("Il servizio scelto non è disponibile");
     }
 
     if (options?.requireExplicitCollaborator && service.requiresCollaborator) {
@@ -102,7 +102,7 @@ export class AvailabilityService {
         },
       });
       if (!collaboratorExists) {
-        throw new BadRequestException("Collaborator not available for service");
+        throw new BadRequestException("Il professionista scelto non è disponibile per questo servizio");
       }
     }
 
@@ -122,7 +122,7 @@ export class AvailabilityService {
     const dateKey = resolveZonedDateKey(dateInput, timezone);
     const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
     if (!dateMatch) {
-      throw new BadRequestException("Invalid date");
+      throw new BadRequestException("La data scelta non è valida");
     }
     const year = Number(dateMatch[1]);
     const month = Number(dateMatch[2]);

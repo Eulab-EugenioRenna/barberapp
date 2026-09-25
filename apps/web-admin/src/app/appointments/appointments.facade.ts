@@ -3,6 +3,7 @@ import { firstValueFrom } from "rxjs";
 import { AdminApiService } from "../core/admin-api.service";
 import { AdminFacade } from "../core/admin.facade";
 import { toLocalDateKey } from "@barber/shared/utils";
+import { appointmentStatusLabel } from "../shared/presentation-copy";
 import { AppointmentsService } from "./appointments.service";
 
 type CalendarView = "day" | "week" | "month";
@@ -104,7 +105,7 @@ export class AppointmentsFacade {
       .map((collaborator) => ({
         value: collaborator.id,
         label: `${collaborator.firstName} ${collaborator.lastName}${
-          collaborator.id === defaultCollaboratorId ? " · default" : ""
+          collaborator.id === defaultCollaboratorId ? " · riferimento" : ""
         }`,
       }));
   });
@@ -468,7 +469,7 @@ export class AppointmentsFacade {
       this.feedback.set(
         error?.error?.message ||
           error?.message ||
-          "Errore nel caricamento appuntamenti",
+          "Non riusciamo a caricare gli appuntamenti",
       );
       throw error;
     } finally {
@@ -861,7 +862,7 @@ export class AppointmentsFacade {
   }
 
   formatAppointmentStatus(status: string): string {
-    return status.replace(/_/g, " ");
+    return appointmentStatusLabel(status);
   }
 
   private filterAppointmentCustomers(): void {

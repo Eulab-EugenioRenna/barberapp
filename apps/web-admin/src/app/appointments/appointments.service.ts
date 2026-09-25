@@ -30,7 +30,7 @@ export class AppointmentsService {
   async cancelAppointment(id: string): Promise<void> {
     await firstValueFrom(
       this.adminApi.cancelAppointment(id, {
-        reason: "Annullato da dashboard admin",
+        reason: "Annullato dalla direzione del salone",
       }),
     );
   }

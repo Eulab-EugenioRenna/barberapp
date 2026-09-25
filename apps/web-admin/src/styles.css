@@ -65,6 +65,7 @@ barber-public-root {
   display: block;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -119,7 +120,9 @@ textarea:focus-visible {
   min-width: 100vw;
   max-width: 100vw;
   min-height: 100vh;
+  min-height: 100dvh;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background-image:
     linear-gradient(rgba(15, 23, 32, 0.02) 0.0625rem, transparent 0.0625rem),
@@ -231,8 +234,198 @@ textarea:focus-visible {
   width: 100%;
   max-width: 100%;
   height: 100vh;
+  height: 100dvh;
   padding: var(--shell-pad);
   overflow: hidden;
+}
+
+/* --- Mobile app chrome ------------------------------------------------ */
+
+.mobile-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 38;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 0.25rem;
+  padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom, 0px));
+  border-top: 0.0625rem solid rgba(15, 23, 32, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(1.25rem);
+  box-shadow: 0 -0.75rem 2.5rem rgba(15, 23, 32, 0.12);
+}
+
+.mobile-nav-btn {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-width: 0;
+  min-height: 3.25rem;
+  border: 0;
+  border-radius: 1rem;
+  background: transparent;
+  padding: 0.35rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: 160ms ease;
+}
+
+.mobile-nav-btn:active {
+  background: rgba(15, 23, 32, 0.05);
+}
+
+.mobile-nav-btn.active {
+  color: var(--brand);
+  background: rgba(28, 124, 100, 0.1);
+}
+
+.mobile-nav-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 32, 0.06);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.mobile-nav-btn.active .mobile-nav-icon {
+  background: rgba(28, 124, 100, 0.16);
+  color: var(--brand);
+}
+
+.mobile-nav-badge {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.5rem;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999rem;
+  background: #dc2626;
+  color: white;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mobile-nav-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- PWA banners ------------------------------------------------------ */
+
+.pwa-banner-stack {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.pwa-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 1.35rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.86rem;
+  box-shadow: 0 0.75rem 2rem rgba(15, 23, 32, 0.1);
+}
+
+.pwa-banner-copy {
+  display: grid;
+  gap: 0.15rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pwa-banner-copy strong {
+  font-size: 0.92rem;
+}
+
+.pwa-banner-copy span {
+  line-height: 1.35;
+  opacity: 0.85;
+}
+
+.pwa-banner-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999rem;
+  font-weight: 800;
+}
+
+.pwa-banner-app-icon {
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.9rem;
+  box-shadow: 0 0.5rem 1.25rem rgba(15, 23, 32, 0.2);
+}
+
+.pwa-banner-action {
+  flex: 0 0 auto;
+}
+
+.pwa-banner-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pwa-banner-install {
+  border: 0.0625rem solid rgba(28, 124, 100, 0.22);
+  background: linear-gradient(
+    135deg,
+    rgba(28, 124, 100, 0.12),
+    rgba(28, 124, 100, 0.04)
+  );
+  color: #0f3d32;
+}
+
+.pwa-banner-install .pwa-banner-app-icon {
+  display: block;
+}
+
+.pwa-banner-update {
+  border: 0.0625rem solid rgba(59, 130, 246, 0.24);
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e3a8a;
+}
+
+.pwa-banner-update .pwa-banner-icon {
+  background: #2563eb;
+  color: white;
+}
+
+.pwa-banner-offline {
+  border: 0.0625rem solid rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+}
+
+.pwa-banner-offline .pwa-banner-icon {
+  background: #d97706;
+  color: white;
 }
 
 .mobile-backdrop {
@@ -302,7 +495,10 @@ textarea:focus-visible {
   gap: 1rem;
   width: min(88%, var(--sidebar-expanded));
   height: 100vh;
+  height: 100dvh;
   padding: 1rem;
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   overflow: hidden;
   transform: translateX(-100%);
   transition:
@@ -943,6 +1139,63 @@ button:disabled {
   display: none;
 }
 
+@media (max-width: 63.99rem) {
+  /* Rispetta notch e barre di sistema su mobile/standalone. */
+  .app-frame {
+    padding-top: calc(var(--shell-pad) + env(safe-area-inset-top, 0px));
+    padding-left: calc(var(--shell-pad) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--shell-pad) + env(safe-area-inset-right, 0px));
+  }
+
+  /* La barra inferiore e fissa: il contenuto deve poter scorrere oltre. */
+  .content-scroll {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .topbar {
+    border-radius: 1.5rem;
+  }
+
+  /*
+   * iOS fa zoom automatico sui campi con font < 16px. Il font-size della UI
+   * e scalato via root, quindi qui serve un valore assoluto.
+   */
+  .field input,
+  .field select,
+  .field textarea,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Azioni del topbar sempre raggiungibili senza andare a capo. */
+  .topbar-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .topbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar-actions > * {
+    flex: 0 0 auto;
+  }
+
+  .pwa-banner {
+    flex-wrap: wrap;
+  }
+
+  .pwa-banner-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 @media (min-width: 64rem) {
   .app-frame {
     padding: 1rem;
@@ -978,6 +1231,10 @@ button:disabled {
 
   .desktop-only {
     display: inline-grid;
+  }
+
+  .mobile-bottom-nav {
+    display: none;
   }
 }
 

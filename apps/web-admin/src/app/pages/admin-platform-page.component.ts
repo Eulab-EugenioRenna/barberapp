@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CustomSelectComponent } from "../custom-select.component";
+import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-platform-page",
@@ -13,11 +14,11 @@ import { CustomSelectComponent } from "../custom-select.component";
         <article class="panel rounded-[2rem] p-5">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="eyebrow text-[var(--accent)]">Platform tenants</p>
-              <h3 class="font-display text-3xl">Tenant management</h3>
+              <p class="eyebrow text-[var(--accent)]">Rete attività</p>
+              <h3 class="font-display text-3xl">Saloni e boutique</h3>
             </div>
             <span class="status-pill status-pill-neutral"
-              >{{ platformTenants.length }} tenants</span
+              >{{ platformTenants.length }} attività</span
             >
           </div>
           <div class="mt-5 grid gap-3">
@@ -31,7 +32,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                 <strong>{{ platformTenant.name }}</strong>
                 <p class="text-sm text-[var(--muted)]">
                   {{ platformTenant.slug }} ·
-                  {{ platformTenant.users?.[0]?.email || "owner mancante" }}
+                  {{ platformTenant.users?.[0]?.email || "responsabile non associato" }}
                 </p>
               </div>
               <span
@@ -45,12 +46,12 @@ import { CustomSelectComponent } from "../custom-select.component";
         </article>
 
         <article class="dark-panel rounded-[2rem] p-5 text-white">
-          <p class="eyebrow text-white/45">Tenant selezionato</p>
+          <p class="eyebrow text-white/45">Attività selezionata</p>
           <h3 class="font-display text-3xl">
             {{
               selectedPlatformTenant
                 ? selectedPlatformTenant.name
-                : "Seleziona un tenant"
+                : "Seleziona un'attività"
             }}
           </h3>
           <p class="mt-2 text-sm text-white/65">
@@ -58,8 +59,8 @@ import { CustomSelectComponent } from "../custom-select.component";
               selectedPlatformTenant
                 ? selectedPlatformTenant.slug +
                   " · " +
-                  (selectedPlatformTenant.users?.[0]?.email || "owner mancante")
-                : "Prima seleziona un tenant dalla lista: tutte le operazioni qui sotto agiranno solo su quel tenant."
+                  (selectedPlatformTenant.users?.[0]?.email || "responsabile non associato")
+                : "Seleziona un'attività dalla lista per gestirne dati, accesso e piano."
             }}
           </p>
           <form
@@ -75,13 +76,13 @@ import { CustomSelectComponent } from "../custom-select.component";
             /></label>
             <div class="grid gap-4 md:grid-cols-2">
               <label class="field"
-                ><span>Slug</span
+                ><span>Identificativo web</span
                 ><input
                   [(ngModel)]="platformTenantForm.slug"
                   name="platformTenantSlug"
               /></label>
               <label class="field"
-                ><span>Public domain</span
+                ><span>Indirizzo web prenotazioni</span
                 ><input
                   [(ngModel)]="platformTenantForm.publicDomain"
                   name="platformTenantPublicDomain"
@@ -102,15 +103,15 @@ import { CustomSelectComponent } from "../custom-select.component";
                   name="platformTenantPublicEnabled"
                   type="checkbox"
                 />
-                <span>Public enabled</span>
+                <span>Prenotazioni online attive</span>
               </label>
               <label class="field">
-                <span>Booking mode</span>
+                <span>Modalità di prenotazione</span>
                 <barber-custom-select
                   [value]="platformTenantForm.bookingMode"
                   (valueChange)="platformTenantForm.bookingMode = $event"
                   [options]="bookingModeOptions"
-                  label="Booking mode"
+                  label="Modalità di prenotazione"
                 ></barber-custom-select>
               </label>
             </div>
@@ -120,7 +121,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                 class="primary-btn"
                 [disabled]="loading || !tenantFormValid"
               >
-                Salva tenant
+                Salva attività
               </button>
               <button
                 type="button"
@@ -144,14 +145,14 @@ import { CustomSelectComponent } from "../custom-select.component";
                 [disabled]="loading"
                 (click)="resetTenantData.emit()"
               >
-                Reset dati
+                Svuota dati attività
               </button>
               <button
                 type="button"
                 class="pill-btn"
                 (click)="deleteTenant.emit()"
               >
-                Elimina tenant
+                Elimina attività
               </button>
             </div>
           </form>
@@ -159,12 +160,11 @@ import { CustomSelectComponent } from "../custom-select.component";
       </div>
 
       <article *ngIf="!selectedPlatformTenant" class="panel rounded-[2rem] p-5">
-        <p class="eyebrow text-[var(--accent)]">Workflow</p>
-        <h3 class="font-display text-3xl">Seleziona prima il tenant</h3>
+        <p class="eyebrow text-[var(--accent)]">Operazioni attività</p>
+        <h3 class="font-display text-3xl">Seleziona prima un'attività</h3>
         <p class="mt-3 max-w-2xl text-sm text-[var(--muted)]">
-          Export, import, reset dati, sospensione, riattivazione, eliminazione e
-          assegnazione subscription vengono sempre eseguiti sul tenant
-          selezionato nella lista.
+          Copia, ripristino, sospensione, riattivazione, eliminazione e piano
+          riguarderanno soltanto l'attività selezionata.
         </p>
       </article>
 
@@ -172,8 +172,8 @@ import { CustomSelectComponent } from "../custom-select.component";
         <article class="panel rounded-[2rem] p-5 xl:col-span-2">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="eyebrow text-[var(--accent)]">Export / import</p>
-              <h3 class="font-display text-3xl">Snapshot tenant JSON</h3>
+              <p class="eyebrow text-[var(--accent)]">Copia di sicurezza</p>
+              <h3 class="font-display text-3xl">Salva o ripristina i dati</h3>
             </div>
             <div class="flex gap-3">
               <button
@@ -182,7 +182,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                 [disabled]="!selectedPlatformTenant"
                 (click)="exportTenant.emit()"
               >
-                Export
+                Prepara copia completa
               </button>
               <button
                 type="button"
@@ -190,7 +190,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                 [disabled]="!selectedPlatformTenant"
                 (click)="exportTenantCsv.emit()"
               >
-                Export CSV
+                Prepara copia tabellare
               </button>
               <button
                 type="button"
@@ -198,7 +198,7 @@ import { CustomSelectComponent } from "../custom-select.component";
                 [disabled]="!selectedPlatformTenant || !platformImportJson"
                 (click)="importTenant.emit()"
               >
-                Import replace
+                Ripristina copia completa
               </button>
               <button
                 type="button"
@@ -206,13 +206,13 @@ import { CustomSelectComponent } from "../custom-select.component";
                 [disabled]="!selectedPlatformTenant || !platformImportCsv"
                 (click)="importTenantCsv.emit()"
               >
-                Import CSV
+                Ripristina copia tabellare
               </button>
             </div>
           </div>
           <div class="mt-5 grid gap-4 lg:grid-cols-2">
             <label class="field">
-              <span>Export JSON</span>
+              <span>Dati da conservare</span>
               <textarea
                 [ngModel]="platformExportJson"
                 name="platformExportJson"
@@ -221,7 +221,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               ></textarea>
             </label>
             <label class="field">
-              <span>Import JSON</span>
+              <span>Dati completi da ripristinare</span>
               <textarea
                 [ngModel]="platformImportJson"
                 (ngModelChange)="platformImportJsonChange.emit($event)"
@@ -232,7 +232,7 @@ import { CustomSelectComponent } from "../custom-select.component";
           </div>
           <div class="mt-5 grid gap-4 lg:grid-cols-2">
             <label class="field">
-              <span>Export CSV bundle</span>
+              <span>Tabelle da conservare</span>
               <textarea
                 [ngModel]="platformExportCsv"
                 name="platformExportCsv"
@@ -241,7 +241,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               ></textarea>
             </label>
             <label class="field">
-              <span>Import CSV bundle</span>
+              <span>Tabelle da ripristinare</span>
               <textarea
                 [ngModel]="platformImportCsv"
                 (ngModelChange)="platformImportCsvChange.emit($event)"
@@ -253,26 +253,26 @@ import { CustomSelectComponent } from "../custom-select.component";
         </article>
 
         <article class="dark-panel rounded-[2rem] p-5 text-white">
-          <p class="eyebrow text-white/45">Health check</p>
-          <h3 class="font-display text-3xl">Tenant status</h3>
+          <p class="eyebrow text-white/45">Controllo dati</p>
+          <h3 class="font-display text-3xl">Contenuti dell'attività</h3>
           <div
             *ngIf="platformHealthCheck"
             class="mt-5 grid gap-3 text-sm text-white/75"
           >
             <div class="rounded-[1.3rem] bg-white/8 p-4">
-              Users: {{ platformHealthCheck.counts.users }}
+              Utenti: {{ platformHealthCheck.counts.users }}
             </div>
             <div class="rounded-[1.3rem] bg-white/8 p-4">
-              Collaborators: {{ platformHealthCheck.counts.collaborators }}
+              Professionisti: {{ platformHealthCheck.counts.collaborators }}
             </div>
             <div class="rounded-[1.3rem] bg-white/8 p-4">
-              Customers: {{ platformHealthCheck.counts.customers }}
+              Clienti: {{ platformHealthCheck.counts.customers }}
             </div>
             <div class="rounded-[1.3rem] bg-white/8 p-4">
-              Appointments: {{ platformHealthCheck.counts.appointments }}
+              Appuntamenti: {{ platformHealthCheck.counts.appointments }}
             </div>
             <div class="rounded-[1.3rem] bg-white/8 p-4">
-              Sales: {{ platformHealthCheck.counts.sales }}
+              Vendite: {{ platformHealthCheck.counts.sales }}
             </div>
           </div>
         </article>
@@ -282,7 +282,7 @@ import { CustomSelectComponent } from "../custom-select.component";
         <article class="panel rounded-[2rem] p-5">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="eyebrow text-[var(--accent)]">Plans</p>
+              <p class="eyebrow text-[var(--accent)]">Offerta</p>
               <h3 class="font-display text-3xl">Piani</h3>
             </div>
             <button type="button" class="pill-btn" (click)="resetPlan.emit()">
@@ -299,7 +299,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               <div>
                 <strong>{{ plan.name }}</strong>
                 <p class="text-sm text-[var(--muted)]">
-                  {{ plan.code }} · {{ plan.billingInterval }}
+                  {{ plan.code }} · {{ formatBillingInterval(plan.billingInterval) }}
                 </p>
               </div>
               <span class="status-pill status-pill-blue"
@@ -310,13 +310,13 @@ import { CustomSelectComponent } from "../custom-select.component";
           <form class="mt-5 grid gap-4" (ngSubmit)="savePlan.emit()">
             <div class="grid gap-4 md:grid-cols-2">
               <label class="field"
-                ><span>Code</span
+                ><span>Codice piano</span
                 ><input
                   [(ngModel)]="platformPlanForm.code"
                   name="platformPlanCode"
               /></label>
               <label class="field"
-                ><span>Name</span
+                ><span>Nome</span
                 ><input
                   [(ngModel)]="platformPlanForm.name"
                   name="platformPlanName"
@@ -324,19 +324,19 @@ import { CustomSelectComponent } from "../custom-select.component";
             </div>
             <div class="grid gap-4 md:grid-cols-2">
               <label class="field"
-                ><span>Price</span
+                ><span>Prezzo</span
                 ><input
                   [(ngModel)]="platformPlanForm.price"
                   name="platformPlanPrice"
                   type="number"
               /></label>
               <label class="field">
-                <span>Interval</span>
+                <span>Frequenza</span>
                 <barber-custom-select
                   [value]="platformPlanForm.billingInterval"
                   (valueChange)="platformPlanForm.billingInterval = $event"
                   [options]="billingIntervalOptions"
-                  label="Interval"
+                  label="Frequenza"
                 ></barber-custom-select>
               </label>
             </div>
@@ -353,8 +353,8 @@ import { CustomSelectComponent } from "../custom-select.component";
         <article class="dark-panel rounded-[2rem] p-5 text-white">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="eyebrow text-white/45">Subscriptions</p>
-              <h3 class="font-display text-3xl">Assegnazioni</h3>
+              <p class="eyebrow text-white/45">Abbonamenti</p>
+              <h3 class="font-display text-3xl">Piani assegnati</h3>
             </div>
           </div>
           <div class="mt-5 grid gap-3">
@@ -373,13 +373,13 @@ import { CustomSelectComponent } from "../custom-select.component";
               </div>
               <p class="mt-2 text-sm text-white/70">
                 {{ subscription.plan.name }} ·
-                {{ subscription.plan.billingInterval }}
+                {{ formatBillingInterval(subscription.plan.billingInterval) }}
               </p>
             </div>
           </div>
           <form class="mt-5 grid gap-4" (ngSubmit)="saveSubscription.emit()">
             <label class="field">
-              <span>Piano da assegnare al tenant selezionato</span>
+              <span>Piano da assegnare all'attività selezionata</span>
               <barber-custom-select
                 [value]="platformSubscriptionForm.planId"
                 (valueChange)="platformSubscriptionForm.planId = $event"
@@ -388,12 +388,12 @@ import { CustomSelectComponent } from "../custom-select.component";
               ></barber-custom-select>
             </label>
             <label class="field">
-              <span>Status</span>
+              <span>Stato</span>
               <barber-custom-select
                 [value]="platformSubscriptionForm.status"
                 (valueChange)="platformSubscriptionForm.status = $event"
                 [options]="subscriptionStatusSelectOptions"
-                label="Status"
+                label="Stato"
               ></barber-custom-select>
             </label>
             <button
@@ -401,7 +401,7 @@ import { CustomSelectComponent } from "../custom-select.component";
               class="primary-btn"
               [disabled]="loading || !selectedPlatformTenant"
             >
-              Assegna subscription
+              Assegna piano
             </button>
           </form>
         </article>
@@ -410,6 +410,7 @@ import { CustomSelectComponent } from "../custom-select.component";
   `,
 })
 export class AdminPlatformPageComponent {
+  formatBillingInterval = billingIntervalLabel;
   @Input() platformTenants: any[] = [];
   @Input() selectedPlatformTenant: any = null;
   @Input() platformTenantForm: any = {};
@@ -472,9 +473,9 @@ export class AdminPlatformPageComponent {
     isActive?: boolean;
   }): string {
     if (tenant.isSuspended) {
-      return "suspended";
+      return "Sospesa";
     }
-    return tenant.isActive ? "active" : "inactive";
+    return tenant.isActive ? "Attiva" : "Non attiva";
   }
 
   platformTenantStatusClass(tenant: {
@@ -488,7 +489,7 @@ export class AdminPlatformPageComponent {
   }
 
   formatSubscriptionStatus(status: string): string {
-    return status.replace(/_/g, " ");
+    return subscriptionStatusLabel(status);
   }
 
   subscriptionStatusClass(status: string): string {

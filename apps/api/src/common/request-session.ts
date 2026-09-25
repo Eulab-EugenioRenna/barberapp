@@ -60,7 +60,7 @@ export async function resolveRequestSession(
   const userId = parseSessionToken(authorization);
 
   if (!userId) {
-    throw new UnauthorizedException("Authentication required");
+    throw new UnauthorizedException("Accedi per continuare");
   }
 
   const user = (await prisma.user.findUnique({
@@ -84,16 +84,16 @@ export async function resolveRequestSession(
   })) as UserSessionRecord | null;
 
   if (!user || !user.isActive) {
-    throw new UnauthorizedException("Authentication required");
+    throw new UnauthorizedException("Accedi per continuare");
   }
 
   if (user.role !== UserRole.PlatformAdmin) {
     if (!user.tenantId || !user.tenant) {
-      throw new ForbiddenException("User is not assigned to an active tenant");
+      throw new ForbiddenException("Il tuo account non è associato a un'attività attiva");
     }
 
     if (!user.tenant.isActive || user.tenant.isSuspended) {
-      throw new ForbiddenException("Tenant access is suspended");
+      throw new ForbiddenException("L'accesso a questa attività è sospeso");
     }
   }
 
@@ -113,7 +113,7 @@ export async function resolveRequestSession(
 export function requireTenantId(session: RequestSession): string {
   if (!session.tenantId) {
     throw new NotFoundException(
-      "No tenant is configured yet. Create an account first.",
+      "Non hai ancora configurato la tua attività",
     );
   }
 
@@ -124,7 +124,7 @@ export function requireUser(
   session: RequestSession,
 ): NonNullable<RequestSession["user"]> {
   if (!session.user) {
-    throw new UnauthorizedException("Authentication required");
+    throw new UnauthorizedException("Accedi per continuare");
   }
 
   return session.user;
@@ -136,7 +136,7 @@ export function requirePlatformAdmin(
   const user = requireUser(session);
 
   if (user.role !== UserRole.PlatformAdmin) {
-    throw new ForbiddenException("Platform admin required");
+    throw new ForbiddenException("Non hai i permessi per questa operazione");
   }
 
   return user;

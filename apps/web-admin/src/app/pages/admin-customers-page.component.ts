@@ -4,6 +4,7 @@ import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-customers-page",
@@ -14,7 +15,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       <article class="panel rounded-[2rem] p-5">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="eyebrow text-[var(--accent)]">CRM</p>
+            <p class="eyebrow text-[var(--accent)]">Relazioni</p>
             <h3 class="font-display text-3xl">Clienti</h3>
           </div>
           <div class="flex items-center gap-2">
@@ -219,8 +220,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
         >
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="eyebrow text-[var(--muted)]">Timeline</p>
-              <h4 class="font-display text-2xl">Storico cliente</h4>
+              <p class="eyebrow text-[var(--muted)]">Percorso cliente</p>
+              <h4 class="font-display text-2xl">Appuntamenti e acquisti</h4>
             </div>
             <strong *ngIf="customerHistory"
               >€{{ customerHistory.salesTotal | number: "1.2-2" }}</strong
@@ -243,14 +244,14 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 <strong>{{ formatDay(entry.date) }}</strong>
                 <p class="mt-1 text-sm text-[var(--muted)]">
                   <span *ngIf="entry.appointments.length"
-                    >{{ entry.appointments.length }} prenotazione/i</span
+                    >{{ entry.appointments.length }} appuntamenti</span
                   >
                   <span
                     *ngIf="entry.appointments.length && entry.sales.length"
                     > · </span
                   >
                   <span *ngIf="entry.sales.length"
-                    >{{ entry.sales.length }} ordine/i</span
+                    >{{ entry.sales.length }} vendite</span
                   >
                 </p>
               </div>
@@ -258,7 +259,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 <strong *ngIf="entry.sales.length"
                   >€{{ entry.salesTotal | number: "1.2-2" }}</strong
                 >
-                <p class="text-xs text-[var(--muted)]">Apri dettaglio</p>
+              <p class="text-xs text-[var(--muted)]">Vedi la giornata</p>
               </div>
             </button>
             <p
@@ -313,7 +314,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             <div class="flex items-center justify-between gap-3">
               <strong>{{ appointment.service?.name || "Servizio" }}</strong>
               <span class="status-pill status-pill-neutral">{{
-                appointment.status
+                formatAppointmentStatus(appointment.status)
               }}</span>
             </div>
             <p class="mt-1 text-sm text-[var(--muted)]">
@@ -334,7 +335,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
         </section>
 
         <section *ngIf="timelineEntry.sales.length" class="mt-6">
-          <h3 class="font-display text-xl">Ordini</h3>
+          <h3 class="font-display text-xl">Vendite</h3>
           <article
             *ngFor="let sale of timelineEntry.sales"
             class="mt-3 rounded-2xl border border-[var(--line)] p-4"
@@ -342,12 +343,12 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             <div class="flex items-center justify-between gap-3">
               <strong>€{{ sale.total | number: "1.2-2" }}</strong>
               <span class="status-pill status-pill-neutral">{{
-                sale.paymentStatus
+                formatPaymentStatus(sale.paymentStatus)
               }}</span>
             </div>
             <p class="mt-1 text-sm text-[var(--muted)]">
               {{ formatDateTime(sale.soldAt) }} ·
-              {{ sale.paymentMethod || "metodo non indicato" }}
+              {{ formatPaymentMethod(sale.paymentMethod) }}
             </p>
             <ul class="mt-2 grid gap-1 text-sm text-[var(--muted)]">
               <li *ngFor="let item of sale.items">
@@ -363,6 +364,9 @@ import { UiIconComponent } from "../shared/ui-icon.component";
   `,
 })
 export class AdminCustomersPageComponent {
+  formatAppointmentStatus = appointmentStatusLabel;
+  formatPaymentMethod = paymentMethodLabel;
+  formatPaymentStatus = paymentStatusLabel;
   @Input() customers: any[] = [];
   @Input() customerForm: any = {};
   @Input() loading = false;

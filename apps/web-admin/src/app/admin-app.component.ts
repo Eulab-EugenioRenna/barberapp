@@ -32,6 +32,8 @@ import { AdminServicesPageComponent } from "./pages/admin-services-page.componen
 import { AdminSettingsPageComponent } from "./pages/admin-settings-page.component";
 import { PendingOrdersQueueComponent } from "./pending-orders/pending-orders-queue.component";
 import { QuickOrderModalComponent } from "./quick-order/quick-order-modal.component";
+import { AdminPwaBannerComponent } from "./shared/admin-pwa-banner.component";
+import { appointmentStatusLabel, bookingModeLabel } from "./shared/presentation-copy";
 
 type ViewKey =
   | "platform"
@@ -66,6 +68,7 @@ type ViewKey =
     AdminSettingsPageComponent,
     PendingOrdersQueueComponent,
     QuickOrderModalComponent,
+    AdminPwaBannerComponent,
   ],
   template: `
     <main class="admin-shell min-h-screen">
@@ -135,41 +138,37 @@ type ViewKey =
         class="mx-auto grid min-h-screen max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
       >
         <aside class="hero-panel rounded-[2rem] p-6 text-white lg:p-10">
-          <p class="eyebrow">Platforma booking</p>
+          <p class="eyebrow">Direzione salone</p>
           <h1
             class="mt-4 font-display text-5xl font-semibold leading-none md:text-7xl"
           >
-            Un gestionale davvero operativo, non una demo.
+            Il tuo salone, sempre sotto controllo.
           </h1>
           <p class="mt-6 max-w-xl text-base text-white/72 md:text-lg">
-            Onboarding tenant, dashboard con valori DB, agenda modificabile,
-            white label e booking pubblico in una UI piu moderna e mobile-first.
+            Organizza appuntamenti, squadra, clienti e incassi con una visione
+            chiara della giornata e dell'andamento del salone.
           </p>
           <div class="mt-8 grid gap-3 md:grid-cols-3">
             <article class="glass-tile rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                Dashboard
+                Agenda
               </p>
-              <strong class="mt-3 block text-3xl">Live</strong>
-              <span class="text-sm text-white/70">Metriche dal database</span>
+              <strong class="mt-3 block text-3xl">Ordinata</strong>
+              <span class="text-sm text-white/70">Ogni appuntamento al suo posto</span>
             </article>
             <article class="glass-tile rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                Booking
+                Squadra
               </p>
-              <strong class="mt-3 block text-3xl">CRUD</strong>
-              <span class="text-sm text-white/70"
-                >Crea e modifica appuntamenti</span
-              >
+              <strong class="mt-3 block text-3xl">Coordinata</strong>
+              <span class="text-sm text-white/70">Orari e carichi sempre visibili</span>
             </article>
             <article class="glass-tile rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
-                White label
+                Risultati
               </p>
-              <strong class="mt-3 block text-3xl">Hybrid</strong>
-              <span class="text-sm text-white/70"
-                >Tenant pubblico o chiuso</span
-              >
+              <strong class="mt-3 block text-3xl">Chiari</strong>
+              <span class="text-sm text-white/70">Incassi e clienti in primo piano</span>
             </article>
           </div>
         </aside>
@@ -179,7 +178,7 @@ type ViewKey =
             <div>
               <p class="eyebrow text-[var(--accent)]">Accesso</p>
               <h2 class="mt-2 font-display text-4xl">
-                {{ authMode === "login" ? "Accedi" : "Crea il tuo tenant" }}
+                {{ authMode === "login" ? "Bentornato nel tuo salone" : "Apri il tuo spazio" }}
               </h2>
             </div>
             <button
@@ -187,7 +186,7 @@ type ViewKey =
               class="pill-btn"
               (click)="authMode = authMode === 'login' ? 'signup' : 'login'"
             >
-              {{ authMode === "login" ? "Signup" : "Login" }}
+              {{ authMode === "login" ? "Crea un account" : "Ho già un account" }}
             </button>
           </div>
 
@@ -215,11 +214,11 @@ type ViewKey =
             </div>
 
             <label *ngIf="authMode === 'signup'" class="field">
-              <span>Nome attivita</span>
+              <span>Nome del salone o boutique</span>
               <input
                 [(ngModel)]="signupForm.companyName"
                 name="companyName"
-                placeholder="Atelier Barberia Milano"
+                placeholder="Atelier Milano"
               />
             </label>
 
@@ -228,7 +227,7 @@ type ViewKey =
               <input
                 [(ngModel)]="loginForm.email"
                 name="loginEmail"
-                placeholder="owner@atelier.it"
+                placeholder="direzione@atelier.it"
               />
             </label>
 
@@ -264,10 +263,10 @@ type ViewKey =
             <button type="submit" class="primary-btn" [disabled]="loading">
               {{
                 loading
-                  ? "Caricamento..."
+                  ? "Un momento..."
                   : authMode === "login"
-                    ? "Accedi alla dashboard"
-                    : "Crea account e tenant"
+                    ? "Entra nel salone"
+                    : "Configura il mio salone"
               }}
             </button>
           </form>
@@ -291,7 +290,7 @@ type ViewKey =
         >
           <div class="sidebar-header">
             <div class="sidebar-brand">
-              <p class="eyebrow text-white/45">Control room</p>
+              <p class="eyebrow text-white/45">Regia del salone</p>
               <div class="mt-3 flex items-center gap-3 sidebar-brand-copy">
                 <img
                   *ngIf="
@@ -304,10 +303,10 @@ type ViewKey =
                 <h1 class="font-display text-3xl text-white">
                   {{
                     currentUser?.role === "platform_admin"
-                      ? "Platform Control"
+                      ? "Gestione attività"
                       : (tenant?.publicTitle ??
                         tenant?.name ??
-                        "Barber Control")
+                        "Il tuo salone")
                   }}
                 </h1>
               </div>
@@ -360,34 +359,36 @@ type ViewKey =
             class="sidebar-footer rounded-[1.6rem] border border-white/10 bg-white/6 p-4 text-white/78"
           >
             <p class="text-xs uppercase tracking-[0.28em] text-white/40">
-              Public booking
+              Prenotazioni online
             </p>
             <p class="mt-2 text-sm sidebar-footer-copy">
-              Tenant slug:
+              Pagina clienti:
               <strong>{{
-                tenant?.slug || currentUser?.role || "default"
+                computedPublicUrl || "non configurata"
               }}</strong>
             </p>
             <p class="mt-1 text-sm sidebar-footer-copy">
-              Modalita:
+              Apertura prenotazioni:
               <strong>{{
-                tenant?.bookingMode || currentUser?.role || "hybrid"
+                formatBookingMode(tenant?.bookingMode)
               }}</strong>
             </p>
             <button
               type="button"
               class="secondary-btn sidebar-logout mt-4 w-full"
               (click)="logout()"
-              [attr.aria-label]="sidebarCollapsed ? 'Logout' : null"
-              [title]="sidebarCollapsed ? 'Logout' : null"
+              [attr.aria-label]="sidebarCollapsed ? 'Esci' : null"
+              [title]="sidebarCollapsed ? 'Esci' : null"
             >
               <span class="nav-icon sidebar-footer-icon">L</span>
-              <span class="sidebar-footer-copy">Logout</span>
+              <span class="sidebar-footer-copy">Esci</span>
             </button>
           </article>
         </aside>
 
         <div class="content-shell">
+          <barber-admin-pwa-banner></barber-admin-pwa-banner>
+
           <header class="topbar panel rounded-[2rem] p-4 md:p-5">
             <div
               class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
@@ -407,13 +408,13 @@ type ViewKey =
                   <h2 class="font-display text-3xl md:text-5xl">
                     {{
                       currentUser?.role === "platform_admin"
-                        ? "Platform Admin"
-                        : tenant?.name || "Dashboard"
+                        ? "Gestione attività"
+                        : tenant?.name || "Panoramica"
                     }}
                   </h2>
                 </div>
               </div>
-              <div class="flex flex-wrap gap-3">
+              <div class="topbar-actions flex flex-wrap gap-3">
                 <button
                   type="button"
                   class="pill-btn"
@@ -427,7 +428,7 @@ type ViewKey =
                   class="pill-btn"
                   (click)="openQuickOrder()"
                 >
-                  Nuovo ordine
+                  Nuova vendita
                 </button>
                 <button
                   *ngIf="currentUser?.role !== 'platform_admin'"
@@ -453,8 +454,7 @@ type ViewKey =
               <div>
                 <p class="eyebrow text-amber-700">Appuntamenti trascorsi</p>
                 <p class="text-sm font-semibold text-amber-900">
-                  {{ appointmentOrderAlerts().length }} ordini in attesa di
-                  conferma
+                  {{ appointmentOrderAlerts().length }} conti da chiudere
                 </p>
               </div>
               <button
@@ -462,7 +462,7 @@ type ViewKey =
                 class="primary-btn"
                 (click)="selectView('confirmations')"
               >
-                Apri coda
+                Vai ai conti
               </button>
             </article>
 
@@ -648,11 +648,50 @@ type ViewKey =
             ></barber-admin-settings-page>
           </main>
         </div>
+
+        <nav
+          *ngIf="currentUser?.role !== 'platform_admin'"
+          class="mobile-bottom-nav"
+          aria-label="Navigazione principale"
+        >
+          <button
+            *ngFor="let item of mobileNavItems"
+            type="button"
+            class="mobile-nav-btn"
+            [ngClass]="{ active: activeView === item.key }"
+            [attr.aria-label]="item.label"
+            [attr.aria-current]="activeView === item.key ? 'page' : null"
+            (click)="selectView(item.key)"
+          >
+            <span class="mobile-nav-icon">
+              {{ item.icon }}
+              <span
+                *ngIf="
+                  item.key === 'confirmations' &&
+                  appointmentOrderAlerts().length
+                "
+                class="mobile-nav-badge"
+                >{{ appointmentOrderAlerts().length }}</span
+              >
+            </span>
+            <span class="mobile-nav-label">{{ item.label }}</span>
+          </button>
+          <button
+            type="button"
+            class="mobile-nav-btn"
+            aria-label="Apri tutte le sezioni"
+            (click)="sidebarOpen = true"
+          >
+            <span class="mobile-nav-icon">☰</span>
+            <span class="mobile-nav-label">Altro</span>
+          </button>
+        </nav>
       </section>
     </main>
   `,
 })
 export class AdminAppComponent implements OnInit, OnDestroy {
+  formatBookingMode = bookingModeLabel;
   @ViewChild(AdminAppointmentsFeaturePageComponent)
   private readonly appointmentsFeaturePage?: AdminAppointmentsFeaturePageComponent;
 
@@ -812,29 +851,29 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   navItems: Array<{ key: ViewKey; label: string; hint: string; icon: string }> =
     [
-      { key: "dashboard", label: "Dashboard", hint: "metriche", icon: "D" },
-      { key: "appointments", label: "Prenotazioni", hint: "agenda", icon: "P" },
+      { key: "dashboard", label: "Panoramica", hint: "andamento", icon: "P" },
+      { key: "appointments", label: "Agenda", hint: "appuntamenti", icon: "A" },
       {
         key: "confirmations",
-        label: "Conferme",
-        hint: "ordini in coda",
+        label: "Conti da chiudere",
+        hint: "fine servizio",
         icon: "!",
       },
-      { key: "sales", label: "Sales", hint: "cassa", icon: "V" },
-      { key: "customers", label: "Clienti", hint: "crm", icon: "C" },
-      { key: "services", label: "Servizi", hint: "catalogo", icon: "S" },
-      { key: "collaborators", label: "Collaboratori", hint: "team", icon: "T" },
-      { key: "settings", label: "Settings", hint: "white label", icon: "W" },
+      { key: "sales", label: "Cassa", hint: "vendite", icon: "C" },
+      { key: "customers", label: "Clienti", hint: "relazioni", icon: "R" },
+      { key: "services", label: "Listino", hint: "servizi e prodotti", icon: "L" },
+      { key: "collaborators", label: "Squadra", hint: "orari", icon: "S" },
+      { key: "settings", label: "Il tuo salone", hint: "immagine e prenotazioni", icon: "I" },
     ];
 
   get activeViewLabel(): string {
     if (this.isPlatformRoute) {
-      return "Platform";
+      return "Gestione attività";
     }
 
     return (
       this.visibleNavItems.find((item) => item.key === this.activeView)
-        ?.label ?? "Dashboard"
+        ?.label ?? "Panoramica"
     );
   }
 
@@ -845,6 +884,22 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     icon: string;
   }> {
     return this.currentUser?.role === "platform_admin" ? [] : this.navItems;
+  }
+
+  /** Sezioni sempre a portata di pollice nella barra inferiore mobile. */
+  get mobileNavItems(): Array<{
+    key: ViewKey;
+    label: string;
+    hint: string;
+    icon: string;
+  }> {
+    const keys: ViewKey[] = [
+      "dashboard",
+      "appointments",
+      "confirmations",
+      "sales",
+    ];
+    return this.visibleNavItems.filter((item) => keys.includes(item.key));
   }
 
   get serviceSelectOptions(): Array<{ value: string; label: string }> {
@@ -873,7 +928,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       .map((collaborator) => ({
         value: collaborator.id,
         label: `${collaborator.firstName} ${collaborator.lastName}${
-          collaborator.id === defaultCollaboratorId ? " · default" : ""
+          collaborator.id === defaultCollaboratorId ? " · riferimento" : ""
         }`,
       }));
   }
@@ -940,9 +995,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
     if (!configured.length) {
       return [
-        { title: "Servizio", caption: "Catalogo reale dal tenant" },
-        { title: "Slot", caption: "Disponibilita per data e collaboratore" },
-        { title: "Conferma", caption: "Prenotazione persistita su DB" },
+        { title: "Scegli", caption: "Trova il servizio che desideri" },
+        { title: "Prenota", caption: "Scegli professionista, giorno e orario" },
+        { title: "Conferma", caption: "Invia la richiesta al salone" },
       ];
     }
 
@@ -950,7 +1005,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       const [title, caption] = line.split("|");
 
       return {
-        title: title?.trim() || "Step",
+        title: title?.trim() || "Passaggio",
         caption: caption?.trim() || "",
       };
     });
@@ -994,13 +1049,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     );
 
     if (defaultCollaborator) {
-      return `${defaultCollaborator.firstName} ${defaultCollaborator.lastName} · default`;
+      return `${defaultCollaborator.firstName} ${defaultCollaborator.lastName} · riferimento`;
     }
 
     const fallback = this.collaborators[0];
     return fallback
       ? `${fallback.firstName} ${fallback.lastName}`
-      : "Seleziona collaboratore default";
+      : "Scegli il professionista di riferimento";
   }
 
   isDefaultCollaborator(collaboratorId: string): boolean {
@@ -1008,23 +1063,23 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   readonly bookingModeOptions = [
-    { value: "public", label: "public" },
-    { value: "hybrid", label: "hybrid" },
-    { value: "closed", label: "closed" },
+    { value: "public", label: "Solo prenotazioni online" },
+    { value: "hybrid", label: "Online e dal salone" },
+    { value: "closed", label: "Solo dal salone" },
   ];
 
   readonly billingIntervalOptions = [
-    { value: "monthly", label: "monthly" },
-    { value: "yearly", label: "yearly" },
-    { value: "one_time", label: "one_time" },
+    { value: "monthly", label: "Mensile" },
+    { value: "yearly", label: "Annuale" },
+    { value: "one_time", label: "Una tantum" },
   ];
 
   readonly subscriptionStatusSelectOptions = [
-    { value: "trialing", label: "trialing" },
-    { value: "active", label: "active" },
-    { value: "past_due", label: "past_due" },
-    { value: "suspended", label: "suspended" },
-    { value: "cancelled", label: "cancelled" },
+    { value: "trialing", label: "Periodo di prova" },
+    { value: "active", label: "Attivo" },
+    { value: "past_due", label: "Pagamento scaduto" },
+    { value: "suspended", label: "Sospeso" },
+    { value: "cancelled", label: "Annullato" },
   ];
 
   get isPlatformRoute(): boolean {
@@ -1338,7 +1393,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Operazione non riuscita";
+        error?.error?.message || error?.message || "Non siamo riusciti a completare l'accesso. Riprova.";
     } finally {
       this.loading = false;
     }
@@ -1389,10 +1444,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         publicTitle: this.tenant?.publicTitle ?? this.tenant?.name ?? "",
         publicDescription:
           this.tenant?.publicDescription ||
-          "Esperienza pubblica con palette servizi, catalogo reale e disponibilita dinamica per collaboratore.",
+          "Scegli il servizio, trova il momento giusto e invia la tua richiesta al salone.",
         publicStepsText: Array.isArray(this.tenant?.publicSteps)
           ? this.tenant.publicSteps.join("\n")
-          : "Servizio|Palette e catalogo reale dal tenant\nCollaboratore|Disponibilita live del team\nConferma|Prenotazione persistita e notificata",
+          : "Scegli|Trova il servizio che desideri\nPrenota|Scegli professionista, giorno e orario\nConferma|Invia la richiesta al salone",
         logoUrl: this.tenant?.logoUrl || "",
         coverUrl: this.tenant?.coverUrl || "",
         publicEnabled: this.tenant?.publicEnabled,
@@ -1418,7 +1473,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Errore nel caricamento dashboard";
+        "Non riusciamo a caricare la panoramica";
     }
   }
 
@@ -1483,7 +1538,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Errore nel caricamento contesto admin";
+        "Non riusciamo a caricare i dati del salone";
     }
   }
 
@@ -1616,8 +1671,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         kind,
         "success",
         kind === "logo"
-          ? "Logo caricato con successo"
-          : "Cover caricata con successo",
+          ? "Logo caricato"
+          : "Copertina caricata",
       );
     } catch (error: any) {
       this.showUploadFeedback(
@@ -1626,8 +1681,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         error?.error?.message ||
           error?.message ||
           (kind === "logo"
-            ? "Upload logo non riuscito"
-            : "Upload cover non riuscito"),
+            ? "Caricamento del logo non riuscito"
+            : "Caricamento della copertina non riuscito"),
       );
     } finally {
       this.loading = false;
@@ -1676,7 +1731,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.showUploadFeedback(
         kind,
         "success",
-        kind === "logo" ? "Logo rimosso" : "Cover rimossa",
+        kind === "logo" ? "Logo rimosso" : "Copertina rimossa",
       );
     } catch (error: any) {
       this.showUploadFeedback(
@@ -1686,7 +1741,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           error?.message ||
           (kind === "logo"
             ? "Rimozione logo non riuscita"
-            : "Rimozione cover non riuscita"),
+            : "Rimozione della copertina non riuscita"),
       );
     } finally {
       this.loading = false;
@@ -1702,9 +1757,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       publicTitle:
         this.settingsForm.name || this.tenant?.name || "Prenota online",
       publicDescription:
-        "Esperienza pubblica con palette servizi, catalogo reale e disponibilita dinamica per collaboratore.",
+        "Scegli il servizio, trova il momento giusto e invia la tua richiesta al salone.",
       publicStepsText:
-        "Servizio|Palette e catalogo reale dal tenant\nCollaboratore|Disponibilita live del team\nConferma|Prenotazione persistita e notificata",
+        "Scegli|Trova il servizio che desideri\nPrenota|Scegli professionista, giorno e orario\nConferma|Invia la richiesta al salone",
       logoUrl: "",
       coverUrl: "",
       holidays: [],
@@ -2145,7 +2200,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       await this.http
         .post(
           `${this.apiUrl}/appointments/${this.appointmentForm.id}/cancel`,
-          { reason: "Annullato da dashboard admin" },
+          { reason: "Annullato dalla direzione del salone" },
           this.authHeaders(),
         )
         .toPromise();
@@ -2236,7 +2291,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.authHeaders(),
         )
         .toPromise();
-      this.feedback = "Impostazioni tenant aggiornate";
+      this.feedback = "Impostazioni del salone aggiornate";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
@@ -2263,13 +2318,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.authHeaders(),
         )
         .toPromise();
-      this.feedback = "Tenant aggiornato";
+      this.feedback = "Attività aggiornata";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Aggiornamento tenant non riuscito";
+        "Aggiornamento dell'attività non riuscito";
     } finally {
       this.loading = false;
     }
@@ -2282,17 +2337,17 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       await this.http
         .post(
           `${this.apiUrl}/platform-admin/tenants/${this.selectedPlatformTenant.id}/suspend`,
-          { reason: "Sospeso da console platform" },
+          { reason: "Sospeso dalla gestione centrale" },
           this.authHeaders(),
         )
         .toPromise();
-      this.feedback = "Tenant sospeso";
+      this.feedback = "Attività sospesa";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Sospensione tenant non riuscita";
+        "Sospensione dell'attività non riuscita";
     } finally {
       this.loading = false;
     }
@@ -2309,13 +2364,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.authHeaders(),
         )
         .toPromise();
-      this.feedback = "Tenant riattivato";
+      this.feedback = "Attività riattivata";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Riattivazione tenant non riuscita";
+        "Riattivazione dell'attività non riuscita";
     } finally {
       this.loading = false;
     }
@@ -2332,13 +2387,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.authHeaders(),
         )
         .toPromise();
-      this.feedback = "Dati tenant resettati";
+      this.feedback = "Dati dell'attività svuotati";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Reset dati tenant non riuscito";
+        "Non è stato possibile svuotare i dati dell'attività";
     } finally {
       this.loading = false;
     }
@@ -2347,9 +2402,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   async deleteSelectedTenant(): Promise<void> {
     if (!this.selectedPlatformTenant) return;
     this.openDeleteDialog(
-      "Eliminare questo tenant?",
-      `Stai per eliminare il tenant ${this.selectedPlatformTenant.name}.`,
-      "Elimina tenant",
+      "Eliminare questa attività?",
+      `Stai per eliminare ${this.selectedPlatformTenant.name}.`,
+      "Elimina attività",
       async () => {
         this.loading = true;
         try {
@@ -2359,7 +2414,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
               this.authHeaders(),
             )
             .toPromise();
-          this.feedback = "Tenant eliminato";
+          this.feedback = "Attività eliminata";
           this.selectedPlatformTenant = null;
           this.platformTenantForm = this.emptyPlatformTenantForm();
           this.platformHealthCheck = null;
@@ -2368,7 +2423,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.feedback =
             error?.error?.message ||
             error?.message ||
-            "Eliminazione tenant non riuscita";
+            "Eliminazione dell'attività non riuscita";
           throw error;
         } finally {
           this.loading = false;
@@ -2388,10 +2443,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.platformExportJson = JSON.stringify(exported, null, 2);
-      this.feedback = "Export JSON generato";
+      this.feedback = "Copia completa pronta";
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Export tenant non riuscito";
+        error?.error?.message || error?.message || "Preparazione della copia non riuscita";
     } finally {
       this.loading = false;
     }
@@ -2408,10 +2463,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.platformExportCsv = JSON.stringify(exported, null, 2);
-      this.feedback = "Export CSV generato";
+      this.feedback = "Copia tabellare pronta";
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Export CSV non riuscito";
+        error?.error?.message || error?.message || "Preparazione delle tabelle non riuscita";
     } finally {
       this.loading = false;
     }
@@ -2429,11 +2484,11 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.authHeaders(),
         )
         .toPromise();
-      this.feedback = "Import JSON completato";
+      this.feedback = "Dati completi ripristinati";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Import tenant non riuscito";
+        error?.error?.message || error?.message || "Ripristino dei dati non riuscito";
     } finally {
       this.loading = false;
     }
@@ -2451,11 +2506,11 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.authHeaders(),
         )
         .toPromise();
-      this.feedback = "Import CSV completato";
+      this.feedback = "Tabelle ripristinate";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Import CSV non riuscito";
+        error?.error?.message || error?.message || "Ripristino delle tabelle non riuscito";
     } finally {
       this.loading = false;
     }
@@ -2521,13 +2576,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.authHeaders(),
         )
         .toPromise();
-      this.feedback = "Subscription assegnata";
+      this.feedback = "Piano assegnato";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Assegnazione subscription non riuscita";
+        "Assegnazione del piano non riuscita";
     } finally {
       this.loading = false;
     }
@@ -2559,7 +2614,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.adminFacade.setRevenueReport(this.revenueReport);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || "Caricamento fatturato non riuscito";
+        error?.error?.message || "Caricamento degli incassi non riuscito";
     } finally {
       this.loading = false;
     }
@@ -2621,7 +2676,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Aggiornamento dashboard non riuscito";
+        "Aggiornamento della panoramica non riuscito";
     }
   }
 
@@ -2682,11 +2737,11 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         this.appointmentOrderNotifications.dismiss(appointmentId);
       }
       this.closeQuickOrder();
-      this.feedback = isEditing ? "Ordine aggiornato" : "Ordine registrato";
+      this.feedback = isEditing ? "Vendita aggiornata" : "Vendita registrata";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || "Registrazione ordine non riuscita";
+        error?.error?.message || "Registrazione della vendita non riuscita";
     } finally {
       this.loading = false;
     }
@@ -2749,11 +2804,11 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         ),
       );
       this.appointmentOrderNotifications.dismiss(event.appointment.id);
-      this.feedback = "Ordine collegato alla prenotazione";
+      this.feedback = "Vendita collegata all'appuntamento";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || "Collegamento ordine non riuscito";
+        error?.error?.message || "Collegamento della vendita non riuscito";
     } finally {
       this.loading = false;
     }
@@ -2768,18 +2823,18 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   deleteSale(sale: any): void {
     if (!sale?.id) return;
     this.openDeleteDialog(
-      "Elimina ordine",
-      "L'ordine e tutte le sue righe verranno eliminati. L'appuntamento collegato resterà disponibile.",
-      "Elimina ordine",
+      "Elimina vendita",
+      "La vendita e tutte le sue voci verranno eliminate. L'appuntamento collegato resterà disponibile.",
+      "Elimina vendita",
       async () => {
         this.loading = true;
         try {
           await firstValueFrom(this.adminApi.deleteSale(sale.id));
-          this.feedback = "Ordine eliminato";
+          this.feedback = "Vendita eliminata";
           await this.refreshAll();
         } catch (error: any) {
           this.feedback =
-            error?.error?.message || "Eliminazione ordine non riuscita";
+            error?.error?.message || "Eliminazione della vendita non riuscita";
           throw error;
         } finally {
           this.loading = false;
@@ -3046,15 +3101,15 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       }
 
       this.feedback = this.collaboratorForm.id
-        ? "Collaboratore aggiornato"
-        : "Collaboratore creato";
+        ? "Professionista aggiornato"
+        : "Professionista aggiunto";
       this.collaboratorForm = this.emptyCollaboratorForm();
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Salvataggio collaboratore non riuscito";
+        "Salvataggio del professionista non riuscito";
     } finally {
       this.loading = false;
     }
@@ -3075,13 +3130,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
 
-      this.feedback = "Collaboratore default aggiornato";
+      this.feedback = "Professionista di riferimento aggiornato";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
         error?.error?.message ||
         error?.message ||
-        "Aggiornamento collaboratore default non riuscito";
+        "Aggiornamento del professionista di riferimento non riuscito";
     } finally {
       this.loading = false;
     }
@@ -3094,14 +3149,14 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
     if (this.isDefaultCollaborator(this.collaboratorForm.id)) {
       this.feedback =
-        "Questo collaboratore e il default del tenant. Impostane un altro come default prima di eliminarlo.";
+        "Questo è il professionista di riferimento. Scegline un altro prima di eliminarlo.";
       return;
     }
 
     this.openDeleteDialog(
-      "Eliminare questo collaboratore?",
-      `Stai per eliminare ${this.collaboratorForm.firstName || "questo"} ${this.collaboratorForm.lastName || "collaboratore"}.`,
-      "Elimina collaboratore",
+      "Eliminare questo professionista?",
+      `Stai per eliminare ${this.collaboratorForm.firstName || "questo"} ${this.collaboratorForm.lastName || "professionista"}.`,
+      "Elimina professionista",
       async () => {
         this.loading = true;
 
@@ -3112,14 +3167,14 @@ export class AdminAppComponent implements OnInit, OnDestroy {
               this.authHeaders(),
             )
             .toPromise();
-          this.feedback = "Collaboratore eliminato";
+          this.feedback = "Professionista eliminato";
           this.collaboratorForm = this.emptyCollaboratorForm();
           await this.refreshAll();
         } catch (error: any) {
           this.feedback =
             error?.error?.message ||
             error?.message ||
-            "Eliminazione collaboratore non riuscita";
+            "Eliminazione del professionista non riuscita";
           throw error;
         } finally {
           this.loading = false;
@@ -3224,7 +3279,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   formatAppointmentStatus(status: string): string {
-    return status.replace(/_/g, " ");
+    return appointmentStatusLabel(status);
   }
 
   appointmentStatusClass(status: string): string {

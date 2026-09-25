@@ -4,6 +4,7 @@ import { FormsModule } from "@angular/forms";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import { appointmentStatusLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-appointments-page",
@@ -52,11 +53,11 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       <article class="appointments-panel panel rounded-[2rem] p-5">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Gestione agenda</p>
-            <h3 class="font-display text-3xl">Modifica appuntamenti</h3>
+            <p class="eyebrow text-[var(--accent)]">Agenda del salone</p>
+            <h3 class="font-display text-3xl">Appuntamenti</h3>
           </div>
           <span class="status-pill status-pill-neutral"
-            >{{ appointments.length }} records</span
+            >{{ appointments.length }} appuntamenti</span
           >
         </div>
         <p
@@ -94,12 +95,12 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       </article>
 
       <article class="appointments-panel panel rounded-[2rem] p-5">
-        <p class="eyebrow text-[var(--accent)]">Editor</p>
+        <p class="eyebrow text-[var(--accent)]">Scheda appuntamento</p>
         <h3 class="font-display text-3xl">
           {{
             appointmentForm.id
               ? "Aggiorna appuntamento"
-              : "Nuova prenotazione interna"
+              : "Nuovo appuntamento"
           }}
         </h3>
         <form
@@ -169,7 +170,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               ></barber-custom-select>
             </label>
             <label class="field">
-              <span>Collaboratore</span>
+              <span>Professionista</span>
               <barber-custom-select
                 [value]="appointmentForm.collaboratorId"
                 (valueChange)="
@@ -180,8 +181,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                   updateAppointmentSlots.emit()
                 "
                 [options]="appointmentCollaboratorOptions"
-                label="Collaboratore"
-                placeholder="Seleziona collaboratore"
+                label="Professionista"
+                placeholder="Seleziona professionista"
               ></barber-custom-select>
             </label>
           </div>
@@ -214,10 +215,10 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 label="Orario"
                 [placeholder]="
                   !appointmentForm.collaboratorId
-                    ? 'Prima seleziona il collaboratore'
+                    ? 'Prima seleziona il professionista'
                     : appointmentSlots.length
                       ? 'Seleziona orario'
-                      : 'Nessuno slot disponibile'
+                      : 'Nessun orario disponibile'
                 "
               ></barber-custom-select>
             </label>
@@ -266,7 +267,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               [disabled]="loading"
               (click)="confirmOrder.emit()"
             >
-              <barber-ui-icon name="receipt"></barber-ui-icon> Conferma ordine
+              <barber-ui-icon name="receipt"></barber-ui-icon> Chiudi il conto
             </button>
             <button
               *ngIf="appointmentForm.id"
@@ -292,7 +293,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               [disabled]="loading"
               (click)="reset.emit()"
             >
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuova prenotazione
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo appuntamento
             </button>
           </div>
         </form>
@@ -353,7 +354,7 @@ export class AdminAppointmentsPageComponent {
   }
 
   formatAppointmentStatus(status: string): string {
-    return status.replace(/_/g, " ");
+    return appointmentStatusLabel(status);
   }
 
   appointmentStatusClass(status: string): string {

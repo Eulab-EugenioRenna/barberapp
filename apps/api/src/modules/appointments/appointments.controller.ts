@@ -71,8 +71,8 @@ export class AppointmentsController {
     if (!window.isAvailable) {
       throw new BadRequestException(
         window.isHoliday
-          ? "Collaborator is not available due to holiday"
-          : "Collaborator is not working on selected day",
+          ? "Il professionista non è disponibile per una chiusura programmata"
+          : "Il professionista non lavora nel giorno scelto",
       );
     }
 
@@ -86,7 +86,7 @@ export class AppointmentsController {
       slotEndMinutes > window.endMinutes
     ) {
       throw new BadRequestException(
-        "Appointment is outside collaborator working hours",
+        "L'appuntamento è fuori dall'orario di lavoro del professionista",
       );
     }
   }
@@ -124,7 +124,7 @@ export class AppointmentsController {
     });
 
     if (overlapping) {
-      throw new BadRequestException("Selected slot is not available");
+      throw new BadRequestException("L'orario scelto non è disponibile");
     }
   }
 
@@ -150,7 +150,7 @@ export class AppointmentsController {
       typeof body["phone"] === "string" ? body["phone"].trim() : undefined;
 
     if (!firstName) {
-      throw new BadRequestException("Customer name is required");
+      throw new BadRequestException("Indica il nome del cliente");
     }
 
     const customer = await this.customersAlignmentService.findOrCreateCustomer({
@@ -248,7 +248,7 @@ export class AppointmentsController {
     );
 
     if (!serviceId || !startsAt) {
-      throw new BadRequestException("serviceId and startsAt are required");
+      throw new BadRequestException("Scegli servizio e orario");
     }
 
     const service = await this.prisma.service.findUnique({
@@ -256,7 +256,7 @@ export class AppointmentsController {
     });
 
     if (!service) {
-      throw new BadRequestException("Service not found");
+      throw new BadRequestException("Il servizio scelto non è disponibile");
     }
 
     const endsAt = new Date(
@@ -403,7 +403,7 @@ export class AppointmentsController {
     const current = await this.prisma.appointment.findUnique({ where: { id } });
 
     if (!current) {
-      throw new BadRequestException("Appointment not found");
+      throw new BadRequestException("L'appuntamento non è stato trovato");
     }
 
     const serviceId =
@@ -415,7 +415,7 @@ export class AppointmentsController {
     });
 
     if (!service) {
-      throw new BadRequestException("Service not found");
+      throw new BadRequestException("Il servizio scelto non è disponibile");
     }
 
     const timezone = await this.resolveTenantTimezone(
@@ -428,7 +428,7 @@ export class AppointmentsController {
         timezone,
       );
       if (!parsedStartsAt) {
-        throw new BadRequestException("Invalid startsAt");
+        throw new BadRequestException("L'orario indicato non è valido");
       }
       startsAt = parsedStartsAt;
     }
@@ -660,7 +660,7 @@ export class AppointmentsController {
         });
 
         if (!appointment) {
-          throw new BadRequestException("Appointment not found");
+          throw new BadRequestException("L'appuntamento non è stato trovato");
         }
 
         const diffHours =

@@ -161,10 +161,10 @@ export class SalesController {
       throw new BadRequestException("Cliente non valido");
     }
     if (collaboratorId && !collaborator) {
-      throw new BadRequestException("Collaboratore non valido");
+      throw new BadRequestException("Professionista non valido");
     }
     if (appointmentId && !appointment) {
-      throw new BadRequestException("Prenotazione non valida");
+      throw new BadRequestException("Appuntamento non valido");
     }
 
     let normalizedItems;
@@ -176,7 +176,7 @@ export class SalesController {
       });
     } catch (error) {
       throw new BadRequestException(
-        error instanceof Error ? error.message : "Ordine non valido",
+        error instanceof Error ? error.message : "Vendita non valida",
       );
     }
 
@@ -202,7 +202,7 @@ export class SalesController {
     });
     if (serviceItemsWithoutCollaborator.length) {
       throw new BadRequestException(
-        "Imposta un collaboratore per ogni servizio che lo richiede",
+        "Scegli un professionista per ogni servizio che lo richiede",
       );
     }
 
@@ -220,7 +220,7 @@ export class SalesController {
       });
       if (validCollaborators.length !== itemCollaboratorIds.length) {
         throw new BadRequestException(
-          "Collaboratore non valido in una riga servizio",
+          "Il professionista scelto per un servizio non è valido",
         );
       }
     }
@@ -282,7 +282,7 @@ export class SalesController {
             internalNotes:
               serviceItems.length > 1
                 ? `Ordine rapido con ${serviceItems.length} servizi; durata totale ${retroactiveAppointment.durationMinutes} minuti.`
-                : "Ordine rapido registrato a consuntivo.",
+                : "Vendita veloce registrata a fine servizio.",
             createdById: user.id,
             updatedById: user.id,
           },
@@ -297,7 +297,7 @@ export class SalesController {
         });
         if (existingOrder) {
           throw new ConflictException(
-            "Un ordine è già stato confermato per questa prenotazione",
+            "Una vendita è già collegata a questo appuntamento",
           );
         }
       }
@@ -359,7 +359,7 @@ export class SalesController {
         error.code === "P2002"
       ) {
         throw new ConflictException(
-          "Un ordine è già stato confermato per questa prenotazione",
+          "Una vendita è già collegata a questo appuntamento",
         );
       }
       throw error;
@@ -409,7 +409,7 @@ export class SalesController {
       select: { id: true, appointmentId: true, customerId: true },
     });
     if (!sale) {
-      throw new NotFoundException("Ordine non trovato");
+      throw new NotFoundException("Vendita non trovata");
     }
 
     const customerId =
@@ -443,7 +443,7 @@ export class SalesController {
       });
     } catch (error) {
       throw new BadRequestException(
-        error instanceof Error ? error.message : "Ordine non valido",
+        error instanceof Error ? error.message : "Vendita non valida",
       );
     }
     normalizedItems = normalizedItems.map((item) => {
@@ -468,7 +468,7 @@ export class SalesController {
     });
     if (serviceItemsWithoutCollaborator.length) {
       throw new BadRequestException(
-        "Imposta un collaboratore per ogni servizio che lo richiede",
+        "Scegli un professionista per ogni servizio che lo richiede",
       );
     }
     const itemCollaboratorIds = [
@@ -487,7 +487,7 @@ export class SalesController {
       });
       if (validCollaborators.length !== itemCollaboratorIds.length) {
         throw new BadRequestException(
-          "Collaboratore non valido in una riga servizio",
+          "Il professionista scelto per un servizio non è valido",
         );
       }
     }
@@ -583,7 +583,7 @@ export class SalesController {
         ? body["appointmentId"]
         : "";
     if (!appointmentId) {
-      throw new BadRequestException("Seleziona una prenotazione");
+      throw new BadRequestException("Seleziona un appuntamento");
     }
 
     const [sale, appointment, existingOrder] = await Promise.all([
@@ -601,14 +601,14 @@ export class SalesController {
       }),
     ]);
     if (!sale) {
-      throw new NotFoundException("Ordine non trovato");
+      throw new NotFoundException("Vendita non trovata");
     }
     if (!appointment) {
-      throw new BadRequestException("Prenotazione non valida");
+      throw new BadRequestException("Appuntamento non valido");
     }
     if (existingOrder) {
       throw new ConflictException(
-        "Un ordine e gia collegato a questa prenotazione",
+        "Una vendita è già collegata a questo appuntamento",
       );
     }
 
@@ -664,7 +664,7 @@ export class SalesController {
       select: { id: true, appointmentId: true, customerId: true },
     });
     if (!sale) {
-      throw new NotFoundException("Ordine non trovato");
+      throw new NotFoundException("Vendita non trovata");
     }
 
     await this.prisma.$transaction(async (transaction) => {

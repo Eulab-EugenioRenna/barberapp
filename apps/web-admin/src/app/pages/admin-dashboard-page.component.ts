@@ -5,6 +5,7 @@ import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import { activityStatusLabel, appointmentStatusLabel } from "../shared/presentation-copy";
 
 const BALANCE_STORAGE_KEY = "barber.balance-hidden";
 
@@ -24,8 +25,8 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
       <article class="panel rounded-[2rem] p-5">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p class="eyebrow text-[var(--accent)]">Controllo economico</p>
-            <h3 class="font-display text-3xl">Fatturato</h3>
+            <p class="eyebrow text-[var(--accent)]">Andamento del salone</p>
+            <h3 class="font-display text-3xl">Incassi</h3>
           </div>
           <div class="flex flex-wrap items-center gap-3">
             <button
@@ -55,7 +56,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               class="primary-btn"
               (click)="openQuickOrder.emit()"
             >
-              + Ordine rapido
+              + Vendita veloce
             </button>
           </div>
         </div>
@@ -89,13 +90,13 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
             ></barber-custom-select>
           </label>
           <label class="field">
-            <span>Collaboratore</span>
+            <span>Professionista</span>
             <barber-custom-select
               [value]="revenueFilters.collaboratorId"
               (valueChange)="applyCollaborator($event)"
               [options]="collaboratorFilterOptions"
-              label="Collaboratore"
-              placeholder="Tutti i collaboratori"
+              label="Professionista"
+              placeholder="Tutta la squadra"
             ></barber-custom-select>
           </label>
         </div>
@@ -111,7 +112,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <div class="flex items-center justify-between gap-3">
             <div>
               <p class="eyebrow text-[var(--accent)]">Movimenti</p>
-              <h3 class="font-display text-2xl">Ordini e prenotazioni</h3>
+              <h3 class="font-display text-2xl">Vendite e appuntamenti</h3>
             </div>
             <span class="status-pill status-pill-neutral"
               >{{ activity.length }}</span
@@ -133,10 +134,10 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                     "
                     >{{
                       entry.kind === "appointment"
-                        ? "Prenotazione"
+                        ? "Appuntamento"
                         : entry.kind === "combined"
-                          ? "Ordine e prenotazione"
-                          : "Ordine"
+                          ? "Vendita e appuntamento"
+                          : "Vendita"
                     }}</span
                   >
                   <strong class="truncate">{{ entry.customerName }}</strong>
@@ -162,7 +163,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               *ngIf="!activity.length && !activityLoading"
               class="rounded-2xl border border-dashed border-[var(--line)] p-4 text-sm text-[var(--muted)]"
             >
-              Nessun ordine o prenotazione nel periodo selezionato.
+              Nessuna vendita o appuntamento nel periodo selezionato.
             </p>
             <p
               *ngIf="activityLoading"
@@ -182,7 +183,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         <div class="grid gap-4">
           <article class="panel rounded-[2rem] p-5">
             <p class="eyebrow text-[var(--accent)]">Clienti</p>
-            <h3 class="font-display text-2xl">Fatturato per cliente</h3>
+            <h3 class="font-display text-2xl">Incassi per cliente</h3>
             <div class="mt-4 grid max-h-72 gap-2 overflow-auto pr-1">
               <div
                 *ngFor="let row of revenueReport?.byCustomer"
@@ -195,13 +196,13 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                 *ngIf="!revenueReport?.byCustomer?.length"
                 class="text-sm text-[var(--muted)]"
               >
-                Nessun fatturato nel periodo selezionato.
+                Nessun incasso nel periodo selezionato.
               </p>
             </div>
           </article>
           <article class="panel rounded-[2rem] p-5">
-            <p class="eyebrow text-[var(--accent)]">Collaboratori</p>
-            <h3 class="font-display text-2xl">Fatturato per collaboratore</h3>
+            <p class="eyebrow text-[var(--accent)]">Squadra</p>
+            <h3 class="font-display text-2xl">Incassi per professionista</h3>
             <div class="mt-4 grid max-h-72 gap-2 overflow-auto pr-1">
               <div
                 *ngFor="let row of revenueReport?.byCollaborator"
@@ -214,7 +215,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                 *ngIf="!revenueReport?.byCollaborator?.length"
                 class="text-sm text-[var(--muted)]"
               >
-                Nessun fatturato associato a collaboratori.
+                Nessun incasso associato alla squadra.
               </p>
             </div>
           </article>
@@ -225,7 +226,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         <article class="panel rounded-[2rem] p-5">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <p class="eyebrow text-[var(--accent)]">Agenda live</p>
+              <p class="eyebrow text-[var(--accent)]">Agenda</p>
               <h3 class="font-display text-3xl">Prossimi appuntamenti</h3>
             </div>
             <span class="status-pill status-pill-green"
@@ -247,7 +248,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                 >
                 <span class="text-sm text-[var(--muted)]"
                   >{{ appointment.service.name }} ·
-                  {{ appointment.collaborator?.firstName || "Staff" }}</span
+                  {{ appointment.collaborator?.firstName || "Da assegnare" }}</span
                 >
               </div>
               <span
@@ -266,7 +267,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         </article>
 
         <article class="dark-panel rounded-[2rem] p-5 text-white">
-          <p class="eyebrow text-white/40">Performance</p>
+          <p class="eyebrow text-white/40">Andamento della squadra</p>
           <div class="mt-5 grid gap-3">
             <div
               *ngFor="let collaborator of collaboratorStats"
@@ -280,9 +281,8 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               </div>
               <p class="mt-2 text-sm text-white/65">
                 Ricavi: {{ money(collaborator.revenue) }} ·
-                Ordini: {{ collaborator.orderCount || 0 }} ·
-                Upcoming:
-                {{ collaborator.upcoming }}
+                Vendite: {{ collaborator.orderCount || 0 }} ·
+                Prossimi appuntamenti: {{ collaborator.upcoming }}
               </p>
             </div>
           </div>
@@ -364,7 +364,7 @@ export class AdminDashboardPageComponent {
 
   get collaboratorFilterOptions(): Array<{ value: string; label: string }> {
     return [
-      { value: "", label: "Tutti i collaboratori" },
+      { value: "", label: "Tutta la squadra" },
       ...this.collaboratorOptions,
     ];
   }
@@ -412,11 +412,11 @@ export class AdminDashboardPageComponent {
   }
 
   formatActivityStatus(status: string): string {
-    return (status || "").replace(/_/g, " ");
+    return activityStatusLabel(status);
   }
 
   formatAppointmentStatus(status: string): string {
-    return status.replace(/_/g, " ");
+    return appointmentStatusLabel(status);
   }
 
   appointmentStatusClass(status: string): string {

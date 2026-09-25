@@ -228,7 +228,7 @@ export class DashboardController {
               const collaborator = item.collaborator;
               const current = collaboratorRevenue.get(collaborator.id) ?? {
                 id: collaborator.id,
-                label: collaboratorLabel(collaborator) || "Collaboratore",
+                label: collaboratorLabel(collaborator) || "Professionista",
                 revenue: 0,
               };
               current.revenue += lineValue(item);
@@ -239,7 +239,7 @@ export class DashboardController {
             if (!collaborator) continue;
             const current = collaboratorRevenue.get(collaborator.id) ?? {
               id: collaborator.id,
-              label: collaboratorLabel(collaborator) || "Collaboratore",
+              label: collaboratorLabel(collaborator) || "Professionista",
               revenue: 0,
             };
             current.revenue += saleRevenue(sale);
@@ -264,7 +264,7 @@ export class DashboardController {
               collaborator.id,
             ) ?? {
               id: collaborator.id,
-              label: collaboratorLabel(collaborator) || "Collaboratore",
+              label: collaboratorLabel(collaborator) || "Professionista",
               revenue: 0,
             };
             currentCollaborator.revenue += value;
@@ -284,27 +284,27 @@ export class DashboardController {
           },
           metrics: [
             {
-              label: `Fatturato ${range.label.toLowerCase()}`,
+              label: `Incassi ${range.label.toLowerCase()}`,
               value: `EUR ${kpis.totalRevenue.toFixed(2)}`,
               trend: `${sales.length} vendite`,
             },
             {
-              label: "Fatturato servizi",
+              label: "Incassi dai servizi",
               value: `EUR ${kpis.serviceRevenue.toFixed(2)}`,
               trend: `${serviceItemCount} servizi · ${completedAppointments.length} appuntamenti`,
             },
             {
-              label: "Fatturato prodotti",
+              label: "Incassi dai prodotti",
               value: `EUR ${kpis.productRevenue.toFixed(2)}`,
               trend: `${productItems.length} prodotti`,
             },
             {
-              label: "Prenotazioni",
+              label: "Appuntamenti",
               value: String(appointmentCount),
               trend: `${completedAppointmentCount} completate`,
             },
             {
-              label: "Ticket medio",
+              label: "Spesa media",
               value: `EUR ${kpis.averageTicket.toFixed(2)}`,
               trend: `${kpis.revenueEvents} operazioni · ${customerCount} clienti`,
             },

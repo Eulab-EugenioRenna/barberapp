@@ -223,9 +223,12 @@
   .quick-order-sheet {
     width: 100%;
     max-height: 100vh;
+    max-height: 100dvh;
     margin: 0;
     border-radius: 0;
     padding: 1rem;
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   }
   .quick-order-layout {
     grid-template-columns: 1fr;
