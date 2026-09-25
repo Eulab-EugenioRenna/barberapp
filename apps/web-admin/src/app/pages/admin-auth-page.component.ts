@@ -15,7 +15,7 @@ import { SessionStore } from "../core/session.store";
       <section
         class="mx-auto grid min-h-screen max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
       >
-        <aside class="hero-panel rounded-[2rem] p-6 text-white lg:p-10">
+        <aside class="hero-panel min-w-0 rounded-[2rem] p-6 text-white lg:p-10">
           <p class="eyebrow">Direzione salone</p>
           <h1
             class="mt-4 font-display text-5xl font-semibold leading-none md:text-7xl"
@@ -26,33 +26,47 @@ import { SessionStore } from "../core/session.store";
             Organizza appuntamenti, squadra, clienti e incassi con una visione
             chiara della giornata e dell'andamento del salone.
           </p>
-          <div class="mt-8 grid gap-3 md:grid-cols-3">
-            <article class="glass-tile rounded-[1.4rem] p-4">
+          <div class="mt-8 grid min-w-0 gap-3 md:grid-cols-3 lg:grid-cols-1">
+            <article class="glass-tile min-w-0 rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
                 Agenda
               </p>
-              <strong class="mt-3 block text-3xl">Ordinata</strong>
-              <span class="text-sm text-white/70">Ogni appuntamento al suo posto</span>
+              <strong class="mt-3 block break-words text-2xl md:text-3xl">
+                Ordinata
+              </strong>
+              <span class="text-sm text-white/70"
+                >Ogni appuntamento al suo posto</span
+              >
             </article>
-            <article class="glass-tile rounded-[1.4rem] p-4">
+            <article class="glass-tile min-w-0 rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
                 Squadra
               </p>
-              <strong class="mt-3 block text-3xl">Coordinata</strong>
-              <span class="text-sm text-white/70">Orari e carichi sempre visibili</span>
+              <strong class="mt-3 block break-words text-2xl md:text-3xl">
+                Coordinata
+              </strong>
+              <span class="text-sm text-white/70"
+                >Orari e carichi sempre visibili</span
+              >
             </article>
-            <article class="glass-tile rounded-[1.4rem] p-4">
+            <article class="glass-tile min-w-0 rounded-[1.4rem] p-4">
               <p class="text-xs uppercase tracking-[0.3em] text-white/50">
                 Risultati
               </p>
-              <strong class="mt-3 block text-3xl">Chiari</strong>
-              <span class="text-sm text-white/70">Incassi e clienti in primo piano</span>
+              <strong class="mt-3 block break-words text-2xl md:text-3xl">
+                Chiari
+              </strong>
+              <span class="text-sm text-white/70"
+                >Incassi e clienti in primo piano</span
+              >
             </article>
           </div>
         </aside>
 
-        <section class="panel rounded-[2rem] p-5 md:p-8">
-          <div class="flex items-center justify-between">
+        <section class="panel min-w-0 rounded-[2rem] p-5 md:p-8">
+          <div
+            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          >
             <div>
               <p class="eyebrow text-[var(--accent)]">Accesso</p>
               <h2 class="mt-2 font-display text-4xl">
