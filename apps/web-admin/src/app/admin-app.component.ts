@@ -270,7 +270,7 @@ type ViewKey =
                   }}
                 </h2>
               </div>
-              <div class="topbar-actions flex items-center gap-2 sm:gap-3">
+              <div class="topbar-actions flex shrink-0 items-center gap-2 sm:gap-3">
                 <button
                   type="button"
                   class="icon-btn"
@@ -281,10 +281,7 @@ type ViewKey =
                   <barber-ui-icon name="refresh"></barber-ui-icon>
                 </button>
                 <button
-                  *ngIf="
-                    currentUser?.role !== 'platform_admin' &&
-                    activeView !== 'sales'
-                  "
+                  *ngIf="currentUser?.role !== 'platform_admin'"
                   type="button"
                   class="icon-btn"
                   (click)="openQuickOrder()"

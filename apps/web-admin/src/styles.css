@@ -1095,6 +1095,7 @@ button:disabled {
 /* Azioni del topbar: solo icone, con tooltip al hover/focus. */
 .topbar-actions .icon-btn {
   position: relative;
+  flex-shrink: 0;
   width: 2.6rem;
   height: 2.6rem;
   border: 0.0625rem solid var(--line);
