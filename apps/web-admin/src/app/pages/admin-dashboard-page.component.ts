@@ -111,7 +111,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               >
             </div>
           </div>
-          <div class="mt-4 grid gap-2">
+          <div class="mt-4 grid max-h-[26rem] gap-2 overflow-y-auto pr-1">
             <div
               *ngFor="let entry of activity"
               class="list-card items-center"
@@ -179,7 +179,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <article class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Clienti</p>
             <h3 class="font-display text-xl sm:text-2xl">Incassi per cliente</h3>
-            <div class="mt-3 grid max-h-72 gap-2 overflow-auto pr-1">
+            <div class="mt-3 grid max-h-[18rem] gap-2 overflow-y-auto pr-1">
               <div
                 *ngFor="let row of revenueReport?.byCustomer"
                 class="list-card"
@@ -198,7 +198,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <article class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Squadra</p>
             <h3 class="font-display text-xl sm:text-2xl">Incassi per professionista</h3>
-            <div class="mt-3 grid max-h-72 gap-2 overflow-auto pr-1">
+            <div class="mt-3 grid max-h-[18rem] gap-2 overflow-y-auto pr-1">
               <div
                 *ngFor="let row of revenueReport?.byCollaborator"
                 class="list-card"
@@ -228,7 +228,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               >
             </div>
           </div>
-          <div class="mt-4 grid gap-2.5 sm:gap-3">
+          <div
+            class="mt-4 grid max-h-[24rem] gap-2.5 overflow-y-auto pr-1 sm:gap-3"
+          >
             <button
               *ngFor="let appointment of upcomingAppointments"
               type="button"
@@ -387,7 +389,7 @@ export class AdminDashboardPageComponent {
           new Date(left.startsAt).getTime() -
           new Date(right.startsAt).getTime(),
       )
-      .slice(0, 6);
+      .slice(0, 50);
   }
 
   formatTime(value: string): string {
