@@ -45,10 +45,10 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
       role="dialog"
       aria-modal="true"
       aria-labelledby="quick-reschedule-title"
-      class="absolute left-1/2 top-1/2 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 panel rounded-[2rem] p-5"
+      class="absolute left-1/2 top-1/2 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 panel rounded-[2rem] p-4 sm:p-5"
     >
       <p class="eyebrow text-[var(--accent)]">Sposta appuntamento</p>
-      <h3 id="quick-reschedule-title" class="mt-2 font-display text-3xl">
+      <h3 id="quick-reschedule-title" class="mt-2 font-display text-2xl sm:text-3xl">
         Scegli il nuovo orario
       </h3>
       <p class="mt-2 text-sm text-[var(--muted)]">
@@ -56,7 +56,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
         {{ appointment?.customer?.lastName }} · {{ appointment?.service?.name }}
       </p>
 
-      <article class="quick-modal-card mt-5">
+      <article class="quick-modal-card mt-4">
         <div class="grid gap-3 md:grid-cols-2">
           <div>
             <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
@@ -75,7 +75,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
         </div>
       </article>
 
-      <div class="mt-5 grid gap-4">
+      <div class="mt-4 grid gap-4">
         <barber-calendar-input
           [value]="state?.targetDate || ''"
           (valueChange)="fieldChange.emit({ key: 'targetDate', value: $event })"
@@ -105,7 +105,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
         </p>
       </div>
 
-      <div class="mt-5 flex flex-wrap gap-3">
+      <div class="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
           class="primary-btn"

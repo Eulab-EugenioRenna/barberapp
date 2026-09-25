@@ -60,7 +60,7 @@ type AuthMode = "login" | "signup";
         border: 0;
         border-radius: 999rem;
         background: transparent;
-        padding: 0.7rem 1rem;
+        padding: 0.62rem 1rem;
         color: var(--muted);
         font-weight: 700;
         cursor: pointer;
@@ -211,11 +211,13 @@ type AuthMode = "login" | "signup";
         </div>
       </aside>
 
-      <section class="panel auth-panel min-w-0 rounded-[2rem] p-5 md:p-8">
+      <section
+        class="panel auth-panel min-w-0 rounded-[1.5rem] p-4 sm:p-6 md:rounded-[2rem] md:p-8"
+      >
         <p class="eyebrow text-[var(--accent)] lg:hidden">Direzione salone</p>
 
         <div
-          class="auth-toggle mt-4 lg:mt-0"
+          class="auth-toggle mt-3 lg:mt-0"
           role="tablist"
           aria-label="Modalita accesso"
         >
@@ -246,10 +248,10 @@ type AuthMode = "login" | "signup";
           </button>
         </div>
 
-        <div class="mt-6">
+        <div class="mt-4">
           <p class="eyebrow text-[var(--accent)]">Accesso</p>
           <h2
-            class="mt-2 font-display text-3xl md:text-4xl"
+            class="mt-2 font-display text-2xl sm:text-3xl md:text-4xl"
             [class.auth-heading-login]="authMode === 'login'"
             [class.auth-heading-signup]="authMode === 'signup'"
           >
@@ -262,14 +264,14 @@ type AuthMode = "login" | "signup";
         </div>
 
         <form
-          class="mt-6 grid gap-4"
+          class="mt-4 grid gap-3"
           [class.auth-form-login]="authMode === 'login'"
           [class.auth-form-signup]="authMode === 'signup'"
           (ngSubmit)="submit()"
         >
           <div class="auth-extra" [class.is-open]="authMode === 'signup'">
-            <div class="auth-extra-inner grid gap-4">
-              <div class="grid gap-4 md:grid-cols-2">
+            <div class="auth-extra-inner grid gap-3">
+              <div class="grid gap-3 md:grid-cols-2">
                 <label class="field"
                   ><span
                     >Nome

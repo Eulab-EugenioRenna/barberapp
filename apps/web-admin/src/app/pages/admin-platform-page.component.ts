@@ -11,17 +11,17 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
   template: `
     <section class="grid gap-4">
       <div class="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
-        <article class="panel rounded-[2rem] p-5">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="eyebrow text-[var(--accent)]">Rete attività</p>
-              <h3 class="font-display text-3xl">Saloni e boutique</h3>
+        <article class="panel rounded-[2rem] p-4 sm:p-5">
+          <div class="min-w-0">
+            <p class="eyebrow text-[var(--accent)]">Rete attività</p>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 class="font-display text-2xl sm:text-3xl">Saloni e boutique</h3>
+              <span class="status-pill status-pill-neutral"
+                >{{ platformTenants.length }} attività</span
+              >
             </div>
-            <span class="status-pill status-pill-neutral"
-              >{{ platformTenants.length }} attività</span
-            >
           </div>
-          <div class="mt-5 grid gap-3">
+          <div class="mt-4 grid gap-2.5 sm:gap-3">
             <button
               *ngFor="let platformTenant of platformTenants"
               type="button"
@@ -45,9 +45,9 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
           </div>
         </article>
 
-        <article class="dark-panel rounded-[2rem] p-5 text-white">
+        <article class="dark-panel rounded-[2rem] p-4 sm:p-5 text-white">
           <p class="eyebrow text-white/45">Attività selezionata</p>
-          <h3 class="font-display text-3xl">
+          <h3 class="font-display text-2xl sm:text-3xl">
             {{
               selectedPlatformTenant
                 ? selectedPlatformTenant.name
@@ -65,7 +65,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
           </p>
           <form
             *ngIf="selectedPlatformTenant"
-            class="mt-5 grid gap-4"
+            class="mt-4 grid gap-4"
             (ngSubmit)="saveTenant.emit()"
           >
             <label class="field"
@@ -74,7 +74,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
                 [(ngModel)]="platformTenantForm.name"
                 name="platformTenantName"
             /></label>
-            <div class="grid gap-4 md:grid-cols-2">
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
               <label class="field"
                 ><span>Identificativo web</span
                 ><input
@@ -96,7 +96,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
                 rows="3"
               ></textarea>
             </label>
-            <div class="grid gap-4 md:grid-cols-2">
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
               <label class="field checkbox-field">
                 <input
                   [(ngModel)]="platformTenantForm.publicEnabled"
@@ -159,9 +159,9 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
         </article>
       </div>
 
-      <article *ngIf="!selectedPlatformTenant" class="panel rounded-[2rem] p-5">
+      <article *ngIf="!selectedPlatformTenant" class="panel rounded-[2rem] p-4 sm:p-5">
         <p class="eyebrow text-[var(--accent)]">Operazioni attività</p>
-        <h3 class="font-display text-3xl">Seleziona prima un'attività</h3>
+        <h3 class="font-display text-2xl sm:text-3xl">Seleziona prima un'attività</h3>
         <p class="mt-3 max-w-2xl text-sm text-[var(--muted)]">
           Copia, ripristino, sospensione, riattivazione, eliminazione e piano
           riguarderanno soltanto l'attività selezionata.
@@ -169,11 +169,11 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
       </article>
 
       <div class="grid gap-4 xl:grid-cols-3">
-        <article class="panel rounded-[2rem] p-5 xl:col-span-2">
+        <article class="panel rounded-[2rem] p-4 sm:p-5 xl:col-span-2">
           <div class="flex items-center justify-between gap-3">
             <div>
               <p class="eyebrow text-[var(--accent)]">Copia di sicurezza</p>
-              <h3 class="font-display text-3xl">Salva o ripristina i dati</h3>
+              <h3 class="font-display text-2xl sm:text-3xl">Salva o ripristina i dati</h3>
             </div>
             <div class="flex gap-3">
               <button
@@ -210,7 +210,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
               </button>
             </div>
           </div>
-          <div class="mt-5 grid gap-4 lg:grid-cols-2">
+          <div class="mt-4 grid gap-4 lg:grid-cols-2">
             <label class="field">
               <span>Dati da conservare</span>
               <textarea
@@ -230,7 +230,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
               ></textarea>
             </label>
           </div>
-          <div class="mt-5 grid gap-4 lg:grid-cols-2">
+          <div class="mt-4 grid gap-4 lg:grid-cols-2">
             <label class="field">
               <span>Tabelle da conservare</span>
               <textarea
@@ -252,12 +252,12 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
           </div>
         </article>
 
-        <article class="dark-panel rounded-[2rem] p-5 text-white">
+        <article class="dark-panel rounded-[2rem] p-4 sm:p-5 text-white">
           <p class="eyebrow text-white/45">Controllo dati</p>
-          <h3 class="font-display text-3xl">Contenuti dell'attività</h3>
+          <h3 class="font-display text-2xl sm:text-3xl">Contenuti dell'attività</h3>
           <div
             *ngIf="platformHealthCheck"
-            class="mt-5 grid gap-3 text-sm text-white/75"
+            class="mt-4 grid gap-3 text-sm text-white/75"
           >
             <div class="rounded-[1.3rem] bg-white/8 p-4">
               Utenti: {{ platformHealthCheck.counts.users }}
@@ -279,17 +279,22 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
       </div>
 
       <div class="grid gap-4 xl:grid-cols-2">
-        <article class="panel rounded-[2rem] p-5">
-          <div class="flex items-center justify-between gap-3">
-            <div>
+        <article class="panel rounded-[2rem] p-4 sm:p-5">
+          <div class="page-head">
+            <div class="min-w-0">
               <p class="eyebrow text-[var(--accent)]">Offerta</p>
-              <h3 class="font-display text-3xl">Piani</h3>
+              <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h3 class="font-display text-2xl sm:text-3xl">Piani</h3>
+                <span class="status-pill status-pill-neutral"
+                  >{{ platformPlans.length }} piani</span
+                >
+              </div>
             </div>
             <button type="button" class="pill-btn" (click)="resetPlan.emit()">
               Nuovo piano
             </button>
           </div>
-          <div class="mt-5 grid gap-3">
+          <div class="mt-4 grid gap-2.5 sm:gap-3">
             <button
               *ngFor="let plan of platformPlans"
               type="button"
@@ -307,8 +312,8 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
               >
             </button>
           </div>
-          <form class="mt-5 grid gap-4" (ngSubmit)="savePlan.emit()">
-            <div class="grid gap-4 md:grid-cols-2">
+          <form class="mt-4 grid gap-4" (ngSubmit)="savePlan.emit()">
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
               <label class="field"
                 ><span>Codice piano</span
                 ><input
@@ -322,7 +327,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
                   name="platformPlanName"
               /></label>
             </div>
-            <div class="grid gap-4 md:grid-cols-2">
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
               <label class="field"
                 ><span>Prezzo</span
                 ><input
@@ -350,14 +355,17 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
           </form>
         </article>
 
-        <article class="dark-panel rounded-[2rem] p-5 text-white">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="eyebrow text-white/45">Abbonamenti</p>
-              <h3 class="font-display text-3xl">Piani assegnati</h3>
+        <article class="dark-panel rounded-[2rem] p-4 sm:p-5 text-white">
+          <div class="min-w-0">
+            <p class="eyebrow text-white/45">Abbonamenti</p>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 class="font-display text-2xl sm:text-3xl">Piani assegnati</h3>
+              <span class="status-pill status-pill-inverse"
+                >{{ platformSubscriptions.length }} attivi</span
+              >
             </div>
           </div>
-          <div class="mt-5 grid gap-3">
+          <div class="mt-4 grid gap-2.5 sm:gap-3">
             <div
               *ngFor="let subscription of platformSubscriptions"
               class="rounded-[1.3rem] bg-white/8 p-4"
@@ -377,7 +385,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
               </p>
             </div>
           </div>
-          <form class="mt-5 grid gap-4" (ngSubmit)="saveSubscription.emit()">
+          <form class="mt-4 grid gap-4" (ngSubmit)="saveSubscription.emit()">
             <label class="field">
               <span>Piano da assegnare all'attività selezionata</span>
               <barber-custom-select

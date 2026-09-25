@@ -290,6 +290,57 @@ button:disabled {
   );
 }
 
+@media (max-width: 63.99rem) {
+  /*
+   * Mobile: la pagina scorre come un documento. Niente pannelli a 100%
+   * incastrati dentro una griglia con overflow hidden (tagliavano il form).
+   */
+  .public-shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .public-frame {
+    height: auto;
+    overflow: visible;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .public-hero,
+  .public-panel {
+    height: auto;
+  }
+
+  .public-hero {
+    padding: 1.25rem;
+  }
+
+  .public-panel {
+    overflow: visible;
+  }
+
+  .public-panel-scroll {
+    height: auto;
+    overflow: visible;
+    padding: 1.25rem 1rem;
+  }
+
+  /* iOS: niente zoom automatico sui campi. */
+  .field input,
+  .field select,
+  input,
+  select {
+    font-size: 16px;
+  }
+}
+
 @media (min-width: 64rem) {
   .public-frame {
     grid-template-columns: 44% 56%;

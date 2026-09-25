@@ -12,22 +12,22 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
   imports: [CommonModule, FormsModule, InfiniteScrollDirective, AutofocusFirstDirective, UiIconComponent],
   template: `
     <section class="grid gap-4">
-      <article class="panel rounded-[2rem] p-5">
-        <div class="flex items-center justify-between gap-3">
-          <div>
+      <article class="panel rounded-[2rem] p-4 sm:p-5">
+        <div class="page-head">
+          <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Relazioni</p>
-            <h3 class="font-display text-3xl">Clienti</h3>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 class="font-display text-2xl sm:text-3xl">Clienti</h3>
+              <span class="status-pill status-pill-neutral"
+                >{{ customers.length }} contatti</span
+              >
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <button type="button" class="primary-btn" (click)="openNew()">
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo cliente
-            </button>
-            <span class="status-pill status-pill-neutral"
-              >{{ customers.length }} contatti</span
-            >
-          </div>
+          <button type="button" class="primary-btn" (click)="openNew()">
+            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo cliente
+          </button>
         </div>
-        <label class="field mt-5">
+        <label class="field mt-4">
           <span>Cerca cliente</span>
           <input
             [(ngModel)]="customerQuery"
@@ -38,7 +38,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
             placeholder="Nome, email o telefono"
           />
         </label>
-        <div class="mt-5 grid gap-3">
+        <div class="mt-4 grid gap-2.5 sm:gap-3">
           <button
             *ngFor="let customer of customers; trackBy: trackById"
             type="button"
@@ -109,7 +109,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
             <p class="eyebrow text-[var(--accent)]">Cliente</p>
             <h2
               id="customer-form-title"
-              class="mt-2 font-display text-3xl"
+              class="mt-2 font-display text-2xl sm:text-3xl"
             >
               {{ customerForm.id ? "Modifica cliente" : "Nuovo cliente" }}
             </h2>
@@ -123,8 +123,8 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
           </button>
         </div>
 
-        <form class="mt-5 grid gap-4" (ngSubmit)="submit()">
-          <div class="grid gap-4 md:grid-cols-2">
+        <form class="mt-4 grid gap-4" (ngSubmit)="submit()">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span
                 >Nome <em class="required-mark" aria-hidden="true">*</em></span
@@ -149,7 +149,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
               />
             </label>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Email</span>
               <input
@@ -291,7 +291,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
             <p class="eyebrow text-[var(--accent)]">Storico cliente</p>
             <h2
               id="history-modal-title"
-              class="mt-2 font-display text-3xl"
+              class="mt-2 font-display text-2xl sm:text-3xl"
             >
               {{ formatDay(timelineEntry.date) }}
             </h2>

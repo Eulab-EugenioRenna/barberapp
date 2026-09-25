@@ -15,26 +15,26 @@ import {
   imports: [CommonModule, FormsModule, InfiniteScrollDirective, UiIconComponent],
   template: `
     <section class="grid gap-4">
-      <article class="panel rounded-[2rem] p-5">
-        <div class="flex items-center justify-between gap-3">
-          <div>
+      <article class="panel rounded-[2rem] p-4 sm:p-5">
+        <div class="page-head">
+          <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Cassa</p>
-            <h3 class="font-display text-3xl">Vendite e incassi</h3>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 class="font-display text-2xl sm:text-3xl">Vendite e incassi</h3>
+              <span class="status-pill status-pill-neutral"
+                >{{ sales.length }} vendite</span
+              >
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="primary-btn"
-              (click)="openQuickOrder.emit()"
-            >
-              <barber-ui-icon name="receipt"></barber-ui-icon> Nuova vendita
-            </button>
-            <span class="status-pill status-pill-neutral"
-              >{{ sales.length }} vendite</span
-            >
-          </div>
+          <button
+            type="button"
+            class="primary-btn"
+            (click)="openQuickOrder.emit()"
+          >
+            <barber-ui-icon name="receipt"></barber-ui-icon> Nuova vendita
+          </button>
         </div>
-        <label class="field mt-5">
+        <label class="field mt-4">
           <span>Cerca vendita</span>
           <input
             [(ngModel)]="saleQuery"
@@ -44,7 +44,7 @@ import {
             placeholder="Cliente, articolo, pagamento"
           />
         </label>
-        <div class="mt-5 grid gap-3">
+        <div class="mt-4 grid gap-2.5 sm:gap-3">
           <button
             *ngFor="let sale of filteredSales; trackBy: trackById"
             type="button"
@@ -110,7 +110,7 @@ import {
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="eyebrow text-[var(--accent)]">Vendita</p>
-            <h2 id="sale-detail-title" class="mt-2 font-display text-3xl">
+            <h2 id="sale-detail-title" class="mt-2 font-display text-2xl sm:text-3xl">
               {{ selectedSale.customer?.firstName || "Vendita" }}
               {{ selectedSale.customer?.lastName || "senza cliente" }}
             </h2>
@@ -127,7 +127,7 @@ import {
           </button>
         </div>
 
-        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
           <article class="rounded-2xl border border-[var(--line)] p-4">
             <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Cliente</p>
             <strong class="mt-2 block">
@@ -148,7 +148,7 @@ import {
 
         <article
           *ngIf="selectedSale.appointment"
-          class="mt-5 rounded-2xl border border-[var(--line)] p-4"
+          class="mt-4 rounded-2xl border border-[var(--line)] p-4"
         >
           <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
             Appuntamento collegato
@@ -172,7 +172,7 @@ import {
           </p>
         </article>
 
-        <div class="mt-5 grid gap-3">
+        <div class="mt-4 grid gap-3">
           <article
             *ngFor="let item of selectedSale.items || []"
             class="rounded-2xl border border-[var(--line)] p-4"
@@ -198,7 +198,7 @@ import {
         </div>
 
         <div
-          class="mt-5 grid gap-2 rounded-2xl border border-[var(--line)] p-4 text-sm"
+          class="mt-4 grid gap-2 rounded-2xl border border-[var(--line)] p-4 text-sm"
         >
           <div class="flex justify-between">
             <span class="text-[var(--muted)]">Subtotale</span>
@@ -229,7 +229,7 @@ import {
             <span>{{ formatPaymentStatus(selectedSale.paymentStatus) }}</span>
           </div>
         </div>
-        <div class="mt-5 flex flex-wrap gap-3">
+        <div class="mt-4 flex flex-wrap gap-3">
           <button type="button" class="primary-btn" (click)="editSelectedSale()">
             <barber-ui-icon name="edit"></barber-ui-icon> Modifica vendita
           </button>

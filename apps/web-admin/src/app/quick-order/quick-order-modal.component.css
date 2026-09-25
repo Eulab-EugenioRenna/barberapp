@@ -226,17 +226,31 @@
     max-height: 100dvh;
     margin: 0;
     border-radius: 0;
+    padding: 0;
+  }
+  .quick-order-header {
     padding: 1rem;
     padding-top: calc(1rem + env(safe-area-inset-top, 0px));
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+  .quick-order-header h2 {
+    font-size: 1.65rem;
   }
   .quick-order-layout {
     grid-template-columns: 1fr;
   }
+  .quick-order-catalog,
+  .quick-order-cart {
+    gap: 1rem;
+    padding: 1rem;
+  }
   .quick-order-cart {
     min-height: auto;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   }
   .touch-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .touch-card {
+    min-height: 7rem;
   }
 }

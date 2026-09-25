@@ -11,17 +11,22 @@ import { UiIconComponent } from "../shared/ui-icon.component";
   imports: [CommonModule, FormsModule, InfiniteScrollDirective, AutofocusFirstDirective, UiIconComponent],
   template: `
     <section class="grid gap-4">
-      <article class="panel rounded-[2rem] p-5">
-        <div class="flex items-center justify-between gap-3">
-          <div>
+      <article class="panel rounded-[2rem] p-4 sm:p-5">
+        <div class="page-head">
+          <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Squadra</p>
-            <h3 class="font-display text-3xl">Professionisti</h3>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 class="font-display text-2xl sm:text-3xl">Professionisti</h3>
+              <span class="status-pill status-pill-neutral"
+                >{{ filteredCollaborators.length }} in squadra</span
+              >
+            </div>
           </div>
           <button type="button" class="primary-btn" (click)="openNew()">
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo professionista
           </button>
         </div>
-        <label class="field mt-5">
+        <label class="field mt-4">
           <span>Cerca nella squadra</span>
           <input
             [(ngModel)]="collaboratorQuery"
@@ -31,7 +36,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             placeholder="Nome, email o telefono"
           />
         </label>
-        <div class="mt-5 grid gap-3 md:grid-cols-2">
+        <div class="mt-4 grid gap-2.5 sm:gap-3 md:grid-cols-2">
           <button
             *ngFor="let collaborator of filteredCollaborators"
             type="button"
@@ -96,7 +101,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             <p class="eyebrow text-[var(--accent)]">Squadra</p>
             <h2
               id="collaborator-form-title"
-              class="mt-2 font-display text-3xl"
+              class="mt-2 font-display text-2xl sm:text-3xl"
             >
               <barber-ui-icon name="save"></barber-ui-icon>
               {{
@@ -111,9 +116,9 @@ import { UiIconComponent } from "../shared/ui-icon.component";
           </button>
         </div>
 
-        <form class="mt-5 grid gap-4 lg:grid-cols-2" (ngSubmit)="submit()">
+        <form class="mt-4 grid gap-4 lg:grid-cols-2" (ngSubmit)="submit()">
           <div class="grid content-start gap-4">
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span
                 >Nome <em class="required-mark" aria-hidden="true">*</em></span
@@ -138,7 +143,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               />
             </label>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Email</span>
               <input
@@ -158,7 +163,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               />
             </label>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Colore calendario</span>
               <input

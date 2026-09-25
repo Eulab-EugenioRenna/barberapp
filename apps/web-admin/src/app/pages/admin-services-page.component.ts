@@ -20,17 +20,24 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
   ],
   template: `
     <section class="grid gap-4 xl:grid-cols-2">
-      <article class="panel rounded-[2rem] p-5">
-        <div class="flex items-center justify-between gap-3">
-          <div>
+      <article class="panel rounded-[2rem] p-4 sm:p-5">
+        <div class="page-head">
+          <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Listino</p>
-            <h3 class="font-display text-3xl">Servizi e trattamenti</h3>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 class="font-display text-2xl sm:text-3xl">
+                Servizi e trattamenti
+              </h3>
+              <span class="status-pill status-pill-neutral"
+                >{{ filteredServices.length }} servizi</span
+              >
+            </div>
           </div>
           <button type="button" class="primary-btn" (click)="openNewService()">
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo servizio
           </button>
         </div>
-        <label class="field mt-5">
+        <label class="field mt-4">
           <span>Cerca servizio</span>
           <input
             [(ngModel)]="serviceQuery"
@@ -40,7 +47,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             placeholder="Nome o descrizione"
           />
         </label>
-        <div class="mt-5 grid gap-3">
+        <div class="mt-4 grid gap-2.5 sm:gap-3">
           <button
             *ngFor="let service of filteredServices"
             type="button"
@@ -78,26 +85,26 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
         </div>
       </article>
 
-      <article class="panel rounded-[2rem] p-5">
-        <div class="flex items-center justify-between gap-3">
-          <div>
+      <article class="panel rounded-[2rem] p-4 sm:p-5">
+        <div class="page-head">
+          <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Vendita in salone</p>
-            <h3 class="font-display text-3xl">Prodotti</h3>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 class="font-display text-2xl sm:text-3xl">Prodotti</h3>
+              <span class="status-pill status-pill-neutral"
+                >{{ products.length }} prodotti</span
+              >
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="primary-btn"
-              (click)="openNewProduct()"
-            >
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo prodotto
-            </button>
-            <span class="status-pill status-pill-neutral">{{
-              products.length
-            }}</span>
-          </div>
+          <button
+            type="button"
+            class="primary-btn"
+            (click)="openNewProduct()"
+          >
+            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo prodotto
+          </button>
         </div>
-        <label class="field mt-5">
+        <label class="field mt-4">
           <span>Cerca prodotto</span>
           <input
             [(ngModel)]="productQuery"
@@ -107,7 +114,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             placeholder="Nome o descrizione"
           />
         </label>
-        <div class="mt-5 grid gap-2 sm:grid-cols-2">
+        <div class="mt-4 grid gap-2 sm:grid-cols-2">
           <button
             *ngFor="let product of filteredProducts"
             type="button"
@@ -156,7 +163,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="eyebrow text-[var(--accent)]">Servizio</p>
-            <h2 id="service-form-title" class="mt-2 font-display text-3xl">
+            <h2 id="service-form-title" class="mt-2 font-display text-2xl sm:text-3xl">
               {{ serviceForm.id ? "Modifica servizio" : "Nuovo servizio" }}
             </h2>
           </div>
@@ -169,7 +176,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
           </button>
         </div>
 
-        <form class="mt-5 grid gap-4" (ngSubmit)="submitService()">
+        <form class="mt-4 grid gap-4" (ngSubmit)="submitService()">
           <label class="field">
             <span>Nome <em class="required-mark" aria-hidden="true">*</em></span>
             <input [(ngModel)]="serviceForm.name" name="serviceName" required />
@@ -181,7 +188,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               name="servicePublicDescription"
             />
           </label>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Durata minuti</span>
               <input
@@ -203,7 +210,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               />
             </label>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Colore</span>
               <input
@@ -270,7 +277,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                 Nessun prodotto associato a questo servizio.
               </p>
             </ng-template>
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
               <label class="field md:col-span-2">
                 <span>Prodotto</span>
                 <barber-custom-select
@@ -364,7 +371,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="eyebrow text-[var(--accent)]">Prodotto</p>
-            <h2 id="product-form-title" class="mt-2 font-display text-3xl">
+            <h2 id="product-form-title" class="mt-2 font-display text-2xl sm:text-3xl">
               {{ productForm.id ? "Modifica prodotto" : "Nuovo prodotto" }}
             </h2>
           </div>
@@ -377,7 +384,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
           </button>
         </div>
 
-        <form class="mt-5 grid gap-3" (ngSubmit)="submitProduct()">
+        <form class="mt-4 grid gap-3" (ngSubmit)="submitProduct()">
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="field"
               ><span

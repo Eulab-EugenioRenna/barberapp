@@ -39,23 +39,23 @@ import { CustomSelectComponent } from "./custom-select.component";
               alt="Logo del salone"
               class="h-auto w-auto max-h-28 max-w-[24rem] object-contain md:max-h-36 md:max-w-[30rem]"
             />
-            <h1 class="font-display text-5xl leading-none md:text-7xl">
+            <h1 class="font-display text-3xl leading-none sm:text-5xl md:text-7xl">
               {{
                 settings()?.publicTitle ?? settings()?.name ?? "Prenota online"
               }}
             </h1>
           </div>
-          <p class="mt-5 max-w-xl text-base text-white/74 md:text-lg">
+          <p class="mt-4 max-w-xl text-sm text-white/74 sm:mt-5 sm:text-base md:text-lg">
             {{
               settings()?.publicDescription ||
                 "Scegli il servizio, trova il momento giusto e invia la tua richiesta al salone."
             }}
           </p>
 
-          <div class="mt-8 grid gap-3">
+          <div class="mt-5 grid gap-2.5 sm:mt-8 sm:gap-3">
             <article
               *ngFor="let step of publicSteps; index as index"
-              class="hero-step rounded-[1.4rem] p-4"
+              class="hero-step rounded-[1.4rem] p-3.5 sm:p-4"
             >
               <div class="flex items-center gap-3">
                 <span
@@ -86,7 +86,9 @@ import { CustomSelectComponent } from "./custom-select.component";
             >
               <div>
                 <p class="eyebrow text-[var(--accent)]">Prenotazione</p>
-                <h2 class="font-display text-4xl">Scegli servizio e orario</h2>
+                <h2 class="font-display text-2xl sm:text-4xl">
+                  Scegli servizio e orario
+                </h2>
               </div>
               <label class="field public-date-field">
                 <span>Data <em class="required-mark" aria-hidden="true">*</em></span>
@@ -101,11 +103,13 @@ import { CustomSelectComponent } from "./custom-select.component";
               </label>
             </div>
 
-            <div class="mt-4 grid gap-2 md:grid-cols-7">
+            <div
+              class="mt-4 flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-7 md:overflow-visible md:pb-0"
+            >
               <button
                 *ngFor="let day of facade.availabilityWeek()"
                 type="button"
-                class="rounded-[1rem] border px-3 py-3 text-left text-sm"
+                class="w-[6.75rem] shrink-0 rounded-[1rem] border px-3 py-3 text-left text-sm md:w-auto md:shrink"
                 [ngClass]="{
                   'border-[var(--accent)] bg-[rgba(var(--accent-rgb),0.12)]':
                     day.isSelected,
@@ -127,11 +131,11 @@ import { CustomSelectComponent } from "./custom-select.component";
               </button>
             </div>
 
-            <div class="mt-3 grid gap-2 md:grid-cols-7">
+            <div class="mt-3 grid grid-cols-7 gap-1.5 sm:gap-2">
               <button
                 *ngFor="let day of facade.availabilityMonth()"
                 type="button"
-                class="min-h-[4.25rem] rounded-[1rem] border px-3 py-2 text-left text-sm"
+                class="min-h-[3.25rem] rounded-[0.9rem] border px-1.5 py-1.5 text-left text-xs sm:min-h-[4.25rem] sm:rounded-[1rem] sm:px-3 sm:py-2 sm:text-sm"
                 [ngClass]="{
                   'border-[var(--accent)] bg-[rgba(var(--accent-rgb),0.12)]':
                     day.isSelected,
@@ -148,8 +152,10 @@ import { CustomSelectComponent } from "./custom-select.component";
                 [disabled]="day.isPast"
                 (click)="onSelectedDateChange(day.key)"
               >
-                <strong class="block">{{ day.dayNumber }}</strong>
-                <span class="mt-1 block text-[11px] opacity-70">
+                <strong class="block text-center sm:text-left">{{
+                  day.dayNumber
+                }}</strong>
+                <span class="mt-1 hidden text-[11px] opacity-70 sm:block">
                   {{ day.statusLabel }}
                 </span>
               </button>

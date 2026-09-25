@@ -6,20 +6,18 @@ import { Component, Input } from "@angular/core";
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div class="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-5">
       <article
         *ngFor="let metric of metrics"
-        class="metric-card panel rounded-[1.7rem] p-5"
+        class="metric-card panel rounded-[1.2rem] p-3 sm:rounded-[1.7rem] sm:p-4"
       >
-        <p class="text-sm font-semibold text-[var(--muted)]">
+        <p class="text-xs font-semibold text-[var(--muted)] sm:text-sm">
           {{ metric.label }}
         </p>
-        <strong class="mt-3 block font-display text-4xl">{{
+        <strong class="mt-2 block font-display text-2xl sm:text-4xl">{{
           displayValue(metric)
         }}</strong>
-        <span class="status-pill status-pill-neutral mt-3">{{
-          metric.trend
-        }}</span>
+        <span class="status-pill status-pill-neutral mt-2">{{ metric.trend }}</span>
       </article>
     </div>
   `,

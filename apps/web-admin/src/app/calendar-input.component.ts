@@ -275,6 +275,9 @@ type CalendarCell = {
         left: 0;
         z-index: 30;
         width: min(22rem, 100vw - 2rem);
+        max-height: min(70vh, calc(100dvh - 1rem));
+        overflow-y: auto;
+        overscroll-behavior: contain;
         border: 0.0625rem solid rgba(15, 23, 32, 0.08);
         border-radius: 1.5rem;
         background:

@@ -10,13 +10,13 @@ import { bookingModeLabel } from "../shared/presentation-copy";
   imports: [CommonModule, FormsModule, CustomSelectComponent],
   template: `
     <section class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-      <article class="dark-panel rounded-[2rem] p-5 text-white">
+      <article class="dark-panel rounded-[2rem] p-4 text-white sm:p-5">
         <p class="eyebrow text-white/45">Vetrina online</p>
-        <h3 class="font-display text-3xl">Anteprima per i clienti</h3>
-        <p class="mt-3 text-sm text-white/70">
+        <h3 class="font-display text-2xl sm:text-3xl">Anteprima per i clienti</h3>
+        <p class="mt-2 text-sm text-white/70 sm:mt-3">
           Guarda come apparirà la pagina di prenotazione del tuo salone.
         </p>
-        <div class="public-editor-preview mt-5">
+        <div class="public-editor-preview mt-4 sm:mt-4">
           <aside
             class="public-editor-hero"
             [style.background]="publicPreviewHeroBackground"
@@ -89,12 +89,12 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 <p class="eyebrow" [style.color]="settingsForm.accentColor">
                   Prenotazione
                 </p>
-                <h4 class="font-display text-3xl text-[var(--ink)]">
+                <h4 class="font-display text-2xl sm:text-3xl text-[var(--ink)]">
                   Scegli servizio e orario
                 </h4>
               </div>
 
-              <div class="mt-5 grid gap-3">
+              <div class="mt-4 grid gap-2.5 sm:gap-3">
                 <article
                   *ngFor="let service of publicPreviewServices"
                   class="public-editor-service"
@@ -117,7 +117,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 </article>
               </div>
 
-              <div class="mt-5 grid gap-4 md:grid-cols-2">
+              <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
                 <div class="field">
                   <span>Professionista</span>
                   <div class="public-editor-field-surface">
@@ -130,7 +130,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 </div>
               </div>
 
-              <div class="mt-5 grid gap-4 md:grid-cols-2">
+              <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
                 <div class="field">
                   <span>Nome e cognome</span>
                   <div class="public-editor-field-surface">Mario Rossi</div>
@@ -159,10 +159,10 @@ import { bookingModeLabel } from "../shared/presentation-copy";
         </div>
       </article>
 
-      <article class="panel rounded-[2rem] p-5">
+      <article class="panel rounded-[2rem] p-4 sm:p-5">
         <p class="eyebrow text-[var(--accent)]">Identità del salone</p>
-        <h3 class="font-display text-3xl">Immagine e prenotazioni</h3>
-        <form class="mt-5 grid gap-4" (ngSubmit)="save.emit()">
+        <h3 class="font-display text-2xl sm:text-3xl">Immagine e prenotazioni</h3>
+        <form class="mt-4 grid gap-3 sm:mt-4 sm:gap-4" (ngSubmit)="save.emit()">
           <label class="field"
             ><span>Nome del salone o boutique <em class="required-mark" aria-hidden="true">*</em></span
             ><input
@@ -308,7 +308,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               {{ uploadFeedback?.message }}
             </div>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field"
               ><span>Colore principale</span
               ><input
@@ -324,7 +324,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 type="color"
             /></label>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Come accetti le prenotazioni</span>
               <barber-custom-select
@@ -422,12 +422,13 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 (ngModelChange)="uiScaleChange.emit($event)"
                 name="settingsUiScale"
                 type="range"
-                min="85"
+                min="50"
                 max="110"
                 step="1"
               />
               <small class="field-hint"
-                >Preferenza di questo dispositivo: 92% è il valore consigliato.</small
+                >Preferenza di questo dispositivo, da 50% a 110%. 92% è il valore
+                consigliato.</small
               >
             </label>
           </section>

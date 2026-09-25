@@ -579,6 +579,30 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
+/*
+ * Intestazione di pagina: titolo + eventuale conteggio a sinistra, azione
+ * primaria a destra. Su mobile l'azione va a capo a piena larghezza, cosi la
+ * gerarchia resta chiara e non si creano righe di pulsanti affollate.
+ */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.page-head > .primary-btn {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 47.99rem) {
+  .page-head > .primary-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .nav-btn,
 .list-card,
 .field input,
@@ -1167,22 +1191,25 @@ button:disabled {
 
 /*
  * La pagina di accesso e l'unica route "documento": la shell blocca lo scroll
- * per le viste gestionali, quindi qui serve un contenitore scrollabile a
- * tutta altezza (altrimenti su mobile il form viene tagliato).
+ * per le viste gestionali. La posizioniamo fissa sul viewport cosi lo scroll
+ * resta affidabile anche con dvh o tastiera mobile, e il form non viene mai
+ * tagliato.
  */
 .auth-scroll {
-  height: 100vh;
-  height: 100dvh;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  align-content: safe center;
 }
 
 @media (max-width: 63.99rem) {
   .auth-scroll {
-    padding-top: calc(2rem + env(safe-area-inset-top, 0px));
-    padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+    padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   /* Rispetta notch e barre di sistema su mobile/standalone. */

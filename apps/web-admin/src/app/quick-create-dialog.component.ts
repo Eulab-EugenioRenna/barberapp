@@ -16,9 +16,9 @@ export type QuickCreateKind = "customer" | "service" | "product";
       <button type="button" class="quick-create-backdrop" aria-label="Chiudi" [disabled]="saving" (click)="cancel.emit()"></button>
       <form class="quick-create-dialog" (ngSubmit)="save()">
         <p class="eyebrow text-[var(--accent)]">Aggiunta veloce</p>
-        <h2 [id]="titleId" class="font-display text-3xl">{{ title }}</h2>
+        <h2 [id]="titleId" class="font-display text-2xl sm:text-3xl">{{ title }}</h2>
         <p class="mt-2 text-sm text-[var(--muted)]">Potrai completare i dettagli in seguito.</p>
-        <label class="field mt-5">
+        <label class="field mt-4">
           <span
             >{{ kind === "customer" ? "Nome cliente" : "Nome" }}
             <em class="required-mark" aria-hidden="true">*</em></span

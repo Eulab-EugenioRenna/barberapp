@@ -100,7 +100,7 @@ type ViewKey =
           aria-labelledby="confirm-dialog-title"
         >
           <p class="eyebrow text-[var(--accent)]">Conferma eliminazione</p>
-          <h2 id="confirm-dialog-title" class="mt-3 font-display text-3xl">
+          <h2 id="confirm-dialog-title" class="mt-3 font-display text-2xl sm:text-3xl">
             {{ confirmDialog.title }}
           </h2>
           <p class="mt-4 text-sm text-[var(--muted)]">
@@ -165,7 +165,7 @@ type ViewKey =
                   alt="Logo"
                   class="h-auto w-auto max-h-20 max-w-[18rem] object-contain"
                 />
-                <h1 class="font-display text-3xl text-white">
+                <h1 class="font-display text-2xl sm:text-3xl text-white">
                   {{
                     currentUser?.role === "platform_admin"
                       ? "Gestione attività"
@@ -254,11 +254,11 @@ type ViewKey =
         <div class="content-shell">
           <barber-admin-pwa-banner></barber-admin-pwa-banner>
 
-          <header class="topbar panel rounded-[2rem] p-4 md:p-5">
+          <header class="topbar panel rounded-[1.5rem] p-3 sm:rounded-[2rem] sm:p-4 md:p-5">
             <div
-              class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+              class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
             >
-              <div class="flex items-center gap-3">
+              <div class="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
                   class="icon-btn lg:hidden"
@@ -266,11 +266,13 @@ type ViewKey =
                 >
                   ☰
                 </button>
-                <div>
+                <div class="min-w-0">
                   <p class="eyebrow text-[var(--accent)]">
                     {{ activeViewLabel }}
                   </p>
-                  <h2 class="font-display text-3xl md:text-5xl">
+                  <h2
+                    class="truncate font-display text-xl sm:text-3xl md:text-5xl"
+                  >
                     {{
                       currentUser?.role === "platform_admin"
                         ? "Gestione attività"
@@ -279,16 +281,19 @@ type ViewKey =
                   </h2>
                 </div>
               </div>
-              <div class="topbar-actions flex flex-wrap gap-3">
+              <div class="topbar-actions flex flex-wrap gap-2 sm:gap-3">
                 <button
                   type="button"
-                  class="pill-btn"
+                  class="ghost-btn"
                   (click)="refreshCurrentView()"
                 >
                   Aggiorna
                 </button>
                 <button
-                  *ngIf="currentUser?.role !== 'platform_admin'"
+                  *ngIf="
+                    currentUser?.role !== 'platform_admin' &&
+                    activeView !== 'sales'
+                  "
                   type="button"
                   class="pill-btn"
                   (click)="openQuickOrder()"
@@ -1071,7 +1076,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   setUiScale(value: number): void {
-    this.uiScale = Math.min(110, Math.max(85, Math.round(Number(value) || 92)));
+    this.uiScale = Math.min(110, Math.max(50, Math.round(Number(value) || 92)));
     this.document.documentElement.style.setProperty(
       "--ui-scale",
       String(this.uiScale / 100),

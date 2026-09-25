@@ -10,22 +10,22 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
   imports: [CommonModule, FormsModule, UiIconComponent],
   template: `
     <section class="grid gap-4">
-      <article class="panel rounded-[2rem] p-5">
-        <div class="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p class="eyebrow text-[var(--accent)]">Fine servizio</p>
-            <h3 class="font-display text-3xl">Conti da chiudere</h3>
-            <p class="mt-1 text-sm text-[var(--muted)]">
-              Qui trovi gli appuntamenti conclusi che non hanno ancora una
-              vendita registrata.
-            </p>
+      <article class="panel rounded-[2rem] p-4 sm:p-5">
+        <div class="min-w-0">
+          <p class="eyebrow text-[var(--accent)]">Fine servizio</p>
+          <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 class="font-display text-2xl sm:text-3xl">Conti da chiudere</h3>
+            <span class="status-pill status-pill-amber"
+              >{{ appointments.length }} in attesa</span
+            >
           </div>
-          <span class="status-pill status-pill-amber"
-            >{{ appointments.length }} in attesa</span
-          >
+          <p class="mt-1 text-sm text-[var(--muted)]">
+            Qui trovi gli appuntamenti conclusi che non hanno ancora una vendita
+            registrata.
+          </p>
         </div>
 
-        <div class="mt-5 grid gap-3">
+        <div class="mt-4 grid gap-2.5 sm:gap-3">
           <article
             *ngFor="let appointment of appointments"
             class="rounded-2xl border border-[var(--line)] p-4"
@@ -54,7 +54,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                class="primary-btn"
+                class="primary-btn w-full sm:w-auto"
                 [disabled]="loading"
                 (click)="confirmOrder.emit(appointment)"
               >

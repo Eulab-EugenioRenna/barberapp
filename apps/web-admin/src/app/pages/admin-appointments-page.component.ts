@@ -46,27 +46,47 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
         padding-right: 0.25rem;
         align-content: start;
       }
+
+      /* Mobile: i pannelli si impilano e scorre la pagina, non la card. */
+      @media (max-width: 63.99rem) {
+        :host {
+          height: auto;
+        }
+
+        .appointments-list-layout {
+          height: auto;
+        }
+
+        .appointments-panel {
+          height: auto;
+          overflow: visible;
+        }
+
+        .appointments-panel-scroll {
+          overflow: visible;
+        }
+      }
     `,
   ],
   template: `
     <section class="appointments-list-layout xl:grid-cols-[1.08fr_0.92fr]">
-      <article class="appointments-panel panel rounded-[2rem] p-5">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <p class="eyebrow text-[var(--accent)]">Agenda del salone</p>
-            <h3 class="font-display text-3xl">Appuntamenti</h3>
+      <article class="appointments-panel panel rounded-[2rem] p-4 sm:p-5">
+        <div class="min-w-0">
+          <p class="eyebrow text-[var(--accent)]">Agenda del salone</p>
+          <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 class="font-display text-2xl sm:text-3xl">Appuntamenti</h3>
+            <span class="status-pill status-pill-neutral"
+              >{{ appointments.length }} appuntamenti</span
+            >
           </div>
-          <span class="status-pill status-pill-neutral"
-            >{{ appointments.length }} appuntamenti</span
-          >
         </div>
         <p
           *ngIf="!appointments.length"
-          class="mt-5 rounded-[1.2rem] border border-dashed border-[var(--line)]/80 bg-white/70 px-4 py-3 text-sm text-[var(--muted)]"
+          class="mt-4 rounded-[1.2rem] border border-dashed border-[var(--line)]/80 bg-white/70 px-4 py-3 text-sm text-[var(--muted)]"
         >
           Nessun appuntamento trovato per il filtro selezionato.
         </p>
-        <div class="appointments-panel-scroll mt-5">
+        <div class="appointments-panel-scroll mt-4">
           <div class="grid gap-3">
             <button
               *ngFor="let appointment of appointments"
@@ -94,9 +114,9 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
         </div>
       </article>
 
-      <article class="appointments-panel panel rounded-[2rem] p-5">
+      <article class="appointments-panel panel rounded-[2rem] p-4 sm:p-5">
         <p class="eyebrow text-[var(--accent)]">Scheda appuntamento</p>
-        <h3 class="font-display text-3xl">
+        <h3 class="font-display text-2xl sm:text-3xl">
           {{
             appointmentForm.id
               ? "Aggiorna appuntamento"
@@ -104,10 +124,10 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
           }}
         </h3>
         <form
-          class="appointments-panel-scroll mt-5 grid gap-4"
+          class="appointments-panel-scroll mt-4 grid gap-4"
           (ngSubmit)="save.emit()"
         >
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field md:col-span-2">
               <span>Cliente <em class="required-mark" aria-hidden="true">*</em></span>
               <barber-custom-select
@@ -122,7 +142,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
             </label>
           </div>
           <div
-            class="grid gap-4 md:grid-cols-2"
+            class="grid gap-3 sm:gap-4 md:grid-cols-2"
             *ngIf="!appointmentForm.customerId"
           >
             <label class="field">
@@ -151,7 +171,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
               />
             </label>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Servizio <em class="required-mark" aria-hidden="true">*</em></span>
               <barber-custom-select
@@ -186,7 +206,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
               ></barber-custom-select>
             </label>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Data</span>
               <barber-calendar-input
@@ -223,7 +243,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
               ></barber-custom-select>
             </label>
           </div>
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Stato</span>
               <barber-custom-select

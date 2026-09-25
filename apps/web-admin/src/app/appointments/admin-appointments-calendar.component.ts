@@ -359,23 +359,88 @@ import { buildDayListingEvent } from "./calendar-date";
       }
 
       /*
-       * Su mobile la griglia del mese diventa una lista a una colonna:
-       * l'intestazione dei giorni della settimana (7 colonne) non ha piu
-       * senso e va nascosta.
+       * Mobile: il calendario smette di essere una "app dentro la app".
+       * L'altezza diventa naturale e lasciamo scorrere il contenitore della
+       * pagina: cosi giorno, settimana e mese restano sempre visibili.
        */
-      @media (max-width: 47.99rem) {
+      @media (max-width: 63.99rem) {
+        :host {
+          height: auto;
+        }
+
+        .calendar-shell {
+          height: auto;
+          overflow: visible;
+        }
+
+        .calendar-main {
+          margin-top: 0.75rem;
+          overflow: visible;
+        }
+
+        .calendar-view-viewport,
+        .calendar-day-scroll,
+        .calendar-week-shell,
+        .calendar-month-shell,
+        .calendar-week-grid,
+        .calendar-month-grid {
+          overflow: visible;
+        }
+
+        /* Giorno: una colonna per professionista, scorrevole in orizzontale. */
+        .calendar-day-grid {
+          height: auto;
+          overflow-x: auto;
+          overflow-y: visible;
+          scroll-snap-type: x proximity;
+          padding-bottom: 0.25rem;
+        }
+
+        .calendar-hour-rail {
+          position: sticky;
+          left: 0;
+          z-index: 7;
+        }
+
+        .calendar-day-columns {
+          gap: 0.75rem;
+        }
+
+        .calendar-day-column {
+          flex: 0 0 min(86vw, 18rem);
+          scroll-snap-align: start;
+        }
+
+        .calendar-day-column-header-surface {
+          min-height: 3.5rem;
+          padding: 0.75rem;
+        }
+
+        /* Settimana e mese: lista verticale di card, nessun taglio. */
+        .calendar-week-day-card {
+          height: auto;
+        }
+
+        .calendar-week-day-scroll {
+          overflow: visible;
+        }
+
         .calendar-month-weekdays {
           display: none;
+        }
+
+        .calendar-month-cell {
+          min-height: auto;
         }
       }
     `,
   ],
   template: `
-    <article class="calendar-shell panel rounded-[2rem] p-5">
+    <article class="calendar-shell panel rounded-[2rem] p-4 sm:p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p class="eyebrow text-[var(--accent)]">Agenda del salone</p>
-          <h3 class="font-display text-3xl">{{ title }}</h3>
+          <h3 class="font-display text-2xl sm:text-3xl">{{ title }}</h3>
         </div>
         <div class="ml-auto flex w-full flex-col gap-2 sm:w-auto sm:min-w-[16rem]">
           <barber-calendar-input
@@ -398,7 +463,7 @@ import { buildDayListingEvent } from "./calendar-date";
         </div>
       </div>
 
-      <div class="mt-5 flex flex-wrap gap-2">
+      <div class="mt-4 flex flex-wrap gap-2">
         <button
           *ngFor="let option of viewOptions"
           type="button"
@@ -410,44 +475,44 @@ import { buildDayListingEvent } from "./calendar-date";
         </button>
       </div>
 
-      <div class="mt-5 grid gap-3 md:grid-cols-4">
+      <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
         <article
-          class="rounded-[1.4rem] border border-[var(--line)]/70 bg-white/75 p-4"
+          class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
-          <p class="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
+          <p class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]">
             Eventi
           </p>
-          <strong class="mt-2 block font-display text-3xl">{{
+          <strong class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl">{{
             summary.total
           }}</strong>
         </article>
         <article
-          class="rounded-[1.4rem] border border-[var(--line)]/70 bg-white/75 p-4"
+          class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
-          <p class="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
+          <p class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]">
             Confermati
           </p>
-          <strong class="mt-2 block font-display text-3xl">{{
+          <strong class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl">{{
             summary.confirmed
           }}</strong>
         </article>
         <article
-          class="rounded-[1.4rem] border border-[var(--line)]/70 bg-white/75 p-4"
+          class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
-          <p class="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
+          <p class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]">
             Completati
           </p>
-          <strong class="mt-2 block font-display text-3xl">{{
+          <strong class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl">{{
             summary.completed
           }}</strong>
         </article>
         <article
-          class="rounded-[1.4rem] border border-[var(--line)]/70 bg-white/75 p-4"
+          class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
-          <p class="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">
+          <p class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]">
             Valore
           </p>
-          <strong class="mt-2 block font-display text-3xl"
+          <strong class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl"
             >€{{ summary.revenue.toFixed(0) }}</strong
           >
         </article>

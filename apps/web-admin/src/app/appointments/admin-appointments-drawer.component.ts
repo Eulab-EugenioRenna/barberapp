@@ -101,7 +101,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 : "Evento selezionato"
             }}
           </p>
-          <h3 id="appointment-drawer-title" class="mt-2 font-display text-3xl">
+          <h3 id="appointment-drawer-title" class="mt-2 font-display text-2xl sm:text-3xl">
             {{ appointment?.customer?.firstName }}
             {{ appointment?.customer?.lastName }}
           </h3>

@@ -65,7 +65,7 @@ import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dia
 
         <article
           *ngIf="appointmentsFacade.loading()"
-          class="panel rounded-[2rem] p-5 text-sm text-[var(--muted)]"
+          class="panel rounded-[2rem] p-4 sm:p-5 text-sm text-[var(--muted)]"
         >
           Caricamento calendario in corso...
         </article>
@@ -259,6 +259,31 @@ import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dia
         background: var(--accent);
         color: white;
         border-color: transparent;
+      }
+
+      /*
+       * Mobile: niente altezze fisse annidate. Il calendario cresce in modo
+       * naturale e a scorrere e il contenitore della pagina.
+       */
+      @media (max-width: 63.99rem) {
+        :host {
+          height: auto;
+        }
+
+        .appointments-shell {
+          height: auto;
+          grid-template-rows: auto auto;
+        }
+
+        .appointments-view {
+          height: auto;
+          gap: 0.75rem;
+        }
+
+        .appointments-calendar-panel {
+          height: auto;
+          flex: 0 0 auto;
+        }
       }
     `,
   ],
