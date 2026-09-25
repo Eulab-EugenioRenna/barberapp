@@ -257,9 +257,7 @@ type ViewKey =
           <barber-admin-pwa-banner></barber-admin-pwa-banner>
 
           <header class="topbar panel rounded-[1.5rem] p-3 sm:rounded-[2rem] sm:p-4 md:p-5">
-            <div
-              class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-            >
+            <div class="flex items-center justify-between gap-3">
               <div class="min-w-0">
                 <p class="eyebrow text-[var(--accent)]">
                   {{ activeViewLabel }}
@@ -272,7 +270,7 @@ type ViewKey =
                   }}
                 </h2>
               </div>
-              <div class="topbar-actions flex flex-wrap items-center gap-2 sm:gap-3">
+              <div class="topbar-actions flex items-center gap-2 sm:gap-3">
                 <button
                   type="button"
                   class="icon-btn"
@@ -603,18 +601,22 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   currentUser: any = this.sessionStore.currentUser();
   uiScale = 92;
 
-  tenant: any = null;
-  revenueMetrics: any[] = [];
-  revenueReport: any = null;
-  appointmentStats: any = null;
-  collaboratorStats: any[] = [];
-  serviceStats: any[] = [];
-  appointments: any[] = [];
-  sales: any[] = [];
-  services: any[] = [];
-  products: any[] = [];
-  collaborators: any[] = [];
-  customers: any[] = [];
+  // Riprendiamo l'ultimo tenant caricato dal facade (singleton) per evitare
+  // il lampo "Panoramica" quando la shell viene ricreata al cambio pagina.
+  tenant: any = this.adminFacade.tenant();
+  // Stesso principio del tenant: al remount della shell ripartiamo dagli
+  // ultimi dati in cache del facade invece di mostrare liste vuote.
+  revenueMetrics: any[] = this.adminFacade.revenueMetrics();
+  revenueReport: any = this.adminFacade.revenueReport();
+  appointmentStats: any = this.adminFacade.appointmentStats();
+  collaboratorStats: any[] = this.adminFacade.collaboratorStats();
+  serviceStats: any[] = this.adminFacade.serviceStats();
+  appointments: any[] = this.adminFacade.appointments();
+  sales: any[] = this.adminFacade.sales();
+  services: any[] = this.adminFacade.services();
+  products: any[] = this.adminFacade.products();
+  collaborators: any[] = this.adminFacade.collaborators();
+  customers: any[] = this.adminFacade.customers();
   quickOrderOpen = false;
   quickOrderAppointment: any = null;
   quickOrderSale: any = null;
