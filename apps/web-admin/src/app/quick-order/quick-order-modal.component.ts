@@ -9,13 +9,22 @@ import {
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CustomSelectComponent } from "../custom-select.component";
-import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dialog.component";
+import {
+  QuickCreateDialogComponent,
+  QuickCreateKind,
+} from "../quick-create-dialog.component";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 
 @Component({
   selector: "barber-quick-order-modal",
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent, QuickCreateDialogComponent, AutofocusFirstDirective],
+  imports: [
+    CommonModule,
+    FormsModule,
+    CustomSelectComponent,
+    QuickCreateDialogComponent,
+    AutofocusFirstDirective,
+  ],
   templateUrl: "./quick-order-modal.component.html",
   styleUrl: "./quick-order-modal.component.css",
 })
@@ -33,6 +42,7 @@ export class QuickOrderModalComponent implements OnInit {
   @Output() close = new EventEmitter<void>();
   @Output() submitOrder = new EventEmitter<Record<string, unknown>>();
   @Output() catalogChanged = new EventEmitter<void>();
+  @Output() customerSearchChange = new EventEmitter<string>();
 
   customerId = "";
   appointmentId = "";
@@ -79,29 +89,43 @@ export class QuickOrderModalComponent implements OnInit {
   }
 
   get customerOptions() {
-    return this.uniqueEntities([...this.createdCustomers, ...this.customers]).map((customer) => ({
+    const selectedCustomer = this.sale?.customer || this.appointment?.customer;
+    return this.uniqueEntities([
+      ...this.createdCustomers,
+      ...(selectedCustomer ? [selectedCustomer] : []),
+      ...this.customers,
+    ]).map((customer) => ({
       value: customer.id,
       label: `${customer.firstName} ${customer.lastName}`.trim(),
     }));
   }
 
   get collaboratorOptions() {
-    return [...this.collaborators].sort((left, right) => {
-      if (left.id === this.defaultCollaboratorId) return -1;
-      if (right.id === this.defaultCollaboratorId) return 1;
-      return `${left.firstName} ${left.lastName}`.localeCompare(
-        `${right.firstName} ${right.lastName}`,
-        "it",
-      );
-    }).map((collaborator) => ({
-      value: collaborator.id,
-      label: `${collaborator.firstName} ${collaborator.lastName}`.trim() +
-        (collaborator.id === this.defaultCollaboratorId ? " · riferimento" : ""),
-    }));
+    return [...this.collaborators]
+      .sort((left, right) => {
+        if (left.id === this.defaultCollaboratorId) return -1;
+        if (right.id === this.defaultCollaboratorId) return 1;
+        return `${left.firstName} ${left.lastName}`.localeCompare(
+          `${right.firstName} ${right.lastName}`,
+          "it",
+        );
+      })
+      .map((collaborator) => ({
+        value: collaborator.id,
+        label:
+          `${collaborator.firstName} ${collaborator.lastName}`.trim() +
+          (collaborator.id === this.defaultCollaboratorId
+            ? " · riferimento"
+            : ""),
+      }));
   }
 
-  get catalogServices(): any[] { return this.uniqueEntities([...this.createdServices, ...this.services]); }
-  get catalogProducts(): any[] { return this.uniqueEntities([...this.createdProducts, ...this.products]); }
+  get catalogServices(): any[] {
+    return this.uniqueEntities([...this.createdServices, ...this.services]);
+  }
+  get catalogProducts(): any[] {
+    return this.uniqueEntities([...this.createdProducts, ...this.products]);
+  }
 
   onQuickCreated(event: { kind: QuickCreateKind; entity: any }): void {
     if (event.kind === "customer") {
@@ -141,7 +165,9 @@ export class QuickOrderModalComponent implements OnInit {
       const service =
         this.services.find((entry) => entry.id === item.serviceId) ??
         this.createdServices.find((entry) => entry.id === item.serviceId);
-      return sum + Number(service?.durationMinutes || 0) * Number(item.quantity || 1);
+      return (
+        sum + Number(service?.durationMinutes || 0) * Number(item.quantity || 1)
+      );
     }, 0);
   }
 
@@ -246,7 +272,9 @@ export class QuickOrderModalComponent implements OnInit {
         productId: item.productId,
         serviceId: item.serviceId,
         collaboratorId:
-          item.kind === "service" ? item.collaboratorId || undefined : undefined,
+          item.kind === "service"
+            ? item.collaboratorId || undefined
+            : undefined,
         quantity: Number(item.quantity || 1),
         unitPrice: Number(item.unitPrice),
       })),

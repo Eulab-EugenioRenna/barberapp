@@ -1,4 +1,10 @@
-import { CommonModule, DOCUMENT, DatePipe, DecimalPipe, NgClass } from "@angular/common";
+import {
+  CommonModule,
+  DOCUMENT,
+  DatePipe,
+  DecimalPipe,
+  NgClass,
+} from "@angular/common";
 import { HttpClient } from "@angular/common/http";
 import {
   Component,
@@ -33,10 +39,14 @@ import { AdminServicesPageComponent } from "./pages/admin-services-page.componen
 import { AdminSettingsPageComponent } from "./pages/admin-settings-page.component";
 import { PendingOrdersQueueComponent } from "./pending-orders/pending-orders-queue.component";
 import { QuickOrderModalComponent } from "./quick-order/quick-order-modal.component";
+import { buildQuickOrderCustomerQuery } from "./quick-order/quick-order-customer-query";
 import { AdminAuthPanelComponent } from "./auth/admin-auth-panel.component";
 import { AdminPwaBannerComponent } from "./shared/admin-pwa-banner.component";
 import { UiIconComponent } from "./shared/ui-icon.component";
-import { appointmentStatusLabel, bookingModeLabel } from "./shared/presentation-copy";
+import {
+  appointmentStatusLabel,
+  bookingModeLabel,
+} from "./shared/presentation-copy";
 
 type ViewKey =
   | "platform"
@@ -81,16 +91,19 @@ type ViewKey =
     <main class="admin-shell min-h-screen">
       <barber-quick-order-modal
         *ngIf="quickOrderOpen"
-        [customers]="adminData().customers"
+        [customers]="quickOrderCustomers"
         [services]="adminData().services"
         [products]="adminData().products"
         [collaborators]="adminData().collaborators"
-        [defaultCollaboratorId]="adminData().tenant?.defaultCollaboratorId || ''"
+        [defaultCollaboratorId]="
+          adminData().tenant?.defaultCollaboratorId || ''
+        "
         [appointment]="quickOrderAppointment"
         [sale]="quickOrderSale"
         [loading]="loading"
         (close)="closeQuickOrder()"
         (submitOrder)="saveQuickOrder($event)"
+        (customerSearchChange)="searchQuickOrderCustomers($event)"
         (catalogChanged)="refreshAll()"
       ></barber-quick-order-modal>
       <barber-admin-appointments-editor-modal
@@ -113,7 +126,10 @@ type ViewKey =
           aria-labelledby="confirm-dialog-title"
         >
           <p class="eyebrow text-[var(--accent)]">Conferma eliminazione</p>
-          <h2 id="confirm-dialog-title" class="mt-3 font-display text-2xl sm:text-3xl">
+          <h2
+            id="confirm-dialog-title"
+            class="mt-3 font-display text-2xl sm:text-3xl"
+          >
             {{ confirmDialog.title }}
           </h2>
           <p class="mt-4 text-sm text-[var(--muted)]">
@@ -147,9 +163,7 @@ type ViewKey =
         </article>
       </div>
 
-      <barber-admin-auth-panel
-        *ngIf="!sessionToken"
-      ></barber-admin-auth-panel>
+      <barber-admin-auth-panel *ngIf="!sessionToken"></barber-admin-auth-panel>
 
       <section *ngIf="sessionToken" class="app-frame">
         <button
@@ -182,9 +196,7 @@ type ViewKey =
                   {{
                     currentUser?.role === "platform_admin"
                       ? "Gestione attività"
-                      : (tenant?.publicTitle ??
-                        tenant?.name ??
-                        "Il tuo salone")
+                      : (tenant?.publicTitle ?? tenant?.name ?? "Il tuo salone")
                   }}
                 </h1>
               </div>
@@ -267,13 +279,17 @@ type ViewKey =
         <div class="content-shell">
           <barber-admin-pwa-banner></barber-admin-pwa-banner>
 
-          <header class="topbar panel rounded-[1.5rem] p-3 sm:rounded-[2rem] sm:p-4 md:p-5">
+          <header
+            class="topbar panel rounded-[1.5rem] p-3 sm:rounded-[2rem] sm:p-4 md:p-5"
+          >
             <div class="flex items-center justify-between gap-3">
               <div class="min-w-0">
                 <p class="eyebrow text-[var(--accent)]">
                   {{ activeViewLabel }}
                 </p>
-                <h2 class="truncate font-display text-xl sm:text-3xl md:text-5xl">
+                <h2
+                  class="truncate font-display text-xl sm:text-3xl md:text-5xl"
+                >
                   {{
                     currentUser?.role === "platform_admin"
                       ? "Gestione attività"
@@ -281,7 +297,9 @@ type ViewKey =
                   }}
                 </h2>
               </div>
-              <div class="topbar-actions flex shrink-0 items-center gap-2 sm:gap-3">
+              <div
+                class="topbar-actions flex shrink-0 items-center gap-2 sm:gap-3"
+              >
                 <button
                   type="button"
                   class="icon-btn"
@@ -441,7 +459,9 @@ type ViewKey =
               *ngIf="activeView === 'collaborators'"
               [collaborators]="adminData().collaborators"
               [collaboratorForm]="collaboratorForm"
-              [defaultCollaboratorId]="adminData().tenant?.defaultCollaboratorId || ''"
+              [defaultCollaboratorId]="
+                adminData().tenant?.defaultCollaboratorId || ''
+              "
               [loading]="loading"
               [hasMore]="collaboratorsHasMore()"
               (edit)="editCollaborator($event)"
@@ -629,6 +649,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   quickOrderOpen = false;
   quickOrderAppointment: any = null;
   quickOrderSale: any = null;
+  quickOrderCustomers: any[] = [];
+  private quickOrderCustomerSearchTimer: ReturnType<typeof setTimeout> | null =
+    null;
+  private quickOrderCustomerRequestId = 0;
   appointmentsEditorOpen = false;
   appointmentsEditorAppointment: any = null;
   customerHistory: any = null;
@@ -725,21 +749,31 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     icon: string;
     short?: string;
   }> = [
-      { key: "dashboard", label: "Panoramica", hint: "andamento", icon: "P" },
-      { key: "appointments", label: "Agenda", hint: "appuntamenti", icon: "A" },
-      {
-        key: "confirmations",
-        label: "Conti da chiudere",
-        hint: "fine servizio",
-        icon: "!",
-        short: "Conferme",
-      },
-      { key: "sales", label: "Cassa", hint: "vendite", icon: "C" },
-      { key: "customers", label: "Clienti", hint: "relazioni", icon: "R" },
-      { key: "services", label: "Listino", hint: "servizi e prodotti", icon: "L" },
-      { key: "collaborators", label: "Squadra", hint: "orari", icon: "S" },
-      { key: "settings", label: "Il tuo salone", hint: "immagine e prenotazioni", icon: "I" },
-    ];
+    { key: "dashboard", label: "Panoramica", hint: "andamento", icon: "P" },
+    { key: "appointments", label: "Agenda", hint: "appuntamenti", icon: "A" },
+    {
+      key: "confirmations",
+      label: "Conti da chiudere",
+      hint: "fine servizio",
+      icon: "!",
+      short: "Conferme",
+    },
+    { key: "sales", label: "Cassa", hint: "vendite", icon: "C" },
+    { key: "customers", label: "Clienti", hint: "relazioni", icon: "R" },
+    {
+      key: "services",
+      label: "Listino",
+      hint: "servizi e prodotti",
+      icon: "L",
+    },
+    { key: "collaborators", label: "Squadra", hint: "orari", icon: "S" },
+    {
+      key: "settings",
+      label: "Il tuo salone",
+      hint: "immagine e prenotazioni",
+      icon: "I",
+    },
+  ];
 
   get activeViewLabel(): string {
     if (this.isPlatformRoute) {
@@ -910,14 +944,16 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     duration: number;
     highlighted: boolean;
   }> {
-    return this.adminData().services.slice(0, 3).map((service, index) => ({
-      name: service.name,
-      description:
-        service.publicDescription || "Prenotazione online disponibile",
-      price: Number(service.basePrice || 0).toFixed(2),
-      duration: Number(service.durationMinutes || 30),
-      highlighted: index === 0,
-    }));
+    return this.adminData()
+      .services.slice(0, 3)
+      .map((service, index) => ({
+        name: service.name,
+        description:
+          service.publicDescription || "Prenotazione online disponibile",
+        price: Number(service.basePrice || 0).toFixed(2),
+        duration: Number(service.durationMinutes || 30),
+        highlighted: index === 0,
+      }));
   }
 
   get publicPreviewCollaboratorLabel(): string {
@@ -1030,6 +1066,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     if (this.dashboardRefreshTimer) {
       clearInterval(this.dashboardRefreshTimer);
       this.dashboardRefreshTimer = null;
+    }
+    if (this.quickOrderCustomerSearchTimer) {
+      clearTimeout(this.quickOrderCustomerSearchTimer);
     }
     this.appointmentOrderNotifications.stop();
   }
@@ -1515,9 +1554,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.showUploadFeedback(
         kind,
         "success",
-        kind === "logo"
-          ? "Logo caricato"
-          : "Copertina caricata",
+        kind === "logo" ? "Logo caricato" : "Copertina caricata",
       );
     } catch (error: any) {
       this.showUploadFeedback(
@@ -2272,7 +2309,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback = "Copia completa pronta";
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Preparazione della copia non riuscita";
+        error?.error?.message ||
+        error?.message ||
+        "Preparazione della copia non riuscita";
     } finally {
       this.loading = false;
     }
@@ -2292,7 +2331,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback = "Copia tabellare pronta";
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Preparazione delle tabelle non riuscita";
+        error?.error?.message ||
+        error?.message ||
+        "Preparazione delle tabelle non riuscita";
     } finally {
       this.loading = false;
     }
@@ -2314,7 +2355,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Ripristino dei dati non riuscito";
+        error?.error?.message ||
+        error?.message ||
+        "Ripristino dei dati non riuscito";
     } finally {
       this.loading = false;
     }
@@ -2336,7 +2379,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Ripristino delle tabelle non riuscito";
+        error?.error?.message ||
+        error?.message ||
+        "Ripristino delle tabelle non riuscito";
     } finally {
       this.loading = false;
     }
@@ -2577,6 +2622,43 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.quickOrderAppointment = appointment;
     this.quickOrderSale = sale;
     this.quickOrderOpen = true;
+    void this.loadQuickOrderCustomers("");
+  }
+
+  searchQuickOrderCustomers(search: string): void {
+    if (this.quickOrderCustomerSearchTimer) {
+      clearTimeout(this.quickOrderCustomerSearchTimer);
+    }
+    this.quickOrderCustomerSearchTimer = setTimeout(() => {
+      void this.loadQuickOrderCustomers(search);
+    }, 300);
+  }
+
+  private async loadQuickOrderCustomers(search: string): Promise<void> {
+    const requestId = ++this.quickOrderCustomerRequestId;
+    const query = buildQuickOrderCustomerQuery(search);
+    try {
+      const response = await firstValueFrom(
+        this.adminApi.loadCustomersPage(
+          query.page,
+          query.search,
+          query.pageSize,
+        ),
+      );
+      if (
+        this.quickOrderOpen &&
+        requestId === this.quickOrderCustomerRequestId
+      ) {
+        this.quickOrderCustomers = response?.items || [];
+      }
+    } catch {
+      if (
+        this.quickOrderOpen &&
+        requestId === this.quickOrderCustomerRequestId
+      ) {
+        this.quickOrderCustomers = [];
+      }
+    }
   }
 
   confirmPendingOrder(appointment: any): void {
@@ -2606,8 +2688,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.appointmentOrderNotifications.dismiss(appointment.id);
           await this.refreshAll();
         } catch (error: any) {
-          this.feedback =
-            error?.error?.message || "Annullamento non riuscito";
+          this.feedback = error?.error?.message || "Annullamento non riuscito";
           throw error;
         } finally {
           this.loading = false;
@@ -2624,10 +2705,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.loading = true;
     try {
       await firstValueFrom(
-        this.adminApi.linkSaleToAppointment(
-          event.saleId,
-          event.appointment.id,
-        ),
+        this.adminApi.linkSaleToAppointment(event.saleId, event.appointment.id),
       );
       this.appointmentOrderNotifications.dismiss(event.appointment.id);
       this.feedback = "Vendita collegata all'appuntamento";
@@ -2641,9 +2719,15 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   closeQuickOrder(): void {
+    if (this.quickOrderCustomerSearchTimer) {
+      clearTimeout(this.quickOrderCustomerSearchTimer);
+      this.quickOrderCustomerSearchTimer = null;
+    }
+    this.quickOrderCustomerRequestId += 1;
     this.quickOrderOpen = false;
     this.quickOrderAppointment = null;
     this.quickOrderSale = null;
+    this.quickOrderCustomers = [];
   }
 
   deleteSale(sale: any): void {

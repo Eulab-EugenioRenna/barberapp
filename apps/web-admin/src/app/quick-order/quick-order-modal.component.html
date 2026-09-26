@@ -17,17 +17,31 @@
     <header class="quick-order-header">
       <div>
         <p class="eyebrow text-[var(--accent)]">
-          {{ isEditing ? "Modifica vendita" : isLinkedToAppointment ? "Fine servizio" : "Vendita al banco" }}
+          {{
+            isEditing
+              ? "Modifica vendita"
+              : isLinkedToAppointment
+                ? "Fine servizio"
+                : "Vendita al banco"
+          }}
         </p>
         <h2 id="quick-order-title" class="font-display text-4xl">
-          {{ isEditing ? "Modifica vendita" : isLinkedToAppointment ? "Chiudi il conto" : "Vendita veloce" }}
+          {{
+            isEditing
+              ? "Modifica vendita"
+              : isLinkedToAppointment
+                ? "Chiudi il conto"
+                : "Vendita veloce"
+          }}
         </h2>
         <p class="mt-1 text-sm text-[var(--muted)]">
           <ng-container *ngIf="isLinkedToAppointment; else quickIntro">
-            La vendita verrà collegata all'appuntamento e chiuderà il conto del cliente.
+            La vendita verrà collegata all'appuntamento e chiuderà il conto del
+            cliente.
           </ng-container>
           <ng-template #quickIntro>
-            Registra in pochi tocchi servizi e prodotti acquistati senza prenotazione.
+            Registra in pochi tocchi servizi e prodotti acquistati senza
+            prenotazione.
           </ng-template>
         </p>
       </div>
@@ -52,6 +66,8 @@
             label="Cliente"
             placeholder="Seleziona il cliente"
             createLabel="Aggiungi nuovo cliente"
+            [remoteSearch]="true"
+            (searchChange)="customerSearchChange.emit($event)"
             (createRequest)="quickCreateKind = 'customer'"
           ></barber-custom-select>
         </label>
@@ -59,8 +75,20 @@
           <div class="flex items-center justify-between gap-3">
             <p class="quick-order-step">2 · Tocca servizi o prodotti</p>
             <div class="flex gap-2">
-              <button type="button" class="pill-btn" (click)="quickCreateKind = 'service'">+ Servizio</button>
-              <button type="button" class="pill-btn" (click)="quickCreateKind = 'product'">+ Prodotto</button>
+              <button
+                type="button"
+                class="pill-btn"
+                (click)="quickCreateKind = 'service'"
+              >
+                + Servizio
+              </button>
+              <button
+                type="button"
+                class="pill-btn"
+                (click)="quickCreateKind = 'product'"
+              >
+                + Prodotto
+              </button>
             </div>
           </div>
           <div class="touch-grid">
@@ -94,91 +122,91 @@
 
       <aside class="quick-order-cart">
         <div class="quick-order-cart-scroll">
-        <p class="quick-order-step">3 · Riepilogo vendita</p>
-        <div class="cart-empty" *ngIf="!items.length">
-          Tocca un servizio o un prodotto per iniziare.
-        </div>
-        <article *ngFor="let item of items; let i = index" class="cart-line">
-          <div class="cart-line-head">
-            <div>
-              <span class="touch-card-kind">{{
-                item.kind === "service" ? "Servizio" : "Prodotto"
-              }}</span>
-              <strong>{{ item.label }}</strong>
+          <p class="quick-order-step">3 · Riepilogo vendita</p>
+          <div class="cart-empty" *ngIf="!items.length">
+            Tocca un servizio o un prodotto per iniziare.
+          </div>
+          <article *ngFor="let item of items; let i = index" class="cart-line">
+            <div class="cart-line-head">
+              <div>
+                <span class="touch-card-kind">{{
+                  item.kind === "service" ? "Servizio" : "Prodotto"
+                }}</span>
+                <strong>{{ item.label }}</strong>
+              </div>
+              <button type="button" class="remove-line" (click)="removeItem(i)">
+                Rimuovi
+              </button>
             </div>
-            <button type="button" class="remove-line" (click)="removeItem(i)">
-              Rimuovi
-            </button>
-          </div>
-          <div class="cart-line-fields">
-            <label>
-              <span>Q.tà</span>
-              <input
-                [(ngModel)]="item.quantity"
-                [name]="'quickQty' + i"
-                type="number"
-                min="1"
-                inputmode="numeric"
-              />
-            </label>
-            <label>
-              <span>Prezzo</span>
-              <input
-                [(ngModel)]="item.unitPrice"
-                [name]="'quickPrice' + i"
-                type="number"
-                min="0"
-                step="0.01"
-                inputmode="decimal"
-                (focus)="pricePadIndex = i"
-              />
-            </label>
-            <label *ngIf="item.kind === 'service'" class="cart-collaborator">
-              <span>Professionista</span>
-              <barber-custom-select
-                [value]="item.collaboratorId"
-                (valueChange)="item.collaboratorId = $event"
-                [options]="collaboratorOptions"
-                [label]="'Professionista per ' + item.label"
-                placeholder="Scegli il professionista"
-              ></barber-custom-select>
-            </label>
-          </div>
-        </article>
+            <div class="cart-line-fields">
+              <label>
+                <span>Q.tà</span>
+                <input
+                  [(ngModel)]="item.quantity"
+                  [name]="'quickQty' + i"
+                  type="number"
+                  min="1"
+                  inputmode="numeric"
+                />
+              </label>
+              <label>
+                <span>Prezzo</span>
+                <input
+                  [(ngModel)]="item.unitPrice"
+                  [name]="'quickPrice' + i"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputmode="decimal"
+                  (focus)="pricePadIndex = i"
+                />
+              </label>
+              <label *ngIf="item.kind === 'service'" class="cart-collaborator">
+                <span>Professionista</span>
+                <barber-custom-select
+                  [value]="item.collaboratorId"
+                  (valueChange)="item.collaboratorId = $event"
+                  [options]="collaboratorOptions"
+                  [label]="'Professionista per ' + item.label"
+                  placeholder="Scegli il professionista"
+                ></barber-custom-select>
+              </label>
+            </div>
+          </article>
 
-        <div
-          *ngIf="pricePadIndex >= 0 && items[pricePadIndex]"
-          class="price-pad"
-        >
-          <div class="price-pad-title">
-            <span>Prezzo · {{ items[pricePadIndex].label }}</span>
-            <button type="button" (click)="pricePadIndex = -1">OK</button>
+          <div
+            *ngIf="pricePadIndex >= 0 && items[pricePadIndex]"
+            class="price-pad"
+          >
+            <div class="price-pad-title">
+              <span>Prezzo · {{ items[pricePadIndex].label }}</span>
+              <button type="button" (click)="pricePadIndex = -1">OK</button>
+            </div>
+            <div class="price-pad-grid">
+              <button
+                *ngFor="
+                  let key of [
+                    '1',
+                    '2',
+                    '3',
+                    '4',
+                    '5',
+                    '6',
+                    '7',
+                    '8',
+                    '9',
+                    '0',
+                    '.',
+                  ]
+                "
+                type="button"
+                (click)="appendPrice(key)"
+              >
+                {{ key }}
+              </button>
+              <button type="button" (click)="clearPrice()">C</button>
+            </div>
           </div>
-          <div class="price-pad-grid">
-            <button
-              *ngFor="
-                let key of [
-                  '1',
-                  '2',
-                  '3',
-                  '4',
-                  '5',
-                  '6',
-                  '7',
-                  '8',
-                  '9',
-                  '0',
-                  '.',
-                ]
-              "
-              type="button"
-              (click)="appendPrice(key)"
-            >
-              {{ key }}
-            </button>
-            <button type="button" (click)="clearPrice()">C</button>
-          </div>
-        </div>
         </div>
 
         <div class="checkout-bar">
@@ -217,7 +245,13 @@
             [disabled]="loading || !canSubmit()"
             (click)="submit()"
           >
-            {{ loading ? "Salvataggio..." : isEditing ? "Salva vendita" : "Registra vendita" }}
+            {{
+              loading
+                ? "Salvataggio..."
+                : isEditing
+                  ? "Salva vendita"
+                  : "Registra vendita"
+            }}
           </button>
         </div>
       </aside>

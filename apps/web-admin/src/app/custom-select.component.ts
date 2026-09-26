@@ -60,48 +60,49 @@ type SelectOption = {
 
       <ng-template #popoverTemplate>
         <div
-        role="listbox"
-        [id]="listboxId"
-        class="select-popover"
-        (click)="$event.stopPropagation()"
-      >
-        <label class="select-filter-shell">
-          <input
-            [(ngModel)]="filterQuery"
-            class="select-filter-input"
-            placeholder="Filtra opzioni"
-            aria-label="Filtra opzioni"
-            (pointerdown)="$event.stopPropagation()"
-            (click)="$event.stopPropagation()"
-          />
-        </label>
-        <button
-          *ngIf="createLabel"
-          type="button"
-          class="select-create-action"
-          (pointerdown)="requestCreate($event)"
+          role="listbox"
+          [id]="listboxId"
+          class="select-popover"
+          (click)="$event.stopPropagation()"
         >
-          <span aria-hidden="true">+</span>{{ createLabel }}
-        </button>
-        <div
-          *ngFor="let option of filteredOptions"
-          role="option"
-          [attr.tabindex]="option.disabled ? -1 : 0"
-          [attr.aria-selected]="option.value === value"
-          [attr.aria-disabled]="option.disabled || null"
-          class="select-option"
-          [class.active]="option.value === value"
-          [class.option-disabled]="option.disabled"
-          (pointerdown)="choose(option, $event)"
-          (keydown.enter)="choose(option, $event)"
-          (keydown.space)="choose(option, $event)"
-        >
-          <span>{{ option.label }}</span>
-          <small *ngIf="option.hint">{{ option.hint }}</small>
-        </div>
-        <div *ngIf="!filteredOptions.length" class="select-empty">
-          Nessun risultato
-        </div>
+          <label class="select-filter-shell">
+            <input
+              [ngModel]="filterQuery"
+              (ngModelChange)="onFilterQueryChange($event)"
+              class="select-filter-input"
+              placeholder="Filtra opzioni"
+              aria-label="Filtra opzioni"
+              (pointerdown)="$event.stopPropagation()"
+              (click)="$event.stopPropagation()"
+            />
+          </label>
+          <button
+            *ngIf="createLabel"
+            type="button"
+            class="select-create-action"
+            (pointerdown)="requestCreate($event)"
+          >
+            <span aria-hidden="true">+</span>{{ createLabel }}
+          </button>
+          <div
+            *ngFor="let option of filteredOptions"
+            role="option"
+            [attr.tabindex]="option.disabled ? -1 : 0"
+            [attr.aria-selected]="option.value === value"
+            [attr.aria-disabled]="option.disabled || null"
+            class="select-option"
+            [class.active]="option.value === value"
+            [class.option-disabled]="option.disabled"
+            (pointerdown)="choose(option, $event)"
+            (keydown.enter)="choose(option, $event)"
+            (keydown.space)="choose(option, $event)"
+          >
+            <span>{{ option.label }}</span>
+            <small *ngIf="option.hint">{{ option.hint }}</small>
+          </div>
+          <div *ngIf="!filteredOptions.length" class="select-empty">
+            Nessun risultato
+          </div>
         </div>
       </ng-template>
     </div>
@@ -273,8 +274,10 @@ export class CustomSelectComponent implements OnDestroy {
   @Input() placeholder = "Seleziona";
   @Input() disabled = false;
   @Input() createLabel = "";
+  @Input() remoteSearch = false;
   @Output() valueChange = new EventEmitter<string>();
   @Output() createRequest = new EventEmitter<void>();
+  @Output() searchChange = new EventEmitter<string>();
 
   open = false;
   filterQuery = "";
@@ -286,7 +289,7 @@ export class CustomSelectComponent implements OnDestroy {
   get filteredOptions(): SelectOption[] {
     const query = this.filterQuery.trim().toLowerCase();
 
-    if (!query) {
+    if (!query || this.remoteSearch) {
       return this.options;
     }
 
@@ -368,12 +371,22 @@ export class CustomSelectComponent implements OnDestroy {
     this.createRequest.emit();
   }
 
+  onFilterQueryChange(value: string): void {
+    this.filterQuery = value;
+    if (this.remoteSearch) {
+      this.searchChange.emit(value);
+    }
+  }
+
   private openPopover(): void {
     const template = this.popoverTemplate;
     if (!template) return;
 
     this.open = true;
     this.filterQuery = "";
+    if (this.remoteSearch) {
+      this.searchChange.emit("");
+    }
     this.portalView = template.createEmbeddedView({});
     this.applicationRef.attachView(this.portalView);
     this.portalView.detectChanges();
@@ -428,7 +441,10 @@ export class CustomSelectComponent implements OnDestroy {
       triggerRect.bottom / scale + gap + popoverHeight <=
       window.innerHeight / scale - viewportPadding
         ? triggerRect.bottom / scale + gap
-        : Math.max(viewportPadding, triggerRect.top / scale - gap - popoverHeight);
+        : Math.max(
+            viewportPadding,
+            triggerRect.top / scale - gap - popoverHeight,
+          );
 
     Object.assign(popover.style, {
       top: `${top}px`,

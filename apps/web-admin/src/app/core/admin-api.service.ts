@@ -47,10 +47,11 @@ export class AdminApiService {
   loadCustomersPage(
     page: number,
     search = "",
+    pageSize = this.listPageSize,
   ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
     const query = new URLSearchParams({
       page: String(page),
-      pageSize: String(this.listPageSize),
+      pageSize: String(pageSize),
     });
     if (search) {
       query.set("search", search);
@@ -291,9 +292,12 @@ export class AdminApiService {
     saleId: string,
     appointmentId: string,
   ): Observable<any> {
-    return this.http.patch(`${ADMIN_API_URL}/sales/${saleId}/link-appointment`, {
-      appointmentId,
-    });
+    return this.http.patch(
+      `${ADMIN_API_URL}/sales/${saleId}/link-appointment`,
+      {
+        appointmentId,
+      },
+    );
   }
 
   createOrUpdateProduct(
