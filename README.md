@@ -120,9 +120,9 @@ precache dei bundle e non intercetta mai `/api/**`. La cache serve solo come
 fallback offline.
 
 Quando viene pubblicato un nuovo deploy, l'app confronta il build in esecuzione
-con `index.html` remoto e mostra il banner "Nuova versione disponibile". Il
-pulsante **Aggiorna** invalida le cache del service worker e ricarica, cosi il
-browser non continua a servire file vecchi.
+con `index.html` remoto, invalida le cache del service worker e si ricarica
+automaticamente. Se e aperto un modale, il refresh resta in coda fino alla
+chiusura dell'ultimo modale, cosi non interrompe un'operazione in corso.
 
 Perche l'invalidazione funzioni:
 

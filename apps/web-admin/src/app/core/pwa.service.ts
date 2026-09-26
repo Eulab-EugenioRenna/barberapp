@@ -1,5 +1,6 @@
 import { DOCUMENT } from "@angular/common";
 import { Injectable, computed, inject, signal } from "@angular/core";
+import { UpdateReloadQueue } from "./update-reload-queue";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -8,14 +9,15 @@ type BeforeInstallPromptEvent = Event & {
 
 const INSTALL_DISMISS_KEY = "barber.pwa-install-dismissed";
 const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
+const OPEN_MODAL_SELECTOR = '[role="dialog"][aria-modal="true"]';
 
 /**
  * Stato PWA dell'admin.
  *
  * La cache e volutamente non aggressiva: il service worker lavora
  * network-first e qui rileviamo i nuovi deploy confrontando il build corrente
- * con `index.html` remoto. Quando cambia, l'utente puo invalidare le cache e
- * ricaricare l'app.
+ * con `index.html` remoto. Quando cambia, le cache vengono invalidate e l'app
+ * viene ricaricata automaticamente appena non ci sono modali aperte.
  */
 @Injectable({ providedIn: "root" })
 export class AdminPwaService {
@@ -23,13 +25,12 @@ export class AdminPwaService {
 
   private deferredPrompt: BeforeInstallPromptEvent | null = null;
   private updateTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly updateReloadQueue: UpdateReloadQueue | null;
 
   readonly installAvailable = signal(false);
   readonly installed = signal(false);
-  readonly updateAvailable = signal(false);
   readonly offline = signal(false);
   readonly installDismissed = signal(false);
-  readonly applyingUpdate = signal(false);
 
   readonly showInstallBanner = computed(
     () =>
@@ -39,8 +40,21 @@ export class AdminPwaService {
   constructor() {
     const window = this.document.defaultView;
     if (!window) {
+      this.updateReloadQueue = null;
       return;
     }
+
+    this.updateReloadQueue = new UpdateReloadQueue({
+      hasOpenModal: () =>
+        Boolean(this.document.querySelector(OPEN_MODAL_SELECTOR)),
+      observeModalChanges: (onChange) => {
+        const observer = new window.MutationObserver(onChange);
+        observer.observe(this.document.body, { childList: true, subtree: true });
+        return () => observer.disconnect();
+      },
+      beforeReload: () => this.clearCaches(),
+      reload: () => window.location.reload(),
+    });
 
     this.installed.set(this.isStandalone());
     this.offline.set(!window.navigator.onLine);
@@ -129,7 +143,7 @@ export class AdminPwaService {
       const currentId = this.currentBuildId();
 
       if (remoteId && currentId && remoteId !== currentId) {
-        this.updateAvailable.set(true);
+        this.updateReloadQueue?.request();
         return true;
       }
     } catch {
@@ -137,13 +151,6 @@ export class AdminPwaService {
     }
 
     return false;
-  }
-
-  /** Invalida le cache del browser/service worker e ricarica l'app. */
-  async applyUpdate(): Promise<void> {
-    this.applyingUpdate.set(true);
-    await this.clearCaches();
-    this.document.defaultView?.location.reload();
   }
 
   private registerServiceWorker(window: Window): void {

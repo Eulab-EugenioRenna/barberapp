@@ -406,17 +406,6 @@ textarea:focus-visible {
   display: block;
 }
 
-.pwa-banner-update {
-  border: 0.0625rem solid rgba(59, 130, 246, 0.24);
-  background: rgba(59, 130, 246, 0.1);
-  color: #1e3a8a;
-}
-
-.pwa-banner-update .pwa-banner-icon {
-  background: #2563eb;
-  color: white;
-}
-
 .pwa-banner-offline {
   border: 0.0625rem solid rgba(245, 158, 11, 0.28);
   background: rgba(245, 158, 11, 0.12);

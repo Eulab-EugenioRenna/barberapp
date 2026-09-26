@@ -24,26 +24,6 @@ import { AdminPwaService } from "../core/pwa.service";
       </section>
 
       <section
-        *ngIf="pwa.updateAvailable()"
-        class="pwa-banner pwa-banner-update"
-        role="status"
-      >
-        <span class="pwa-banner-icon" aria-hidden="true">↻</span>
-        <div class="pwa-banner-copy">
-          <strong>Nuova versione disponibile</strong>
-          <span>Aggiorna per usare l'ultima versione dell'app.</span>
-        </div>
-        <button
-          type="button"
-          class="primary-btn pwa-banner-action"
-          [disabled]="pwa.applyingUpdate()"
-          (click)="pwa.applyUpdate()"
-        >
-          {{ pwa.applyingUpdate() ? "Aggiornamento..." : "Aggiorna" }}
-        </button>
-      </section>
-
-      <section
         *ngIf="pwa.showInstallBanner()"
         class="pwa-banner pwa-banner-install"
         role="status"
