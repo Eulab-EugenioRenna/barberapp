@@ -1,5 +1,10 @@
 # Step 4 — flusso auth e collaudo manuale
 
+## Distribuzione npm adottata — 24 ottobre 2026
+
+ALORA dipende ora dalla versione esatta pubblica [@eulab/connect 0.10.0](https://www.npmjs.com/package/@eulab/connect/v/0.10.0), installata dal registry con integrità SHA-512 verificata e lockfile aggiornato. SHA-256 dell’archivio pubblico: `2e07f936a8d52b9ff47862dcd674e0afa39fe0a4c9919ffa37d4cd9380cc294d`. L’intero archivio pubblico coincide byte per byte con il tarball già collaudato manualmente dall’utente. I tarball vendor/ sono solo archivio storico; npm ci e Docker non dipendono da essi. Le note precedenti sulla candidata locale descrivono la fase precedente alla pubblicazione. Non è stato ripetuto il login dell’utente durante questo cambio di distribuzione.
+
+
 Aggiornamento 24 ottobre 2026: ALORA usa il tarball SDK 0.10.0 consegnato con schema Connect 013, SHA-256 `2e07f936a8d52b9ff47862dcd674e0afa39fe0a4c9919ffa37d4cd9380cc294d`. Il vecchio servizio enrollment/intake locale è rimosso. Le richieste passano solo dalla facciata ufficiale e dagli endpoint esistenti app-onboarding.
 
 ## Configurazione predisposta
@@ -66,3 +71,5 @@ Il nuovo tentativo manuale dell’utente arriva al callback e torna ancora con `
 ## Conferma manuale dell’utente — 24 ottobre 2026
 
 Dopo il riallineamento del client OIDC (audience connect-api e scope basic), l’utente ha confermato che l’accesso all’admin ALORA funziona. È una verifica manuale sull’installazione Docker locale: non equivale al collaudo di rinnovo, revoca, permessi, MFA o produzione. Nessuna migrazione o sessione utente è stata eseguita automaticamente per questa verifica.
+
+Verifica adozione npm: integrità del tarball pubblico confrontata con il manifest registry; tutti i file SDK dell’immagine ricostruita con npm ci corrispondono al tarball verificato. I volumi node_modules dei tre servizi sono stati riallineati dall’immagine npm, compresi i metadati del pacchetto, conservando i dati applicativi. Build API/admin, lint e build delle tre immagini superati. Nessun login automatico o migrazione ripetuta. La risoluzione DNS temporanea è stata limitata al comando npm host e non cambia la configurazione di sistema.

@@ -1,5 +1,10 @@
 # Step 4 — Accesso Connect obbligatorio e migrazione assistita
 
+## Distribuzione npm adottata — 24 ottobre 2026
+
+ALORA dipende ora dalla versione esatta pubblica [@eulab/connect 0.10.0](https://www.npmjs.com/package/@eulab/connect/v/0.10.0), installata dal registry con integrità SHA-512 verificata e lockfile aggiornato. SHA-256 dell’archivio pubblico: `2e07f936a8d52b9ff47862dcd674e0afa39fe0a4c9919ffa37d4cd9380cc294d`. L’intero archivio pubblico coincide byte per byte con il tarball già collaudato manualmente dall’utente. I tarball vendor/ sono solo archivio storico; npm ci e Docker non dipendono da essi. Le note precedenti sulla candidata locale descrivono la fase precedente alla pubblicazione. Non è stato ripetuto il login dell’utente durante questo cambio di distribuzione.
+
+
 ## Stato corrente — una sola facciata SDK, presenter schema 013
 
 Adottato il tarball SDK 0.10.0 del 24 ottobre con SHA-256 `938a998004345cf650cbeb1881cf3f33df465ce3e806848a3ed436044abc56a1`. Rimosso il percorso enrollment/intake parallelo: discovery, prova legacy, challenge, consenso, richiesta, attesa e SSO usano la stessa facciata ConnectApplication e gli endpoint app-onboarding esistenti.

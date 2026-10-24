@@ -1,15 +1,12 @@
-# Connect SDK artifacts
+# Historical Connect SDK artifacts
 
-ALORA currently pins `eulab-connect-0.10.0.tgz`, copied unchanged from the adjacent Connect release directory. Its SHA-256 matches the delivery manifest: `2e07f936a8d52b9ff47862dcd674e0afa39fe0a4c9919ffa37d4cd9380cc294d`. It includes the schema-013 presenter capability, approved configuration sync, application facade and PostgreSQL store. The local SDK candidate now includes the server-only OIDC transport origin for Docker. No npm publication was performed. The previous artifacts remain for reproducibility.
+ALORA now installs **[@eulab/connect@0.10.0 from npm](https://www.npmjs.com/package/@eulab/connect/v/0.10.0)**. The root package pins the exact version; the lockfile contains the public registry URL and SHA-512 integrity. Docker dependency stages use npm ci and do not copy vendor/ before installing.
 
-SDK 0.9.0 SHA-256: `b8b82f04190c8ec89a56fb53e8ffb2458ac9f2b06990afcda06bde5e361a79bf`.
+The tarballs here preserve the earlier integration snapshots only. They are not the active dependency. The local 0.10.0 snapshot SHA-256 is `2e07f936a8d52b9ff47862dcd674e0afa39fe0a4c9919ffa37d4cd9380cc294d`; the public registry artifact was verified byte-for-byte identical to this accepted local snapshot.
 
-The root package and lockfile reference the 0.10.0 repository artifact. Docker dependency stages copy `vendor/` before installing. The tarballs contain compiled SDK code, declarations and package documentation, without deployment environment files or credentials. Node >=22 is required. The CommonJS API loads the ESM server/application entries through native dynamic import. Integration changes stay local until ALORA acceptance; npm publication is a later explicit release action.
+Earlier artifact SHA-256 values:
 
-Historical SDK 0.8.1 SHA-256: `089e065b2cf7f94da43b31a5fe7408b4852b4bb2603839760b9784178dae2321`. The user confirmed its earlier npm publication; publication of 0.9.0 is not claimed by this artifact update.
+- 0.9.0: `b8b82f04190c8ec89a56fb53e8ffb2458ac9f2b06990afcda06bde5e361a79bf`
+- 0.8.1: `089e065b2cf7f94da43b31a5fe7408b4852b4bb2603839760b9784178dae2321`
 
-## SDK Connect: riferimenti online
-
-Pacchetto ufficiale: [@eulab/connect su npm](https://www.npmjs.com/package/@eulab/connect). Codice e guida: [SDK nel repository Connect](https://github.com/Eulab-EugenioRenna/connect/tree/main/packages/sdk). Gli ingressi usati dal backend sono `@eulab/connect/application` e `@eulab/connect/server`.
-
-Questa integrazione usa la candidata locale **0.10.0** tramite tarball versionato in `vendor/`, come specificato nel lockfile. Il collegamento npm identifica il pacchetto ufficiale; non attesta che la candidata sia pubblicata. Prima del passaggio alla distribuzione npm verificare la versione con `npm view @eulab/connect version`, pubblicare la candidata approvata e aggiornare dipendenza e lockfile alla versione esatta. La verifica del registry del 24 ottobre è stata impedita da DNS ENOTFOUND; la dipendenza locale funzionante resta invariata.
+Source and integration guide: [Connect SDK](https://github.com/Eulab-EugenioRenna/connect/tree/main/packages/sdk). Server entries require Node >=22 and are loaded through native dynamic import by the CommonJS API. Provider credentials remain backend-only.

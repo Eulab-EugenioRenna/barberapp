@@ -1,5 +1,10 @@
 # Requisito trasversale — integrazione Connect rapida nelle prossime app
 
+## Distribuzione npm adottata — 24 ottobre 2026
+
+ALORA dipende ora dalla versione esatta pubblica [@eulab/connect 0.10.0](https://www.npmjs.com/package/@eulab/connect/v/0.10.0), installata dal registry con integrità SHA-512 verificata e lockfile aggiornato. SHA-256 dell’archivio pubblico: `2e07f936a8d52b9ff47862dcd674e0afa39fe0a4c9919ffa37d4cd9380cc294d`. L’intero archivio pubblico coincide byte per byte con il tarball già collaudato manualmente dall’utente. I tarball vendor/ sono solo archivio storico; npm ci e Docker non dipendono da essi. Le note precedenti sulla candidata locale descrivono la fase precedente alla pubblicazione. Non è stato ripetuto il login dell’utente durante questo cambio di distribuzione.
+
+
 Aggiornamento 24 ottobre: requisito consegnato e adottato tramite presenter e configuration.sync della stessa facciata SDK 0.10.0/schema 013. Nessun nuovo intake: riutilizzati app-onboarding, pratiche e pannello esistenti. Il servizio enrollment locale è rimosso. [Adozione e revisione di standardizzazione](auth-flow-step-4.md); il collaudo dell’installazione effettiva è riservato all’utente. Le sezioni seguenti conservano i requisiti e la baseline precedenti.
 
 Decisione del 22 ottobre 2026: continuare il piano ALORA, ma usare questa integrazione per consolidare un SDK che la prossima applicazione possa istanziare e richiamare, senza ricopiare il protocollo. Questa capacità è un requisito di integrazione, non una nuova milestone di prodotto ALORA né un motivo per interrompere i collaudi in corso.
