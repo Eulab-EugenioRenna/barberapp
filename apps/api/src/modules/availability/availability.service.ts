@@ -2,10 +2,7 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { CACHE_TTL_SECONDS, cacheKeys } from "../../cache/cache.constants";
 import { normalizeCacheToken } from "../../cache/cache.helpers";
 import { AppCacheService } from "../../cache/cache.service";
-import {
-  resolveZonedDateKey,
-  zonedTimeToUtc,
-} from "../../common/zoned-time";
+import { resolveZonedDateKey, zonedTimeToUtc } from "../../common/zoned-time";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CollaboratorScheduleService } from "./collaborator-schedule.service";
 
@@ -57,7 +54,8 @@ export class AvailabilityService {
         serviceId,
         dateToken,
         collaboratorToken,
-      ),
+      ) +
+        `:${options?.publicOnly ? "public" : "internal"}:${options?.requireExplicitCollaborator ? "explicit" : "auto"}`,
       CACHE_TTL_SECONDS.publicAvailability,
       () =>
         this.buildAvailability(
@@ -102,7 +100,9 @@ export class AvailabilityService {
         },
       });
       if (!collaboratorExists) {
-        throw new BadRequestException("Il professionista scelto non è disponibile per questo servizio");
+        throw new BadRequestException(
+          "Il professionista scelto non è disponibile per questo servizio",
+        );
       }
     }
 
@@ -131,10 +131,7 @@ export class AvailabilityService {
     // Server-local date used only for weekday/schedule resolution.
     const localDay = new Date(year, month - 1, dayOfMonth);
     // Tenant day boundaries expressed as UTC instants for conflict queries.
-    const dayStart = zonedTimeToUtc(
-      { year, month, day: dayOfMonth },
-      timezone,
-    );
+    const dayStart = zonedTimeToUtc({ year, month, day: dayOfMonth }, timezone);
     const nextCalendarDay = new Date(Date.UTC(year, month - 1, dayOfMonth + 1));
     const nextDayStart = zonedTimeToUtc(
       {

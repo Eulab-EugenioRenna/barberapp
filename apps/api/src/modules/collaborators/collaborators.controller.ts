@@ -1,3 +1,4 @@
+import { LegacyWriteDto } from "../../common/legacy-write.dto";
 import {
   BadRequestException,
   Body,
@@ -18,10 +19,7 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
-import {
-  buildPaginatedResult,
-  parsePagination,
-} from "../../common/pagination";
+import { buildPaginatedResult, parsePagination } from "../../common/pagination";
 
 @Controller("collaborators")
 export class CollaboratorsController {
@@ -76,7 +74,7 @@ export class CollaboratorsController {
   @Post()
   async create(
     @Req() request: { headers: { authorization?: string } },
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -161,7 +159,7 @@ export class CollaboratorsController {
   async update(
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -177,9 +175,8 @@ export class CollaboratorsController {
       : null;
 
     const updated = await this.prisma.collaborator.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
-        tenantId,
         firstName:
           typeof body["firstName"] === "string" ? body["firstName"] : undefined,
         lastName:
@@ -274,7 +271,7 @@ export class CollaboratorsController {
       );
     }
 
-    await this.prisma.collaborator.delete({ where: { id } });
+    await this.prisma.collaborator.delete({ where: { id, tenantId } });
 
     await Promise.all([
       this.cacheInvalidationService.invalidateCollaborators(tenantId),

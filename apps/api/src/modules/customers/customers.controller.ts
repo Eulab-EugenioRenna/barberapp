@@ -1,3 +1,4 @@
+import { LegacyWriteDto } from "../../common/legacy-write.dto";
 import {
   Body,
   Controller,
@@ -17,10 +18,7 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
-import {
-  buildPaginatedResult,
-  parsePagination,
-} from "../../common/pagination";
+import { buildPaginatedResult, parsePagination } from "../../common/pagination";
 import { resolveSaleItemLabels } from "../sales/sales.logic";
 import { CustomersAlignmentService } from "./customers-alignment.service";
 
@@ -85,7 +83,7 @@ export class CustomersController {
   @Post()
   async create(
     @Req() request: { headers: { authorization?: string } },
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -146,7 +144,7 @@ export class CustomersController {
   async update(
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -154,7 +152,7 @@ export class CustomersController {
     );
     const tenantId = requireTenantId(session);
     const updated = await this.prisma.customer.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         firstName:
           typeof body["firstName"] === "string" ? body["firstName"] : undefined,
@@ -253,7 +251,7 @@ export class CustomersController {
     );
     const tenantId = requireTenantId(session);
 
-    await this.prisma.customer.delete({ where: { id } });
+    await this.prisma.customer.delete({ where: { id, tenantId } });
 
     await Promise.all([
       this.cacheInvalidationService.invalidateCustomers(tenantId),

@@ -85,6 +85,7 @@ enum BillingInterval {
 }
 
 model Tenant {
+  connectBinding ConnectTenantBinding?
   id                            String                         @id @default(uuid())
   name                          String
   slug                          String                         @unique
@@ -156,11 +157,20 @@ model User {
   isActive                    Boolean                      @default(true)
   createdAt                   DateTime                     @default(now())
   updatedAt                   DateTime                     @updatedAt
+  connectSubject              String?
+  connectInstallationId       String?
+  connectAcceptedAt           DateTime?
+  connectActivatedAt          DateTime?
+  connectSessions             ConnectSession[]
+  connectAuthFlows            ConnectAuthFlow[]
+  migrationChallenges         ConnectMigrationChallenge[]
+  sessions                    LocalSession[]
   collaborator                Collaborator?
   notificationInboxItems      NotificationInbox[]
   notificationPreferenceUsers NotificationPreferenceUser[]
 
   @@index([tenantId, role])
+  @@unique([connectInstallationId, connectSubject])
 }
 
 model Collaborator {
@@ -586,4 +596,99 @@ model TenantSubscription {
 
   @@index([tenantId, status])
   @@index([planId, status])
+}
+
+// Additive transitional sessions; refresh history is retained to detect replay.
+model LocalSession {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectSessionId String?
+  connectSession   ConnectSession? @relation(fields: [connectSessionId], references: [id], onDelete: Cascade)
+  familyId         String
+  accessHash       String   @unique
+  refreshHash      String   @unique
+  accessExpiresAt  DateTime
+  refreshExpiresAt DateTime
+  usedAt           DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+
+  @@index([familyId])
+  @@index([userId])
+}
+
+// Provider credentials are encrypted; browsers receive only the existing opaque ALORA tokens.
+model ConnectSession {
+  id               String @id @default(uuid())
+  userId           String
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installationId   String
+  accessCipher     String
+  refreshCipher    String?
+  sdkSessionCipher String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  sessions         LocalSession[]
+  flows            ConnectAuthFlow[]
+  @@index([userId])
+}
+
+// State/one-use handoff hashes and an encrypted PKCE verifier; never a password.
+model ConnectAuthFlow {
+  id               String @id @default(uuid())
+  userId           String?
+  user             User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contextCipher    String?
+  installationId   String
+  stateHash        String @unique
+  browserHash      String
+  verifierCipher   String
+  expiresAt        DateTime
+  usedAt           DateTime?
+  handoffHash      String? @unique
+  exchangedAt      DateTime?
+  connectSessionId String?
+  connectSession   ConnectSession? @relation(fields: [connectSessionId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+// Server-authorized SaaS binding. The browser cannot select or change it.
+model ConnectTenantBinding {
+  tenantId       String @id
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId     String
+  installationId String @unique
+  secretCipher   String
+  createdAt      DateTime @default(now())
+}
+
+// Only permits submitting a migration request, never access to business APIs.
+model ConnectMigrationChallenge {
+  id        String @id @default(uuid())
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+// Official SDK store schema 001, managed additively with the consumer migrations.
+model ConnectSdkSchema {
+  version Int @id
+  @@map("connect_sdk_schema")
+}
+
+model ConnectSdkRecord {
+  namespace String
+  id String
+  cipher String
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  @@id([namespace, id])
+  @@index([expiresAt], map: "connect_sdk_expiry")
+  @@map("connect_sdk_records")
 }

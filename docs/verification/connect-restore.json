@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-22T20:41:32.215Z",
+  "status": "passed",
+  "checks": 17,
+  "tablesReconciled": 32,
+  "legacyProjectionPreserved": true,
+  "historicalCheckpointCompatible": true,
+  "repeatedApply": true,
+  "monetaryDriftDetected": true,
+  "allPostBackupRowsPreserved": true,
+  "newWritesPreserved": true,
+  "connectCiphersReadableWithOriginalKey": true,
+  "sdkProofResumedAfterRestore": true,
+  "sdkProofReplayBlocked": true,
+  "wrongKeyRejected": true,
+  "localAccessStillBlocked": true,
+  "sourceDatabaseReadOnly": true,
+  "productionCopy": false,
+  "cleanupVerified": true
+}

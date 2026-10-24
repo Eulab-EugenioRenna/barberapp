@@ -1,18 +1,25 @@
 {
-  "name": "Direzione salone",
-  "short_name": "Il mio salone",
-  "description": "Agenda, squadra, clienti, vendite e andamento del tuo salone.",
+  "name": "alora by EULAB",
+  "short_name": "alora",
+  "description": "Agenda, clienti, squadra e vendite per la tua attività Beauty & Wellness.",
   "lang": "it",
   "dir": "ltr",
   "start_url": "/admin/#/dashboard",
   "scope": "/admin/",
   "id": "/admin/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait-primary",
-  "background_color": "#0d141c",
-  "theme_color": "#101923",
-  "categories": ["business", "productivity"],
+  "background_color": "#f4f8ec",
+  "theme_color": "#1e3425",
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -38,19 +45,34 @@
       "name": "Panoramica",
       "short_name": "Panoramica",
       "url": "/admin/#/dashboard",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Prenotazioni",
       "short_name": "Agenda",
       "url": "/admin/#/appointments",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "Conferme",
       "short_name": "Conferme",
       "url": "/admin/#/confirmations",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

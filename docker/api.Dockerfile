@@ -2,7 +2,8 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY package*.json ./
-RUN npm install
+COPY vendor ./vendor
+RUN npm ci --no-audit --no-fund
 
 FROM deps AS dev
 RUN apk add --no-cache netcat-openbsd

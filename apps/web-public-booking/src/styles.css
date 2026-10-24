@@ -1,4 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@500;700;800&display=swap");
+@import "../../../libs/shared/brand/src/theme.css";
+
+@font-face {
+  font-family: "Inter";
+  src: url("/booking/fonts/Inter-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
@@ -7,14 +15,6 @@
 :root {
   --ui-scale: 0.92;
   font-size: 14.72px;
-  --ink: #14181f;
-  --muted: #5f6876;
-  --line: rgba(20, 24, 31, 0.08);
-  --brand: #1c7c64;
-  --accent: #f97316;
-  --scrollbar-track: rgba(20, 24, 31, 0.05);
-  --scrollbar-thumb: rgba(20, 24, 31, 0.18);
-  --scrollbar-thumb-hover: rgba(20, 24, 31, 0.28);
 }
 
 * {
@@ -63,19 +63,8 @@ barber-public-root {
 body {
   margin: 0;
   color: var(--ink);
-  font-family: "Plus Jakarta Sans", sans-serif;
-  background:
-    radial-gradient(
-      circle at 12% 18%,
-      rgba(249, 115, 22, 0.16),
-      transparent 22rem
-    ),
-    radial-gradient(
-      circle at 88% 12%,
-      rgba(28, 124, 100, 0.18),
-      transparent 24rem
-    ),
-    linear-gradient(135deg, #fff8ef 0%, #eff4f1 48%, #f8f2eb 100%);
+  font-family: var(--font-body);
+  background: var(--bg);
 }
 
 button,
@@ -95,30 +84,19 @@ button:focus-visible,
 [role="option"]:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 0.1875rem solid rgba(var(--accent-rgb, 249, 115, 22), 0.72);
+  outline: 0.1875rem solid var(--focus);
   outline-offset: 0.1875rem;
 }
 
 .font-display {
-  font-family: "Syne", sans-serif;
+  font-family: var(--font-display);
 }
 
 .public-shell {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background:
-    radial-gradient(
-      circle at 12% 18%,
-      rgba(var(--accent-rgb, 249, 115, 22), 0.16),
-      transparent 22rem
-    ),
-    radial-gradient(
-      circle at 88% 12%,
-      rgba(var(--brand-rgb, 28, 124, 100), 0.18),
-      transparent 24rem
-    ),
-    linear-gradient(135deg, #fff8ef 0%, #eff4f1 48%, #f8f2eb 100%);
+  background: var(--bg);
 }
 
 .public-frame {
@@ -132,14 +110,8 @@ select:focus-visible {
 }
 
 .booking-hero {
-  background:
-    radial-gradient(
-      circle at top right,
-      rgba(249, 115, 22, 0.18),
-      transparent 18rem
-    ),
-    linear-gradient(180deg, #101923 0%, #0d141c 100%);
-  box-shadow: 0 1.75rem 5rem rgba(10, 14, 20, 0.28);
+  background: var(--brand);
+  box-shadow: 0 0.75rem 2.5rem rgba(30, 52, 37, 0.16);
 }
 
 .public-hero,
@@ -157,8 +129,7 @@ select:focus-visible {
 .panel {
   border: 0.0625rem solid var(--line);
   background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 1.25rem 4.375rem rgba(15, 23, 32, 0.08);
-  backdrop-filter: blur(1.125rem);
+  box-shadow: 0 0.5rem 1.75rem rgba(30, 52, 37, 0.05);
 }
 
 .public-panel {
@@ -231,8 +202,8 @@ select:focus-visible {
 .field input:focus,
 .field select:focus {
   outline: none;
-  border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.34);
-  box-shadow: 0 0 0 0.25rem rgba(var(--brand-rgb, 28, 124, 100), 0.1);
+  border-color: rgba(var(--brand-rgb, 30, 52, 37), 0.34);
+  box-shadow: 0 0 0 0.25rem rgba(var(--brand-rgb, 30, 52, 37), 0.1);
 }
 
 .field input:focus:user-invalid,
@@ -259,19 +230,19 @@ select:focus-visible {
 }
 
 .service-card.active {
-  border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.25);
-  background: rgba(var(--brand-rgb, 28, 124, 100), 0.08);
+  border-color: rgba(var(--brand-rgb, 30, 52, 37), 0.25);
+  background: rgba(var(--brand-rgb, 30, 52, 37), 0.08);
 }
 
 .primary-btn {
   border: 0;
   cursor: pointer;
   border-radius: 1.35rem;
-  background: linear-gradient(135deg, var(--brand), #123b33);
+  background: linear-gradient(135deg, var(--brand), #1e3425);
   padding: 1rem 1.2rem;
   color: white;
   font-weight: 800;
-  box-shadow: 0 1rem 2.25rem rgba(var(--brand-rgb, 28, 124, 100), 0.22);
+  box-shadow: 0 1rem 2.25rem rgba(var(--brand-rgb, 30, 52, 37), 0.22);
 }
 
 .primary-btn:disabled,
@@ -361,4 +332,8 @@ button:disabled {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.public-panel .eyebrow {
+  color: var(--alora-accent-ink);
 }

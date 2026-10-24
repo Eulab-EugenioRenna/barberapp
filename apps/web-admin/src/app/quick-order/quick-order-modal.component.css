@@ -14,7 +14,7 @@
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(8, 15, 20, 0.72);
+  background: rgba(30, 52, 37, 0.72);
   backdrop-filter: blur(8px);
 }
 .quick-order-sheet {
@@ -29,7 +29,7 @@
   overflow: auto;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 2rem;
-  background: #f7f3ea;
+  background: var(--alora-paper);
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.38);
   padding: 0;
 }
@@ -42,8 +42,8 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #ded7c8;
-  background: rgba(247, 243, 234, 0.94);
+  border-bottom: 1px solid var(--line);
+  background: rgba(244, 248, 236, 0.98);
   backdrop-filter: blur(12px);
 }
 .quick-order-layout {
@@ -67,7 +67,7 @@
   display: flex;
   flex-direction: column;
   color: #fff;
-  background: #111b1a;
+  background: var(--alora-forest);
 }
 .quick-order-cart-scroll {
   display: grid;
@@ -96,10 +96,10 @@
   align-content: space-between;
   gap: 0.6rem;
   padding: 1rem;
-  border: 1px solid #d9d0be;
+  border: 1px solid var(--line);
   border-radius: 1.25rem;
   text-align: left;
-  background: #fffdf8;
+  background: #fff;
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -125,7 +125,7 @@
   border-top: 5px solid var(--accent);
 }
 .product-card {
-  border-top: 5px solid #1c7c64;
+  border-top: 5px solid var(--alora-lime);
 }
 .cart-empty {
   padding: 2rem;
@@ -188,7 +188,7 @@
   padding: 1rem;
   border-radius: 1.25rem;
   color: #111;
-  background: #f5b942;
+  background: var(--alora-lime);
 }
 .price-pad-grid {
   display: grid;
@@ -213,7 +213,7 @@
   gap: 0.8rem;
   margin-top: auto;
   padding-top: 1rem;
-  background: #111b1a;
+  background: var(--alora-forest);
 }
 .checkout-bar .field {
   color: rgba(255, 255, 255, 0.72);
@@ -228,7 +228,7 @@
   border-top: 1px solid rgba(255, 255, 255, 0.14);
 }
 .checkout-total strong {
-  font-family: var(--font-display, serif);
+  font-family: var(--font-display, sans-serif);
   font-size: 2rem;
 }
 .checkout-bar .primary-btn {

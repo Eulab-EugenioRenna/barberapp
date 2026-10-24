@@ -1,6 +1,9 @@
+import { FunctionAccessDirective } from "../shared/function-access.directive";
+import { SessionStore } from "../core/session.store";
 import { CommonModule } from "@angular/common";
 import {
   Component,
+  inject,
   EventEmitter,
   HostListener,
   Input,
@@ -19,6 +22,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
   selector: "barber-quick-order-modal",
   standalone: true,
   imports: [
+    FunctionAccessDirective,
     CommonModule,
     FormsModule,
     CustomSelectComponent,
@@ -29,6 +33,8 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
   styleUrl: "./quick-order-modal.component.css",
 })
 export class QuickOrderModalComponent implements OnInit {
+  readonly session = inject(SessionStore);
+
   protected readonly Number = Number;
   @Input() customers: any[] = [];
   @Input() services: any[] = [];

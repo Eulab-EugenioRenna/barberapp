@@ -14,9 +14,23 @@ async function bootstrap(): Promise<void> {
   });
   const config = app.get(ConfigService);
 
-  app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-  }));
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    }),
+  );
+  app.use(
+    "/auth",
+    (
+      _request: unknown,
+      response: { setHeader(name: string, value: string): void },
+      next: () => void,
+    ) => {
+      response.setHeader("Cache-Control", "no-store");
+      response.setHeader("Referrer-Policy", "no-referrer");
+      next();
+    },
+  );
   app.useStaticAssets(join(process.cwd(), "uploads"), {
     prefix: "/uploads/",
   });
@@ -36,8 +50,10 @@ async function bootstrap(): Promise<void> {
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle("Barber SaaS API")
-    .setDescription("REST API for the white-label booking SaaS MVP.")
+    .setTitle("ALORA by EULAB API")
+    .setDescription(
+      "Agenda, clienti, squadra e vendite della piattaforma ALORA.",
+    )
     .setVersion("0.1.0")
     .addBearerAuth()
     .build();

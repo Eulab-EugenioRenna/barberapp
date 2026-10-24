@@ -1,13 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./apps/**/*.{html,ts}'],
+  content: ["./apps/**/*.{html,ts}"],
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Fraunces"', 'Georgia', 'serif'],
-        body: ['"Manrope"', 'Verdana', 'sans-serif']
-      }
-    }
+        display: ["Inter", "sans-serif"],
+        body: ["Inter", "sans-serif"],
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 };

@@ -109,18 +109,18 @@ type MultiSelectOption = {
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1.2rem;
         background: rgba(255, 255, 255, 0.94);
         padding: 0.92rem 1rem;
-        color: #0f1720;
+        color: #1e3425;
         text-align: left;
-        box-shadow: 0 0.75rem 2rem rgba(15, 23, 32, 0.06);
+        box-shadow: 0 0.75rem 2rem rgba(30, 52, 37, 0.06);
       }
 
       .open .multi-trigger {
-        border-color: rgba(28, 124, 100, 0.3);
-        box-shadow: 0 0 0 0.22rem rgba(28, 124, 100, 0.1);
+        border-color: rgba(30, 52, 37, 0.3);
+        box-shadow: 0 0 0 0.22rem rgba(30, 52, 37, 0.1);
       }
 
       .multi-copy {
@@ -134,7 +134,7 @@ type MultiSelectOption = {
         font-weight: 800;
         letter-spacing: 0.16em;
         text-transform: uppercase;
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .multi-value {
@@ -144,7 +144,7 @@ type MultiSelectOption = {
       }
 
       .multi-value.placeholder {
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .multi-chevron {
@@ -165,11 +165,11 @@ type MultiSelectOption = {
         width: min(22rem, 90vw);
         max-height: 20rem;
         overflow: auto;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1.3rem;
         background: rgba(255, 255, 255, 0.98);
         padding: 0.45rem;
-        box-shadow: 0 1.25rem 3rem rgba(15, 23, 32, 0.14);
+        box-shadow: 0 1.25rem 3rem rgba(30, 52, 37, 0.14);
       }
 
       .multi-filter-shell {
@@ -179,11 +179,11 @@ type MultiSelectOption = {
 
       .multi-filter-input {
         width: 100%;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1rem;
-        background: rgba(15, 23, 32, 0.03);
+        background: rgba(30, 52, 37, 0.03);
         padding: 0.78rem 0.9rem;
-        color: #0f1720;
+        color: #1e3425;
       }
 
       .multi-clear,
@@ -197,7 +197,7 @@ type MultiSelectOption = {
         border-radius: 1rem;
         background: transparent;
         padding: 0.8rem 0.9rem;
-        color: #0f1720;
+        color: #1e3425;
         text-align: left;
       }
 
@@ -208,7 +208,7 @@ type MultiSelectOption = {
       .multi-option.active,
       .multi-option:hover,
       .multi-clear:hover {
-        background: rgba(15, 23, 32, 0.06);
+        background: rgba(30, 52, 37, 0.06);
       }
 
       .multi-check {
@@ -218,7 +218,7 @@ type MultiSelectOption = {
 
       .multi-empty {
         padding: 0.9rem;
-        color: rgba(15, 23, 32, 0.5);
+        color: rgba(30, 52, 37, 0.5);
         text-align: center;
       }
     `,

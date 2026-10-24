@@ -1,3 +1,4 @@
+import { SessionRefreshService } from "./session-refresh.service";
 import { Injectable, computed, inject, signal } from "@angular/core";
 import { catchError, firstValueFrom, forkJoin, of } from "rxjs";
 import { AdminApiService } from "./admin-api.service";
@@ -6,6 +7,7 @@ import { SessionStore } from "./session.store";
 
 @Injectable({ providedIn: "root" })
 export class AdminFacade {
+  private readonly sessionRefresh = inject(SessionRefreshService);
   private readonly adminApi = inject(AdminApiService);
   private readonly authApi = inject(AuthApiService);
   private readonly sessionStore = inject(SessionStore);
@@ -51,9 +53,7 @@ export class AdminFacade {
     collaboratorStats: this.collaboratorStats(),
   }));
 
-  async refreshAll(
-    revenueFilters: Record<string, string> = {},
-  ): Promise<{
+  async refreshAll(revenueFilters: Record<string, string> = {}): Promise<{
     mode: "platform" | "tenant" | "unauthenticated";
   }> {
     if (!this.sessionStore.isAuthenticated()) {
@@ -82,9 +82,9 @@ export class AdminFacade {
         forkJoin({
           coreResponse: this.adminApi.loadAdminCoreData(),
           // A failed secondary report must not discard the operational data.
-          statsResponse: this.adminApi.loadAdminStatsData(revenueFilters).pipe(
-            catchError(() => of(null)),
-          ),
+          statsResponse: this.adminApi
+            .loadAdminStatsData(revenueFilters)
+            .pipe(catchError(() => of(null))),
         }),
       );
       this.setCoreData(coreResponse);
@@ -220,7 +220,9 @@ export class AdminFacade {
       return;
     }
     const nextPage = this.loadedPages.sales + 1;
-    const response = await firstValueFrom(this.adminApi.loadSalesPage(nextPage));
+    const response = await firstValueFrom(
+      this.adminApi.loadSalesPage(nextPage),
+    );
     this.sales.update((items) => [...items, ...(response?.items || [])]);
     this.salesHasMore.set(Boolean(response?.hasMore));
     this.loadedPages.sales = nextPage;
@@ -260,13 +262,16 @@ export class AdminFacade {
     const response = await firstValueFrom(
       this.adminApi.loadCollaboratorsPage(nextPage),
     );
-    this.collaborators.update((items) => [...items, ...(response?.items || [])]);
+    this.collaborators.update((items) => [
+      ...items,
+      ...(response?.items || []),
+    ]);
     this.collaboratorsHasMore.set(Boolean(response?.hasMore));
     this.loadedPages.collaborators = nextPage;
   }
 
   clearSession(): void {
-    this.sessionStore.clear();
+    this.sessionRefresh.logout();
   }
 }
 

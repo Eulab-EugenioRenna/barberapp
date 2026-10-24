@@ -7,7 +7,7 @@ import { ADMIN_API_URL } from "./api-config";
 export class AuthApiService {
   private readonly http = inject(HttpClient);
 
-  login(payload: { email: string; password: string }): Observable<any> {
+  login(payload: { email: string; password?: string }): Observable<any> {
     return this.http.post(`${ADMIN_API_URL}/auth/login`, payload);
   }
 
@@ -19,6 +19,31 @@ export class AuthApiService {
     password: string;
   }): Observable<any> {
     return this.http.post(`${ADMIN_API_URL}/auth/signup`, payload);
+  }
+
+  loginMethod(email: string): Observable<{ connect: boolean }> {
+    return this.http.post<{ connect: boolean }>(
+      `${ADMIN_API_URL}/auth/method`,
+      { email },
+    );
+  }
+
+  acceptConnect(payload: {
+    firstName: string;
+    lastName: string;
+    password: string;
+    challenge: string;
+    accepted: true;
+    consentVersion: string;
+    newConnectPassword?: string;
+  }): Observable<any> {
+    return this.http.post(`${ADMIN_API_URL}/auth/connect/accept`, payload);
+  }
+
+  exchangeConnect(handoff: string): Observable<any> {
+    return this.http.post(`${ADMIN_API_URL}/auth/connect/exchange`, {
+      handoff,
+    });
   }
 
   me(): Observable<any> {

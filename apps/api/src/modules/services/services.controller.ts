@@ -1,3 +1,5 @@
+import { LegacyWriteDto } from "../../common/legacy-write.dto";
+import { assertTenantReferences } from "../../common/tenant-references";
 import {
   Body,
   Controller,
@@ -17,10 +19,7 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
-import {
-  buildPaginatedResult,
-  parsePagination,
-} from "../../common/pagination";
+import { buildPaginatedResult, parsePagination } from "../../common/pagination";
 
 @Controller("services")
 export class ServicesController {
@@ -74,7 +73,7 @@ export class ServicesController {
   @Post()
   async create(
     @Req() request: { headers: { authorization?: string } },
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -120,7 +119,7 @@ export class ServicesController {
   async update(
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -129,9 +128,8 @@ export class ServicesController {
 
     const tenantId = requireTenantId(session);
     const updated = await this.prisma.service.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
-        tenantId,
         name: typeof body["name"] === "string" ? body["name"] : undefined,
         publicDescription:
           typeof body["publicDescription"] === "string"
@@ -175,13 +173,17 @@ export class ServicesController {
   async attachProduct(
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    await assertTenantReferences(this.prisma, tenantId, {
+      serviceId: id,
+      productId: String(body["productId"] ?? ""),
+    });
     const updated = await this.prisma.serviceProduct.upsert({
       where: {
         serviceId_productId: {
@@ -222,6 +224,10 @@ export class ServicesController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    await assertTenantReferences(this.prisma, tenantId, {
+      serviceId: id,
+      productId: productId,
+    });
 
     await this.prisma.serviceProduct.delete({
       where: {
@@ -251,7 +257,7 @@ export class ServicesController {
     );
     const tenantId = requireTenantId(session);
 
-    await this.prisma.service.delete({ where: { id } });
+    await this.prisma.service.delete({ where: { id, tenantId } });
 
     await Promise.all([
       this.cacheInvalidationService.invalidateServices(tenantId),

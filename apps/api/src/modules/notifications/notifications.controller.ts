@@ -1,3 +1,4 @@
+import { authorizeLocalOperation } from "../../common/local-policy.guard";
 import {
   Body,
   Controller,
@@ -10,12 +11,7 @@ import {
   Sse,
 } from "@nestjs/common";
 import { NotificationChannel } from "@prisma/client";
-import {
-  Observable,
-  exhaustMap,
-  map,
-  timer,
-} from "rxjs";
+import { Observable, exhaustMap, map, timer } from "rxjs";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   requireTenantId,
@@ -44,6 +40,7 @@ export class NotificationsController {
           this.prisma,
           request.headers.authorization,
         );
+        authorizeLocalOperation(session, "NotificationsController", "stream");
         const tenantId = requireTenantId(session);
         const now = new Date();
         const appointments =

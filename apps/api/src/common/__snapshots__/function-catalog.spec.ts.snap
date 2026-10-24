@@ -1,0 +1,121 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ALORA function catalog projects only Connect contract fields, with a stable versioned document 1`] = `
+{
+  "appId": "alora-test",
+  "functions": [
+    {
+      "description": "Consultare gli appuntamenti aziendali.",
+      "key": "appointments.read.all",
+      "name": "Agenda aziendale",
+    },
+    {
+      "description": "Consultare soltanto gli appuntamenti assegnati.",
+      "key": "appointments.read.own",
+      "name": "Agenda personale",
+    },
+    {
+      "description": "Prenotare un appuntamento.",
+      "key": "appointments.create",
+      "name": "Creazione appuntamenti",
+    },
+    {
+      "description": "Modificare e annullare gli appuntamenti aziendali.",
+      "key": "appointments.update.all",
+      "name": "Gestione appuntamenti",
+    },
+    {
+      "description": "Aggiornare lo stato degli appuntamenti assegnati.",
+      "key": "appointments.update.own",
+      "name": "Esecuzione personale",
+    },
+    {
+      "description": "Consultare anagrafiche e storico aziendali.",
+      "key": "clients.read.full",
+      "name": "Consultazione clienti",
+    },
+    {
+      "description": "Creare, modificare ed eliminare clienti.",
+      "key": "clients.manage",
+      "name": "Gestione clienti",
+    },
+    {
+      "description": "Consultare i servizi aziendali.",
+      "key": "services.read",
+      "name": "Consultazione listino",
+    },
+    {
+      "description": "Modificare servizi e associazioni ai prodotti.",
+      "key": "services.manage",
+      "name": "Gestione listino",
+    },
+    {
+      "description": "Consultare il catalogo prodotti.",
+      "key": "products.read",
+      "name": "Consultazione prodotti",
+    },
+    {
+      "description": "Modificare il catalogo prodotti, senza gestione delle giacenze.",
+      "key": "products.manage",
+      "name": "Gestione prodotti",
+    },
+    {
+      "description": "Consultare professionisti e orari.",
+      "key": "collaborators.read",
+      "name": "Consultazione squadra",
+    },
+    {
+      "description": "Modificare professionisti e orari.",
+      "key": "collaborators.manage",
+      "name": "Gestione squadra",
+    },
+    {
+      "description": "Consultare conti e righe delle vendite.",
+      "key": "sales.read",
+      "name": "Consultazione vendite",
+    },
+    {
+      "description": "Creare, modificare ed eliminare conti e righe.",
+      "key": "sales.manage",
+      "name": "Gestione vendite",
+    },
+    {
+      "description": "Consultare andamento, attività e aggregazioni aziendali.",
+      "key": "dashboard.revenue.read",
+      "name": "Report aziendali",
+    },
+    {
+      "description": "Gestire impostazioni, immagine e prenotazione pubblica.",
+      "key": "settings.manage",
+      "name": "Impostazioni aziendali",
+    },
+    {
+      "description": "Elencare le utenze e revocarne le sessioni.",
+      "key": "users.manage",
+      "name": "Utenze locali",
+    },
+    {
+      "description": "Consultare le operazioni registrate per la propria azienda.",
+      "key": "audit.read",
+      "name": "Consultazione audit",
+    },
+    {
+      "description": "Consultare inbox e preferenze personali.",
+      "key": "notifications.read",
+      "name": "Notifiche personali",
+    },
+    {
+      "description": "Gestire provider, template, preferenze aziendali ed eventi.",
+      "key": "notifications.manage",
+      "name": "Gestione notifiche",
+    },
+    {
+      "description": "Ricevere gli appuntamenti aziendali in attesa di conto.",
+      "key": "confirmations.read",
+      "name": "Conti da chiudere",
+    },
+  ],
+  "schemaVersion": 1,
+  "version": 1,
+}
+`;

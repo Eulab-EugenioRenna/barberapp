@@ -1,3 +1,4 @@
+import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { AdminMetricsGridComponent } from "../shared/admin-metrics-grid.component";
@@ -5,7 +6,10 @@ import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
-import { activityStatusLabel, appointmentStatusLabel } from "../shared/presentation-copy";
+import {
+  activityStatusLabel,
+  appointmentStatusLabel,
+} from "../shared/presentation-copy";
 
 const BALANCE_STORAGE_KEY = "barber.balance-hidden";
 
@@ -13,6 +17,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
   selector: "barber-admin-dashboard-page",
   standalone: true,
   imports: [
+    FunctionAccessDirective,
     CommonModule,
     AdminMetricsGridComponent,
     CalendarInputComponent,
@@ -33,7 +38,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
             class="ghost-btn balance-toggle"
             (click)="toggleBalance()"
             [attr.aria-pressed]="balanceHidden"
-            [attr.aria-label]="balanceHidden ? 'Mostra saldo' : 'Nascondi saldo'"
+            [attr.aria-label]="
+              balanceHidden ? 'Mostra saldo' : 'Nascondi saldo'
+            "
             [title]="balanceHidden ? 'Mostra saldo' : 'Nascondi saldo'"
           >
             <barber-ui-icon
@@ -106,18 +113,17 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
             <p class="eyebrow text-[var(--accent)]">Movimenti</p>
             <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h3 class="font-display text-2xl">Vendite e appuntamenti</h3>
-              <span class="status-pill status-pill-neutral"
-                >{{ activity.length }}</span
-              >
+              <span class="status-pill status-pill-neutral">{{
+                activity.length
+              }}</span>
             </div>
           </div>
           <div class="mt-4 grid max-h-[26rem] gap-2 overflow-y-auto pr-1">
-            <div
-              *ngFor="let entry of activity"
-              class="list-card items-center"
-            >
+            <div *ngFor="let entry of activity" class="list-card items-center">
               <div class="min-w-0 flex-1">
-                <div class="activity-head flex min-w-0 flex-wrap items-center gap-2">
+                <div
+                  class="activity-head flex min-w-0 flex-wrap items-center gap-2"
+                >
                   <span
                     class="status-pill"
                     [ngClass]="
@@ -178,7 +184,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         <div class="grid gap-4">
           <article class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Clienti</p>
-            <h3 class="font-display text-xl sm:text-2xl">Incassi per cliente</h3>
+            <h3 class="font-display text-xl sm:text-2xl">
+              Incassi per cliente
+            </h3>
             <div class="mt-3 grid max-h-[18rem] gap-2 overflow-y-auto pr-1">
               <div
                 *ngFor="let row of revenueReport?.byCustomer"
@@ -197,7 +205,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           </article>
           <article class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Squadra</p>
-            <h3 class="font-display text-xl sm:text-2xl">Incassi per professionista</h3>
+            <h3 class="font-display text-xl sm:text-2xl">
+              Incassi per professionista
+            </h3>
             <div class="mt-3 grid max-h-[18rem] gap-2 overflow-y-auto pr-1">
               <div
                 *ngFor="let row of revenueReport?.byCollaborator"
@@ -222,7 +232,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Agenda</p>
             <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h3 class="font-display text-2xl sm:text-3xl">Prossimi appuntamenti</h3>
+              <h3 class="font-display text-2xl sm:text-3xl">
+                Prossimi appuntamenti
+              </h3>
               <span class="status-pill status-pill-green"
                 >{{ appointmentStats?.total || 0 }} nel mese</span
               >
@@ -245,7 +257,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                 >
                 <span class="text-sm text-[var(--muted)]"
                   >{{ appointment.service.name }} ·
-                  {{ appointment.collaborator?.firstName || "Da assegnare" }}</span
+                  {{
+                    appointment.collaborator?.firstName || "Da assegnare"
+                  }}</span
                 >
               </div>
               <span
@@ -277,9 +291,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                 >
               </div>
               <p class="mt-2 text-sm text-white/65">
-                Ricavi: {{ money(collaborator.revenue) }} ·
-                Vendite: {{ collaborator.orderCount || 0 }} ·
-                Prossimi appuntamenti: {{ collaborator.upcoming }}
+                Ricavi: {{ money(collaborator.revenue) }} · Vendite:
+                {{ collaborator.orderCount || 0 }} · Prossimi appuntamenti:
+                {{ collaborator.upcoming }}
               </p>
             </div>
           </div>

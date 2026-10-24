@@ -21,10 +21,7 @@ import {
   requireUser,
   resolveRequestSession,
 } from "../../common/request-session";
-import {
-  buildPaginatedResult,
-  parsePagination,
-} from "../../common/pagination";
+import { buildPaginatedResult, parsePagination } from "../../common/pagination";
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
 import {
   calculateRetroactiveAppointment,
@@ -189,7 +186,7 @@ export class SalesController {
         collaboratorId:
           item.collaboratorId ||
           (service?.requiresCollaborator
-            ? tenant?.defaultCollaboratorId ?? undefined
+            ? (tenant?.defaultCollaboratorId ?? undefined)
             : undefined),
       };
     });
@@ -262,108 +259,110 @@ export class SalesController {
       );
     }
 
-    const created = await this.prisma.$transaction(async (transaction) => {
-      let resolvedAppointmentId = appointmentId;
+    const created = await this.prisma
+      .$transaction(async (transaction) => {
+        let resolvedAppointmentId = appointmentId;
 
-      if (!resolvedAppointmentId && serviceItems.length && customerId) {
-        const firstServiceItem = serviceItems[0];
-        const generatedAppointment = await transaction.appointment.create({
+        if (!resolvedAppointmentId && serviceItems.length && customerId) {
+          const firstServiceItem = serviceItems[0];
+          const generatedAppointment = await transaction.appointment.create({
+            data: {
+              tenantId,
+              customerId,
+              serviceId: firstServiceItem.serviceId as string,
+              collaboratorId: primaryCollaboratorId,
+              startsAt: retroactiveAppointment.startsAt,
+              endsAt: retroactiveAppointment.endsAt,
+              status: "completed",
+              source: "internal",
+              estimatedPrice: retroactiveAppointment.serviceTotal,
+              finalPrice: retroactiveAppointment.serviceTotal,
+              internalNotes:
+                serviceItems.length > 1
+                  ? `Ordine rapido con ${serviceItems.length} servizi; durata totale ${retroactiveAppointment.durationMinutes} minuti.`
+                  : "Vendita veloce registrata a fine servizio.",
+              createdById: user.id,
+              updatedById: user.id,
+            },
+          });
+          resolvedAppointmentId = generatedAppointment.id;
+        }
+
+        if (resolvedAppointmentId) {
+          const existingOrder = await transaction.sale.findFirst({
+            where: { tenantId, appointmentId: resolvedAppointmentId },
+            select: { id: true },
+          });
+          if (existingOrder) {
+            throw new ConflictException(
+              "Una vendita è già collegata a questo appuntamento",
+            );
+          }
+        }
+
+        const createdSale = await transaction.sale.create({
           data: {
             tenantId,
             customerId,
-            serviceId: firstServiceItem.serviceId as string,
             collaboratorId: primaryCollaboratorId,
-            startsAt: retroactiveAppointment.startsAt,
-            endsAt: retroactiveAppointment.endsAt,
-            status: "completed",
-            source: "internal",
-            estimatedPrice: retroactiveAppointment.serviceTotal,
-            finalPrice: retroactiveAppointment.serviceTotal,
-            internalNotes:
-              serviceItems.length > 1
-                ? `Ordine rapido con ${serviceItems.length} servizi; durata totale ${retroactiveAppointment.durationMinutes} minuti.`
-                : "Vendita veloce registrata a fine servizio.",
+            appointmentId: resolvedAppointmentId,
+            subtotal,
+            discountTotal,
+            taxTotal,
+            total,
+            paymentStatus: paymentStatus as never,
+            paymentMethod:
+              typeof body["paymentMethod"] === "string"
+                ? body["paymentMethod"]
+                : undefined,
+            soldAt,
             createdById: user.id,
-            updatedById: user.id,
+            items: {
+              create: normalizedItems,
+            },
+          },
+          include: {
+            items: {
+              include: {
+                product: true,
+                service: true,
+                collaborator: true,
+              },
+            },
+            customer: true,
+            collaborator: true,
+            appointment: {
+              include: { customer: true, service: true, collaborator: true },
+            },
           },
         });
-        resolvedAppointmentId = generatedAppointment.id;
-      }
 
-      if (resolvedAppointmentId) {
-        const existingOrder = await transaction.sale.findFirst({
-          where: { tenantId, appointmentId: resolvedAppointmentId },
-          select: { id: true },
-        });
-        if (existingOrder) {
+        if (resolvedAppointmentId) {
+          await transaction.appointment.updateMany({
+            where: {
+              id: resolvedAppointmentId,
+              status: { notIn: ["cancelled", "no_show"] },
+            },
+            data: { finalPrice: total, status: "completed" },
+          });
+        }
+
+        return createdSale;
+      })
+      .catch((error: unknown) => {
+        if (
+          appointmentId &&
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "P2002"
+        ) {
           throw new ConflictException(
             "Una vendita è già collegata a questo appuntamento",
           );
         }
-      }
-
-      const createdSale = await transaction.sale.create({
-        data: {
-          tenantId,
-          customerId,
-          collaboratorId: primaryCollaboratorId,
-          appointmentId: resolvedAppointmentId,
-          subtotal,
-          discountTotal,
-          taxTotal,
-          total,
-          paymentStatus: paymentStatus as never,
-          paymentMethod:
-            typeof body["paymentMethod"] === "string"
-              ? body["paymentMethod"]
-              : undefined,
-          soldAt,
-          createdById: user.id,
-          items: {
-            create: normalizedItems,
-          },
-        },
-        include: {
-          items: {
-            include: {
-              product: true,
-              service: true,
-              collaborator: true,
-            },
-          },
-          customer: true,
-          collaborator: true,
-          appointment: {
-            include: { customer: true, service: true, collaborator: true },
-          },
-        },
+        throw error;
       });
-
-      if (resolvedAppointmentId) {
-        await transaction.appointment.updateMany({
-          where: {
-            id: resolvedAppointmentId,
-            status: { notIn: ["cancelled", "no_show"] },
-          },
-          data: { finalPrice: total, status: "completed" },
-        });
-      }
-
-      return createdSale;
-    }).catch((error: unknown) => {
-      if (
-        appointmentId &&
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        error.code === "P2002"
-      ) {
-        throw new ConflictException(
-          "Una vendita è già collegata a questo appuntamento",
-        );
-      }
-      throw error;
-    });
 
     await Promise.all([
       this.cacheInvalidationService.invalidateSales(tenantId),
@@ -455,7 +454,7 @@ export class SalesController {
         collaboratorId:
           item.collaboratorId ||
           (service?.requiresCollaborator
-            ? tenant?.defaultCollaboratorId ?? undefined
+            ? (tenant?.defaultCollaboratorId ?? undefined)
             : undefined),
       };
     });
@@ -513,9 +512,11 @@ export class SalesController {
       undefined;
 
     const updated = await this.prisma.$transaction(async (transaction) => {
-      await transaction.saleItem.deleteMany({ where: { saleId: id } });
+      await transaction.saleItem.deleteMany({
+        where: { saleId: id, sale: { tenantId } },
+      });
       const updatedSale = await transaction.sale.update({
-        where: { id },
+        where: { id, tenantId },
         data: {
           customerId,
           collaboratorId: primaryCollaboratorId,
@@ -549,7 +550,7 @@ export class SalesController {
       });
       if (sale.appointmentId) {
         await transaction.appointment.update({
-          where: { id: sale.appointmentId },
+          where: { id: sale.appointmentId, tenantId },
           data: { finalPrice: total },
         });
       }
@@ -615,12 +616,12 @@ export class SalesController {
     const updated = await this.prisma.$transaction(async (transaction) => {
       if (sale.appointmentId && sale.appointmentId !== appointmentId) {
         await transaction.appointment.update({
-          where: { id: sale.appointmentId },
+          where: { id: sale.appointmentId, tenantId },
           data: { finalPrice: null },
         });
       }
       const linked = await transaction.sale.update({
-        where: { id },
+        where: { id, tenantId },
         data: { appointmentId },
         include: {
           items: {
@@ -634,7 +635,7 @@ export class SalesController {
         },
       });
       await transaction.appointment.update({
-        where: { id: appointmentId },
+        where: { id: appointmentId, tenantId },
         data: { finalPrice: linked.total, status: "completed" },
       });
       return linked;
@@ -668,10 +669,10 @@ export class SalesController {
     }
 
     await this.prisma.$transaction(async (transaction) => {
-      await transaction.sale.delete({ where: { id } });
+      await transaction.sale.delete({ where: { id, tenantId } });
       if (sale.appointmentId) {
         await transaction.appointment.update({
-          where: { id: sale.appointmentId },
+          where: { id: sale.appointmentId, tenantId },
           data: { finalPrice: null },
         });
       }

@@ -1,15 +1,27 @@
+import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
-import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "../shared/presentation-copy";
+import {
+  appointmentStatusLabel,
+  paymentMethodLabel,
+  paymentStatusLabel,
+} from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-customers-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, InfiniteScrollDirective, AutofocusFirstDirective, UiIconComponent],
+  imports: [
+    FunctionAccessDirective,
+    CommonModule,
+    FormsModule,
+    InfiniteScrollDirective,
+    AutofocusFirstDirective,
+    UiIconComponent,
+  ],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-4 sm:p-5">
@@ -23,7 +35,12 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
               >
             </div>
           </div>
-          <button type="button" class="primary-btn" (click)="openNew()">
+          <button
+            aloraFunction="clients.manage"
+            type="button"
+            class="primary-btn"
+            (click)="openNew()"
+          >
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo cliente
           </button>
         </div>
@@ -114,11 +131,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
               {{ customerForm.id ? "Modifica cliente" : "Nuovo cliente" }}
             </h2>
           </div>
-          <button
-            type="button"
-            class="pill-btn"
-            (click)="formOpen = false"
-          >
+          <button type="button" class="pill-btn" (click)="formOpen = false">
             Chiudi
           </button>
         </div>
@@ -187,6 +200,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
           </label>
           <div class="flex flex-wrap gap-3">
             <button
+              aloraFunction="clients.manage"
               type="submit"
               class="primary-btn"
               [disabled]="loading || !formValid"
@@ -195,6 +209,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
               {{ customerForm.id ? "Salva cliente" : "Crea cliente" }}
             </button>
             <button
+              aloraFunction="clients.manage"
               *ngIf="customerForm.id"
               type="button"
               class="pill-btn"
@@ -204,6 +219,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
               <barber-ui-icon name="trash"></barber-ui-icon> Elimina cliente
             </button>
             <button
+              aloraFunction="clients.manage"
               type="button"
               class="secondary-btn"
               [disabled]="loading"
@@ -246,10 +262,9 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
                   <span *ngIf="entry.appointments.length"
                     >{{ entry.appointments.length }} appuntamenti</span
                   >
-                  <span
-                    *ngIf="entry.appointments.length && entry.sales.length"
-                    > · </span
-                  >
+                  <span *ngIf="entry.appointments.length && entry.sales.length">
+                    ·
+                  </span>
                   <span *ngIf="entry.sales.length"
                     >{{ entry.sales.length }} vendite</span
                   >
@@ -259,7 +274,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
                 <strong *ngIf="entry.sales.length"
                   >€{{ entry.salesTotal | number: "1.2-2" }}</strong
                 >
-              <p class="text-xs text-[var(--muted)]">Vedi la giornata</p>
+                <p class="text-xs text-[var(--muted)]">Vedi la giornata</p>
               </div>
             </button>
             <p
@@ -296,11 +311,7 @@ import { appointmentStatusLabel, paymentMethodLabel, paymentStatusLabel } from "
               {{ formatDay(timelineEntry.date) }}
             </h2>
           </div>
-          <button
-            type="button"
-            class="pill-btn"
-            (click)="closeTimelineEntry()"
-          >
+          <button type="button" class="pill-btn" (click)="closeTimelineEntry()">
             Chiudi
           </button>
         </div>

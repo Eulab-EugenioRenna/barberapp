@@ -51,9 +51,9 @@ export class EmailNotificationProvider implements NotificationProvider {
     });
 
     const info = await transporter.sendMail({
-      from: `${this.configService.get<string>("SMTP_FROM_NAME") ?? "Barber SaaS"} <${this.configService.get<string>("SMTP_FROM_EMAIL") ?? "no-reply@barber.test"}>`,
+      from: `${this.configService.get<string>("SMTP_FROM_NAME") ?? "ALORA by EULAB"} <${this.configService.get<string>("SMTP_FROM_EMAIL") ?? "no-reply@barber.test"}>`,
       to: input.target.recipientEmail,
-      subject: input.target.subject ?? "Notifica Barber SaaS",
+      subject: input.target.subject ?? "Notifica ALORA by EULAB",
       text: input.target.message,
       html: `<p>${input.target.message}</p>`,
       headers: {

@@ -123,13 +123,13 @@ type SelectOption = {
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1.2rem;
         background: rgba(255, 255, 255, 0.94);
         padding: 0.92rem 1rem;
-        color: #0f1720;
+        color: #1e3425;
         text-align: left;
-        box-shadow: 0 0.75rem 2rem rgba(15, 23, 32, 0.06);
+        box-shadow: 0 0.75rem 2rem rgba(30, 52, 37, 0.06);
         transition:
           border-color 180ms ease,
           box-shadow 180ms ease,
@@ -138,12 +138,12 @@ type SelectOption = {
 
       .select-trigger:hover {
         transform: translateY(-0.0625rem);
-        border-color: rgba(28, 124, 100, 0.22);
+        border-color: rgba(30, 52, 37, 0.22);
       }
 
       .open .select-trigger {
-        border-color: rgba(28, 124, 100, 0.3);
-        box-shadow: 0 0 0 0.22rem rgba(28, 124, 100, 0.1);
+        border-color: rgba(30, 52, 37, 0.3);
+        box-shadow: 0 0 0 0.22rem rgba(30, 52, 37, 0.1);
       }
 
       .disabled .select-trigger {
@@ -162,11 +162,11 @@ type SelectOption = {
         font-weight: 800;
         letter-spacing: 0.16em;
         text-transform: uppercase;
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .select-value.placeholder {
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .select-chevron {
@@ -185,11 +185,11 @@ type SelectOption = {
         width: 100%;
         max-height: 18rem;
         overflow: auto;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1.3rem;
         background: rgba(255, 255, 255, 0.98);
         padding: 0.45rem;
-        box-shadow: 0 1.25rem 3rem rgba(15, 23, 32, 0.14);
+        box-shadow: 0 1.25rem 3rem rgba(30, 52, 37, 0.14);
       }
 
       .select-filter-shell {
@@ -199,16 +199,16 @@ type SelectOption = {
 
       .select-filter-input {
         width: 100%;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1rem;
-        background: rgba(15, 23, 32, 0.03);
+        background: rgba(30, 52, 37, 0.03);
         padding: 0.78rem 0.9rem;
-        color: #0f1720;
+        color: #1e3425;
       }
 
       .select-empty {
         padding: 0.9rem;
-        color: rgba(15, 23, 32, 0.5);
+        color: rgba(30, 52, 37, 0.5);
         text-align: center;
       }
 
@@ -217,9 +217,9 @@ type SelectOption = {
         width: 100%;
         align-items: center;
         gap: 0.5rem;
-        border: 0.0625rem dashed rgba(28, 124, 100, 0.38);
+        border: 0.0625rem dashed rgba(30, 52, 37, 0.38);
         border-radius: 1rem;
-        background: rgba(28, 124, 100, 0.06);
+        background: rgba(30, 52, 37, 0.06);
         padding: 0.72rem 0.9rem;
         color: #176b57;
         font-weight: 800;
@@ -227,7 +227,7 @@ type SelectOption = {
       }
 
       .select-create-action:hover {
-        background: rgba(28, 124, 100, 0.12);
+        background: rgba(30, 52, 37, 0.12);
       }
 
       .select-option {
@@ -239,16 +239,16 @@ type SelectOption = {
         background: transparent;
         padding: 0.8rem 0.9rem;
         text-align: left;
-        color: #0f1720;
+        color: #1e3425;
       }
 
       .select-option small {
-        color: rgba(15, 23, 32, 0.5);
+        color: rgba(30, 52, 37, 0.5);
       }
 
       .select-option:hover,
       .select-option.active {
-        background: rgba(15, 23, 32, 0.06);
+        background: rgba(30, 52, 37, 0.06);
       }
 
       .select-option.option-disabled {

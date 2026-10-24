@@ -2,7 +2,7 @@
   "name": "barber-saas",
   "version": "0.1.0",
   "private": true,
-  "description": "White-label SaaS platform for bookings, services, collaborators, sales, notifications, and revenue dashboards.",
+  "description": "ALORA by EULAB — shared SaaS for Beauty & Wellness bookings, operations and sales.",
   "scripts": {
     "serve:api": "nest start --watch --config apps/api/nest-cli.json",
     "serve:admin": "ng serve web-admin --host 0.0.0.0",
@@ -18,7 +18,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed:platform-demo": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' prisma/seed.ts",
-    "demo:create": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/create-demo-account.ts"
+    "demo:create": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/create-demo-account.ts",
+    "connect:check": "node scripts/check-connect-configuration.mjs",
+    "brand:icons": "swift scripts/generate-brand-icons.swift"
   },
   "dependencies": {
     "@angular/animations": "^18.2.0",
@@ -29,6 +31,7 @@
     "@angular/platform-browser": "^18.2.0",
     "@angular/platform-browser-dynamic": "^18.2.0",
     "@angular/router": "^18.2.0",
+    "@eulab/connect": "file:vendor/eulab-connect-0.10.0.tgz",
     "@nestjs/bullmq": "^10.2.3",
     "@nestjs/cache-manager": "^2.2.2",
     "@nestjs/common": "^10.4.0",
@@ -47,6 +50,7 @@
     "helmet": "^7.2.0",
     "ioredis": "^5.4.1",
     "nodemailer": "^6.10.0",
+    "pg": "8.23.0",
     "rxjs": "^7.8.1",
     "zone.js": "^0.14.10"
   },

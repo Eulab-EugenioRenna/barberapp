@@ -12,12 +12,9 @@ const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
 const OPEN_MODAL_SELECTOR = '[role="dialog"][aria-modal="true"]';
 
 /**
- * Stato PWA dell'admin.
- *
- * La cache e volutamente non aggressiva: il service worker lavora
- * network-first e qui rileviamo i nuovi deploy confrontando il build corrente
- * con `index.html` remoto. Quando cambia, le cache vengono invalidate e l'app
- * viene ricaricata automaticamente appena non ci sono modali aperte.
+ * PWA installabile senza cache offline: richieste sempre in rete.
+ * I deploy vengono rilevati confrontando index.html; il reload attende
+ * la chiusura delle modali, mentre le cache storiche vengono eliminate.
  */
 @Injectable({ providedIn: "root" })
 export class AdminPwaService {
@@ -49,7 +46,10 @@ export class AdminPwaService {
         Boolean(this.document.querySelector(OPEN_MODAL_SELECTOR)),
       observeModalChanges: (onChange) => {
         const observer = new window.MutationObserver(onChange);
-        observer.observe(this.document.body, { childList: true, subtree: true });
+        observer.observe(this.document.body, {
+          childList: true,
+          subtree: true,
+        });
         return () => observer.disconnect();
       },
       beforeReload: () => this.clearCaches(),
@@ -90,6 +90,7 @@ export class AdminPwaService {
     });
 
     this.registerServiceWorker(window);
+    void this.clearCaches();
     void this.checkForUpdate();
     this.updateTimer = setInterval(
       () => void this.checkForUpdate(),
@@ -173,23 +174,17 @@ export class AdminPwaService {
       });
   }
 
-  private clearCaches(): Promise<void> {
-    return new Promise((resolve) => {
-      const controller = this.document.defaultView?.navigator.serviceWorker
-        ?.controller;
-
-      if (!controller) {
-        resolve();
-        return;
-      }
-
-      const channel = new MessageChannel();
-      const timer = setTimeout(() => resolve(), 1500);
-      channel.port1.onmessage = () => {
-        clearTimeout(timer);
-        resolve();
-      };
-      controller.postMessage({ type: "CLEAR_CACHES" }, [channel.port2]);
+  private async clearCaches(): Promise<void> {
+    const window = this.document.defaultView;
+    if (!window) return;
+    try {
+      const keys = await window.caches?.keys();
+      await Promise.all((keys ?? []).map((key) => window.caches.delete(key)));
+    } catch {
+      // The worker also clears legacy caches when activated.
+    }
+    window.navigator.serviceWorker?.controller?.postMessage({
+      type: "CLEAR_CACHES",
     });
   }
 

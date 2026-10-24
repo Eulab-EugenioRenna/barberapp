@@ -1,4 +1,9 @@
 import {
+  LegacyWriteDto,
+  AppointmentStatusDto,
+} from "../../common/legacy-write.dto";
+import { assertTenantReferences } from "../../common/tenant-references";
+import {
   BadRequestException,
   Body,
   Controller,
@@ -42,6 +47,58 @@ export class AppointmentsController {
     private readonly customersAlignmentService: CustomersAlignmentService,
     private readonly collaboratorScheduleService: CollaboratorScheduleService,
   ) {}
+
+  // Projection required by agenda rendering, independent of catalog administration.
+  @Get("context")
+  async context(
+    @Req() request: { headers: { authorization?: string } },
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const [services, collaborators] = await Promise.all([
+      this.prisma.service.findMany({
+        where: { tenantId, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          durationMinutes: true,
+          bufferBeforeMinutes: true,
+          bufferAfterMinutes: true,
+          basePrice: true,
+        },
+      }),
+      this.prisma.collaborator.findMany({
+        where: { tenantId, isActive: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          calendarColor: true,
+          weeklySchedules: {
+            select: {
+              weekday: true,
+              isWorkingDay: true,
+              startTime: true,
+              endTime: true,
+            },
+          },
+          dayOverrides: {
+            select: {
+              date: true,
+              isHoliday: true,
+              isWorkingDay: true,
+              startTime: true,
+              endTime: true,
+            },
+          },
+        },
+      }),
+    ]);
+    return { services, collaborators };
+  }
 
   private async resolveTenantTimezone(tenantId: string): Promise<string> {
     const tenant = await this.prisma.tenant.findUnique({
@@ -133,6 +190,9 @@ export class AppointmentsController {
     body: AppointmentPayload,
   ): Promise<string> {
     if (typeof body["customerId"] === "string" && body["customerId"]) {
+      await assertTenantReferences(this.prisma, tenantId, {
+        customerId: body["customerId"],
+      });
       return body["customerId"];
     }
 
@@ -177,8 +237,13 @@ export class AppointmentsController {
     const tenantId = requireTenantId(session);
     const from = query["from"] ? new Date(query["from"]) : undefined;
     const to = query["to"] ? new Date(query["to"]) : undefined;
+    const ownCollaboratorId =
+      session.user?.role === "collaborator"
+        ? session.user.collaboratorId
+        : null;
     const where = {
       tenantId,
+      ...(ownCollaboratorId ? { collaboratorId: ownCollaboratorId } : {}),
       ...(from && !Number.isNaN(from.getTime())
         ? { startsAt: { gte: from } }
         : {}),
@@ -195,13 +260,33 @@ export class AppointmentsController {
       : `:range:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`;
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.appointmentsList(tenantId)}${cacheSuffix}`,
+      `${cacheKeys.appointmentsList(tenantId)}:${ownCollaboratorId ?? "all"}${cacheSuffix}:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`,
       CACHE_TTL_SECONDS.appointments,
       async () => {
         const include = {
-          customer: true,
+          customer:
+            session.user?.role === "collaborator"
+              ? {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    phone: true,
+                  },
+                }
+              : true,
           service: true,
-          collaborator: true,
+          collaborator:
+            session.user?.role === "collaborator"
+              ? {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    calendarColor: true,
+                  },
+                }
+              : true,
           room: true,
         } as const;
 
@@ -232,7 +317,7 @@ export class AppointmentsController {
   @Post()
   async create(
     @Req() request: { headers: { authorization?: string } },
-    @Body() body: AppointmentPayload,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -252,7 +337,7 @@ export class AppointmentsController {
     }
 
     const service = await this.prisma.service.findUnique({
-      where: { id: serviceId },
+      where: { id: serviceId, tenantId: requireTenantId(session) },
     });
 
     if (!service) {
@@ -269,6 +354,10 @@ export class AppointmentsController {
     const roomId =
       typeof body["roomId"] === "string" ? body["roomId"] : undefined;
 
+    await assertTenantReferences(this.prisma, requireTenantId(session), {
+      collaboratorId,
+      roomId,
+    });
     await this.ensureNoConflicts(tenantId, {
       startsAt,
       endsAt,
@@ -373,15 +462,41 @@ export class AppointmentsController {
     const tenantId = requireTenantId(session);
 
     return this.cacheService.getOrSet(
-      cacheKeys.appointmentDetail(tenantId, id),
+      `${cacheKeys.appointmentDetail(tenantId, id)}:${session.user?.role === "collaborator" ? "own:" + session.user.collaboratorId : "all"}`,
       CACHE_TTL_SECONDS.appointments,
       () =>
         this.prisma.appointment.findFirst({
-          where: { id, tenantId },
+          where: {
+            id,
+            tenantId,
+            ...(session.user?.role === "collaborator"
+              ? { collaboratorId: session.user.collaboratorId! }
+              : {}),
+          },
           include: {
-            customer: true,
+            customer:
+              session.user?.role === "collaborator"
+                ? {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      phone: true,
+                    },
+                  }
+                : true,
             service: true,
-            collaborator: true,
+            collaborator:
+              session.user?.role === "collaborator"
+                ? {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      calendarColor: true,
+                    },
+                  }
+                : true,
             room: true,
             cancellations: true,
           },
@@ -393,14 +508,16 @@ export class AppointmentsController {
   async update(
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
-    @Body() body: AppointmentPayload,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
       request.headers.authorization,
     );
     const user = requireUser(session);
-    const current = await this.prisma.appointment.findUnique({ where: { id } });
+    const current = await this.prisma.appointment.findUnique({
+      where: { id, tenantId: requireTenantId(session) },
+    });
 
     if (!current) {
       throw new BadRequestException("L'appuntamento non è stato trovato");
@@ -411,16 +528,14 @@ export class AppointmentsController {
         ? body["serviceId"]
         : current.serviceId;
     const service = await this.prisma.service.findUnique({
-      where: { id: serviceId },
+      where: { id: serviceId, tenantId: requireTenantId(session) },
     });
 
     if (!service) {
       throw new BadRequestException("Il servizio scelto non è disponibile");
     }
 
-    const timezone = await this.resolveTenantTimezone(
-      requireTenantId(session),
-    );
+    const timezone = await this.resolveTenantTimezone(requireTenantId(session));
     let startsAt = current.startsAt;
     if (body["startsAt"]) {
       const parsedStartsAt = parseZonedDateTime(
@@ -442,6 +557,10 @@ export class AppointmentsController {
     const roomId =
       typeof body["roomId"] === "string" ? body["roomId"] : current.roomId;
 
+    await assertTenantReferences(this.prisma, requireTenantId(session), {
+      collaboratorId,
+      roomId,
+    });
     await this.ensureNoConflicts(requireTenantId(session), {
       startsAt,
       endsAt,
@@ -458,7 +577,7 @@ export class AppointmentsController {
 
     const previousCollaboratorId = current.collaboratorId;
     const updated = await this.prisma.appointment.update({
-      where: { id },
+      where: { id, tenantId: requireTenantId(session) },
       data: {
         serviceId,
         collaboratorId,
@@ -532,8 +651,11 @@ export class AppointmentsController {
     );
     const user = requireUser(session);
 
+    await this.cacheInvalidationService.invalidateBookingReadModels(
+      requireTenantId(session),
+    );
     return this.prisma.appointment.update({
-      where: { id },
+      where: { id, tenantId: requireTenantId(session) },
       data: {
         status: AppointmentStatus.Cancelled,
         updatedById: user.id,
@@ -545,7 +667,7 @@ export class AppointmentsController {
   async updateStatus(
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
-    @Body() body: { status: AppointmentStatus },
+    @Body() body: AppointmentStatusDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -554,7 +676,7 @@ export class AppointmentsController {
     const user = requireUser(session);
 
     const updated = await this.prisma.appointment.update({
-      where: { id },
+      where: { id, tenantId: requireTenantId(session) },
       data: {
         status: body.status,
         updatedById: user.id,
@@ -590,7 +712,7 @@ export class AppointmentsController {
   async cancel(
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -599,7 +721,7 @@ export class AppointmentsController {
     const user = requireUser(session);
 
     await this.prisma.appointment.update({
-      where: { id },
+      where: { id, tenantId: requireTenantId(session) },
       data: {
         status: AppointmentStatus.Cancelled,
         updatedById: user.id,
@@ -656,7 +778,13 @@ export class AppointmentsController {
       CACHE_TTL_SECONDS.appointments,
       async () => {
         const appointment = await this.prisma.appointment.findFirst({
-          where: { id, tenantId },
+          where: {
+            id,
+            tenantId,
+            ...(session.user?.role === "collaborator"
+              ? { collaboratorId: session.user.collaboratorId! }
+              : {}),
+          },
         });
 
         if (!appointment) {

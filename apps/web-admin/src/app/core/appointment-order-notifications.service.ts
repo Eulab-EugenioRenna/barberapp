@@ -1,9 +1,14 @@
-import { Injectable, signal } from "@angular/core";
+import { firstValueFrom } from "rxjs";
+import { SessionStore } from "./session.store";
+import { SessionRefreshService } from "./session-refresh.service";
+import { Injectable, inject, signal } from "@angular/core";
 import { ADMIN_API_URL } from "./api-config";
 import { parseAppointmentOrderSseFrame } from "./sse.utils";
 
 @Injectable({ providedIn: "root" })
 export class AppointmentOrderNotificationsService {
+  private readonly store = inject(SessionStore);
+  private readonly refresh = inject(SessionRefreshService);
   readonly appointments = signal<any[]>([]);
   readonly connected = signal(false);
 
@@ -12,7 +17,7 @@ export class AppointmentOrderNotificationsService {
   private activeToken = "";
 
   connect(token: string): void {
-    if (!token) {
+    if (!token || !this.store.can("confirmations.read")) {
       this.stop();
       return;
     }
@@ -52,6 +57,11 @@ export class AppointmentOrderNotificationsService {
     controller: AbortController,
   ): Promise<void> {
     try {
+      if (this.store.needsRefresh() && this.store.refreshToken())
+        await firstValueFrom(this.refresh.refresh());
+      if (controller.signal.aborted) return;
+      token = this.store.token();
+      this.activeToken = token;
       const response = await fetch(`${ADMIN_API_URL}/notifications/stream`, {
         headers: {
           Accept: "text/event-stream",
@@ -91,7 +101,10 @@ export class AppointmentOrderNotificationsService {
       this.controller = null;
       this.connected.set(false);
       if (!controller.signal.aborted && this.activeToken === token) {
-        this.reconnectTimer = setTimeout(() => this.connect(token), 3_000);
+        this.reconnectTimer = setTimeout(
+          () => this.connect(this.store.token()),
+          3_000,
+        );
       }
     }
   }

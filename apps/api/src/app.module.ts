@@ -1,3 +1,9 @@
+import { AuthAttemptGuard } from "./modules/auth/auth-attempt.guard";
+import { FunctionCatalogController } from "./modules/function-catalog/function-catalog.controller";
+import { PrismaErrorFilter } from "./common/prisma-error.filter";
+import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from "@nestjs/core";
+import { LocalPolicyGuard } from "./common/local-policy.guard";
+import { SecurityAuditInterceptor } from "./common/security-audit.interceptor";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AppCacheModule } from "./cache/cache.module";
@@ -44,6 +50,12 @@ import { UsersModule } from "./modules/users/users.module";
     PlatformAdminModule,
     PublicBookingModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, FunctionCatalogController],
+  providers: [
+    { provide: APP_FILTER, useClass: PrismaErrorFilter },
+    { provide: APP_GUARD, useClass: AuthAttemptGuard },
+    { provide: APP_GUARD, useClass: LocalPolicyGuard },
+    { provide: APP_INTERCEPTOR, useClass: SecurityAuditInterceptor },
+  ],
 })
 export class AppModule {}

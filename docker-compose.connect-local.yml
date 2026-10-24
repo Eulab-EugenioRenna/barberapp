@@ -1,0 +1,19 @@
+# Optional local transport to the existing Connect Docker API.
+# Uses the existing ALORA Nginx, with real TLS and a private development CA.
+services:
+  api:
+    environment:
+      ALORA_CONNECT_API_URL: https://nginx
+      ALORA_CONNECT_OIDC_TRANSPORT_ORIGIN: https://nginx
+      NODE_EXTRA_CA_CERTS: /app/.local/connect-dev/ca.crt
+  nginx:
+    networks:
+      - app
+      - connect-local
+    volumes:
+      - ./docker/nginx-connect-local.conf:/etc/nginx/conf.d/connect-local.conf:ro
+      - ./.local/connect-dev:/etc/nginx/connect-local:ro
+networks:
+  connect-local:
+    external: true
+    name: ${ALORA_CONNECT_DOCKER_NETWORK:-eulab-connect_edge}

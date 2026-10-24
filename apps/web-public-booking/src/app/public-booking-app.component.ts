@@ -1,3 +1,4 @@
+import { AloraBrandComponent } from "@barber/shared/brand";
 import { CommonModule, DecimalPipe, NgClass } from "@angular/common";
 import { Component, OnInit, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -11,6 +12,7 @@ import { CustomSelectComponent } from "./custom-select.component";
   selector: "barber-public-root",
   standalone: true,
   imports: [
+    AloraBrandComponent,
     CommonModule,
     FormsModule,
     NgClass,
@@ -39,13 +41,17 @@ import { CustomSelectComponent } from "./custom-select.component";
               alt="Logo del salone"
               class="h-auto w-auto max-h-28 max-w-[24rem] object-contain md:max-h-36 md:max-w-[30rem]"
             />
-            <h1 class="font-display text-3xl leading-none sm:text-5xl md:text-7xl">
+            <h1
+              class="font-display text-3xl leading-none sm:text-5xl md:text-7xl"
+            >
               {{
                 settings()?.publicTitle ?? settings()?.name ?? "Prenota online"
               }}
             </h1>
           </div>
-          <p class="mt-4 max-w-xl text-sm text-white/74 sm:mt-5 sm:text-base md:text-lg">
+          <p
+            class="mt-4 max-w-xl text-sm text-white/74 sm:mt-5 sm:text-base md:text-lg"
+          >
             {{
               settings()?.publicDescription ||
                 "Scegli il servizio, trova il momento giusto e invia la tua richiesta al salone."
@@ -69,6 +75,10 @@ import { CustomSelectComponent } from "./custom-select.component";
               </div>
             </article>
           </div>
+          <footer class="mt-8 flex flex-wrap items-center gap-3">
+            <span class="text-xs text-white/60">Prenotazioni con</span>
+            <alora-brand [onDark]="true"></alora-brand>
+          </footer>
         </aside>
 
         <section class="panel public-panel">
@@ -91,7 +101,10 @@ import { CustomSelectComponent } from "./custom-select.component";
                 </h2>
               </div>
               <label class="field public-date-field">
-                <span>Data <em class="required-mark" aria-hidden="true">*</em></span>
+                <span
+                  >Data
+                  <em class="required-mark" aria-hidden="true">*</em></span
+                >
                 <barber-calendar-input
                   [value]="selectedDateValue"
                   (valueChange)="onSelectedDateChange($event)"
@@ -146,7 +159,10 @@ import { CustomSelectComponent } from "./custom-select.component";
                   'border-[var(--line)]/60 bg-slate-50/70 text-slate-400':
                     !day.inMonth,
                   'border-[var(--line)]/70 bg-white/80':
-                    day.inMonth && !day.isSelected && !day.isUnavailable && !day.isPast,
+                    day.inMonth &&
+                    !day.isSelected &&
+                    !day.isUnavailable &&
+                    !day.isPast,
                   'opacity-40': day.isPast,
                 }"
                 [disabled]="day.isPast"
@@ -191,7 +207,10 @@ import { CustomSelectComponent } from "./custom-select.component";
                   </p>
                   <div class="mt-3 flex flex-wrap gap-2">
                     <span class="status-pill status-pill-neutral"
-                      >{{ service.collaborators?.length || 0 }} professionisti</span
+                      >{{
+                        service.collaborators?.length || 0
+                      }}
+                      professionisti</span
                     >
                     <span
                       *ngFor="
@@ -225,7 +244,10 @@ import { CustomSelectComponent } from "./custom-select.component";
               class="mt-6 grid gap-4 md:grid-cols-2"
             >
               <label class="field">
-                <span>Professionista <em class="required-mark" aria-hidden="true">*</em></span>
+                <span
+                  >Professionista
+                  <em class="required-mark" aria-hidden="true">*</em></span
+                >
                 <barber-custom-select
                   [value]="selectedCollaboratorId()"
                   (valueChange)="onSelectedCollaboratorChange($event)"
@@ -235,7 +257,10 @@ import { CustomSelectComponent } from "./custom-select.component";
                 ></barber-custom-select>
               </label>
               <label class="field">
-                <span>Orari disponibili <em class="required-mark" aria-hidden="true">*</em></span>
+                <span
+                  >Orari disponibili
+                  <em class="required-mark" aria-hidden="true">*</em></span
+                >
                 <barber-custom-select
                   [value]="selectedSlot()"
                   (valueChange)="onSelectedSlotChange($event)"
@@ -256,7 +281,10 @@ import { CustomSelectComponent } from "./custom-select.component";
             <form class="mt-6 grid gap-4" (ngSubmit)="submitBooking()">
               <div class="grid gap-4 md:grid-cols-2">
                 <label class="field">
-                  <span>Nome e cognome <em class="required-mark" aria-hidden="true">*</em></span>
+                  <span
+                    >Nome e cognome
+                    <em class="required-mark" aria-hidden="true">*</em></span
+                  >
                   <input
                     [ngModel]="bookingForm().customerName"
                     (ngModelChange)="
@@ -324,7 +352,11 @@ import { CustomSelectComponent } from "./custom-select.component";
                   !bookingForm().customerName.trim()
                 "
               >
-                {{ loading() ? "Stiamo inviando la richiesta..." : "Richiedi la prenotazione" }}
+                {{
+                  loading()
+                    ? "Stiamo inviando la richiesta..."
+                    : "Richiedi la prenotazione"
+                }}
               </button>
             </form>
 

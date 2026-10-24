@@ -218,6 +218,15 @@ export class NotificationsService {
     return this.prisma.notificationProviderConfig.findMany({
       where: { tenantId },
       orderBy: { channel: "asc" },
+      select: {
+        id: true,
+        tenantId: true,
+        channel: true,
+        providerKey: true,
+        enabled: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }
 
@@ -255,7 +264,8 @@ export class NotificationsService {
 
     await this.invalidateTenantCaches(tenantId);
 
-    return config;
+    const { config: _privateConfig, ...publicConfig } = config;
+    return publicConfig;
   }
 
   async listTemplates(tenantId: string): Promise<unknown> {
@@ -660,7 +670,9 @@ export class NotificationsService {
     });
 
     if (!history) {
-      throw new NotFoundException("La comunicazione richiesta non è stata trovata");
+      throw new NotFoundException(
+        "La comunicazione richiesta non è stata trovata",
+      );
     }
 
     return history;
@@ -924,9 +936,7 @@ export class NotificationsService {
     });
 
     if (!template) {
-      throw new NotFoundException(
-        "Il messaggio richiesto non è disponibile",
-      );
+      throw new NotFoundException("Il messaggio richiesto non è disponibile");
     }
 
     const normalized = {

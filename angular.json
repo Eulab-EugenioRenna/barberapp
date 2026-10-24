@@ -14,7 +14,9 @@
             "outputPath": "dist/apps/web-admin",
             "index": "apps/web-admin/src/index.html",
             "browser": "apps/web-admin/src/main.ts",
-            "polyfills": ["zone.js"],
+            "polyfills": [
+              "zone.js"
+            ],
             "tsConfig": "apps/web-admin/tsconfig.app.json",
             "inlineStyleLanguage": "css",
             "outputHashing": "all",
@@ -25,7 +27,9 @@
                 "output": ""
               }
             ],
-            "styles": ["apps/web-admin/src/styles.css"]
+            "styles": [
+              "apps/web-admin/src/styles.css"
+            ]
           }
         },
         "serve": {
@@ -33,7 +37,9 @@
           "options": {
             "buildTarget": "web-admin:build",
             "proxyConfig": "apps/web-admin/proxy.conf.json",
-            "allowedHosts": ["barber.eulab.cloud"]
+            "allowedHosts": [
+              "barber.eulab.cloud"
+            ]
           }
         }
       }
@@ -49,11 +55,26 @@
             "outputPath": "dist/apps/web-public-booking",
             "index": "apps/web-public-booking/src/index.html",
             "browser": "apps/web-public-booking/src/main.ts",
-            "polyfills": ["zone.js"],
+            "polyfills": [
+              "zone.js"
+            ],
             "tsConfig": "apps/web-public-booking/tsconfig.app.json",
             "inlineStyleLanguage": "css",
-            "assets": [],
-            "styles": ["apps/web-public-booking/src/styles.css"]
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "apps/web-admin/public/icons",
+                "output": "icons"
+              },
+              {
+                "glob": "**/*",
+                "input": "apps/web-admin/public/fonts",
+                "output": "fonts"
+              }
+            ],
+            "styles": [
+              "apps/web-public-booking/src/styles.css"
+            ]
           }
         },
         "serve": {
@@ -61,7 +82,9 @@
           "options": {
             "buildTarget": "web-public-booking:build",
             "proxyConfig": "apps/web-public-booking/proxy.conf.json",
-            "allowedHosts": ["barber.eulab.cloud"]
+            "allowedHosts": [
+              "barber.eulab.cloud"
+            ]
           }
         }
       }

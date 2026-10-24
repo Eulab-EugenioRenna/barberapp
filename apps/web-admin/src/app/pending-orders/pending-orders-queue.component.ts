@@ -1,3 +1,4 @@
+import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -7,7 +8,12 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
 @Component({
   selector: "barber-pending-orders-queue",
   standalone: true,
-  imports: [CommonModule, FormsModule, UiIconComponent],
+  imports: [
+    FunctionAccessDirective,
+    CommonModule,
+    FormsModule,
+    UiIconComponent,
+  ],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-4 sm:p-5">
@@ -48,19 +54,24 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                   {{ formatAppointmentStatus(appointment.status) }}
                 </p>
               </div>
-              <span class="status-pill status-pill-amber">Conto da chiudere</span>
+              <span class="status-pill status-pill-amber"
+                >Conto da chiudere</span
+              >
             </div>
 
             <div class="mt-3 flex flex-wrap items-center gap-2">
               <button
+                aloraFunction="sales.manage"
                 type="button"
                 class="primary-btn w-full sm:w-auto"
                 [disabled]="loading"
                 (click)="confirmOrder.emit(appointment)"
               >
-                <barber-ui-icon name="receipt"></barber-ui-icon> Registra vendita
+                <barber-ui-icon name="receipt"></barber-ui-icon> Registra
+                vendita
               </button>
               <button
+                aloraFunction="sales.manage"
                 type="button"
                 class="secondary-btn"
                 *ngIf="unlinkedSales.length"
@@ -74,16 +85,19 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 }}
               </button>
               <button
+                aloraFunction="appointments.update.all"
                 type="button"
                 class="ghost-btn text-red-700"
                 [disabled]="loading"
                 (click)="cancelAppointment.emit(appointment)"
               >
-                <barber-ui-icon name="ban"></barber-ui-icon> Annulla appuntamento
+                <barber-ui-icon name="ban"></barber-ui-icon> Annulla
+                appuntamento
               </button>
             </div>
 
             <div
+              aloraFunction="sales.manage"
               *ngIf="linkOpenFor === appointment.id"
               class="mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-black/5 p-3"
             >
@@ -92,16 +106,21 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 [(ngModel)]="selectedSaleId"
                 [ngModelOptions]="{ standalone: true }"
               >
-                <option value="">Seleziona una vendita senza appuntamento</option>
+                <option value="">
+                  Seleziona una vendita senza appuntamento
+                </option>
                 <option *ngFor="let sale of unlinkedSales" [value]="sale.id">
                   {{ saleLabel(sale) }}
                 </option>
               </select>
               <button
+                aloraFunction="sales.manage"
                 type="button"
                 class="primary-btn"
                 [disabled]="!selectedSaleId || loading"
-                (click)="linkOrder.emit({ appointment, saleId: selectedSaleId })"
+                (click)="
+                  linkOrder.emit({ appointment, saleId: selectedSaleId })
+                "
               >
                 Collega
               </button>
@@ -126,7 +145,10 @@ export class PendingOrdersQueueComponent {
   @Input() loading = false;
 
   @Output() confirmOrder = new EventEmitter<any>();
-  @Output() linkOrder = new EventEmitter<{ appointment: any; saleId: string }>();
+  @Output() linkOrder = new EventEmitter<{
+    appointment: any;
+    saleId: string;
+  }>();
   @Output() cancelAppointment = new EventEmitter<any>();
 
   linkOpenFor = "";

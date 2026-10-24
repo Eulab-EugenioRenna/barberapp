@@ -1,3 +1,5 @@
+import { AccessUnavailableComponent } from "./pages/access-unavailable.component";
+import { PersonalAgendaComponent } from "./pages/personal-agenda.component";
 import { Routes } from "@angular/router";
 import { authGuard } from "./core/auth.guard";
 import { AdminAppComponent } from "./admin-app.component";
@@ -14,6 +16,16 @@ export const adminRoutes: Routes = [
   { path: "", pathMatch: "full", redirectTo: "login" },
   { path: "login", component: AdminAuthPageComponent },
   { path: "signup", component: AdminAuthPageComponent },
+  {
+    path: "my-agenda",
+    component: PersonalAgendaComponent,
+    canActivate: [authGuard],
+  },
+  {
+    path: "access-unavailable",
+    component: AccessUnavailableComponent,
+    canActivate: [authGuard],
+  },
   shellRoute("dashboard", "dashboard"),
   shellRoute("appointments", "appointments"),
   shellRoute("confirmations", "confirmations"),

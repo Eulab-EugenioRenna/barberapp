@@ -1,0 +1,24 @@
+/* Shared ALORA identity. Tenant brand/accent overrides remain local to booking. */
+:root {
+  --alora-forest: #1e3425;
+  --alora-lime: #88bd39;
+  --alora-paper: #f4f8ec;
+  --alora-muted: #58635a;
+  --alora-accent-ink: #4d6f18;
+  --font-body: "Inter", sans-serif;
+  --font-display: "Inter", sans-serif;
+  --bg: var(--alora-paper);
+  --ink: var(--alora-forest);
+  --muted: var(--alora-muted);
+  --line: rgba(30, 52, 37, 0.14);
+  --panel: #fff;
+  --brand: var(--alora-forest);
+  --brand-rgb: 30, 52, 37;
+  /* Text uses a darker lime shade; the original lime stays on filled actions. */
+  --accent: var(--alora-accent-ink);
+  --accent-rgb: 136, 189, 57;
+  --focus: #547b22;
+  --scrollbar-track: rgba(30, 52, 37, 0.04);
+  --scrollbar-thumb: rgba(30, 52, 37, 0.2);
+  --scrollbar-thumb-hover: rgba(30, 52, 37, 0.32);
+}

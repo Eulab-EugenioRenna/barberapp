@@ -107,10 +107,10 @@ export class PublicBookingFacade {
       null,
   );
   readonly brandColor = computed(
-    () => this.settings()?.primaryColor || "#1c7c64",
+    () => this.settings()?.primaryColor || "#1e3425",
   );
   readonly accentColor = computed(
-    () => this.settings()?.accentColor || "#f97316",
+    () => this.settings()?.accentColor || "#88bd39",
   );
   readonly brandColorRgb = computed(() => this.hexToRgb(this.brandColor()));
   readonly accentColorRgb = computed(() => this.hexToRgb(this.accentColor()));
@@ -134,13 +134,13 @@ export class PublicBookingFacade {
   readonly publicHeroBackground = computed(() => {
     const settings = this.settings();
     const coverUrl = settings?.coverUrl
-      ? `linear-gradient(180deg, rgba(16, 25, 35, 0.72), rgba(13, 20, 28, 0.9)), url(${this.absoluteAssetUrl(settings.coverUrl)}) center/cover`
+      ? `linear-gradient(180deg, rgba(30, 52, 37, 0.72), rgba(23, 41, 29, 0.9)), url(${this.absoluteAssetUrl(settings.coverUrl)}) center/cover`
       : "";
 
     return [
       `radial-gradient(circle at top right, rgba(${this.accentColorRgb()}, 0.18), transparent 18rem)`,
       coverUrl,
-      `linear-gradient(180deg, ${this.brandColor()} 0%, #0d141c 100%)`,
+      `linear-gradient(180deg, ${this.brandColor()} 0%, #17291d 100%)`,
     ]
       .filter(Boolean)
       .join(", ");
@@ -273,7 +273,7 @@ export class PublicBookingFacade {
 
       this.settings.set(settings);
       this.titleService.setTitle(
-        settings?.publicTitle ?? settings?.name ?? "Prenota online",
+        settings?.publicTitle ?? settings?.name ?? "Prenota online · ALORA",
       );
       this.services.set(services as any[]);
 
@@ -400,7 +400,7 @@ export class PublicBookingFacade {
         : normalized;
 
     if (!/^[0-9a-fA-F]{6}$/.test(full)) {
-      return "28, 124, 100";
+      return "30, 52, 37";
     }
 
     const red = Number.parseInt(full.slice(0, 2), 16);

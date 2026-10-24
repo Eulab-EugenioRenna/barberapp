@@ -39,7 +39,7 @@ export type QuickCreateKind = "customer" | "service" | "product";
   `,
   styles: [`
     .quick-create-overlay { position: fixed; z-index: 1300; inset: 0; display: grid; place-items: center; padding: 1rem; }
-    .quick-create-backdrop { position: absolute; inset: 0; border: 0; background: rgba(15, 23, 32, .42); backdrop-filter: blur(3px); }
+    .quick-create-backdrop { position: absolute; inset: 0; border: 0; background: rgba(30, 52, 37, .42); backdrop-filter: blur(3px); }
     .quick-create-dialog { position: relative; width: min(100%, 28rem); border: .0625rem solid var(--line); border-radius: 1.75rem; background: #fffdf9; padding: 1.5rem; box-shadow: 0 1.5rem 4rem rgba(15,23,32,.22); }
   `],
 })

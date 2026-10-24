@@ -1,5 +1,7 @@
+import { SessionStore } from "../core/session.store";
+import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import { Component, inject, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { CustomSelectComponent } from "../custom-select.component";
@@ -15,6 +17,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
     "[class.appointments-embedded]": "formOnly",
   },
   imports: [
+    FunctionAccessDirective,
     CommonModule,
     FormsModule,
     CalendarInputComponent,
@@ -172,9 +175,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
         <p class="eyebrow text-[var(--accent)]">Scheda appuntamento</p>
         <h3 class="font-display text-2xl sm:text-3xl">
           {{
-            appointmentForm.id
-              ? "Aggiorna appuntamento"
-              : "Nuovo appuntamento"
+            appointmentForm.id ? "Aggiorna appuntamento" : "Nuovo appuntamento"
           }}
         </h3>
         <form
@@ -183,21 +184,29 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
         >
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field md:col-span-2">
-              <span>Cliente <em class="required-mark" aria-hidden="true">*</em></span>
+              <span
+                >Cliente
+                <em class="required-mark" aria-hidden="true">*</em></span
+              >
               <barber-custom-select
                 [value]="appointmentForm.customerId"
                 (valueChange)="appointmentCustomerSelect.emit($event)"
                 [options]="appointmentCustomerOptions"
                 label="Cliente"
                 placeholder="Cerca o seleziona il cliente"
-                createLabel="Aggiungi nuovo cliente"
+                [createLabel]="
+                  session.can('clients.manage') ? 'Aggiungi nuovo cliente' : ''
+                "
                 (createRequest)="quickCreate.emit('customer')"
               ></barber-custom-select>
             </label>
           </div>
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
-              <span>Servizio <em class="required-mark" aria-hidden="true">*</em></span>
+              <span
+                >Servizio
+                <em class="required-mark" aria-hidden="true">*</em></span
+              >
               <barber-custom-select
                 [value]="appointmentForm.serviceId"
                 (valueChange)="
@@ -209,7 +218,11 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 "
                 [options]="serviceSelectOptions"
                 label="Servizio"
-                createLabel="Aggiungi nuovo servizio"
+                [createLabel]="
+                  session.can('services.manage')
+                    ? 'Aggiungi nuovo servizio'
+                    : ''
+                "
                 (createRequest)="quickCreate.emit('service')"
               ></barber-custom-select>
             </label>
@@ -245,7 +258,9 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
               ></barber-calendar-input>
             </label>
             <label class="field">
-              <span>Ora <em class="required-mark" aria-hidden="true">*</em></span>
+              <span
+                >Ora <em class="required-mark" aria-hidden="true">*</em></span
+              >
               <barber-custom-select
                 [value]="appointmentForm.startsAt"
                 (valueChange)="
@@ -298,14 +313,22 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
           <div class="appointments-form-actions">
             <div class="appointments-form-actions-group">
               <button
+                [aloraFunction]="
+                  appointmentForm.id
+                    ? 'appointments.update.all'
+                    : 'appointments.create'
+                "
                 type="submit"
                 class="primary-btn"
                 [disabled]="loading || !formValid"
               >
                 <barber-ui-icon name="save"></barber-ui-icon>
-                {{ appointmentForm.id ? "Salva modifiche" : "Crea appuntamento" }}
+                {{
+                  appointmentForm.id ? "Salva modifiche" : "Crea appuntamento"
+                }}
               </button>
               <button
+                aloraFunction="sales.manage"
                 *ngIf="appointmentForm.id"
                 type="button"
                 class="primary-btn"
@@ -320,6 +343,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
               class="appointments-form-actions-group"
             >
               <button
+                aloraFunction="appointments.update.all"
                 type="button"
                 class="danger-btn"
                 [disabled]="loading"
@@ -328,6 +352,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 <barber-ui-icon name="trash"></barber-ui-icon> Elimina
               </button>
               <button
+                aloraFunction="appointments.update.all"
                 type="button"
                 class="pill-btn"
                 [disabled]="loading"
@@ -343,11 +368,14 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
   `,
 })
 export class AdminAppointmentsPageComponent {
+  readonly session = inject(SessionStore);
+
   @Input() listOnly = false;
   @Input() formOnly = false;
   @Input() appointments: any[] = [];
   @Input() appointmentForm: any = {};
-  @Input() appointmentCustomerOptions: Array<{ value: string; label: string }> = [];
+  @Input() appointmentCustomerOptions: Array<{ value: string; label: string }> =
+    [];
   @Input() serviceSelectOptions: Array<{ value: string; label: string }> = [];
   @Input() appointmentCollaboratorOptions: Array<{
     value: string;
@@ -378,12 +406,14 @@ export class AdminAppointmentsPageComponent {
   get formValid(): boolean {
     const customer = Boolean(
       this.appointmentForm.customerId ||
-        (typeof this.appointmentForm.customerName === "string" &&
-          this.appointmentForm.customerName.trim()),
+      (typeof this.appointmentForm.customerName === "string" &&
+        this.appointmentForm.customerName.trim()),
     );
 
     return Boolean(
-      customer && this.appointmentForm.serviceId && this.appointmentForm.startsAt,
+      customer &&
+      this.appointmentForm.serviceId &&
+      this.appointmentForm.startsAt,
     );
   }
 

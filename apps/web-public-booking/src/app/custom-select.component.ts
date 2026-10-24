@@ -60,40 +60,40 @@ type SelectOption = {
 
       <ng-template #popoverTemplate>
         <div
-        role="listbox"
-        [id]="listboxId"
-        class="select-popover"
-        (click)="$event.stopPropagation()"
-      >
-        <label class="select-filter-shell">
-          <input
-            [(ngModel)]="filterQuery"
-            class="select-filter-input"
-            placeholder="Filtra opzioni"
-            aria-label="Filtra opzioni"
-            (pointerdown)="$event.stopPropagation()"
-            (click)="$event.stopPropagation()"
-          />
-        </label>
-        <div
-          *ngFor="let option of filteredOptions"
-          role="option"
-          [attr.tabindex]="option.disabled ? -1 : 0"
-          [attr.aria-selected]="option.value === value"
-          [attr.aria-disabled]="option.disabled || null"
-          class="select-option"
-          [class.active]="option.value === value"
-          [class.option-disabled]="option.disabled"
-          (pointerdown)="choose(option, $event)"
-          (keydown.enter)="choose(option, $event)"
-          (keydown.space)="choose(option, $event)"
+          role="listbox"
+          [id]="listboxId"
+          class="select-popover"
+          (click)="$event.stopPropagation()"
         >
-          <span>{{ option.label }}</span>
-          <small *ngIf="option.hint">{{ option.hint }}</small>
-        </div>
-        <div *ngIf="!filteredOptions.length" class="select-empty">
-          Nessun risultato
-        </div>
+          <label class="select-filter-shell">
+            <input
+              [(ngModel)]="filterQuery"
+              class="select-filter-input"
+              placeholder="Filtra opzioni"
+              aria-label="Filtra opzioni"
+              (pointerdown)="$event.stopPropagation()"
+              (click)="$event.stopPropagation()"
+            />
+          </label>
+          <div
+            *ngFor="let option of filteredOptions"
+            role="option"
+            [attr.tabindex]="option.disabled ? -1 : 0"
+            [attr.aria-selected]="option.value === value"
+            [attr.aria-disabled]="option.disabled || null"
+            class="select-option"
+            [class.active]="option.value === value"
+            [class.option-disabled]="option.disabled"
+            (pointerdown)="choose(option, $event)"
+            (keydown.enter)="choose(option, $event)"
+            (keydown.space)="choose(option, $event)"
+          >
+            <span>{{ option.label }}</span>
+            <small *ngIf="option.hint">{{ option.hint }}</small>
+          </div>
+          <div *ngIf="!filteredOptions.length" class="select-empty">
+            Nessun risultato
+          </div>
         </div>
       </ng-template>
     </div>
@@ -114,13 +114,13 @@ type SelectOption = {
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1.2rem;
         background: rgba(255, 255, 255, 0.94);
         padding: 0.92rem 1rem;
-        color: #0f1720;
+        color: #1e3425;
         text-align: left;
-        box-shadow: 0 0.75rem 2rem rgba(15, 23, 32, 0.06);
+        box-shadow: 0 0.75rem 2rem rgba(30, 52, 37, 0.06);
         transition:
           border-color 180ms ease,
           box-shadow 180ms ease,
@@ -129,12 +129,12 @@ type SelectOption = {
 
       .select-trigger:hover {
         transform: translateY(-0.0625rem);
-        border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.22);
+        border-color: rgba(var(--brand-rgb, 30, 52, 37), 0.22);
       }
 
       .open .select-trigger {
-        border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.3);
-        box-shadow: 0 0 0 0.22rem rgba(var(--brand-rgb, 28, 124, 100), 0.1);
+        border-color: rgba(var(--brand-rgb, 30, 52, 37), 0.3);
+        box-shadow: 0 0 0 0.22rem rgba(var(--brand-rgb, 30, 52, 37), 0.1);
       }
 
       .disabled .select-trigger {
@@ -153,11 +153,11 @@ type SelectOption = {
         font-weight: 800;
         letter-spacing: 0.16em;
         text-transform: uppercase;
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .select-value.placeholder {
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .select-chevron {
@@ -176,11 +176,11 @@ type SelectOption = {
         width: 100%;
         max-height: 18rem;
         overflow: auto;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1.3rem;
         background: rgba(255, 255, 255, 0.98);
         padding: 0.45rem;
-        box-shadow: 0 1.25rem 3rem rgba(15, 23, 32, 0.14);
+        box-shadow: 0 1.25rem 3rem rgba(30, 52, 37, 0.14);
       }
 
       .select-filter-shell {
@@ -190,16 +190,16 @@ type SelectOption = {
 
       .select-filter-input {
         width: 100%;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1rem;
-        background: rgba(15, 23, 32, 0.03);
+        background: rgba(30, 52, 37, 0.03);
         padding: 0.78rem 0.9rem;
-        color: #0f1720;
+        color: #1e3425;
       }
 
       .select-empty {
         padding: 0.9rem;
-        color: rgba(15, 23, 32, 0.5);
+        color: rgba(30, 52, 37, 0.5);
         text-align: center;
       }
 
@@ -212,16 +212,16 @@ type SelectOption = {
         background: transparent;
         padding: 0.8rem 0.9rem;
         text-align: left;
-        color: #0f1720;
+        color: #1e3425;
       }
 
       .select-option small {
-        color: rgba(15, 23, 32, 0.5);
+        color: rgba(30, 52, 37, 0.5);
       }
 
       .select-option:hover,
       .select-option.active {
-        background: rgba(15, 23, 32, 0.06);
+        background: rgba(30, 52, 37, 0.06);
       }
 
       .select-option.option-disabled {
@@ -393,7 +393,10 @@ export class CustomSelectComponent implements OnDestroy {
       triggerRect.bottom / scale + gap + popoverHeight <=
       window.innerHeight / scale - viewportPadding
         ? triggerRect.bottom / scale + gap
-        : Math.max(viewportPadding, triggerRect.top / scale - gap - popoverHeight);
+        : Math.max(
+            viewportPadding,
+            triggerRect.top / scale - gap - popoverHeight,
+          );
 
     Object.assign(popover.style, {
       top: `${top}px`,

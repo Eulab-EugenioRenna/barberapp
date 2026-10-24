@@ -1,4 +1,12 @@
-import { Controller, Get, Req } from "@nestjs/common";
+import { publicUserSelect } from "../../common/local-sessions";
+import {
+  Controller,
+  Delete,
+  Get,
+  Req,
+  Param,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   requirePlatformAdmin,
   requireTenantId,
@@ -23,7 +31,8 @@ export class UsersController {
       requirePlatformAdmin(session);
       return this.prisma.user.findMany({
         orderBy: { createdAt: "desc" },
-        include: {
+        select: {
+          ...publicUserSelect,
           tenant: {
             select: {
               id: true,
@@ -53,5 +62,28 @@ export class UsersController {
         updatedAt: true,
       },
     });
+  }
+  @Delete(":id/sessions")
+  async revokeSessions(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+  ): Promise<{ ok: true }> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const target = await this.prisma.user.findFirst({
+      where: { id, tenantId },
+    });
+    if (!target) throw new NotFoundException();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"user:" + id}, 0))`;
+      await tx.localSession.updateMany({
+        where: { userId: id },
+        data: { revokedAt: new Date() },
+      });
+    });
+    return { ok: true };
   }
 }

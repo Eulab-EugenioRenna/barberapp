@@ -1,3 +1,4 @@
+import { SessionStore } from "../core/session.store";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, OnInit, Output, inject } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -7,7 +8,10 @@ import { AdminAppointmentsPageComponent } from "../pages/admin-appointments-page
 import { AdminAppointmentsCalendarComponent } from "./admin-appointments-calendar.component";
 import { AppointmentsCollaboratorMultiSelectComponent } from "./appointments-collaborator-multi-select.component";
 import { AppointmentsFacade } from "./appointments.facade";
-import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dialog.component";
+import {
+  QuickCreateDialogComponent,
+  QuickCreateKind,
+} from "../quick-create-dialog.component";
 
 @Component({
   selector: "barber-admin-appointments-feature-page",
@@ -122,7 +126,7 @@ import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dia
             [listOnly]="true"
             [appointments]="appointmentsFacade.listAppointments()"
             [loading]="appointmentsFacade.loading()"
-            (editAppointment)="openEditor.emit($event)"
+            (editAppointment)="editAppointmentById($event.id)"
           ></barber-admin-appointments-page>
         </article>
       </div>
@@ -257,6 +261,8 @@ import { QuickCreateDialogComponent, QuickCreateKind } from "../quick-create-dia
   ],
 })
 export class AdminAppointmentsFeaturePageComponent implements OnInit {
+  private readonly session = inject(SessionStore);
+
   readonly appointmentsFacade = inject(AppointmentsFacade);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -366,6 +372,10 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
   }
 
   editAppointmentById(appointmentId: string): void {
+    if (!this.session.can("appointments.update.all")) {
+      this.openDetails(appointmentId);
+      return;
+    }
     const appointment = this.appointmentsFacade
       .appointments()
       .find((item) => item.id === appointmentId);

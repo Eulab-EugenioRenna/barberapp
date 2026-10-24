@@ -49,6 +49,29 @@ export class TenantController {
     return `/uploads/tenants/${tenantId}/${fileName}`;
   }
 
+  // Minimal operational context: no provider configuration, users or internal settings.
+  @Get("context")
+  async context(
+    @Req() request: { headers: { authorization?: string } },
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    return this.prisma.tenant.findUnique({
+      where: { id: requireTenantId(session) },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        timezone: true,
+        currency: true,
+        language: true,
+      },
+    });
+  }
+
   @Get("settings")
   async getSettings(
     @Req() request: { headers: { authorization?: string } },
@@ -277,7 +300,9 @@ export class TenantController {
     const tenantId = requireTenantId(session);
 
     if (!file?.buffer || !file.mimetype.startsWith("image/")) {
-      throw new BadRequestException("Scegli un'immagine valida per la copertina");
+      throw new BadRequestException(
+        "Scegli un'immagine valida per la copertina",
+      );
     }
 
     const relativeUrl = this.saveTenantImage(tenantId, file, "cover");

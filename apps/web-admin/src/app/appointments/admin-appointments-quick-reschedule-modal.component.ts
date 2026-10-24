@@ -28,7 +28,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
       }
 
       .quick-modal-card {
-        border: 1px solid rgba(15, 23, 32, 0.08);
+        border: 1px solid rgba(30, 52, 37, 0.08);
         border-radius: 1.4rem;
         background: rgba(255, 255, 255, 0.74);
         padding: 1rem;

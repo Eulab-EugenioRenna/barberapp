@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-22T21:47:33.644Z",
+  "checks": 35,
+  "requiredActionBlocked": true,
+  "connectOnlyProvisioned": true,
+  "mfaEnrollment": true,
+  "mfaMissingBlocked": true,
+  "mfaWrongBlocked": true,
+  "mfaCorrectAccepted": true,
+  "realKeycloak": true,
+  "realConnectDocker": true,
+  "realPostgres": true,
+  "realBrowser": false,
+  "sdkVersion": "0.10.0",
+  "sdkFacade": true,
+  "activeProviderLogoutVerified": true,
+  "catalog": "seeded from actual ALORA matrix; HTTPS fetch not tested",
+  "production": false,
+  "cleanupVerified": true,
+  "status": "passed"
+}

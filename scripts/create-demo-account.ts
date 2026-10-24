@@ -1,7 +1,6 @@
 /* eslint-disable no-console */
 import { Prisma, PrismaClient, UserRole } from "@prisma/client";
 import { hash } from "bcrypt";
-import { randomBytes } from "node:crypto";
 
 try {
   // Load .env when running outside the container (local / CI).
@@ -11,29 +10,23 @@ try {
   // .env is optional: rely on process.env (e.g. inside the api container).
 }
 
-const prisma = new PrismaClient();
-
 const args = new Set(process.argv.slice(2));
 const RESET = args.has("--reset") || process.env.DEMO_RESET === "1";
 const RESET_CONFIRMED =
   args.has("--yes") || process.env.DEMO_RESET_CONFIRM === "yes";
 
 const config = {
-  tenantName: process.env.DEMO_TENANT_NAME?.trim() || "Demo Barber Studio",
+  tenantName: process.env.DEMO_TENANT_NAME?.trim() || "ALORA Demo Studio",
   tenantSlug: process.env.DEMO_TENANT_SLUG?.trim() || "demo-barber-studio",
   publicDomain: process.env.DEMO_PUBLIC_DOMAIN?.trim() || undefined,
   ownerEmail: (
     process.env.DEMO_OWNER_EMAIL?.trim() || "demo@barber.test"
   ).toLowerCase(),
-  ownerPassword: process.env.DEMO_OWNER_PASSWORD?.trim() || "DEMO123!",
+  ownerPassword: process.env.DEMO_OWNER_PASSWORD || "",
   ownerFirstName: process.env.DEMO_OWNER_FIRST_NAME?.trim() || "Demo",
   ownerLastName: process.env.DEMO_OWNER_LAST_NAME?.trim() || "Owner",
   timezone: process.env.DEMO_TIMEZONE?.trim() || "Europe/Rome",
 };
-
-function generatedPassword(): string {
-  return `Demo-${randomBytes(9).toString("base64url")}`;
-}
 
 function daysFromNow(days: number, hour: number, minute = 0): Date {
   const date = new Date();
@@ -70,7 +63,10 @@ function buildAutoTags(input: {
   return tags;
 }
 
-async function removeTenantTree(tenantId: string): Promise<void> {
+async function removeTenantTree(
+  prisma: PrismaClient,
+  tenantId: string,
+): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await tx.collaboratorWeeklySchedule.deleteMany({
       where: { collaborator: { tenantId } },
@@ -99,7 +95,7 @@ async function removeTenantTree(tenantId: string): Promise<void> {
   });
 }
 
-async function ensureDemoPlan() {
+async function ensureDemoPlan(prisma: PrismaClient) {
   return prisma.subscriptionPlan.upsert({
     where: { code: "demo" },
     update: {},
@@ -247,7 +243,8 @@ async function createDemoData(
       data: {
         tenantId,
         name: "Scalp tonic",
-        description: "Tonico cute energizzante consigliato nei percorsi premium.",
+        description:
+          "Tonico cute energizzante consigliato nei percorsi premium.",
         category: "Care",
         price: 19,
         sku: "TON-SCLP",
@@ -284,7 +281,8 @@ async function createDemoData(
       data: {
         tenantId,
         name: "Executive grooming",
-        publicDescription: "Percorso completo con styling finale e rituale premium.",
+        publicDescription:
+          "Percorso completo con styling finale e rituale premium.",
         durationMinutes: 30,
         basePrice: 74,
         color: "#111827",
@@ -720,17 +718,17 @@ async function clearPublicLookupCache(slug: string): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
+export async function ensureDemoAccount(prisma: PrismaClient): Promise<void> {
   if (args.has("--help") || args.has("-h")) {
     console.log(`
 Crea un account demo completo e NON distruttivo.
 
 Variabili d'ambiente:
-  DEMO_TENANT_NAME      Nome tenant            (default: Demo Barber Studio)
+  DEMO_TENANT_NAME      Nome tenant            (default: ALORA Demo Studio)
   DEMO_TENANT_SLUG      Slug tenant            (default: demo-barber-studio)
   DEMO_PUBLIC_DOMAIN    Dominio pubblico       (opzionale)
   DEMO_OWNER_EMAIL      Email owner            (default: demo@barber.test)
-  DEMO_OWNER_PASSWORD   Password owner         (default: generata e stampata)
+  DEMO_OWNER_PASSWORD   Password owner         (obbligatoria in .env, mai stampata)
   DEMO_OWNER_FIRST_NAME Nome owner             (default: Demo)
   DEMO_OWNER_LAST_NAME  Cognome owner          (default: Owner)
   DEMO_TIMEZONE         Timezone tenant        (default: Europe/Rome)
@@ -767,6 +765,11 @@ Opzioni:
     );
   }
 
+  if (!config.ownerPassword)
+    throw new Error(
+      "Imposta DEMO_OWNER_PASSWORD in .env prima della creazione o del reset",
+    );
+
   if (RESET) {
     if (!RESET_CONFIRMED) {
       throw new Error(
@@ -775,13 +778,13 @@ Opzioni:
     }
     if (existingTenant) {
       console.log(`Reset: rimuovo il tenant demo "${config.tenantSlug}"...`);
-      await removeTenantTree(existingTenant.id);
+      await removeTenantTree(prisma, existingTenant.id);
     }
     await prisma.user.deleteMany({ where: { email: config.ownerEmail } });
   }
 
-  const plan = await ensureDemoPlan();
-  const password = config.ownerPassword || generatedPassword();
+  const plan = await ensureDemoPlan(prisma);
+  const password = config.ownerPassword;
   const passwordHash = await hash(password, 10);
 
   const tenant = await prisma.$transaction(
@@ -866,17 +869,20 @@ Opzioni:
   console.log(`  Slug:          ${tenant.slug}`);
   console.log(`  Tenant id:     ${tenant.id}`);
   console.log(`  Login owner:   ${config.ownerEmail}`);
-  console.log(`  Password:      ${password}`);
+  console.log("  Password:      configurata in .env, non visualizzata");
   console.log(`  Public:        ${publicUrl}`);
   console.log("========================================");
   console.log("");
 }
 
-main()
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  const prisma = new PrismaClient();
+  ensureDemoAccount(prisma)
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

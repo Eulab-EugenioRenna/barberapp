@@ -1,3 +1,4 @@
+import { LegacyWriteDto } from "../../common/legacy-write.dto";
 import {
   Body,
   Controller,
@@ -17,10 +18,7 @@ import {
   requireTenantId,
   resolveRequestSession,
 } from "../../common/request-session";
-import {
-  buildPaginatedResult,
-  parsePagination,
-} from "../../common/pagination";
+import { buildPaginatedResult, parsePagination } from "../../common/pagination";
 
 @Controller("products")
 export class ProductsController {
@@ -68,7 +66,7 @@ export class ProductsController {
   @Post()
   async create(
     @Req() request: { headers: { authorization?: string } },
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -90,9 +88,7 @@ export class ProductsController {
         category:
           typeof body["category"] === "string" ? body["category"] : undefined,
         price:
-          body["price"] === undefined ||
-          body["price"] === null ||
-          body["price"] === ""
+          body["price"] === undefined || body["price"] === null
             ? null
             : Number(body["price"]),
       },
@@ -110,7 +106,7 @@ export class ProductsController {
   async update(
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
+    @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
@@ -119,9 +115,8 @@ export class ProductsController {
 
     const tenantId = requireTenantId(session);
     const updated = await this.prisma.product.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
-        tenantId,
         name: typeof body["name"] === "string" ? body["name"] : undefined,
         description:
           typeof body["description"] === "string"
@@ -135,7 +130,7 @@ export class ProductsController {
         price:
           body["price"] === undefined
             ? undefined
-            : body["price"] === null || body["price"] === ""
+            : body["price"] === null
               ? null
               : Number(body["price"]),
         isActive:
@@ -162,7 +157,7 @@ export class ProductsController {
     );
     const tenantId = requireTenantId(session);
 
-    await this.prisma.product.delete({ where: { id } });
+    await this.prisma.product.delete({ where: { id, tenantId } });
 
     await Promise.all([
       this.cacheInvalidationService.invalidateProducts(tenantId),

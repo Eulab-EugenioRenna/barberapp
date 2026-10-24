@@ -1,9 +1,17 @@
+import {
+  ConnectOnboardingModalComponent,
+  ConnectOnboardingProfile,
+  canRequestConnectMigration,
+} from "./connect-onboarding-modal.component";
+import { AloraBrandComponent } from "@barber/shared/brand";
 import { CommonModule } from "@angular/common";
 import {
   Component,
   EventEmitter,
   Input,
   OnChanges,
+  OnInit,
+  OnDestroy,
   Output,
   SimpleChanges,
   inject,
@@ -19,7 +27,12 @@ type AuthMode = "login" | "signup";
 @Component({
   selector: "barber-admin-auth-panel",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    AloraBrandComponent,
+    ConnectOnboardingModalComponent,
+  ],
   styles: [
     `
       .auth-panel {
@@ -35,7 +48,7 @@ type AuthMode = "login" | "signup";
         padding: 0.3rem;
         border: 1px solid var(--line);
         border-radius: 999rem;
-        background: rgba(15, 23, 32, 0.05);
+        background: rgba(30, 52, 37, 0.05);
       }
 
       .auth-toggle-thumb {
@@ -45,8 +58,8 @@ type AuthMode = "login" | "signup";
         left: 0.3rem;
         width: calc(50% - 0.425rem);
         border-radius: 999rem;
-        background: linear-gradient(135deg, var(--brand), #123b33);
-        box-shadow: 0 0.5rem 1.25rem rgba(28, 124, 100, 0.28);
+        background: linear-gradient(135deg, var(--brand), #1e3425);
+        box-shadow: 0 0.5rem 1.25rem rgba(30, 52, 37, 0.28);
         transition: transform 340ms cubic-bezier(0.4, 0, 0.2, 1);
       }
 
@@ -157,6 +170,13 @@ type AuthMode = "login" | "signup";
     `,
   ],
   template: `
+    <alora-connect-onboarding-modal
+      *ngIf="onboarding"
+      [profile]="onboarding"
+      [loading]="loading"
+      [feedback]="onboardingFeedback"
+      (accept)="acceptOnboarding($event)"
+    ></alora-connect-onboarding-modal>
     <section
       class="auth-scroll mx-auto grid max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
     >
@@ -164,11 +184,11 @@ type AuthMode = "login" | "signup";
       <aside
         class="hero-panel hidden min-w-0 rounded-[2rem] p-6 text-white lg:block lg:p-10"
       >
-        <p class="eyebrow">Direzione salone</p>
+        <alora-brand [onDark]="true"></alora-brand>
         <h1
           class="mt-4 font-display text-5xl font-semibold leading-none md:text-7xl"
         >
-          Il tuo salone, sempre sotto controllo.
+          Ogni giornata, al suo meglio.
         </h1>
         <p class="mt-6 max-w-xl text-base text-white/72 md:text-lg">
           Organizza appuntamenti, squadra, clienti e incassi con una visione
@@ -214,7 +234,7 @@ type AuthMode = "login" | "signup";
       <section
         class="panel auth-panel min-w-0 rounded-[1.5rem] p-4 sm:p-6 md:rounded-[2rem] md:p-8"
       >
-        <p class="eyebrow text-[var(--accent)] lg:hidden">Direzione salone</p>
+        <alora-brand class="lg:hidden"></alora-brand>
 
         <div
           class="auth-toggle mt-3 lg:mt-0"
@@ -244,7 +264,7 @@ type AuthMode = "login" | "signup";
             [attr.aria-selected]="authMode === 'signup'"
             (click)="setMode('signup')"
           >
-            Crea account
+            Richiedi attivazione
           </button>
         </div>
 
@@ -258,7 +278,7 @@ type AuthMode = "login" | "signup";
             {{
               authMode === "login"
                 ? "Bentornato nel tuo salone"
-                : "Apri il tuo spazio"
+                : "Richiedi il tuo spazio"
             }}
           </h2>
         </div>
@@ -317,15 +337,22 @@ type AuthMode = "login" | "signup";
             ><input
               [(ngModel)]="loginForm.email"
               name="loginEmail"
+              (ngModelChange)="connectLogin = false"
+              (blur)="detectLoginMethod()"
               type="email"
               placeholder="direzione@atelier.it"
               autocomplete="email"
               required
           /></label>
-          <label class="field"
+          <label class="field" *ngIf="!connectLogin || authMode === 'signup'"
             ><span
               >Password
-              <em class="required-mark" aria-hidden="true">*</em></span
+              <em
+                *ngIf="authMode === 'signup'"
+                class="required-mark"
+                aria-hidden="true"
+                >*</em
+              ></span
             ><input
               [(ngModel)]="loginForm.password"
               name="loginPassword"
@@ -334,8 +361,8 @@ type AuthMode = "login" | "signup";
               [autocomplete]="
                 authMode === 'login' ? 'current-password' : 'new-password'
               "
-              minlength="8"
-              required
+              [attr.minlength]="authMode === 'signup' ? 8 : null"
+              [required]="authMode === 'signup'"
           /></label>
 
           <div class="auth-extra" [class.is-open]="authMode === 'signup'">
@@ -358,6 +385,10 @@ type AuthMode = "login" | "signup";
             </div>
           </div>
 
+          <p *ngIf="authMode === 'login'" class="text-sm text-[var(--muted)]">
+            L’accesso usa EULAB Connect. Se possiedi solo un account locale,
+            inserisci anche la password per richiedere la migrazione.
+          </p>
           <p
             *ngIf="feedback"
             role="alert"
@@ -376,8 +407,8 @@ type AuthMode = "login" | "signup";
               loading
                 ? "Un momento..."
                 : authMode === "login"
-                  ? "Entra nel salone"
-                  : "Configura il mio salone"
+                  ? "Accedi"
+                  : "Invia richiesta"
             }}
           </button>
         </form>
@@ -385,7 +416,7 @@ type AuthMode = "login" | "signup";
     </section>
   `,
 })
-export class AdminAuthPanelComponent implements OnChanges {
+export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
   private readonly authApi = inject(AuthApiService);
   private readonly sessionStore = inject(SessionStore);
   private readonly router = inject(Router);
@@ -400,6 +431,131 @@ export class AdminAuthPanelComponent implements OnChanges {
   signupForm = { companyName: "", firstName: "", lastName: "" };
   signupPasswordConfirm = "";
 
+  connectLogin = false;
+  onboarding: ConnectOnboardingProfile | null = null;
+  onboardingFeedback = "";
+  private destroyed = false;
+  private onboardingTimer: ReturnType<typeof setTimeout> | null = null;
+
+  ngOnInit(): void {
+    void this.finishConnectReturn();
+  }
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.clearCredentials();
+  }
+
+  detectLoginMethod(): void {
+    // No email-only account enumeration. The server checks both authorities on submit.
+    this.connectLogin = false;
+  }
+
+  private clearCredentials(): void {
+    this.loginForm.password = "";
+    this.signupPasswordConfirm = "";
+    if (this.onboardingTimer) clearTimeout(this.onboardingTimer);
+    this.onboardingTimer = null;
+  }
+
+  private async finishConnectReturn(): Promise<void> {
+    const url = new URL(window.location.href);
+    const [route,hashQuery=""] = url.hash.slice(1).split("?");
+    const fragment = new URLSearchParams(hashQuery);
+    const handoff = fragment.get("alora_connect") ?? url.searchParams.get("alora_connect");
+    const error = url.searchParams.get("connect_error");
+    if (!handoff && !error) return;
+    url.searchParams.delete("alora_connect");
+    fragment.delete("alora_connect");
+    url.hash = route + (fragment.size ? "?" + fragment.toString() : "");
+    url.searchParams.delete("connect_error");
+    window.history.replaceState(null, "", url.href);
+    if (error) {
+      this.feedback =
+        "Accesso Connect non completato. Puoi riprovare dallo stesso pulsante.";
+      return;
+    }
+    this.loading = true;
+    try {
+      const session = await firstValueFrom(
+        this.authApi.exchangeConnect(handoff!),
+      );
+      if (this.destroyed) return;
+      this.sessionStore.setSession(session);
+      await this.enterApplication();
+    } catch {
+      this.feedback = "Accesso Connect da ripetere. Premi nuovamente Accedi.";
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async acceptOnboarding(profile: {
+    firstName: string;
+    lastName: string;
+    newConnectPassword?: string;
+  }): Promise<void> {
+    if (
+      !this.onboarding ||
+      this.loading ||
+      !canRequestConnectMigration(this.onboarding) ||
+      !this.loginForm.password
+    )
+      return;
+    if(this.onboarding.request?.nextAction === "choose_connect_password" && (!profile.newConnectPassword || profile.newConnectPassword === this.loginForm.password)) {
+      this.onboardingFeedback = "Scegli una nuova password Connect diversa da quella locale.";
+      return;
+    }
+    this.loading = true;
+    this.onboardingFeedback = "";
+    if (this.onboardingTimer) clearTimeout(this.onboardingTimer);
+    try {
+      const result = await firstValueFrom(
+        this.authApi.acceptConnect({
+          ...profile,
+          challenge: this.onboarding.challenge,
+          password: this.loginForm.password,
+          accepted: true,
+          consentVersion: this.onboarding.version,
+        }),
+      );
+      this.clearCredentials();
+      if (!this.destroyed && this.onboarding) {
+        this.onboarding = {
+          ...this.onboarding,
+          challenge: "",
+          request: result.request,
+        };
+        this.onboardingFeedback =
+          "Richiesta inviata. Attendi l’approvazione EULAB prima di accedere.";
+      }
+    } catch (error: any) {
+      this.clearCredentials();
+      if (this.onboarding)
+        this.onboarding = { ...this.onboarding, challenge: "" };
+      this.onboardingFeedback =
+        (typeof error?.error?.message === "string"
+          ? error.error.message
+          : "Invio non completato.") +
+        " Ricarica la pagina e verifica nuovamente credenziali e stato prima di un nuovo invio.";
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  private async enterApplication(): Promise<void> {
+    const currentUser = await firstValueFrom(this.authApi.me());
+    this.sessionStore.setCurrentUser(currentUser);
+    const pending = this.sessionStore.consumeRequestedUrl();
+    await this.router.navigateByUrl(
+      pending ||
+        (currentUser?.role === "platform_admin"
+          ? "/platform"
+          : currentUser?.role === "collaborator"
+            ? "/my-agenda"
+            : "/dashboard"),
+    );
+  }
+
   ngOnChanges(changes: SimpleChanges): void {
     if (changes["mode"]) {
       this.authMode = this.mode;
@@ -409,14 +565,14 @@ export class AdminAuthPanelComponent implements OnChanges {
   get formValid(): boolean {
     const credentialsValid =
       this.loginForm.email.trim().length > 0 &&
-      this.loginForm.password.length >= 8;
+      (this.authMode === "login" || this.loginForm.password.length >= 8);
     if (this.authMode === "login") return credentialsValid;
     return Boolean(
       credentialsValid &&
-        this.signupForm.companyName.trim() &&
-        this.signupForm.firstName.trim() &&
-        this.signupForm.lastName.trim() &&
-        this.signupPasswordConfirm.length >= 8,
+      this.signupForm.companyName.trim() &&
+      this.signupForm.firstName.trim() &&
+      this.signupForm.lastName.trim() &&
+      this.signupPasswordConfirm.length >= 8,
     );
   }
 
@@ -425,6 +581,8 @@ export class AdminAuthPanelComponent implements OnChanges {
       return;
     }
     this.authMode = mode;
+    this.connectLogin = false;
+    this.clearCredentials();
     this.feedback = "";
     this.modeChange.emit(mode);
   }
@@ -443,7 +601,13 @@ export class AdminAuthPanelComponent implements OnChanges {
 
       const authResponse: any =
         this.authMode === "login"
-          ? await firstValueFrom(this.authApi.login(this.loginForm))
+          ? await firstValueFrom(
+              this.authApi.login(
+                this.connectLogin
+                  ? { email: this.loginForm.email }
+                  : this.loginForm,
+              ),
+            )
           : await firstValueFrom(
               this.authApi.signup({
                 companyName: this.signupForm.companyName,
@@ -454,20 +618,40 @@ export class AdminAuthPanelComponent implements OnChanges {
               }),
             );
 
-      this.sessionStore.setToken(authResponse.accessToken);
-      const currentUser = await firstValueFrom(this.authApi.me());
-      this.sessionStore.setCurrentUser(currentUser);
-
-      const pending = this.sessionStore.consumeRequestedUrl();
-      if (pending) {
-        await this.router.navigateByUrl(pending);
+      if (this.destroyed) return;
+      if (authResponse.status === "connect_redirect") {
+        this.clearCredentials();
+        window.location.assign(authResponse.redirectUrl);
         return;
       }
-
-      await this.router.navigateByUrl(
-        currentUser?.role === "platform_admin" ? "/platform" : "/dashboard",
-      );
+      if (authResponse.status === "migration_pending") {
+        this.clearCredentials();
+        this.feedback = `Richiesta ${authResponse.request.requestId} ricevuta. Attendi l’approvazione EULAB; l’accesso non è ancora abilitato.`;
+        return;
+      }
+      if (authResponse.onboarding) {
+        this.sessionStore.clear();
+        this.onboarding = authResponse.onboarding;
+        this.onboardingFeedback = authResponse.onboarding.feedback ?? "";
+        if (!canRequestConnectMigration(this.onboarding!)) {
+          this.clearCredentials();
+          return;
+        }
+        if (this.onboardingTimer) clearTimeout(this.onboardingTimer);
+        this.onboardingTimer = setTimeout(() => {
+          this.clearCredentials();
+          if (this.onboarding)
+            this.onboarding = { ...this.onboarding, challenge: "" };
+          this.onboardingFeedback =
+            "La verifica è scaduta. Ricarica la pagina e inserisci nuovamente le credenziali per inviare la richiesta.";
+        }, 120_000);
+        return;
+      }
+      this.sessionStore.setSession(authResponse);
+      this.clearCredentials();
+      await this.enterApplication();
     } catch (error: any) {
+      this.clearCredentials();
       this.feedback =
         error?.error?.message ||
         error?.message ||

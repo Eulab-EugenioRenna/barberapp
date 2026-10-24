@@ -1,27 +1,63 @@
+import { SessionStore } from "./session.store";
 import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
-import { Observable, forkJoin } from "rxjs";
+import { Observable, forkJoin, of, map } from "rxjs";
 import { ADMIN_API_URL } from "./api-config";
 
 @Injectable({ providedIn: "root" })
 export class AdminApiService {
   private readonly http = inject(HttpClient);
+  private readonly session = inject(SessionStore);
+
+  private allowed<T>(
+    key: string,
+    load: () => Observable<T>,
+    fallback: T,
+  ): Observable<T> {
+    return this.session.can(key) ? load() : of(fallback);
+  }
+
+  private loadTenantContext(): Observable<any> {
+    return this.http.get(
+      `${ADMIN_API_URL}/tenant/${this.session.can("settings.manage") ? "settings" : "context"}`,
+    );
+  }
+
+  private loadAgendaContext(): Observable<any> {
+    return this.allowed(
+      "appointments.read.all",
+      () => this.http.get(`${ADMIN_API_URL}/appointments/context`),
+      { services: [], collaborators: [] },
+    );
+  }
 
   readonly listPageSize = 50;
   readonly catalogPageSize = 200;
 
   loadAdminData(): Observable<Record<string, unknown>> {
     return forkJoin({
-      tenant: this.http.get(`${ADMIN_API_URL}/tenant/settings`),
-      revenue: this.http.get(`${ADMIN_API_URL}/dashboard/revenue`),
-      appointmentStats: this.http.get(
-        `${ADMIN_API_URL}/dashboard/appointments`,
+      tenant: this.loadTenantContext(),
+      revenue: this.allowed<any>(
+        "dashboard.revenue.read",
+        () => this.http.get(`${ADMIN_API_URL}/dashboard/revenue`),
+        null,
       ),
-      collaboratorStats: this.http.get(
-        `${ADMIN_API_URL}/dashboard/collaborators`,
+      appointmentStats: this.allowed<any>(
+        "dashboard.revenue.read",
+        () => this.http.get(`${ADMIN_API_URL}/dashboard/appointments`),
+        null,
       ),
-      serviceStats: this.http.get(`${ADMIN_API_URL}/dashboard/services`),
-      appointments: this.http.get(`${ADMIN_API_URL}/appointments`),
+      collaboratorStats: this.allowed<any>(
+        "dashboard.revenue.read",
+        () => this.http.get(`${ADMIN_API_URL}/dashboard/collaborators`),
+        null,
+      ),
+      serviceStats: this.allowed<any>(
+        "dashboard.revenue.read",
+        () => this.http.get(`${ADMIN_API_URL}/dashboard/services`),
+        null,
+      ),
+      appointments: this.loadAppointments(),
       sales: this.loadSalesPage(1),
       services: this.loadServicesPage(1),
       products: this.loadProductsPage(1),
@@ -32,7 +68,7 @@ export class AdminApiService {
 
   loadAdminCoreData(): Observable<Record<string, unknown>> {
     return forkJoin({
-      tenant: this.http.get(`${ADMIN_API_URL}/tenant/settings`),
+      tenant: this.loadTenantContext(),
       appointments: this.loadAppointments(),
       services: this.loadServicesPage(1),
       collaborators: this.loadCollaboratorsPage(1),
@@ -41,7 +77,11 @@ export class AdminApiService {
   }
 
   loadAppointments(): Observable<any[]> {
-    return this.http.get<any[]>(`${ADMIN_API_URL}/appointments`);
+    return this.allowed<any[]>(
+      "appointments.read.all",
+      () => this.http.get<any[]>(`${ADMIN_API_URL}/appointments`),
+      [],
+    );
   }
 
   loadCustomersPage(
@@ -56,55 +96,85 @@ export class AdminApiService {
     if (search) {
       query.set("search", search);
     }
-    return this.http.get<any>(`${ADMIN_API_URL}/customers?${query.toString()}`);
+    return this.allowed<any>(
+      "clients.read.full",
+      () =>
+        this.http.get<any>(`${ADMIN_API_URL}/customers?${query.toString()}`),
+      { items: [], total: 0, hasMore: false },
+    );
   }
 
   loadSalesPage(
     page: number,
   ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
-    return this.http.get<any>(
-      `${ADMIN_API_URL}/sales?page=${page}&pageSize=${this.listPageSize}`,
+    return this.allowed<any>(
+      "sales.read",
+      () =>
+        this.http.get<any>(
+          `${ADMIN_API_URL}/sales?page=${page}&pageSize=${this.listPageSize}`,
+        ),
+      { items: [], total: 0, hasMore: false },
     );
   }
 
   loadServicesPage(
     page: number,
   ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
-    return this.http.get<any>(
-      `${ADMIN_API_URL}/services?page=${page}&pageSize=${this.catalogPageSize}`,
+    return this.allowed<any>(
+      "services.read",
+      () =>
+        this.http.get<any>(
+          `${ADMIN_API_URL}/services?page=${page}&pageSize=${this.catalogPageSize}`,
+        ),
+      { items: [], total: 0, hasMore: false },
     );
   }
 
   loadProductsPage(
     page: number,
   ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
-    return this.http.get<any>(
-      `${ADMIN_API_URL}/products?page=${page}&pageSize=${this.catalogPageSize}`,
+    return this.allowed<any>(
+      "products.read",
+      () =>
+        this.http.get<any>(
+          `${ADMIN_API_URL}/products?page=${page}&pageSize=${this.catalogPageSize}`,
+        ),
+      { items: [], total: 0, hasMore: false },
     );
   }
 
   loadCollaboratorsPage(
     page: number,
   ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
-    return this.http.get<any>(
-      `${ADMIN_API_URL}/collaborators?page=${page}&pageSize=${this.catalogPageSize}`,
+    return this.allowed<any>(
+      "collaborators.read",
+      () =>
+        this.http.get<any>(
+          `${ADMIN_API_URL}/collaborators?page=${page}&pageSize=${this.catalogPageSize}`,
+        ),
+      { items: [], total: 0, hasMore: false },
     );
   }
 
   loadShellData(): Observable<Record<string, unknown>> {
     return forkJoin({
-      tenant: this.http.get(`${ADMIN_API_URL}/tenant/settings`),
+      tenant: this.loadTenantContext(),
     });
   }
 
   loadAppointmentsViewData(): Observable<Record<string, unknown>> {
     return forkJoin({
-      tenant: this.http.get(`${ADMIN_API_URL}/tenant/settings`),
-      appointments: this.http.get(`${ADMIN_API_URL}/appointments`),
-      services: this.loadServicesPage(1),
-      collaborators: this.loadCollaboratorsPage(1),
+      tenant: this.loadTenantContext(),
+      appointments: this.loadAppointments(),
+      context: this.loadAgendaContext(),
       customers: this.loadCustomersPage(1),
-    });
+    }).pipe(
+      map(({ context, ...data }) => ({
+        ...data,
+        services: context.services,
+        collaborators: context.collaborators,
+      })),
+    );
   }
 
   loadAdminStatsData(
@@ -112,16 +182,26 @@ export class AdminApiService {
   ): Observable<Record<string, unknown>> {
     return forkJoin({
       revenue: this.loadRevenueReport(revenueFilters),
-      upcomingAppointments: this.http.get(
-        `${ADMIN_API_URL}/dashboard/upcoming-appointments`,
+      upcomingAppointments: this.allowed<any>(
+        "dashboard.revenue.read",
+        () => this.http.get(`${ADMIN_API_URL}/dashboard/upcoming-appointments`),
+        null,
       ),
-      appointmentStats: this.http.get(
-        `${ADMIN_API_URL}/dashboard/appointments`,
+      appointmentStats: this.allowed<any>(
+        "dashboard.revenue.read",
+        () => this.http.get(`${ADMIN_API_URL}/dashboard/appointments`),
+        null,
       ),
-      collaboratorStats: this.http.get(
-        `${ADMIN_API_URL}/dashboard/collaborators`,
+      collaboratorStats: this.allowed<any>(
+        "dashboard.revenue.read",
+        () => this.http.get(`${ADMIN_API_URL}/dashboard/collaborators`),
+        null,
       ),
-      serviceStats: this.http.get(`${ADMIN_API_URL}/dashboard/services`),
+      serviceStats: this.allowed<any>(
+        "dashboard.revenue.read",
+        () => this.http.get(`${ADMIN_API_URL}/dashboard/services`),
+        null,
+      ),
       sales: this.loadSalesPage(1),
       products: this.loadProductsPage(1),
     });
@@ -317,8 +397,13 @@ export class AdminApiService {
     const query = new URLSearchParams(
       Object.entries(filters).filter(([, value]) => Boolean(value)),
     ).toString();
-    return this.http.get(
-      `${ADMIN_API_URL}/dashboard/revenue${query ? `?${query}` : ""}`,
+    return this.allowed<any>(
+      "dashboard.revenue.read",
+      () =>
+        this.http.get(
+          `${ADMIN_API_URL}/dashboard/revenue${query ? `?${query}` : ""}`,
+        ),
+      null,
     );
   }
 
@@ -332,8 +417,13 @@ export class AdminApiService {
     );
     query.set("page", String(page));
     query.set("pageSize", String(pageSize));
-    return this.http.get<any>(
-      `${ADMIN_API_URL}/dashboard/activity?${query.toString()}`,
+    return this.allowed<any>(
+      "dashboard.revenue.read",
+      () =>
+        this.http.get(
+          `${ADMIN_API_URL}/dashboard/activity?${query.toString()}`,
+        ),
+      null,
     );
   }
 

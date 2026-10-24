@@ -1,3 +1,4 @@
+import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -12,7 +13,13 @@ import {
 @Component({
   selector: "barber-admin-sales-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, InfiniteScrollDirective, UiIconComponent],
+  imports: [
+    FunctionAccessDirective,
+    CommonModule,
+    FormsModule,
+    InfiniteScrollDirective,
+    UiIconComponent,
+  ],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-4 sm:p-5">
@@ -20,13 +27,16 @@ import {
           <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Cassa</p>
             <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h3 class="font-display text-2xl sm:text-3xl">Vendite e incassi</h3>
+              <h3 class="font-display text-2xl sm:text-3xl">
+                Vendite e incassi
+              </h3>
               <span class="status-pill status-pill-neutral"
                 >{{ sales.length }} vendite</span
               >
             </div>
           </div>
           <button
+            aloraFunction="sales.manage"
             type="button"
             class="primary-btn"
             (click)="openQuickOrder.emit()"
@@ -110,7 +120,10 @@ import {
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="eyebrow text-[var(--accent)]">Vendita</p>
-            <h2 id="sale-detail-title" class="mt-2 font-display text-2xl sm:text-3xl">
+            <h2
+              id="sale-detail-title"
+              class="mt-2 font-display text-2xl sm:text-3xl"
+            >
               {{ selectedSale.customer?.firstName || "Vendita" }}
               {{ selectedSale.customer?.lastName || "senza cliente" }}
             </h2>
@@ -129,20 +142,30 @@ import {
 
         <div class="mt-4 grid gap-3 sm:grid-cols-2">
           <article class="rounded-2xl border border-[var(--line)] p-4">
-            <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Cliente</p>
+            <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
+              Cliente
+            </p>
             <strong class="mt-2 block">
               {{ selectedSale.customer?.firstName || "Vendita" }}
               {{ selectedSale.customer?.lastName || "senza cliente" }}
             </strong>
             <p class="mt-1 text-sm text-[var(--muted)]">
               {{ selectedSale.customer?.email || "Email non disponibile" }}
-              <span *ngIf="selectedSale.customer?.phone"> · {{ selectedSale.customer.phone }}</span>
+              <span *ngIf="selectedSale.customer?.phone">
+                · {{ selectedSale.customer.phone }}</span
+              >
             </p>
           </article>
           <article class="rounded-2xl border border-[var(--line)] p-4">
-            <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Pagamento</p>
-            <strong class="mt-2 block">{{ formatPaymentStatus(selectedSale.paymentStatus) }}</strong>
-            <p class="mt-1 text-sm text-[var(--muted)]">Metodo: {{ formatPaymentMethod(selectedSale.paymentMethod) }}</p>
+            <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
+              Pagamento
+            </p>
+            <strong class="mt-2 block">{{
+              formatPaymentStatus(selectedSale.paymentStatus)
+            }}</strong>
+            <p class="mt-1 text-sm text-[var(--muted)]">
+              Metodo: {{ formatPaymentMethod(selectedSale.paymentMethod) }}
+            </p>
           </article>
         </div>
 
@@ -163,7 +186,10 @@ import {
             </span>
             <span *ngIf="selectedSale.appointment.collaborator">
               ·
-              {{ selectedSale.appointment.collaborator?.firstName || "Da assegnare" }}
+              {{
+                selectedSale.appointment.collaborator?.firstName ||
+                  "Da assegnare"
+              }}
               {{ selectedSale.appointment.collaborator?.lastName || "" }}
             </span>
           </p>
@@ -188,8 +214,12 @@ import {
                     · sconto €{{ Number(item.discount).toFixed(2) }}
                   </span>
                 </p>
-                <p *ngIf="item.collaborator" class="mt-1 text-xs text-[var(--muted)]">
-                  Professionista: {{ item.collaborator.firstName }} {{ item.collaborator.lastName }}
+                <p
+                  *ngIf="item.collaborator"
+                  class="mt-1 text-xs text-[var(--muted)]"
+                >
+                  Professionista: {{ item.collaborator.firstName }}
+                  {{ item.collaborator.lastName }}
                 </p>
               </div>
               <strong>€{{ Number(item.lineTotal || 0).toFixed(2) }}</strong>
@@ -218,9 +248,7 @@ import {
             <span class="text-[var(--muted)]">Tasse</span>
             <span>€{{ Number(selectedSale.taxTotal).toFixed(2) }}</span>
           </div>
-          <div
-            class="flex justify-between border-t border-[var(--line)] pt-2"
-          >
+          <div class="flex justify-between border-t border-[var(--line)] pt-2">
             <strong>Totale</strong>
             <strong>€{{ Number(selectedSale.total || 0).toFixed(2) }}</strong>
           </div>
@@ -230,10 +258,20 @@ import {
           </div>
         </div>
         <div class="mt-4 flex flex-wrap gap-3">
-          <button type="button" class="primary-btn" (click)="editSelectedSale()">
+          <button
+            aloraFunction="sales.manage"
+            type="button"
+            class="primary-btn"
+            (click)="editSelectedSale()"
+          >
             <barber-ui-icon name="edit"></barber-ui-icon> Modifica vendita
           </button>
-          <button type="button" class="pill-btn" (click)="deleteSelectedSale()">
+          <button
+            aloraFunction="sales.manage"
+            type="button"
+            class="pill-btn"
+            (click)="deleteSelectedSale()"
+          >
             <barber-ui-icon name="trash"></barber-ui-icon> Elimina vendita
           </button>
         </div>
@@ -271,8 +309,7 @@ export class AdminSalesPageComponent {
         sale.paymentMethod,
         sale.paymentStatus,
         ...(sale.items || []).map(
-          (item: any) =>
-            item.service?.name || item.product?.name || item.label,
+          (item: any) => item.service?.name || item.product?.name || item.label,
         ),
       ]
         .filter(Boolean)
@@ -313,7 +350,9 @@ export class AdminSalesPageComponent {
   }
 
   saleItemLabels(sale: any): string {
-    return (sale.items || []).map((item: any) => this.saleItemLabel(item)).join(" · ");
+    return (sale.items || [])
+      .map((item: any) => this.saleItemLabel(item))
+      .join(" · ");
   }
 
   formatDateTime(value: string): string {

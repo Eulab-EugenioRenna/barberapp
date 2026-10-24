@@ -1,5 +1,8 @@
+import { validateTenantImport } from "../../common/validate-tenant-import";
+import { publicUserSelect } from "../../common/local-sessions";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import {
+  Prisma,
   BillingInterval,
   BookingMode,
   SubscriptionStatus,
@@ -144,7 +147,10 @@ export class PlatformAdminService {
       saleItems,
       subscriptions,
     ] = await Promise.all([
-      this.prisma.user.findMany({ where: { tenantId } }),
+      this.prisma.user.findMany({
+        where: { tenantId },
+        select: publicUserSelect,
+      }),
       this.prisma.collaborator.findMany({ where: { tenantId } }),
       this.prisma.customer.findMany({ where: { tenantId } }),
       this.prisma.service.findMany({ where: { tenantId } }),
@@ -216,13 +222,13 @@ export class PlatformAdminService {
 
   async getTenant(tenantId: string): Promise<unknown> {
     const tenant = await this.cacheService.getOrSet(
-      cacheKeys.platformAdminTenant(tenantId),
+      `${cacheKeys.platformAdminTenant(tenantId)}:public-users-v1`,
       CACHE_TTL_SECONDS.dashboard,
       () =>
         this.prisma.tenant.findUnique({
           where: { id: tenantId },
           include: {
-            users: { orderBy: { createdAt: "asc" } },
+            users: { orderBy: { createdAt: "asc" }, select: publicUserSelect },
             subscriptions: {
               orderBy: { createdAt: "desc" },
               include: { plan: true },
@@ -335,6 +341,17 @@ export class PlatformAdminService {
     const now = new Date();
 
     const tenant = await this.prisma.$transaction(async (tx) => {
+      const users = await tx.user.findMany({
+        where: { tenantId },
+        select: { id: true },
+        orderBy: { id: "asc" },
+      });
+      for (const user of users)
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"user:" + user.id}, 0))`;
+      await tx.localSession.updateMany({
+        where: { user: { tenantId } },
+        data: { revokedAt: new Date() },
+      });
       const tenant = await tx.tenant.update({
         where: { id: tenantId },
         data: {
@@ -404,27 +421,33 @@ export class PlatformAdminService {
     return tenant;
   }
 
+  private async clearTenantData(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+  ): Promise<void> {
+    await tx.saleItem.deleteMany({ where: { sale: { tenantId } } });
+    await tx.sale.deleteMany({ where: { tenantId } });
+    await tx.appointmentCancellation.deleteMany({
+      where: { appointment: { tenantId } },
+    });
+    await tx.appointment.deleteMany({ where: { tenantId } });
+    await tx.serviceProduct.deleteMany({ where: { service: { tenantId } } });
+    await tx.notificationHistory.deleteMany({ where: { tenantId } });
+    await tx.notificationInbox.deleteMany({ where: { tenantId } });
+    await tx.notificationPreferenceUser.deleteMany({ where: { tenantId } });
+    await tx.notificationPreferenceTenant.deleteMany({ where: { tenantId } });
+    await tx.notificationTemplate.deleteMany({ where: { tenantId } });
+    await tx.notificationProviderConfig.deleteMany({ where: { tenantId } });
+    await tx.product.deleteMany({ where: { tenantId } });
+    await tx.room.deleteMany({ where: { tenantId } });
+    await tx.service.deleteMany({ where: { tenantId } });
+    await tx.customer.deleteMany({ where: { tenantId } });
+    await tx.collaborator.deleteMany({ where: { tenantId } });
+  }
+
   async resetTenantData(tenantId: string): Promise<unknown> {
     await this.prisma.$transaction(async (tx) => {
-      await tx.saleItem.deleteMany({ where: { sale: { tenantId } } });
-      await tx.sale.deleteMany({ where: { tenantId } });
-      await tx.appointmentCancellation.deleteMany({
-        where: { appointment: { tenantId } },
-      });
-      await tx.appointment.deleteMany({ where: { tenantId } });
-      await tx.serviceProduct.deleteMany({ where: { service: { tenantId } } });
-      await tx.notificationHistory.deleteMany({ where: { tenantId } });
-      await tx.notificationInbox.deleteMany({ where: { tenantId } });
-      await tx.notificationPreferenceUser.deleteMany({ where: { tenantId } });
-      await tx.notificationPreferenceTenant.deleteMany({ where: { tenantId } });
-      await tx.notificationTemplate.deleteMany({ where: { tenantId } });
-      await tx.notificationProviderConfig.deleteMany({ where: { tenantId } });
-      await tx.product.deleteMany({ where: { tenantId } });
-      await tx.room.deleteMany({ where: { tenantId } });
-      await tx.service.deleteMany({ where: { tenantId } });
-      await tx.customer.deleteMany({ where: { tenantId } });
-      await tx.collaborator.deleteMany({ where: { tenantId } });
-      await tx.auditLog.deleteMany({ where: { tenantId } });
+      await this.clearTenantData(tx, tenantId);
     });
 
     await this.cacheInvalidationService.invalidatePlatformAdminTenants();
@@ -496,11 +519,9 @@ export class PlatformAdminService {
     });
     if (!tenant) throw new NotFoundException("Attività non trovata");
 
-    if (mode === "replace") {
-      await this.resetTenantData(tenantId);
-    }
-
     await this.prisma.$transaction(async (tx) => {
+      await validateTenantImport(tx, tenantId, snapshot, mode === "replace");
+      if (mode === "replace") await this.clearTenantData(tx, tenantId);
       const tenantData = snapshot["tenant"];
       if (tenantData) {
         await tx.tenant.update({
@@ -654,7 +675,9 @@ export class PlatformAdminService {
   ): Promise<unknown> {
     const files = bundle["files"] as Record<string, string> | undefined;
     if (!files) {
-      throw new NotFoundException("La copia tabellare non contiene tutti i dati necessari");
+      throw new NotFoundException(
+        "La copia tabellare non contiene tutti i dati necessari",
+      );
     }
 
     const snapshot: Record<string, any> = {};

@@ -1,7 +1,9 @@
+import { SessionStore } from "../core/session.store";
 import { CommonModule } from "@angular/common";
 import {
   AfterViewInit,
   Component,
+  inject,
   ElementRef,
   EventEmitter,
   Input,
@@ -97,9 +99,9 @@ import { buildDayListingEvent } from "./calendar-date";
       }
 
       .calendar-drag-preview {
-        outline: 2px dashed rgba(249, 115, 22, 0.45);
+        outline: 2px dashed rgba(136, 189, 57, 0.45);
         outline-offset: -4px;
-        background: rgba(249, 115, 22, 0.08);
+        background: rgba(136, 189, 57, 0.08);
       }
 
       .calendar-drag-ghost {
@@ -107,7 +109,7 @@ import { buildDayListingEvent } from "./calendar-date";
         z-index: 2;
         opacity: 0.55;
         border: 1px dashed rgba(255, 255, 255, 0.65);
-        box-shadow: 0 18px 30px rgba(15, 23, 32, 0.2);
+        box-shadow: 0 18px 30px rgba(30, 52, 37, 0.2);
         transition:
           top 120ms ease,
           min-height 120ms ease;
@@ -135,12 +137,12 @@ import { buildDayListingEvent } from "./calendar-date";
 
       .calendar-month-cell.calendar-is-selected,
       .calendar-week-day.calendar-is-selected {
-        box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.22) inset;
+        box-shadow: 0 0 0 2px rgba(136, 189, 57, 0.22) inset;
       }
 
       .calendar-month-cell.calendar-is-today,
       .calendar-week-day.calendar-is-today {
-        border-color: rgba(249, 115, 22, 0.42);
+        border-color: rgba(136, 189, 57, 0.42);
       }
 
       .calendar-sticky-header {
@@ -152,9 +154,9 @@ import { buildDayListingEvent } from "./calendar-date";
 
       .calendar-day-column-header-surface {
         min-height: 4.75rem;
-        border: 1px solid rgba(15, 23, 32, 0.08);
+        border: 1px solid rgba(30, 52, 37, 0.08);
         border-radius: 1.6rem 1.6rem 0 0;
-        background: rgba(249, 246, 240, 0.94);
+        background: rgba(244, 248, 236, 0.94);
         padding: 1rem 1rem 0.95rem;
       }
 
@@ -223,7 +225,7 @@ import { buildDayListingEvent } from "./calendar-date";
         top: 0;
         z-index: 5;
         flex: 0 0 4.25rem;
-        background: rgba(244, 241, 234, 0.92);
+        background: rgba(244, 248, 236, 0.92);
         align-self: flex-start;
       }
 
@@ -242,7 +244,7 @@ import { buildDayListingEvent } from "./calendar-date";
         flex: 1 1 auto;
         min-height: 0;
         overflow: hidden;
-        border: 1px solid rgba(15, 23, 32, 0.08);
+        border: 1px solid rgba(30, 52, 37, 0.08);
         border-top: 0;
         border-radius: 0 0 1.6rem 1.6rem;
         background: rgba(255, 255, 255, 0.82);
@@ -327,13 +329,13 @@ import { buildDayListingEvent } from "./calendar-date";
         position: sticky;
         top: 0;
         z-index: 3;
-        background: rgba(244, 241, 234, 0.92);
+        background: rgba(244, 248, 236, 0.92);
         padding-bottom: 0.1rem;
         backdrop-filter: blur(12px);
       }
 
       .calendar-month-weekday {
-        border: 1px solid rgba(15, 23, 32, 0.08);
+        border: 1px solid rgba(30, 52, 37, 0.08);
         border-radius: 1rem;
         background: rgba(255, 255, 255, 0.72);
         padding: 0.75rem;
@@ -442,7 +444,9 @@ import { buildDayListingEvent } from "./calendar-date";
           <p class="eyebrow text-[var(--accent)]">Agenda del salone</p>
           <h3 class="font-display text-2xl sm:text-3xl">{{ title }}</h3>
         </div>
-        <div class="ml-auto flex w-full flex-col gap-2 sm:w-auto sm:min-w-[16rem]">
+        <div
+          class="ml-auto flex w-full flex-col gap-2 sm:w-auto sm:min-w-[16rem]"
+        >
           <barber-calendar-input
             [value]="calendarDateKey"
             (valueChange)="selectDateKey($event)"
@@ -479,37 +483,48 @@ import { buildDayListingEvent } from "./calendar-date";
         <article
           class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
-          <p class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]">
+          <p
+            class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]"
+          >
             Eventi
           </p>
-          <strong class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl">{{
-            summary.total
-          }}</strong>
+          <strong
+            class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl"
+            >{{ summary.total }}</strong
+          >
         </article>
         <article
           class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
-          <p class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]">
+          <p
+            class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]"
+          >
             Confermati
           </p>
-          <strong class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl">{{
-            summary.confirmed
-          }}</strong>
+          <strong
+            class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl"
+            >{{ summary.confirmed }}</strong
+          >
         </article>
         <article
           class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
-          <p class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]">
+          <p
+            class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]"
+          >
             Completati
           </p>
-          <strong class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl">{{
-            summary.completed
-          }}</strong>
+          <strong
+            class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl"
+            >{{ summary.completed }}</strong
+          >
         </article>
         <article
           class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
-          <p class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]">
+          <p
+            class="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--muted)] md:text-xs md:tracking-[0.22em]"
+          >
             Valore
           </p>
           <strong class="mt-1 block font-display text-2xl md:mt-2 md:text-3xl"
@@ -654,7 +669,7 @@ import { buildDayListingEvent } from "./calendar-date";
                       [style.top.rem]="appointment.top"
                       [style.min-height.rem]="appointment.height"
                       [style.background]="appointment.color"
-                      draggable="true"
+                      [draggable]="session.can('appointments.update.all')"
                       (dragstart)="handleDragStart($event, appointment.id)"
                       (dragend)="handleDragEnd()"
                       (click)="appointmentClick.emit(appointment.id)"
@@ -733,7 +748,7 @@ import { buildDayListingEvent } from "./calendar-date";
                       type="button"
                       class="rounded-[1rem] px-3 py-2 text-left text-white"
                       [style.background]="appointment.color"
-                      draggable="true"
+                      [draggable]="session.can('appointments.update.all')"
                       (dragstart)="handleDragStart($event, appointment.id)"
                       (click)="appointmentClick.emit(appointment.id)"
                     >
@@ -827,7 +842,7 @@ import { buildDayListingEvent } from "./calendar-date";
                     type="button"
                     class="w-full min-w-0 truncate rounded-[0.9rem] px-2 py-1 text-left text-xs text-white"
                     [style.background]="appointment.color"
-                    draggable="true"
+                    [draggable]="session.can('appointments.update.all')"
                     (dragstart)="handleDragStart($event, appointment.id)"
                     (click)="appointmentClick.emit(appointment.id)"
                   >
@@ -856,6 +871,8 @@ import { buildDayListingEvent } from "./calendar-date";
 export class AdminAppointmentsCalendarComponent
   implements AfterViewInit, OnChanges
 {
+  readonly session = inject(SessionStore);
+
   private static readonly DAY_START_MINUTES = 9 * 60;
   private static readonly DAY_END_MINUTES = 19 * 60;
   private static readonly SLOT_HEIGHT_REM = 2.75;
@@ -1072,6 +1089,10 @@ export class AdminAppointmentsCalendarComponent
   }
 
   handleDragStart(event: DragEvent, appointmentId: string): void {
+    if (!this.session.can("appointments.update.all")) {
+      event.preventDefault();
+      return;
+    }
     event.dataTransfer?.setData("text/plain", appointmentId);
     const appointment = this.findDraggedAppointment(appointmentId);
     if (appointment) {
@@ -1131,10 +1152,7 @@ export class AdminAppointmentsCalendarComponent
       ),
     );
     const rawIndex = Math.floor((event.clientY - rect.top) / slotPx);
-    const slotIndex = Math.max(
-      0,
-      Math.min(totalSlots - heightSlots, rawIndex),
-    );
+    const slotIndex = Math.max(0, Math.min(totalSlots - heightSlots, rawIndex));
     const totalMinutes =
       AdminAppointmentsCalendarComponent.DAY_START_MINUTES + slotIndex * 30;
     const hour = Math.floor(totalMinutes / 60);
@@ -1142,8 +1160,7 @@ export class AdminAppointmentsCalendarComponent
     this.dragOverKey = "day:" + column.id;
     this.dayDragPreview = {
       columnId: column.id,
-      top:
-        slotIndex * AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM,
+      top: slotIndex * AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM,
       height: this.draggedAppointment.height,
       color: this.draggedAppointment.color,
       timeLabel: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
@@ -1176,6 +1193,10 @@ export class AdminAppointmentsCalendarComponent
   }
 
   handleDrop(event: DragEvent, collaboratorId: string): void {
+    if (!this.session.can("appointments.update.all")) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     this.dragOverKey = "";
     this.dayDragPreview = null;
@@ -1214,6 +1235,10 @@ export class AdminAppointmentsCalendarComponent
       date: Date;
     },
   ): void {
+    if (!this.session.can("appointments.update.all")) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     this.dragOverKey = "";
     const payload = this.readDragPayload(event);
@@ -1234,6 +1259,10 @@ export class AdminAppointmentsCalendarComponent
   }
 
   handleMonthDrop(event: DragEvent, date: Date): void {
+    if (!this.session.can("appointments.update.all")) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     this.dragOverKey = "";
     const payload = this.readDragPayload(event);

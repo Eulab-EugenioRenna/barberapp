@@ -1,0 +1,16 @@
+{
+  "at": "2026-10-22T21:46:19.669Z",
+  "providerSimulated": true,
+  "failureStateInjected": true,
+  "connectDatabase": "PGlite",
+  "production": false,
+  "nextAction": "contact_admin",
+  "expectedNextAction": "contact_admin",
+  "recoveryStatus": 409,
+  "pendingWithAndWithoutPassword": true,
+  "legacyChecks": 0,
+  "storeWrites": 0,
+  "provisionCalls": 0,
+  "status": "passed",
+  "cleanupVerified": true
+}

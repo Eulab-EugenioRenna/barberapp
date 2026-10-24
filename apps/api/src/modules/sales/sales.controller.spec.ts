@@ -55,12 +55,16 @@ describe("SalesController order CRUD", () => {
           },
         ]),
       },
-      customer: { findFirst: jest.fn().mockResolvedValue({ id: "customer-1" }) },
+      customer: {
+        findFirst: jest.fn().mockResolvedValue({ id: "customer-1" }),
+      },
       collaborator: {
         findMany: jest.fn().mockResolvedValue([{ id: "collaborator-1" }]),
       },
       tenant: {
-        findUnique: jest.fn().mockResolvedValue({ defaultCollaboratorId: null }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ defaultCollaboratorId: null }),
       },
       $transaction: jest.fn((callback) => callback(transaction)),
     };
@@ -86,11 +90,11 @@ describe("SalesController order CRUD", () => {
     );
 
     expect(transaction.saleItem.deleteMany).toHaveBeenCalledWith({
-      where: { saleId: "sale-1" },
+      where: { saleId: "sale-1", sale: { tenantId: "tenant-1" } },
     });
     expect(transaction.sale.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "sale-1" },
+        where: { id: "sale-1", tenantId: "tenant-1" },
         data: expect.objectContaining({
           total: 30,
           items: {
@@ -137,12 +141,12 @@ describe("SalesController order CRUD", () => {
 
     expect(transaction.sale.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "sale-1" },
+        where: { id: "sale-1", tenantId: "tenant-1" },
         data: { appointmentId: "appointment-1" },
       }),
     );
     expect(transaction.appointment.update).toHaveBeenCalledWith({
-      where: { id: "appointment-1" },
+      where: { id: "appointment-1", tenantId: "tenant-1" },
       data: { finalPrice: 42, status: "completed" },
     });
   });
@@ -171,10 +175,10 @@ describe("SalesController order CRUD", () => {
       ),
     ).resolves.toEqual({ deleted: true });
     expect(transaction.sale.delete).toHaveBeenCalledWith({
-      where: { id: "sale-1" },
+      where: { id: "sale-1", tenantId: "tenant-1" },
     });
     expect(transaction.appointment.update).toHaveBeenCalledWith({
-      where: { id: "appointment-1" },
+      where: { id: "appointment-1", tenantId: "tenant-1" },
       data: { finalPrice: null },
     });
   });

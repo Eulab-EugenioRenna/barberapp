@@ -65,7 +65,9 @@
             [options]="customerOptions"
             label="Cliente"
             placeholder="Seleziona il cliente"
-            createLabel="Aggiungi nuovo cliente"
+            [createLabel]="
+              session.can('clients.manage') ? 'Aggiungi nuovo cliente' : ''
+            "
             [remoteSearch]="true"
             (searchChange)="customerSearchChange.emit($event)"
             (createRequest)="quickCreateKind = 'customer'"
@@ -76,6 +78,7 @@
             <p class="quick-order-step">2 · Tocca servizi o prodotti</p>
             <div class="flex gap-2">
               <button
+                aloraFunction="services.manage"
                 type="button"
                 class="pill-btn"
                 (click)="quickCreateKind = 'service'"
@@ -83,6 +86,7 @@
                 + Servizio
               </button>
               <button
+                aloraFunction="products.manage"
                 type="button"
                 class="pill-btn"
                 (click)="quickCreateKind = 'product'"

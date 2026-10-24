@@ -1,19 +1,22 @@
-import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
-
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  NotImplementedException,
+} from "@nestjs/common";
 @Controller()
 export class PaymentsController {
-  @Get('payment-settings')
+  @Get("payment-settings")
   settings(): unknown {
-    return { provider: null, enabled: false, captureMode: 'future_ready' };
+    return { provider: null, enabled: false };
   }
-
-  @Patch('payment-settings')
-  updateSettings(@Body() body: Record<string, unknown>): unknown {
-    return body;
+  @Patch("payment-settings")
+  updateSettings(): never {
+    throw new NotImplementedException("Provider pagamenti non disponibile");
   }
-
-  @Post('payments/prepare-intent')
-  prepareIntent(@Body() body: Record<string, unknown>): unknown {
-    return { provider: 'stub', status: 'prepared', ...body };
+  @Post("payments/prepare-intent")
+  prepareIntent(): never {
+    throw new NotImplementedException("Provider pagamenti non disponibile");
   }
 }

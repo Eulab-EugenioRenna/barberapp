@@ -1,3 +1,4 @@
+import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -11,6 +12,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
   selector: "barber-admin-services-page",
   standalone: true,
   imports: [
+    FunctionAccessDirective,
     CommonModule,
     FormsModule,
     CustomSelectComponent,
@@ -20,7 +22,10 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
   ],
   template: `
     <section class="grid gap-4 xl:grid-cols-2">
-      <article class="panel rounded-[2rem] p-4 sm:p-5">
+      <article
+        aloraFunction="services.read"
+        class="panel rounded-[2rem] p-4 sm:p-5"
+      >
         <div class="page-head">
           <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Listino</p>
@@ -33,7 +38,12 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               >
             </div>
           </div>
-          <button type="button" class="primary-btn" (click)="openNewService()">
+          <button
+            aloraFunction="services.manage"
+            type="button"
+            class="primary-btn"
+            (click)="openNewService()"
+          >
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo servizio
           </button>
         </div>
@@ -58,8 +68,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               <strong>{{ service.name }}</strong>
               <p class="mt-1 text-sm text-[var(--muted)]">
                 {{
-                  service.publicDescription ||
-                    "Descrizione non ancora inserita"
+                  service.publicDescription || "Descrizione non ancora inserita"
                 }}
               </p>
             </div>
@@ -85,7 +94,10 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
         </div>
       </article>
 
-      <article class="panel rounded-[2rem] p-4 sm:p-5">
+      <article
+        aloraFunction="products.read"
+        class="panel rounded-[2rem] p-4 sm:p-5"
+      >
         <div class="page-head">
           <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Vendita in salone</p>
@@ -97,6 +109,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             </div>
           </div>
           <button
+            aloraFunction="products.manage"
             type="button"
             class="primary-btn"
             (click)="openNewProduct()"
@@ -163,7 +176,10 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="eyebrow text-[var(--accent)]">Servizio</p>
-            <h2 id="service-form-title" class="mt-2 font-display text-2xl sm:text-3xl">
+            <h2
+              id="service-form-title"
+              class="mt-2 font-display text-2xl sm:text-3xl"
+            >
               {{ serviceForm.id ? "Modifica servizio" : "Nuovo servizio" }}
             </h2>
           </div>
@@ -178,7 +194,9 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
 
         <form class="mt-4 grid gap-4" (ngSubmit)="submitService()">
           <label class="field">
-            <span>Nome <em class="required-mark" aria-hidden="true">*</em></span>
+            <span
+              >Nome <em class="required-mark" aria-hidden="true">*</em></span
+            >
             <input [(ngModel)]="serviceForm.name" name="serviceName" required />
           </label>
           <label class="field">
@@ -255,7 +273,8 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                   <div>
                     <strong>{{ serviceProduct.product?.name }}</strong>
                     <p class="text-sm text-[var(--muted)]">
-                      {{ formatServiceProductMode(serviceProduct.mode) }} · quantità
+                      {{ formatServiceProductMode(serviceProduct.mode) }} ·
+                      quantità
                       {{ serviceProduct.quantity }}
                       <span *ngIf="serviceProduct.priceLocked"
                         >· prezzo bloccato</span
@@ -263,6 +282,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                     </p>
                   </div>
                   <button
+                    aloraFunction="services.manage"
                     type="button"
                     class="pill-btn"
                     (click)="detachProduct.emit(serviceProduct.productId)"
@@ -318,6 +338,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             </div>
             <div class="mt-3">
               <button
+                aloraFunction="services.manage"
                 type="button"
                 class="pill-btn"
                 [disabled]="
@@ -331,6 +352,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
           </div>
           <div class="flex flex-wrap gap-3">
             <button
+              aloraFunction="services.manage"
               type="submit"
               class="primary-btn"
               [disabled]="loading || !serviceFormValid"
@@ -339,6 +361,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               {{ serviceForm.id ? "Salva servizio" : "Crea servizio" }}
             </button>
             <button
+              aloraFunction="services.manage"
               *ngIf="serviceForm.id"
               type="button"
               class="pill-btn"
@@ -346,7 +369,12 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             >
               <barber-ui-icon name="trash"></barber-ui-icon> Elimina
             </button>
-            <button type="button" class="secondary-btn" (click)="openNewService()">
+            <button
+              aloraFunction="services.manage"
+              type="button"
+              class="secondary-btn"
+              (click)="openNewService()"
+            >
               <barber-ui-icon name="plus"></barber-ui-icon> Nuovo servizio
             </button>
           </div>
@@ -371,7 +399,10 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="eyebrow text-[var(--accent)]">Prodotto</p>
-            <h2 id="product-form-title" class="mt-2 font-display text-2xl sm:text-3xl">
+            <h2
+              id="product-form-title"
+              class="mt-2 font-display text-2xl sm:text-3xl"
+            >
               {{ productForm.id ? "Modifica prodotto" : "Nuovo prodotto" }}
             </h2>
           </div>
@@ -413,6 +444,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
           /></label>
           <div class="flex flex-wrap gap-2">
             <button
+              aloraFunction="products.manage"
               type="submit"
               class="primary-btn"
               [disabled]="loading || !productFormValid"
@@ -421,6 +453,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               {{ productForm.id ? "Salva prodotto" : "Crea prodotto" }}
             </button>
             <button
+              aloraFunction="products.manage"
               *ngIf="productForm.id"
               type="button"
               class="pill-btn"
@@ -429,6 +462,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               <barber-ui-icon name="trash"></barber-ui-icon> Elimina prodotto
             </button>
             <button
+              aloraFunction="products.manage"
               type="button"
               class="secondary-btn"
               (click)="openNewProduct()"

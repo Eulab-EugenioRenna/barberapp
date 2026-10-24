@@ -35,15 +35,14 @@ import { AdminPwaService } from "../core/pwa.service";
           aria-hidden="true"
         />
         <div class="pwa-banner-copy">
-          <strong>Porta il salone sul tuo dispositivo</strong>
-          <span>Aggiungi l'app alla schermata principale per averla sempre a portata di mano.</span>
+          <strong>Porta ALORA sul tuo dispositivo</strong>
+          <span
+            >Aggiungi l'app alla schermata principale per averla sempre a
+            portata di mano.</span
+          >
         </div>
         <div class="pwa-banner-actions">
-          <button
-            type="button"
-            class="pill-btn"
-            (click)="pwa.dismissInstall()"
-          >
+          <button type="button" class="pill-btn" (click)="pwa.dismissInstall()">
             Non ora
           </button>
           <button
@@ -51,7 +50,7 @@ import { AdminPwaService } from "../core/pwa.service";
             class="primary-btn pwa-banner-action"
             (click)="pwa.promptInstall()"
           >
-            Installa
+            Installa ALORA
           </button>
         </div>
       </section>

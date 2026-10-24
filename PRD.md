@@ -1,4 +1,6 @@
-# PRD — Sistema SaaS White Label per Gestione Prenotazioni, Servizi, Collaboratori e Vendite
+# PRD — ALORA by EULAB
+
+Questo documento conserva i requisiti iniziali. Per le decisioni correnti, la sequenza dei domini e lo stato verificato consultare la [roadmap ALORA](docs/evolution-roadmap.md) e i relativi rapporti di fase. Le funzionalità descritte qui non sono tutte già operative.
 
 ## 1. Sintesi prodotto
 

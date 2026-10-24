@@ -1,3 +1,4 @@
+import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import {
   Component,
@@ -11,7 +12,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
 @Component({
   selector: "barber-admin-appointments-drawer",
   standalone: true,
-  imports: [CommonModule],
+  imports: [FunctionAccessDirective, CommonModule],
   styles: [
     `
       :host {
@@ -24,7 +25,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
       .drawer-overlay {
         position: absolute;
         inset: 0;
-        background: rgba(15, 23, 32, 0.34);
+        background: rgba(30, 52, 37, 0.34);
         pointer-events: auto;
       }
 
@@ -38,10 +39,10 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
         padding: 1rem;
         padding-top: calc(1rem + env(safe-area-inset-top, 0px));
         padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-        background: rgba(244, 241, 234, 0.96);
+        background: rgba(244, 248, 236, 0.96);
         backdrop-filter: blur(16px);
-        border-right: 1px solid rgba(15, 23, 32, 0.08);
-        box-shadow: 1.25rem 0 3rem rgba(15, 23, 32, 0.14);
+        border-right: 1px solid rgba(30, 52, 37, 0.08);
+        box-shadow: 1.25rem 0 3rem rgba(30, 52, 37, 0.14);
         pointer-events: auto;
       }
 
@@ -54,7 +55,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
       }
 
       .drawer-card {
-        border: 1px solid rgba(15, 23, 32, 0.08);
+        border: 1px solid rgba(30, 52, 37, 0.08);
         border-radius: 1.4rem;
         background: rgba(255, 255, 255, 0.78);
         padding: 1rem;
@@ -64,7 +65,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
         display: inline-flex;
         align-items: center;
         border-radius: 999px;
-        background: rgba(15, 23, 32, 0.08);
+        background: rgba(30, 52, 37, 0.08);
         padding: 0.4rem 0.7rem;
         font-size: 0.78rem;
         font-weight: 700;
@@ -101,7 +102,10 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 : "Evento selezionato"
             }}
           </p>
-          <h3 id="appointment-drawer-title" class="mt-2 font-display text-2xl sm:text-3xl">
+          <h3
+            id="appointment-drawer-title"
+            class="mt-2 font-display text-2xl sm:text-3xl"
+          >
             {{ appointment?.customer?.firstName }}
             {{ appointment?.customer?.lastName }}
           </h3>
@@ -136,7 +140,9 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
               <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
                 Stato
               </p>
-              <strong class="mt-2 block">{{ formatStatus(appointment?.status) }}</strong>
+              <strong class="mt-2 block">{{
+                formatStatus(appointment?.status)
+              }}</strong>
             </div>
             <div>
               <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
@@ -181,6 +187,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
 
       <div class="flex flex-wrap gap-3">
         <button
+          aloraFunction="sales.manage"
           type="button"
           class="primary-btn"
           (click)="createOrder.emit(appointment)"
@@ -196,6 +203,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
           Dettagli
         </button>
         <button
+          aloraFunction="appointments.update.all"
           type="button"
           class="secondary-btn"
           (click)="edit.emit(appointment.id)"

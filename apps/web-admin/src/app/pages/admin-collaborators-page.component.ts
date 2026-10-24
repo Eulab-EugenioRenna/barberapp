@@ -1,3 +1,4 @@
+import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -8,7 +9,14 @@ import { UiIconComponent } from "../shared/ui-icon.component";
 @Component({
   selector: "barber-admin-collaborators-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, InfiniteScrollDirective, AutofocusFirstDirective, UiIconComponent],
+  imports: [
+    FunctionAccessDirective,
+    CommonModule,
+    FormsModule,
+    InfiniteScrollDirective,
+    AutofocusFirstDirective,
+    UiIconComponent,
+  ],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-4 sm:p-5">
@@ -22,7 +30,12 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               >
             </div>
           </div>
-          <button type="button" class="primary-btn" (click)="openNew()">
+          <button
+            aloraFunction="collaborators.manage"
+            type="button"
+            class="primary-btn"
+            (click)="openNew()"
+          >
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo professionista
           </button>
         </div>
@@ -62,7 +75,9 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 class="status-pill"
                 [ngClass]="collaboratorStatusClass(collaborator.isPublic)"
               >
-                {{ collaborator.isPublic ? "prenotabile online" : "solo interno" }}
+                {{
+                  collaborator.isPublic ? "prenotabile online" : "solo interno"
+                }}
               </span>
             </div>
           </button>
@@ -118,193 +133,201 @@ import { UiIconComponent } from "../shared/ui-icon.component";
 
         <form class="mt-4 grid gap-4 lg:grid-cols-2" (ngSubmit)="submit()">
           <div class="grid content-start gap-4">
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
-              <span
-                >Nome <em class="required-mark" aria-hidden="true">*</em></span
-              >
-              <input
-                [(ngModel)]="collaboratorForm.firstName"
-                name="collaboratorFirstName"
-                autocomplete="given-name"
-                required
-              />
-            </label>
-            <label class="field">
-              <span
-                >Cognome
-                <em class="required-mark" aria-hidden="true">*</em></span
-              >
-              <input
-                [(ngModel)]="collaboratorForm.lastName"
-                name="collaboratorLastName"
-                autocomplete="family-name"
-                required
-              />
-            </label>
-          </div>
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
-              <span>Email</span>
-              <input
-                [(ngModel)]="collaboratorForm.email"
-                name="collaboratorEmail"
-                type="email"
-                autocomplete="email"
-              />
-            </label>
-            <label class="field">
-              <span>Telefono</span>
-              <input
-                [(ngModel)]="collaboratorForm.phone"
-                name="collaboratorPhone"
-                type="tel"
-                autocomplete="tel"
-              />
-            </label>
-          </div>
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
-              <span>Colore calendario</span>
-              <input
-                [(ngModel)]="collaboratorForm.calendarColor"
-                name="collaboratorCalendarColor"
-                type="color"
-              />
-            </label>
-            <label class="field checkbox-field pt-6">
-              <input
-                [(ngModel)]="collaboratorForm.isPublic"
-                name="collaboratorIsPublic"
-                type="checkbox"
-              />
-              <span>Prenotabile dai clienti online</span>
-            </label>
-          </div>
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
+              <label class="field">
+                <span
+                  >Nome
+                  <em class="required-mark" aria-hidden="true">*</em></span
+                >
+                <input
+                  [(ngModel)]="collaboratorForm.firstName"
+                  name="collaboratorFirstName"
+                  autocomplete="given-name"
+                  required
+                />
+              </label>
+              <label class="field">
+                <span
+                  >Cognome
+                  <em class="required-mark" aria-hidden="true">*</em></span
+                >
+                <input
+                  [(ngModel)]="collaboratorForm.lastName"
+                  name="collaboratorLastName"
+                  autocomplete="family-name"
+                  required
+                />
+              </label>
+            </div>
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
+              <label class="field">
+                <span>Email</span>
+                <input
+                  [(ngModel)]="collaboratorForm.email"
+                  name="collaboratorEmail"
+                  type="email"
+                  autocomplete="email"
+                />
+              </label>
+              <label class="field">
+                <span>Telefono</span>
+                <input
+                  [(ngModel)]="collaboratorForm.phone"
+                  name="collaboratorPhone"
+                  type="tel"
+                  autocomplete="tel"
+                />
+              </label>
+            </div>
+            <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
+              <label class="field">
+                <span>Colore calendario</span>
+                <input
+                  [(ngModel)]="collaboratorForm.calendarColor"
+                  name="collaboratorCalendarColor"
+                  type="color"
+                />
+              </label>
+              <label class="field checkbox-field pt-6">
+                <input
+                  [(ngModel)]="collaboratorForm.isPublic"
+                  name="collaboratorIsPublic"
+                  type="checkbox"
+                />
+                <span>Prenotabile dai clienti online</span>
+              </label>
+            </div>
           </div>
           <div class="grid content-start gap-4">
-          <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
-            <p class="text-sm font-semibold">Orario settimanale</p>
-            <div class="mt-4 grid gap-3">
-              <article
-                *ngFor="
-                  let schedule of collaboratorForm.weeklySchedules;
-                  let i = index
-                "
-                class="rounded-[1rem] border border-[var(--line)] p-3"
-              >
-                <div
-                  class="grid gap-3 md:grid-cols-[1.1fr_0.8fr_0.8fr_auto] md:items-center"
+            <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
+              <p class="text-sm font-semibold">Orario settimanale</p>
+              <div class="mt-4 grid gap-3">
+                <article
+                  *ngFor="
+                    let schedule of collaboratorForm.weeklySchedules;
+                    let i = index
+                  "
+                  class="rounded-[1rem] border border-[var(--line)] p-3"
                 >
-                  <strong>{{ weekdayLabels[i] }}</strong>
-                  <label class="field checkbox-field">
-                    <input
-                      [(ngModel)]="schedule.isWorkingDay"
-                      [name]="'weeklyWorking' + i"
-                      type="checkbox"
-                    />
-                    <span>Lavora</span>
-                  </label>
-                  <input
-                    [(ngModel)]="schedule.startTime"
-                    [name]="'weeklyStart' + i"
-                    type="time"
-                    [disabled]="!schedule.isWorkingDay"
-                  />
-                  <input
-                    [(ngModel)]="schedule.endTime"
-                    [name]="'weeklyEnd' + i"
-                    type="time"
-                    [disabled]="!schedule.isWorkingDay"
-                  />
-                </div>
-              </article>
-            </div>
-          </div>
-          <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
-            <div class="flex items-center justify-between gap-3">
-              <p class="text-sm font-semibold">Eccezioni giornaliere</p>
-              <button type="button" class="pill-btn" (click)="addDayOverride()">
-                Aggiungi giorno
-              </button>
-            </div>
-            <div class="mt-4 grid gap-3">
-              <article
-                *ngFor="
-                  let override of collaboratorForm.dayOverrides;
-                  let i = index
-                "
-                class="rounded-[1rem] border border-[var(--line)] p-3"
-              >
-                <div class="grid gap-3 md:grid-cols-2">
-                  <label class="field">
-                    <span>Data</span>
-                    <input
-                      [(ngModel)]="override.date"
-                      [name]="'overrideDate' + i"
-                      type="date"
-                    />
-                  </label>
-                  <label class="field checkbox-field pt-6">
-                    <input
-                      [(ngModel)]="override.isHoliday"
-                      [name]="'overrideHoliday' + i"
-                      type="checkbox"
-                    />
-                    <span>Festivo</span>
-                  </label>
-                </div>
-                <div
-                  class="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center"
-                >
-                  <label class="field checkbox-field">
-                    <input
-                      [(ngModel)]="override.isWorkingDay"
-                      [name]="'overrideWorking' + i"
-                      type="checkbox"
-                    />
-                    <span>Disponibile</span>
-                  </label>
-                  <input
-                    [(ngModel)]="override.startTime"
-                    [name]="'overrideStart' + i"
-                    type="time"
-                    [disabled]="!override.isWorkingDay"
-                  />
-                  <input
-                    [(ngModel)]="override.endTime"
-                    [name]="'overrideEnd' + i"
-                    type="time"
-                    [disabled]="!override.isWorkingDay"
-                  />
-                  <button
-                    type="button"
-                    class="pill-btn"
-                    (click)="removeDayOverride(i)"
+                  <div
+                    class="grid gap-3 md:grid-cols-[1.1fr_0.8fr_0.8fr_auto] md:items-center"
                   >
-                    Rimuovi
-                  </button>
-                </div>
-                <label class="field mt-3">
-                  <span>Nota</span>
-                  <input
-                    [(ngModel)]="override.note"
-                    [name]="'overrideNote' + i"
-                    placeholder="Chiuso per festa locale"
-                  />
-                </label>
-              </article>
-              <p
-                *ngIf="!collaboratorForm.dayOverrides?.length"
-                class="text-sm text-[var(--muted)]"
-              >
-                Nessuna eccezione configurata.
-              </p>
+                    <strong>{{ weekdayLabels[i] }}</strong>
+                    <label class="field checkbox-field">
+                      <input
+                        [(ngModel)]="schedule.isWorkingDay"
+                        [name]="'weeklyWorking' + i"
+                        type="checkbox"
+                      />
+                      <span>Lavora</span>
+                    </label>
+                    <input
+                      [(ngModel)]="schedule.startTime"
+                      [name]="'weeklyStart' + i"
+                      type="time"
+                      [disabled]="!schedule.isWorkingDay"
+                    />
+                    <input
+                      [(ngModel)]="schedule.endTime"
+                      [name]="'weeklyEnd' + i"
+                      type="time"
+                      [disabled]="!schedule.isWorkingDay"
+                    />
+                  </div>
+                </article>
+              </div>
             </div>
-          </div>
+            <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-semibold">Eccezioni giornaliere</p>
+                <button
+                  aloraFunction="collaborators.manage"
+                  type="button"
+                  class="pill-btn"
+                  (click)="addDayOverride()"
+                >
+                  Aggiungi giorno
+                </button>
+              </div>
+              <div class="mt-4 grid gap-3">
+                <article
+                  *ngFor="
+                    let override of collaboratorForm.dayOverrides;
+                    let i = index
+                  "
+                  class="rounded-[1rem] border border-[var(--line)] p-3"
+                >
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <label class="field">
+                      <span>Data</span>
+                      <input
+                        [(ngModel)]="override.date"
+                        [name]="'overrideDate' + i"
+                        type="date"
+                      />
+                    </label>
+                    <label class="field checkbox-field pt-6">
+                      <input
+                        [(ngModel)]="override.isHoliday"
+                        [name]="'overrideHoliday' + i"
+                        type="checkbox"
+                      />
+                      <span>Festivo</span>
+                    </label>
+                  </div>
+                  <div
+                    class="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center"
+                  >
+                    <label class="field checkbox-field">
+                      <input
+                        [(ngModel)]="override.isWorkingDay"
+                        [name]="'overrideWorking' + i"
+                        type="checkbox"
+                      />
+                      <span>Disponibile</span>
+                    </label>
+                    <input
+                      [(ngModel)]="override.startTime"
+                      [name]="'overrideStart' + i"
+                      type="time"
+                      [disabled]="!override.isWorkingDay"
+                    />
+                    <input
+                      [(ngModel)]="override.endTime"
+                      [name]="'overrideEnd' + i"
+                      type="time"
+                      [disabled]="!override.isWorkingDay"
+                    />
+                    <button
+                      aloraFunction="collaborators.manage"
+                      type="button"
+                      class="pill-btn"
+                      (click)="removeDayOverride(i)"
+                    >
+                      Rimuovi
+                    </button>
+                  </div>
+                  <label class="field mt-3">
+                    <span>Nota</span>
+                    <input
+                      [(ngModel)]="override.note"
+                      [name]="'overrideNote' + i"
+                      placeholder="Chiuso per festa locale"
+                    />
+                  </label>
+                </article>
+                <p
+                  *ngIf="!collaboratorForm.dayOverrides?.length"
+                  class="text-sm text-[var(--muted)]"
+                >
+                  Nessuna eccezione configurata.
+                </p>
+              </div>
+            </div>
           </div>
           <div class="flex flex-wrap gap-3 lg:col-span-2">
             <button
+              aloraFunction="collaborators.manage"
               type="submit"
               class="primary-btn"
               [disabled]="loading || !formValid"
@@ -316,6 +339,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               }}
             </button>
             <button
+              aloraFunction="settings.manage"
               *ngIf="
                 collaboratorForm.id &&
                 !isDefaultCollaborator(collaboratorForm.id)
@@ -328,6 +352,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               Imposta come riferimento
             </button>
             <button
+              aloraFunction="collaborators.manage"
               *ngIf="collaboratorForm.id"
               type="button"
               class="pill-btn"
@@ -343,9 +368,11 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               "
               class="status-pill status-pill-amber"
             >
-              Professionista di riferimento: scegline un altro prima di eliminarlo
+              Professionista di riferimento: scegline un altro prima di
+              eliminarlo
             </span>
             <button
+              aloraFunction="collaborators.manage"
               type="button"
               class="secondary-btn"
               [disabled]="loading"

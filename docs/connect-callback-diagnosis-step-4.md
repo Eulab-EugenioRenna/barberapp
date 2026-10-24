@@ -1,0 +1,17 @@
+# Step 4 callback diagnosis — 24 ottobre 2026
+
+Il primo tentativo manuale usava una sessione Keycloak di un’identità diversa dal profilo demo: rifiutato durante id_token. Il tentativo successivo in finestra privata supera id_token e fallisce in authorization.
+
+Il client OIDC generato da ensureResolutionClient aveva soltanto profile/email e nessun mapper audience. AuthGuard richiede audience connect-api su /v1/access. Allineato il client ALORA tramite Keycloak Admin API dopo verifica di proprietario sourceId e callback; aggiunto mapper connect-api-audience per access token e introspezione, senza modificare ID token, ruoli o licenze. Nessuna pratica rieseguita, nessuna sessione utente creata dal collaudatore automatico.
+
+La creazione/riconciliazione Connect aggiunge lo stesso mapper ai client di proprietà del deployment e rifiuta configurazioni incompatibili. Fixture e asserzioni del test intake aggiornate; suite non eseguita per rispettare il collaudo riservato all’utente. Compilazione API eseguita. Correzione server-side: nessuna nuova versione SDK o pubblicazione necessaria.
+
+Aggiornamento runtime: compilazione/bundle Connect completati e API Docker sostituita con il bundle corretto. Il rebuild multistage ordinario era bloccato dal DNS di auth.docker.io; usata l’immagine runtime locale esistente come base, con il solo nuovo api.mjs compilato (SHA-256 d94290bc0e4b63f1511d372c1f2403c5d9f52c45be6618ea677f30aa93df7b8a). Dipendenze invariate, immagine precedente conservata nel tag locale pre-audience-fix. Health HTTP 200; nessuna pubblicazione o deploy di produzione. Il build ordinario resta da ripetere quando il registry è raggiungibile.
+
+Il tentativo manuale successivo resta negato in authorization. Verifiche tecniche senza login: contesto sorgente disponibile; credenziale installazione accettata da /v1/access senza bearer (200, expected installation_or_identity_missing); introspezione con token fittizio risponde 200; mapper audience presente. Queste prove non attestano l’accettazione del bearer utente. Aggiunta classificazione chiusa authorizationDetail nello SDK e log Connect della fase di verifica JWT/introspezione (solo codici e nomi di claim ammessi, nessun valore/token). La causa residua resta da identificare dal prossimo tentativo manuale.
+
+Il tentativo manuale delle 20:54 UTC restituisce http_401, verifica bearer nella fase signature. Il client generato aveva soltanto profile/email; lo scope basic, che nel realm Keycloak corrente contiene il mapper oidc-sub-mapper per access token/introspezione, era assente. Riallineati gli scope default via provider Admin API dopo verifica proprietà del client: profile/basic/email. Il provisioning crea basic/profile/email e riconcilia basic mancante sul client di proprietà; se il provider non dispone di basic fallisce esplicitamente. Fixture/asserzioni aggiornate, bundle compilato; nessuna suite funzionale rieseguita. Non sono cambiati account, password, ruoli, licenze o collegamenti. Il test di ingresso completo resta dell’utente.
+
+## Conferma manuale dell’utente — 24 ottobre 2026
+
+Dopo il riallineamento del client OIDC (audience connect-api e scope basic), l’utente ha confermato che l’accesso all’admin ALORA funziona. È una verifica manuale sull’installazione Docker locale: non equivale al collaudo di rinnovo, revoca, permessi, MFA o produzione. Nessuna migrazione o sessione utente è stata eseguita automaticamente per questa verifica.

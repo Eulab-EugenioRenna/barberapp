@@ -1,3 +1,5 @@
+import { canAccessLocalView } from "@barber/shared/functions";
+import { AloraBrandComponent } from "@barber/shared/brand";
 import {
   CommonModule,
   DOCUMENT,
@@ -63,6 +65,7 @@ type ViewKey =
   selector: "barber-admin-root",
   standalone: true,
   imports: [
+    AloraBrandComponent,
     CommonModule,
     FormsModule,
     NgClass,
@@ -182,7 +185,7 @@ type ViewKey =
         >
           <div class="sidebar-header">
             <div class="sidebar-brand">
-              <p class="eyebrow text-white/45">Regia del salone</p>
+              <alora-brand [onDark]="true"></alora-brand>
               <div class="mt-3 flex items-center gap-3 sidebar-brand-copy">
                 <img
                   *ngIf="
@@ -310,7 +313,7 @@ type ViewKey =
                   <barber-ui-icon name="refresh"></barber-ui-icon>
                 </button>
                 <button
-                  *ngIf="currentUser?.role !== 'platform_admin'"
+                  *ngIf="can('sales.manage')"
                   type="button"
                   class="icon-btn"
                   (click)="openQuickOrder()"
@@ -320,7 +323,7 @@ type ViewKey =
                   <barber-ui-icon name="receipt"></barber-ui-icon>
                 </button>
                 <button
-                  *ngIf="currentUser?.role !== 'platform_admin'"
+                  *ngIf="can('appointments.create')"
                   type="button"
                   class="icon-btn icon-btn-accent"
                   (click)="startAppointmentFlow()"
@@ -775,6 +778,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     },
   ];
 
+  can(key: string): boolean {
+    return this.sessionStore.can(key);
+  }
+
   get activeViewLabel(): string {
     if (this.isPlatformRoute) {
       return "Gestione attività";
@@ -793,7 +800,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     icon: string;
     short?: string;
   }> {
-    return this.currentUser?.role === "platform_admin" ? [] : this.navItems;
+    return this.navItems.filter((item) =>
+      canAccessLocalView(this.currentUser, item.key),
+    );
   }
 
   /** Sezioni sempre a portata di pollice nella barra inferiore mobile. */
@@ -1337,7 +1346,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         this.appointmentForm.serviceId = this.services[0].id;
       }
 
-      await this.loadDashboardActivity(true);
+      if (this.can("dashboard.revenue.read"))
+        await this.loadDashboardActivity(true);
     } catch (error: any) {
       if (error?.status === 401) {
         this.rememberRequestedUrl();
@@ -1375,6 +1385,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   openAppointmentsEditor(appointment: any = null): void {
+    if (
+      !this.can(appointment ? "appointments.update.all" : "appointments.create")
+    )
+      return;
     this.appointmentsEditorAppointment = appointment;
     this.appointmentsEditorOpen = true;
   }
@@ -2595,6 +2609,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async saveQuickOrder(payload: Record<string, unknown>): Promise<void> {
+    if (!this.can("sales.manage")) return;
     this.loading = true;
     try {
       const appointmentId = String(payload["appointmentId"] ?? "");
@@ -2619,6 +2634,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   openQuickOrder(appointment: any = null, sale: any = null): void {
+    if (!this.can("sales.manage")) return;
     this.quickOrderAppointment = appointment;
     this.quickOrderSale = sale;
     this.quickOrderOpen = true;
@@ -2666,6 +2682,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   cancelPendingAppointment(appointment: any): void {
+    if (!this.can("appointments.update.all")) return;
     if (!appointment?.id) return;
     const customer = `${appointment.customer?.firstName || ""} ${
       appointment.customer?.lastName || ""
@@ -2701,6 +2718,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     appointment: any;
     saleId: string;
   }): Promise<void> {
+    if (!this.can("sales.manage")) return;
     if (!event?.appointment?.id || !event.saleId) return;
     this.loading = true;
     try {

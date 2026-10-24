@@ -190,7 +190,7 @@ type CalendarCell = {
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1.2rem;
         background: linear-gradient(
           180deg,
@@ -198,9 +198,9 @@ type CalendarCell = {
           rgba(250, 248, 244, 0.92)
         );
         padding: 0.95rem 1rem;
-        color: #0f1720;
+        color: #1e3425;
         text-align: left;
-        box-shadow: 0 0.75rem 2rem rgba(15, 23, 32, 0.08);
+        box-shadow: 0 0.75rem 2rem rgba(30, 52, 37, 0.08);
         cursor: pointer;
         transition:
           transform 180ms ease,
@@ -210,13 +210,13 @@ type CalendarCell = {
 
       .calendar-trigger:hover {
         transform: translateY(-0.0625rem);
-        border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.2);
-        box-shadow: 0 1rem 2.5rem rgba(15, 23, 32, 0.1);
+        border-color: rgba(var(--brand-rgb, 30, 52, 37), 0.2);
+        box-shadow: 0 1rem 2.5rem rgba(30, 52, 37, 0.1);
       }
 
       .open .calendar-trigger {
-        border-color: rgba(var(--brand-rgb, 28, 124, 100), 0.32);
-        box-shadow: 0 0 0 0.22rem rgba(var(--brand-rgb, 28, 124, 100), 0.1);
+        border-color: rgba(var(--brand-rgb, 30, 52, 37), 0.32);
+        box-shadow: 0 0 0 0.22rem rgba(var(--brand-rgb, 30, 52, 37), 0.1);
       }
 
       .disabled .calendar-trigger {
@@ -235,7 +235,7 @@ type CalendarCell = {
         font-weight: 800;
         letter-spacing: 0.18em;
         text-transform: uppercase;
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .calendar-trigger-value {
@@ -244,14 +244,14 @@ type CalendarCell = {
       }
 
       .calendar-trigger-value.placeholder {
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .calendar-trigger-icons {
         display: inline-flex;
         align-items: center;
         gap: 0.45rem;
-        color: rgba(15, 23, 32, 0.56);
+        color: rgba(30, 52, 37, 0.56);
       }
 
       .calendar-glyph {
@@ -275,12 +275,12 @@ type CalendarCell = {
         left: 0;
         z-index: 30;
         width: min(22rem, 100vw - 2rem);
-        border: 0.0625rem solid rgba(15, 23, 32, 0.08);
+        border: 0.0625rem solid rgba(30, 52, 37, 0.08);
         border-radius: 1.5rem;
         background:
           radial-gradient(
             circle at top right,
-            rgba(var(--accent-rgb, 249, 115, 22), 0.08),
+            rgba(var(--accent-rgb, 136, 189, 57), 0.08),
             transparent 10rem
           ),
           linear-gradient(
@@ -289,7 +289,7 @@ type CalendarCell = {
             rgba(247, 244, 238, 0.98)
           );
         padding: 1rem;
-        box-shadow: 0 1.5rem 3.5rem rgba(15, 23, 32, 0.16);
+        box-shadow: 0 1.5rem 3.5rem rgba(30, 52, 37, 0.16);
         backdrop-filter: blur(1rem);
       }
 
@@ -308,11 +308,11 @@ type CalendarCell = {
         font-weight: 800;
         letter-spacing: 0.24em;
         text-transform: uppercase;
-        color: rgba(15, 23, 32, 0.42);
+        color: rgba(30, 52, 37, 0.42);
       }
 
       .calendar-popover strong {
-        font-family: "Syne", sans-serif;
+        font-family: var(--font-display);
         font-size: 1.35rem;
       }
 
@@ -331,8 +331,8 @@ type CalendarCell = {
         width: 2.25rem;
         height: 2.25rem;
         border-radius: 999rem;
-        background: rgba(15, 23, 32, 0.05);
-        color: #0f1720;
+        background: rgba(30, 52, 37, 0.05);
+        color: #1e3425;
       }
 
       .calendar-nav-btn:hover,
@@ -351,7 +351,7 @@ type CalendarCell = {
         margin-top: 1rem;
         margin-bottom: 0.45rem;
         gap: 0.15rem;
-        color: rgba(15, 23, 32, 0.42);
+        color: rgba(30, 52, 37, 0.42);
         font-size: 0.72rem;
         font-weight: 800;
         text-transform: uppercase;
@@ -373,27 +373,27 @@ type CalendarCell = {
         aspect-ratio: 1;
         border-radius: 1rem;
         background: transparent;
-        color: #0f1720;
+        color: #1e3425;
         font-weight: 700;
       }
 
       .calendar-day:hover {
-        background: rgba(15, 23, 32, 0.06);
+        background: rgba(30, 52, 37, 0.06);
       }
 
       .calendar-day.outside {
-        color: rgba(15, 23, 32, 0.28);
+        color: rgba(30, 52, 37, 0.28);
       }
 
       .calendar-day.today {
         box-shadow: inset 0 0 0 0.08rem
-          rgba(var(--accent-rgb, 249, 115, 22), 0.32);
+          rgba(var(--accent-rgb, 136, 189, 57), 0.32);
       }
 
       .calendar-day.selected {
-        background: linear-gradient(135deg, var(--brand, #1c7c64), #123b33);
+        background: linear-gradient(135deg, var(--brand, #1e3425), #1e3425);
         color: white;
-        box-shadow: 0 0.75rem 1.75rem rgba(var(--brand-rgb, 28, 124, 100), 0.24);
+        box-shadow: 0 0.75rem 1.75rem rgba(var(--brand-rgb, 30, 52, 37), 0.24);
       }
 
       .calendar-day:disabled {
@@ -418,7 +418,7 @@ type CalendarCell = {
         font-weight: 800;
         letter-spacing: 0.12em;
         text-transform: uppercase;
-        color: rgba(15, 23, 32, 0.45);
+        color: rgba(30, 52, 37, 0.45);
       }
 
       .calendar-quick-actions {
@@ -433,13 +433,13 @@ type CalendarCell = {
       }
 
       .calendar-chip {
-        background: rgba(15, 23, 32, 0.06);
-        color: #0f1720;
+        background: rgba(30, 52, 37, 0.06);
+        color: #1e3425;
       }
 
       .calendar-apply {
         margin-left: auto;
-        background: linear-gradient(135deg, var(--brand, #1c7c64), #123b33);
+        background: linear-gradient(135deg, var(--brand, #1e3425), #1e3425);
         color: white;
       }
 
@@ -684,7 +684,10 @@ export class CalendarInputComponent
     const scale = 1;
     const viewportPadding = 8;
     const triggerRect = trigger.getBoundingClientRect();
-    const width = Math.min(352, window.innerWidth / scale - viewportPadding * 2);
+    const width = Math.min(
+      352,
+      window.innerWidth / scale - viewportPadding * 2,
+    );
     const left = Math.max(
       viewportPadding,
       Math.min(

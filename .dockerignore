@@ -5,3 +5,11 @@ dist
 coverage
 tmp
 *.log
+
+# Local credentials and repository metadata must not enter images
+.env
+.env.*
+!.env.example
+.git
+
+.local/
