@@ -1,4 +1,4 @@
-import { canAccessLocalView, VIEW_FUNCTIONS } from "@barber/shared/functions";
+import { canAccessLocalView, canUseLocalFunction, VIEW_FUNCTIONS } from "@barber/shared/functions";
 import { firstValueFrom } from "rxjs";
 import { AuthApiService } from "./auth-api.service";
 import { inject } from "@angular/core";
@@ -12,11 +12,13 @@ export const authGuard: CanActivateFn = async (_, state) => {
   const auth = inject(AuthApiService);
   if (sessionStore.isAuthenticated()) {
     try {
-      const user =
-        sessionStore.currentUser() ?? (await firstValueFrom(auth.me()));
+      // Re-read operational restrictions on navigation; the server remains authoritative.
+      const user = await firstValueFrom(auth.me());
       sessionStore.setCurrentUser(user);
-      if (user.role === "collaborator" && state.url !== "/my-agenda")
-        return router.createUrlTree(["/my-agenda"]);
+      if (user.role === "collaborator") {
+        const destination = canUseLocalFunction(user, "appointments.read.own") ? "/my-agenda" : "/access-unavailable";
+        return state.url.split("?")[0] === destination ? true : router.createUrlTree([destination]);
+      }
       if (user.role === "platform_admin")
         return state.url.startsWith("/platform")
           ? true

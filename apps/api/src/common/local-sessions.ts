@@ -13,6 +13,7 @@ export const publicUserSelect = {
   lastName: true,
   role: true,
   permissions: true,
+  permissionsConfigured: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,

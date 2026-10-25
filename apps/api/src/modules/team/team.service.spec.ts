@@ -43,6 +43,17 @@ describe("Delegated team adapter", () => {
     expect(setTeamUserRoles).toHaveBeenCalledTimes(1);
     expect(setTeamUserRoles).toHaveBeenCalledWith("provider-token", "target-subject", ["role-id"]);
   });
+  it("keeps operation failures outside the SDK session callback and preserves local HTTP errors", async () => {
+    let callbackRejected = false;
+    const services = jest.fn(async (_handle: string, operation: (client: unknown, token: string) => Promise<unknown>) => {
+      try { return await operation({}, "provider-token"); }
+      catch (error) { callbackRejected = true; throw error; }
+    });
+    jest.mocked(connectApplication).mockResolvedValue({ services } as unknown as Awaited<ReturnType<typeof connectApplication>>);
+    await expect(service.withTeam("Bearer local-token", async () => { throw new ForbiddenException("Local policy denied"); })).rejects.toThrow("Local policy denied");
+    expect(callbackRejected).toBe(false);
+    expect(services).toHaveBeenCalledTimes(1);
+  });
   it("requires an explicit Connect grant for the new write capability, even for owners", () => {
     const readOnly = { ...session, user: { ...session.user!, connectFunctions: ["users.manage"] } };
     expect(() => authorizeLocalOperation(readOnly, "TeamController", "overview")).not.toThrow();

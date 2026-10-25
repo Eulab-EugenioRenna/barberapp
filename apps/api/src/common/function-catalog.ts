@@ -2,6 +2,7 @@
 export interface LocalIdentity {
   role: string;
   permissions?: readonly string[];
+  permissionsConfigured?: boolean;
   connectFunctions?: readonly string[];
   collaboratorId?: string | null;
 }
@@ -173,7 +174,8 @@ export function canUseLocalFunction(
   if (user.role === "collaborator")
     return (
       !!user.collaboratorId &&
-      ["appointments.read.own", "appointments.update.own"].includes(key)
+      ["appointments.read.own", "appointments.update.own"].includes(key) &&
+      (!user.permissionsConfigured || !!user.permissions?.includes(key))
     );
   if (user.role === "owner")
     return definition.legacy || !!user.connectFunctions?.includes(key);

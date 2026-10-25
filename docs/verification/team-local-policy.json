@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-25",
+  "scope": "local policy and association; no user-flow acceptance",
+  "unitSuites": 5,
+  "unitTestsPassed": 41,
+  "postgresSyntheticFixture": "passed",
+  "migrationOriginalColumnsReconciled": true,
+  "privateLocalBackupRestoreReconciled": true,
+  "productionVerified": false,
+  "operationalAcceptance": false,
+  "connectWritesPerformed": false,
+  "temporaryDatabasesRemoved": true
+}

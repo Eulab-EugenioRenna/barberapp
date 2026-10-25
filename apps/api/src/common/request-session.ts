@@ -19,6 +19,7 @@ export interface RequestSession {
     lastName: string;
     role: string;
     permissions?: string[];
+    permissionsConfigured?: boolean;
     connectFunctions?: string[];
     collaboratorId?: string | null;
   } | null;
@@ -82,6 +83,7 @@ export async function resolveRequestSession(
       lastName: user.lastName,
       role: user.role,
       permissions: user.permissions,
+      permissionsConfigured: user.permissionsConfigured,
       ...(connectFunctions ? { connectFunctions } : {}),
       collaboratorId:
         user.collaborator?.isActive &&

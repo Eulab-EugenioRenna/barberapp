@@ -31,6 +31,15 @@ describe("function-based route access", () => {
     expect(await visit("manager",["users.manage"],"/team")).toBe(true);
     expect(await visit("manager",["appointments.read.all"],"/team")).toBe("/appointments");
   });
+  it("re-reads local restrictions and routes explicit empty collaborator policy away from the agenda", async()=>{
+    const user = { role: "collaborator", permissions: [], permissionsConfigured: true, collaboratorId: "c1" };
+    providers.set(SessionStore, { isAuthenticated:()=>true, currentUser:()=>({ ...user, permissionsConfigured: false }), setCurrentUser:jest.fn(), clear:jest.fn() });
+    const me = jest.fn(()=>of(user));providers.set(AuthApiService, { me });
+    providers.set(Router, { createUrlTree:(paths:string[])=>paths[0] });
+    expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/my-agenda"} as RouterStateSnapshot)).toBe("/access-unavailable");
+    expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/access-unavailable"} as RouterStateSnapshot)).toBe(true);
+    expect(me).toHaveBeenCalledTimes(2);
+  });
   it("keeps platform and personal routes separate", async()=>{
     expect(await visit("platform_admin",[],"/dashboard")).toBe("/platform");
     expect(await visit("collaborator",["dashboard.revenue.read"],"/dashboard")).toBe("/my-agenda");

@@ -62,6 +62,14 @@ describe("ALORA function catalog", () => {
     }
   });
 
+  it("preserves legacy collaborator defaults and honors an explicitly empty local policy", () => {
+    const legacy = { role: "collaborator", permissions: [], collaboratorId: "own", connectFunctions: ["appointments.read.own", "appointments.update.own"] };
+    expect(canUseLocalFunction(legacy, "appointments.read.own")).toBe(true);
+    expect(canUseLocalFunction({ ...legacy, permissionsConfigured: true }, "appointments.read.own")).toBe(false);
+    expect(canUseLocalFunction({ ...legacy, permissionsConfigured: true, permissions: ["appointments.read.own"] }, "appointments.read.own")).toBe(true);
+    expect(canUseLocalFunction({ ...legacy, permissionsConfigured: true, permissions: ["dashboard.revenue.read"], connectFunctions: ["dashboard.revenue.read"] }, "dashboard.revenue.read")).toBe(false);
+  });
+
   it("projects only Connect contract fields, with a stable versioned document", () => {
     const matrix = createFunctionMatrix("alora-test");
     expect(Object.keys(matrix).sort()).toEqual([
