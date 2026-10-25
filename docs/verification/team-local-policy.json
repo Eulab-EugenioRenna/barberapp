@@ -9,5 +9,16 @@
   "productionVerified": false,
   "operationalAcceptance": false,
   "connectWritesPerformed": false,
-  "temporaryDatabasesRemoved": true
+  "temporaryDatabasesRemoved": true,
+  "ownerAssociation": {
+    "unitTestsPassed": 8,
+    "postgresSyntheticFixture": "passed",
+    "ownerAccountUnchanged": true,
+    "transactionRollbackVerified": true,
+    "anonymousEndpointStatus": 401
+  },
+  "latestFullSuite": {
+    "suites": 32,
+    "testsPassed": 165
+  }
 }

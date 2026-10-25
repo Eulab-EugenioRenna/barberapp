@@ -2,7 +2,7 @@ import { AloraBrandComponent } from "@barber/shared/brand";
 import { CommonModule } from "@angular/common";
 import { Component, inject, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { Router } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import { PERSONAL_STATUS_TRANSITIONS } from "@barber/shared/personal";
 import type { PersonalAppointment, PersonalDashboard } from "@barber/shared/personal";
@@ -11,10 +11,10 @@ import { SessionRefreshService } from "../core/session-refresh.service";
 import { SessionStore } from "../core/session.store";
 @Component({
   standalone: true,
-  imports: [CommonModule, AloraBrandComponent, FormsModule],
+  imports: [CommonModule, AloraBrandComponent, FormsModule, RouterLink],
   template: `<main class="mx-auto grid max-w-6xl gap-5 p-4 pb-10 sm:p-7">
     <header class="panel rounded-[2rem] p-5 sm:p-7">
-      <div class="flex flex-wrap items-center justify-between gap-4"><alora-brand></alora-brand><button class="secondary-btn" type="button" (click)="logout()">Esci</button></div>
+      <div class="flex flex-wrap items-center justify-between gap-4"><alora-brand></alora-brand><div class="flex flex-wrap gap-2"><a *ngIf="canOpenCompany" class="secondary-btn" [routerLink]="companyRoute">Area aziendale</a><button class="secondary-btn" type="button" (click)="logout()">Esci</button></div></div>
       <p class="eyebrow mt-6 text-[var(--accent)]">Il mio lavoro</p>
       <h1 class="mt-1 font-display text-3xl sm:text-4xl">La mia agenda</h1>
       <p *ngIf="data" class="mt-2 text-sm opacity-75">{{ data.professional.firstName }} {{ data.professional.lastName }} · Orari {{ data.timezone }}</p>
@@ -64,6 +64,8 @@ export class PersonalAgendaComponent implements OnInit {
   updatingId = "";
   pending: { id: string; status: string } | null = null;
   feedback = "";
+  get companyRoute(): string { return this.store.can("users.manage") ? "/team" : "/appointments"; }
+  get canOpenCompany(): boolean { return this.store.can("appointments.read.all") || this.store.can("users.manage"); }
   get canUpdate(): boolean { return this.store.can("appointments.update.all") || this.store.can("appointments.update.own"); }
   ngOnInit(): void { void this.load(); }
   async load(preserveFeedback = false, resetPage = false): Promise<void> {

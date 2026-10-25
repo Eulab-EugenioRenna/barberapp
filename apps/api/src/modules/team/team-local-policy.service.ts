@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { ALORA_FUNCTIONS, canUseLocalFunction } from "../../common/function-catalog";
 import { requireTenantId, requireUser, resolveRequestSession } from "../../common/request-session";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -43,18 +44,46 @@ export class TeamLocalPolicyService {
         if (user.collaborator && user.collaborator.tenantId !== tenantId) throw new ForbiddenException("Associazione precedente del professionista da riconciliare");
         if ((user.connectSubject && user.connectSubject !== target.subject) || (user.connectInstallationId && user.connectInstallationId !== team.installationId)) throw new ForbiddenException("Collegamento Connect dell’account non coerente");
         const collaboratorId = body.collaboratorId === undefined ? user.collaborator?.id || null : body.collaboratorId;
-        if (collaboratorId) {
-          const professional = await tx.collaborator.findFirst({ where: { id: collaboratorId, tenantId, isActive: true } });
-          if (!professional) throw new NotFoundException("Professionista non disponibile in questa attività");
-          if (professional.userId && professional.userId !== id) throw new ConflictException("Questo professionista è già associato a un altro account");
-        }
         if (permissions.some(key => ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key)) && !collaboratorId) throw new BadRequestException("Associa un professionista per abilitare l’agenda personale");
-        if (body.collaboratorId !== undefined) {
-          await tx.collaborator.updateMany({ where: { tenantId, userId: id }, data: { userId: null } });
-          if (collaboratorId) await tx.collaborator.update({ where: { id: collaboratorId, tenantId }, data: { userId: id } });
+        if (body.collaboratorId === undefined && collaboratorId) {
+          const active = await tx.collaborator.findFirst({ where: { id: collaboratorId, tenantId, isActive: true, userId: id } });
+          if (!active) throw new NotFoundException("Professionista non disponibile in questa attività");
         }
+        if (body.collaboratorId !== undefined) await this.setProfessional(tx, tenantId, id, collaboratorId);
         return tx.user.update({ where: { id, tenantId, role: { in: [...editableRoles] } }, data: { role: body.role, permissions, permissionsConfigured: true }, select: { id: true, role: true, permissions: true, permissionsConfigured: true, collaborator: { select: { id: true } } } });
       });
     });
   }
+  /** The owner may execute services too. This command never writes roles or permissions. */
+  async associateSelf(authorization: string | undefined, collaboratorId: string | null) {
+    return this.team.withTeam(authorization, async (client, token, session) => {
+      const tenantId = requireTenantId(session), actor = requireUser(session);
+      if (actor.role !== "owner" || !canUseLocalFunction(actor, "team.manage")) throw new ForbiddenException("Associazione riservata al titolare autorizzato");
+      const team = await client.teamOverview(token);
+      const target = team.users.find(user => user.localUserId === actor.id);
+      if (!team.canManage || !target || target.accessRevoked || !target.identityEnabled || !target.membershipEnabled) throw new ForbiddenException("Account fuori dall’installazione o non attivo");
+      return this.prisma.$transaction(async tx => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"team-policy:" + tenantId}, 0))`;
+        const user = await tx.user.findFirst({ where: { id: actor.id, tenantId, role: "owner" }, include: { collaborator: true } });
+        if (!user) throw new NotFoundException("Titolare non disponibile in questa attività");
+        if (user.connectSubject !== target.subject || user.connectInstallationId !== team.installationId) throw new ForbiddenException("Collegamento Connect dell’account non coerente");
+        if (user.collaborator && user.collaborator.tenantId !== tenantId) throw new ForbiddenException("Associazione precedente del professionista da riconciliare");
+        await this.setProfessional(tx, tenantId, user.id, collaboratorId);
+        return { id: user.id, collaborator: collaboratorId ? { id: collaboratorId } : null };
+      });
+    });
+  }
+  private async setProfessional(tx: Prisma.TransactionClient, tenantId: string, userId: string, collaboratorId: string | null) {
+    if (collaboratorId) {
+      const professional = await tx.collaborator.findFirst({ where: { id: collaboratorId, tenantId, isActive: true } });
+      if (!professional) throw new NotFoundException("Professionista non disponibile in questa attività");
+      if (professional.userId && professional.userId !== userId) throw new ConflictException("Questo professionista è già associato a un altro account");
+    }
+    await tx.collaborator.updateMany({ where: { tenantId, userId }, data: { userId: null } });
+    if (collaboratorId) {
+      const assigned = await tx.collaborator.updateMany({ where: { id: collaboratorId, tenantId, isActive: true, OR: [{ userId: null }, { userId }] }, data: { userId } });
+      if (assigned.count !== 1) throw new ConflictException("Associazione cambiata: aggiorna la squadra prima di riprovare");
+    }
+  }
+
 }

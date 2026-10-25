@@ -70,6 +70,30 @@ async function main() {
   team.withTeam = (_authorization, operation) => operation({ teamOverview: async () => overview }, 'synthetic-token', { user: actor, tenantId: company });
   await prisma.user.update({ where: { id: target }, data: { role: 'owner' } });
   await assert.rejects(service.save(undefined, target, body), /Account locale non modificabile/);
-  console.log('PASS: additive migration reconciliation, preserved legacy policy/hash, explicit empty policy, scoped links, collision rejection, transaction rollback, owner protection, delegation and cross-tenant rejection. Synthetic PostgreSQL fixture only.');
+  // Owner association is a separate command: no role, credential or permission writes.
+  actor.id = target;
+  Object.assign(overview.users[0], { accessRevoked: false, identityEnabled: true, membershipEnabled: true });
+  await prisma.user.update({ where: { id: target }, data: { connectSubject: 'synthetic-subject', connectInstallationId: overview.installationId } });
+  const ownerBefore = await prisma.user.findUniqueOrThrow({ where: { id: target } });
+  await service.associateSelf(undefined, professional);
+  assert.equal((await prisma.collaborator.findUniqueOrThrow({ where: { id: professional } })).userId, target);
+  await assert.rejects(service.associateSelf(undefined, foreign), /Professionista non disponibile/);
+  await assert.rejects(service.associateSelf(undefined, occupied), /già associato/);
+  assert.equal((await prisma.collaborator.findUniqueOrThrow({ where: { id: professional } })).userId, target);
+  const failAssignment = prisma.$extends({ query: { collaborator: { async updateMany({ args, query }) {
+    if (args.data.userId === target) throw Error('synthetic owner association failure');
+    return query(args);
+  } } } });
+  await assert.rejects(new TeamLocalPolicyService(failAssignment, team).associateSelf(undefined, spare), /synthetic owner association failure/);
+  assert.equal((await prisma.collaborator.findUniqueOrThrow({ where: { id: professional } })).userId, target, 'Owner association must survive rollback');
+  assert.equal((await prisma.collaborator.findUniqueOrThrow({ where: { id: spare } })).userId, null);
+  await service.associateSelf(undefined, spare);
+  assert.equal((await prisma.collaborator.findUniqueOrThrow({ where: { id: professional } })).userId, null);
+  assert.equal((await prisma.collaborator.findUniqueOrThrow({ where: { id: spare } })).userId, target);
+  await service.associateSelf(undefined, null);
+  assert.equal((await prisma.collaborator.findUniqueOrThrow({ where: { id: spare } })).userId, null);
+  assert.deepEqual(await prisma.user.findUniqueOrThrow({ where: { id: target } }), ownerBefore, 'Owner account must be unchanged');
+  await assert.rejects(service.save(undefined, target, body), /tuo ambito operativo/);
+  console.log('PASS: additive migration reconciliation, preserved legacy policy/hash, explicit empty policy, scoped links, collision rejection, transaction rollback, owner protection, delegation, cross-tenant rejection, owner self-association, preserved owner account and atomic association rollback. Synthetic PostgreSQL fixture only.');
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => prisma.$disconnect());

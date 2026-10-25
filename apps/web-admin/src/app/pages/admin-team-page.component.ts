@@ -1,6 +1,7 @@
 import { CommonModule } from "@angular/common";
 import { HttpClient } from "@angular/common/http";
 import { Component, OnInit, inject } from "@angular/core";
+import { RouterLink } from "@angular/router";
 import { FormsModule } from "@angular/forms";
 import { firstValueFrom } from "rxjs";
 import type { TeamOverview, TeamRole, TeamUser } from "@eulab/connect/server";
@@ -14,7 +15,7 @@ interface LocalPolicyDraft { id: string; role: "manager" | "reception" | "collab
 @Component({
   selector: "alora-admin-team-page",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <section class="grid gap-4" aria-labelledby="team-title">
       <header class="panel rounded-[2rem] p-5 sm:p-6">
@@ -31,6 +32,17 @@ interface LocalPolicyDraft { id: string; role: "manager" | "reception" | "collab
       </header>
 
       <ng-container *ngIf="overview as team">
+        <article *ngIf="canAssociateSelf" class="panel grid gap-3 rounded-[2rem] p-5">
+          <h3 class="font-display text-2xl">Il mio profilo professionista</h3>
+          <p class="text-sm opacity-75">Se esegui servizi, associa il tuo account al tuo profilo nella squadra per consultare le attività assegnate a te.</p>
+          <p class="text-sm">{{ selfProfessionalLabel }}</p>
+          <div class="flex flex-wrap gap-2"><button class="secondary-btn" type="button" [disabled]="busy" (click)="editSelfProfessional()">Cambia associazione</button><a *ngIf="hasPersonalAgenda" class="secondary-btn" routerLink="/my-agenda">Apri la mia agenda</a></div>
+          <form *ngIf="selfDraft as draft" class="grid gap-3 rounded-2xl border border-current/10 p-4" (ngSubmit)="saveSelfProfessional()">
+            <label class="field"><span>Il tuo professionista</span><select name="selfProfessional" [(ngModel)]="draft.collaboratorId" [disabled]="busy"><option [ngValue]="null">Nessun professionista</option><option *ngFor="let person of localContext?.collaborators" [ngValue]="person.id" [disabled]="!person.isActive || !!person.userId && person.userId !== draft.id">{{ person.firstName }} {{ person.lastName }}{{ !person.isActive ? ' · non attivo' : person.userId && person.userId !== draft.id ? ' · già associato' : '' }}</option></select></label>
+            <p class="text-sm opacity-75">Confermi questo profilo per le tue attività? Gli appuntamenti mantengono il professionista assegnato.</p>
+            <div class="flex gap-2"><button class="primary-btn" type="submit" [disabled]="busy">Conferma associazione</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="selfDraft = null">Annulla</button></div>
+          </form>
+        </article>
         <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <article class="panel rounded-[2rem] p-5">
             <div class="flex items-center justify-between gap-3"><h3 class="font-display text-2xl">Ruoli</h3>
@@ -101,6 +113,7 @@ export class AdminTeamPageComponent implements OnInit {
   overview: TeamOverview | null = null;
   localContext: LocalTeamContext | null = null;
   localDraft: LocalPolicyDraft | null = null;
+  selfDraft: { id: string; collaboratorId: string | null } | null = null;
   loading = false;
   busy = false;
   feedback = "";
@@ -110,6 +123,23 @@ export class AdminTeamPageComponent implements OnInit {
   revokeSubject = "";
   assignedRoleIds: string[] = [];
   get canManage(): boolean { return !!this.overview?.canManage && this.session.can("team.manage"); }
+  get canAssociateSelf(): boolean {
+    const current = this.session.currentUser();
+    const linked = this.overview?.users.find(user => user.localUserId === current?.id);
+    return this.canManage && current?.role === "owner" && !!linked && !linked.accessRevoked && linked.identityEnabled && linked.membershipEnabled;
+  }
+  get selfLocalUser(): LocalTeamUser | undefined { return this.localContext?.users.find(user => user.id === this.session.currentUser()?.id); }
+  get selfProfessionalLabel(): string {
+    const professional = this.localContext?.collaborators.find(person => person.id === this.selfLocalUser?.collaborator?.id);
+    return professional ? `${professional.firstName} ${professional.lastName}${professional.isActive ? "" : " · non attivo"}` : "Nessun professionista associato";
+  }
+  get hasPersonalAgenda(): boolean { return this.session.can("appointments.read.own") && !!this.localContext?.collaborators.some(person => person.id === this.selfLocalUser?.collaborator?.id && person.isActive); }
+  editSelfProfessional(): void { const user = this.selfLocalUser; if (this.canAssociateSelf && user) this.selfDraft = { id: user.id, collaboratorId: user.collaborator?.id || null }; }
+  async saveSelfProfessional(): Promise<void> {
+    if (!this.selfDraft || !this.canAssociateSelf) return;
+    const collaboratorId = this.selfDraft.collaboratorId;
+    await this.mutate(() => firstValueFrom(this.http.put(ADMIN_API_URL + "/team/me/professional", { collaboratorId })));
+  }
   ngOnInit(): void { void this.load(); }
   async load(preserveFeedback = false): Promise<void> {
     if (!this.session.can("users.manage")) return;
@@ -180,7 +210,7 @@ export class AdminTeamPageComponent implements OnInit {
     this.busy = true;
     try {
       await operation();
-      this.localDraft = null; this.roleDraft = null; this.editingSubject = ""; this.deleteRoleId = ""; this.revokeSubject = "";
+      this.selfDraft = null; this.localDraft = null; this.roleDraft = null; this.editingSubject = ""; this.deleteRoleId = ""; this.revokeSubject = "";
       this.feedback = "Modifica salvata.";
       await this.load(true);
     } catch { this.feedback = "Esito della modifica da verificare. Aggiorna l’elenco e controlla la delega prima di riprovare. La richiesta non è stata ripetuta automaticamente."; }

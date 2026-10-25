@@ -44,3 +44,5 @@ Aggiornamento contratti Connect verificati nel checkout: amministrazione delegat
 ## Passaggi di fase
 
 `evolve.md` richiede autorizzazione prima di ogni passaggio di fase. Il 25 ottobre l’utente ha autorizzato «procedi con il piano» dopo aver confermato l’accesso Connect e il passaggio allo SDK npm. Lo Step 5 è avviato; non viene dichiarato concluso. I collaudi operativi riservati all’utente e le prove di produzione restano esplicitamente aperti e non vengono sostituiti da mock o compilazioni. Il piano complessivo resta attivo.
+
+Aggiornamento Step 5, 25 ottobre: il titolare può associare esplicitamente il proprio account a un professionista attraverso Accessi squadra, mantenendo intatti ruolo, permessi e credenziali. Verificate su PostgreSQL sintetico conservazione della riga User e atomicità; dettagli in [team-step-5.md](team-step-5.md). Il contratto di creazione delegata in Connect e il collaudo dell’utente restano necessari prima della chiusura dello Step 5.
