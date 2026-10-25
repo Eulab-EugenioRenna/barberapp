@@ -10,6 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { bearerToken, tokenHash, sessionUserSelect } from "./local-sessions";
 
 export interface RequestSession {
+  connectSessionId?: string | null;
   user: {
     id: string;
     tenantId: string | null;
@@ -72,6 +73,7 @@ export async function resolveRequestSession(
     : undefined;
 
   return {
+    connectSessionId: stored.connectSessionId,
     user: {
       id: user.id,
       tenantId: user.tenantId,

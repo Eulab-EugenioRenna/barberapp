@@ -27,6 +27,10 @@ describe("function-based route access", () => {
     expect(await visit("reception",["products.read"],"/services")).toBe(true);
     expect(await visit("reception",[],"/dashboard")).toBe("/access-unavailable");
   });
+  it("protects the team page with the local users capability", async()=>{
+    expect(await visit("manager",["users.manage"],"/team")).toBe(true);
+    expect(await visit("manager",["appointments.read.all"],"/team")).toBe("/appointments");
+  });
   it("keeps platform and personal routes separate", async()=>{
     expect(await visit("platform_admin",[],"/dashboard")).toBe("/platform");
     expect(await visit("collaborator",["dashboard.revenue.read"],"/dashboard")).toBe("/my-agenda");

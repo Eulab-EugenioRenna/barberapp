@@ -1,5 +1,7 @@
 # Step 3 — Catalogo delle funzioni ALORA
 
+Aggiornamento Step 5: catalogo versione 2, 23 funzioni; aggiunta team.manage con abilitazione esplicita Connect. Le sezioni successive descrivono la baseline versione 1. Vedi [ruoli e squadra](team-step-5.md).
+
 Stato: implementazione locale e prove automatiche/di integrazione isolate eseguite. Nessuna registrazione o concessione su installazioni Connect operative. Collaudo browser e accettazione dell’ambiente di rilascio pendenti.
 
 ## Registro e associazione alle operazioni

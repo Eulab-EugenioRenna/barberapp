@@ -1,3 +1,4 @@
+import { TeamModule } from "./modules/team/team.module";
 import { AuthAttemptGuard } from "./modules/auth/auth-attempt.guard";
 import { FunctionCatalogController } from "./modules/function-catalog/function-catalog.controller";
 import { PrismaErrorFilter } from "./common/prisma-error.filter";
@@ -36,6 +37,7 @@ import { UsersModule } from "./modules/users/users.module";
     AuthModule,
     TenantModule,
     UsersModule,
+    TeamModule,
     CollaboratorsModule,
     ServicesModule,
     CustomersModule,

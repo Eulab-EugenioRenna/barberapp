@@ -33,6 +33,7 @@ export const adminRoutes: Routes = [
   shellRoute("customers", "customers"),
   shellRoute("services", "services"),
   shellRoute("collaborators", "collaborators"),
+  shellRoute("team", "team"),
   shellRoute("settings", "settings"),
   shellRoute("platform", "platform"),
   { path: "**", redirectTo: "login" },

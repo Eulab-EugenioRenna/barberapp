@@ -124,6 +124,12 @@ export const ALORA_FUNCTIONS = [
     legacy: true,
   },
   {
+    key: "team.manage",
+    name: "Ruoli e accessi della squadra",
+    description: "Gestire ruoli, assegnazioni e accesso alla sola installazione entro la delega Connect.",
+    legacy: false,
+  },
+  {
     key: "audit.read",
     name: "Consultazione audit",
     description: "Consultare le operazioni registrate per la propria azienda.",
@@ -152,7 +158,7 @@ export const ALORA_FUNCTIONS = [
   },
 ] as const satisfies readonly FunctionDefinition[];
 export type FunctionKey = (typeof ALORA_FUNCTIONS)[number]["key"];
-export const FUNCTION_MATRIX_VERSION = 1;
+export const FUNCTION_MATRIX_VERSION = 2;
 export function canUseLocalFunction(
   user: LocalIdentity | null | undefined,
   key: string,
@@ -169,7 +175,8 @@ export function canUseLocalFunction(
       !!user.collaboratorId &&
       ["appointments.read.own", "appointments.update.own"].includes(key)
     );
-  if (user.role === "owner") return definition.legacy;
+  if (user.role === "owner")
+    return definition.legacy || !!user.connectFunctions?.includes(key);
   if (!["manager", "reception"].includes(user.role)) return false;
   return [key, ...(definition.aliases ?? [])].some((permission) =>
     user.permissions?.includes(permission),
@@ -197,6 +204,7 @@ export const VIEW_FUNCTIONS: Readonly<Record<string, FunctionKey>> = {
   customers: "clients.read.full",
   services: "services.read",
   collaborators: "collaborators.read",
+  team: "users.manage",
   settings: "settings.manage",
 };
 

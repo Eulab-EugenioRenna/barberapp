@@ -18,7 +18,7 @@ Vedi [sicurezza e migrazione](docs/security-step-1.md), [rebranding e compatibil
 - Sessioni revocabili, controlli di accesso per azienda e persona, audit delle mutazioni e agenda personale transitoria.
 - PWA installabile con aggiornamento differito mentre sono aperti modali.
 
-Connect, sedi e settori, conto unico, registro dei pagamenti e magazzino sono previsti nella roadmap. I provider di pagamento simulati restano disabilitati.
+SSO Connect è integrato; lo [Step 5, ruoli e squadra](docs/team-step-5.md), è in implementazione con il pannello Accessi squadra. Sedi e settori, conto unico, registro dei pagamenti e magazzino restano nella roadmap. I provider di pagamento simulati restano disabilitati.
 
 ## Local Setup
 

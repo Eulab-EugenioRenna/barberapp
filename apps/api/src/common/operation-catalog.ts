@@ -4,6 +4,14 @@ export type OperationDefinition =
   | { kind: "function"; key: FunctionKey; own?: FunctionKey }
   | { kind: "public" | "session" | "tenant-context" | "platform" | "disabled" };
 export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
+  "TeamController.overview": { kind: "function", key: "users.manage" },
+  "TeamController.createRole": { kind: "function", key: "team.manage" },
+  "TeamController.updateRole": { kind: "function", key: "team.manage" },
+  "TeamController.removeRole": { kind: "function", key: "team.manage" },
+  "TeamController.assignRoles": { kind: "function", key: "team.manage" },
+  "TeamController.revoke": { kind: "function", key: "team.manage" },
+  "TeamController.restore": { kind: "function", key: "team.manage" },
+
   "AuthController.method": { kind: "public" },
   "ConnectAuthController.accept": { kind: "public" },
   "ConnectAuthController.callback": { kind: "public" },

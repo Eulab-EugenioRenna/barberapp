@@ -24,9 +24,9 @@ La prossima applicazione deve poter integrare Connect istanziando il client SDK 
 | 0 | Baseline | Audit tecnico svolto; baseline e copia verificata della produzione ancora da acquisire |
 | 1 | Sicurezza e legacy | [Implementato e verificato localmente](security-step-1.md); copia produzione, browser e rilascio pendenti |
 | 2 | Rebranding ALORA | [Implementato e verificato localmente](rebranding-step-2.md); browser/PWA reale e rilascio pendenti |
-| 3 | Catalogo delle funzioni | [Implementazione locale e integrazione isolata verificate](function-catalog-step-3.md): 22 funzioni, matrice versione 1, handler censiti, API/UI allineate; browser e registrazione nell’ambiente operativo pendenti |
-| 4 | SSO e attivazione azienda | SDK 0.10.0/schema Connect 013 adottato: presenter tecnico, richieste e pratiche esistenti, configurazione approvata cifrata e SSO. Intake parallelo rimosso. [Collaudo manuale e standardizzazione](auth-flow-step-4.md) a cura dell’utente; Step aperto, nessuna migrazione demo eseguita |
-| 5 | Ruoli e squadra | Delega Connect entro cliente/app/licenza, professionisti con account facoltativo, ruoli e dashboard personale; restrizioni anche via API |
+| 3 | Catalogo delle funzioni | [Implementazione locale e integrazione isolata verificate](function-catalog-step-3.md): 23 funzioni, matrice versione 2 (team.manage aggiunta nello Step 5), handler censiti, API/UI allineate; browser e registrazione nell’ambiente operativo pendenti |
+| 4 | SSO e attivazione azienda | SDK npm pubblico 0.10.0/schema Connect 013 adottato. Accesso all’admin dopo migrazione confermato dall’utente; provider Docker riallineato (audience e basic). [Evidenze e limiti](auth-flow-step-4.md); rinnovo/revoca e accettazione di produzione ancora da verificare |
+| 5 | Ruoli e squadra | [In implementazione](team-step-5.md): gestione delegata di ruoli/assegnazioni/accessi con SDK esistente. Account facoltativi, restrizioni locali configurabili e dashboard personale ancora da completare |
 | 6 | Sicurezza personale | Profilo, password tramite SSO, MFA, dispositivi e sessioni; collaudo dei provider attivati |
 | 7 | Sedi e settori | Configurazione e abilitazioni, sede/settore iniziali per legacy; attribuzione completa e query limitate agli ambiti autorizzati |
 | 8 | Conto unico | Righe autorevoli condivise con l’agenda, adattatori legacy, riconciliazione di appuntamenti senza vendite e duplicati storici senza cambiare i totali |
@@ -43,4 +43,4 @@ Aggiornamento contratti Connect verificati nel checkout: amministrazione delegat
 
 ## Passaggi di fase
 
-`evolve.md` richiede: «Non procedere automaticamente allo step successivo: presenta il risultato e attendi l’autorizzazione». Le istruzioni successive della conversazione hanno autorizzato e avviato lo Step 4, incluso il percorso obbligatorio e l’obiettivo dell’SDK riutilizzabile. Lo Step 4 è ancora aperto; lo Step 5 non è stato avviato. L’integrazione operativa SSO resta soggetta alla correzione Connect segnalata e alla configurazione/collaudo dell’ambiente; il piano complessivo rimane aperto.
+`evolve.md` richiede autorizzazione prima di ogni passaggio di fase. Il 25 ottobre l’utente ha autorizzato «procedi con il piano» dopo aver confermato l’accesso Connect e il passaggio allo SDK npm. Lo Step 5 è avviato; non viene dichiarato concluso. I collaudi operativi riservati all’utente e le prove di produzione restano esplicitamente aperti e non vengono sostituiti da mock o compilazioni. Il piano complessivo resta attivo.

@@ -7,11 +7,11 @@ ALORA dipende ora dalla versione esatta pubblica [@eulab/connect 0.10.0](https:/
 
 ## Stato corrente — una sola facciata SDK, presenter schema 013
 
-Adottato il tarball SDK 0.10.0 del 24 ottobre con SHA-256 `938a998004345cf650cbeb1881cf3f33df465ce3e806848a3ed436044abc56a1`. Rimosso il percorso enrollment/intake parallelo: discovery, prova legacy, challenge, consenso, richiesta, attesa e SSO usano la stessa facciata ConnectApplication e gli endpoint app-onboarding esistenti.
+Adottato lo SDK pubblico npm 0.10.0, come descritto sopra. Rimosso il percorso enrollment/intake parallelo: discovery, prova legacy, challenge, consenso, richiesta, attesa e SSO usano la stessa facciata ConnectApplication e gli endpoint app-onboarding esistenti.
 
 Un presenter tecnico identifica il deployment prima dell’approvazione dell’integrazione; nessuna app, azienda, licenza o associazione viene creata dall’emissione della credenziale. ID e segreto sono configurati nel solo `.env` ALORA. Lo SDK recupera poi la configurazione SSO con configuration.sync e la conserva cifrata. ALORA gestisce gli esiti administrative_required/configuration_required senza concedere sessioni o simulare pratiche ricevute. Il catalogo pubblicato segue l’app scelta nel piano tramite il getter SDK.
 
-[Configurazione, percorso manuale e revisione di generalizzazione](auth-flow-step-4.md). L’utente esegue il collaudo: in questa adozione solo installazione e controlli di compilazione/configurazione, nessuna suite o richiesta utente automatica. Il presenter è stato creato come configurazione tecnica; nessuna pratica inviata né migrazione demo eseguita. Lo Step 4 resta aperto.
+[Configurazione, percorso manuale e revisione di generalizzazione](auth-flow-step-4.md). L’utente ha eseguito la migrazione e confermato l’accesso all’admin il 24 ottobre. Rinnovo, revoca, MFA, ripristino e accettazione di produzione non vengono dedotti dal login riuscito e restano da collaudare. Lo Step 5 è ora avviato su autorizzazione dell’utente.
 
 Le sezioni successive conservano evidenze del percorso integrato precedente. Le prove del servizio enrollment locale rimosso e la proposta di un intake separato sono ritirate, non rappresentano il contratto attuale.
 

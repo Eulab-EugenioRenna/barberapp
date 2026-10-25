@@ -95,6 +95,11 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
       "name": "Utenze locali",
     },
     {
+      "description": "Gestire ruoli, assegnazioni e accesso alla sola installazione entro la delega Connect.",
+      "key": "team.manage",
+      "name": "Ruoli e accessi della squadra",
+    },
+    {
       "description": "Consultare le operazioni registrate per la propria azienda.",
       "key": "audit.read",
       "name": "Consultazione audit",
@@ -116,6 +121,6 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
     },
   ],
   "schemaVersion": 1,
-  "version": 1,
+  "version": 2,
 }
 `;
