@@ -17,10 +17,16 @@ export interface PersonalAppointment {
   collaborator: { id: string; firstName: string; lastName: string; calendarColor: string } | null;
   room: { id: string; name: string } | null;
 }
+export interface PersonalSchedule {
+  weekly: { weekday: number; isWorkingDay: boolean; startTime: string | null; endTime: string | null }[];
+  overrides: { date: string; isWorkingDay: boolean; isHoliday: boolean; startTime: string | null; endTime: string | null }[];
+  closedDates: string[];
+}
 export interface PersonalDashboard {
   professional: { firstName: string; lastName: string };
   referenceDate: string; timezone: string;
   range: { start: string; end: string };
+  schedule: PersonalSchedule;
   activity: { totalAppointments: number; completedAppointments: number; cancelledAppointments: number; noShows: number; attributedServices: number };
   values: { registeredServiceLineTotal: string; currency: string } | null;
   appointments: { items: PersonalAppointment[]; total: number; page: number; pageSize: number; hasMore: boolean };

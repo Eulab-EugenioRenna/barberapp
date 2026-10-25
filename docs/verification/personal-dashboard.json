@@ -1,7 +1,7 @@
 {
   "date": "2026-10-25",
-  "unitTestsPassed": 157,
-  "unitSuites": 31,
+  "unitTestsPassed": 167,
+  "unitSuites": 32,
   "postgresFixture": "passed",
   "profileScope": "tenant + active professional linked to authenticated user",
   "economicValues": "explicit Connect and local grant; exact Decimal line sums",
@@ -9,5 +9,7 @@
   "writeOnlyResponse": "id and status only",
   "operationalAcceptance": false,
   "realConnectUserFlowsRun": false,
-  "temporaryDatabaseRemoved": true
+  "temporaryDatabaseRemoved": true,
+  "ownSchedules": "scoped weekly records, selected-period overrides and tenant closure dates; private notes excluded",
+  "scheduleCalendarDates": "UTC calendar boundaries in tenant timezone; DST day verified"
 }

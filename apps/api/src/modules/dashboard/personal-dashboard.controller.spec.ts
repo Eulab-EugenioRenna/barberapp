@@ -6,15 +6,18 @@ import { resolveRequestSession } from "../../common/request-session";
 import { PERSONAL_APPOINTMENT_SELECT } from "../../common/personal-appointment";
 jest.mock("../../common/request-session", () => ({ ...jest.requireActual("../../common/request-session"), resolveRequestSession: jest.fn() }));
 describe("Personal activity projection", () => {
-  const aggregate = jest.fn(), findMany = jest.fn(), groupBy = jest.fn();
+  const aggregate = jest.fn(), findMany = jest.fn(), groupBy = jest.fn(), professional = jest.fn(), holidays = jest.fn();
   const controller = new PersonalDashboardController({
-    collaborator: { findFirst: jest.fn(async () => ({ firstName: "Own", lastName: "Professional" })) },
+    collaborator: { findFirst: professional },
+    tenantHoliday: { findMany: holidays },
     tenant: { findUniqueOrThrow: jest.fn(async () => ({ timezone: "Europe/Rome", currency: "EUR" })) },
     appointment: { findMany, groupBy }, saleItem: { aggregate },
   } as unknown as PrismaService);
   const user = { id: "person-a", tenantId: "company-a", email: "own@example.test", firstName: "Own", lastName: "A", role: "collaborator", collaboratorId: "professional-a", permissionsConfigured: true, permissions: ["appointments.read.own"], connectFunctions: ["appointments.read.own", "dashboard.personal.values.read"] };
   beforeEach(() => {
     jest.clearAllMocks();
+    professional.mockResolvedValue({ firstName: "Own", lastName: "Professional", weeklySchedules: [{ weekday: 0, isWorkingDay: true, startTime: "10:00", endTime: "17:30" }], dayOverrides: [{ date: new Date("2026-10-25T00:00:00Z"), isWorkingDay: false, isHoliday: true, startTime: null, endTime: null }] });
+    holidays.mockResolvedValue([{ date: new Date("2026-10-25T00:00:00Z") }]);
     jest.mocked(resolveRequestSession).mockResolvedValue({ tenantId: "company-a", user });
     findMany.mockResolvedValue([]);groupBy.mockResolvedValue([{ status: "completed", _count: { _all: 3 } }]);
     aggregate.mockImplementation(async args => ({ _sum: args._sum.lineTotal ? { lineTotal: new Prisma.Decimal("0.30") } : { quantity: 2 } }));
@@ -33,6 +36,19 @@ describe("Personal activity projection", () => {
     expect(aggregate).toHaveBeenCalledTimes(2);
     expect(result.range.start).toBe("2026-10-24T22:00:00.000Z");
     expect(result.range.end).toBe("2026-10-25T22:59:59.999Z");
+  });
+  it("projects only personal schedule fields and uses calendar dates across the DST change", async () => {
+    const result = await controller.overview({ headers: {} }, { period: "day", date: "2026-10-25" });
+    expect(result.schedule).toEqual({ weekly: [{ weekday: 0, isWorkingDay: true, startTime: "10:00", endTime: "17:30" }], overrides: [{ date: "2026-10-25", isWorkingDay: false, isHoliday: true, startTime: null, endTime: null }], closedDates: ["2026-10-25"] });
+    const dates = { gte: new Date("2026-10-25T00:00:00Z"), lte: new Date("2026-10-25T00:00:00Z") };
+    expect(professional).toHaveBeenCalledWith({ where: { id: "professional-a", tenantId: "company-a", userId: "person-a", isActive: true }, select: { firstName: true, lastName: true, weeklySchedules: { orderBy: { weekday: "asc" }, select: { weekday: true, isWorkingDay: true, startTime: true, endTime: true } }, dayOverrides: { where: { date: dates }, orderBy: { date: "asc" }, select: { date: true, isWorkingDay: true, isHoliday: true, startTime: true, endTime: true } } } });
+    expect(holidays).toHaveBeenCalledWith({ where: { tenantId: "company-a", date: dates }, orderBy: { date: "asc" }, select: { date: true } });
+    expect(result.professional).toEqual({ firstName: "Own", lastName: "Professional" });
+  });
+  it("rejects an inactive or reassigned profile before loading schedules and activity", async () => {
+    professional.mockResolvedValue(null);
+    await expect(controller.overview({ headers: {} }, {})).rejects.toBeInstanceOf(ForbiddenException);
+    expect(holidays).not.toHaveBeenCalled();expect(aggregate).not.toHaveBeenCalled();
   });
   it("rejects a missing personal association before any activity query", async () => {
     jest.mocked(resolveRequestSession).mockResolvedValue({ tenantId: "company-a", user: { ...user, collaboratorId: null } });

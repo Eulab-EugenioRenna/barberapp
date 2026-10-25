@@ -36,6 +36,19 @@ import { SessionStore } from "../core/session.store";
         <article class="panel rounded-3xl p-5"><p class="eyebrow">Assenze / annullati</p><strong class="mt-2 block font-display text-3xl">{{ dashboard.activity.noShows }} / {{ dashboard.activity.cancelledAppointments }}</strong></article>
       </section>
       <article *ngIf="dashboard.values as values" class="panel rounded-3xl p-5"><p class="eyebrow">Valore registrato dei tuoi servizi</p><strong class="mt-2 block font-display text-3xl">{{ values.registeredServiceLineTotal | currency: values.currency }}</strong><p class="mt-2 text-sm opacity-75">Somma delle righe servizio attribuite a te, prima di eventuali sconti sul conto. Sono esclusi i servizi senza un conto registrato. Non indica incassi o compensi.</p></article>
+      <section class="panel rounded-[2rem] p-5 sm:p-6" aria-labelledby="personal-schedule-title">
+        <h2 id="personal-schedule-title" class="font-display text-2xl">I miei orari</h2>
+        <p class="mt-2 text-sm opacity-75">Turni configurati dal salone, in {{ dashboard.timezone }}. Gli appuntamenti e le altre risorse determinano gli slot ancora prenotabili.</p>
+        <div class="mt-4 grid gap-5 md:grid-cols-2">
+          <div><h3 class="text-sm font-semibold">Settimana tipo</h3><p *ngIf="!dashboard.schedule.weekly.length" class="mt-2 text-sm opacity-70">Nessun turno settimanale configurato.</p>
+            <p class="mt-2 text-xs opacity-65">I giorni senza un turno esplicito usano gli orari standard di prenotazione.</p>
+            <dl class="mt-2 grid gap-2"><div *ngFor="let day of dashboard.schedule.weekly" class="flex flex-wrap justify-between gap-2 border-b border-current/10 pb-2 text-sm"><dt>{{ weekdayLabel(day.weekday) }}</dt><dd>{{ workingHours(day) }}</dd></div></dl>
+          </div>
+          <div><h3 class="text-sm font-semibold">Eccezioni nel periodo selezionato</h3><p *ngIf="!dashboard.schedule.overrides.length && !dashboard.schedule.closedDates.length" class="mt-2 text-sm opacity-70">Nessuna eccezione o chiusura configurata.</p>
+            <dl class="mt-2 grid gap-2"><div *ngFor="let day of dashboard.schedule.overrides" class="flex flex-wrap justify-between gap-2 border-b border-current/10 pb-2 text-sm"><dt>{{ calendarDate(day.date) }}</dt><dd>{{ dashboard.schedule.closedDates.includes(day.date) ? 'Chiusura del salone' : day.isHoliday ? 'Ferie' : workingHours(day) }}</dd></div><div *ngFor="let date of dashboard.schedule.closedDates" [hidden]="hasOverride(date)" class="flex flex-wrap justify-between gap-2 border-b border-current/10 pb-2 text-sm"><dt>{{ calendarDate(date) }}</dt><dd>Chiusura del salone</dd></div></dl>
+          </div>
+        </div>
+      </section>
       <section class="panel rounded-[2rem] p-5 sm:p-6" aria-labelledby="personal-appointments-title">
         <div class="flex flex-wrap items-center justify-between gap-3"><h2 id="personal-appointments-title" class="font-display text-2xl">Appuntamenti assegnati</h2><span class="text-sm opacity-70">{{ dashboard.appointments.total }} nel periodo</span></div>
         <p *ngIf="!dashboard.appointments.items.length" class="py-8 text-sm opacity-75">Nessun appuntamento assegnato in questo periodo.</p>
@@ -86,6 +99,10 @@ export class PersonalAgendaComponent implements OnInit {
   transitions(item: PersonalAppointment): readonly string[] { return PERSONAL_STATUS_TRANSITIONS[item.status] || []; }
   statusLabel(status: string): string { return ({ draft: "Bozza", requested: "Da confermare", confirmed: "Confermato", checked_in: "In corso", completed: "Completato", cancelled: "Annullato", no_show: "Assente", rescheduled: "Riprogrammato" } as Record<string, string>)[status] || status; }
   actionLabel(status: string): string { return ({ confirmed: "Conferma prenotazione", checked_in: "Segna arrivo", completed: "Completa servizio", no_show: "Segna assenza" } as Record<string, string>)[status] || this.statusLabel(status); }
+  weekdayLabel(weekday: number): string { return ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"][weekday] || "Giorno non configurato"; }
+  workingHours(day: { isWorkingDay: boolean; startTime: string | null; endTime: string | null }): string { return day.isWorkingDay && day.startTime && day.endTime ? `${day.startTime} – ${day.endTime}` : "Non lavorativo"; }
+  calendarDate(value: string): string { return new Intl.DateTimeFormat("it-IT", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(new Date(value + "T00:00:00Z")); }
+  hasOverride(date: string): boolean { return !!this.data?.schedule.overrides.some(day => day.date === date); }
   dateTime(value: string): string { return new Intl.DateTimeFormat("it-IT", { timeZone: this.data?.timezone, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
   time(value: string): string { return new Intl.DateTimeFormat("it-IT", { timeZone: this.data?.timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
   async commitStatus(): Promise<void> {

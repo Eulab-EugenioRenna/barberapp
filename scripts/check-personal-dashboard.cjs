@@ -14,6 +14,18 @@ async function main() {
   const account = await prisma.user.create({ data: { tenantId: company.id, email: 'own@example.test', firstName: 'Own', lastName: 'Person', role: 'collaborator', passwordHash: 'synthetic-not-a-credential', permissionsConfigured: true } });
   const own = await prisma.collaborator.create({ data: { tenantId: company.id, userId: account.id, firstName: 'Own', lastName: 'Person' } });
   const other = await prisma.collaborator.create({ data: { tenantId: company.id, firstName: 'Other', lastName: 'Person' } });
+  await prisma.collaboratorWeeklySchedule.create({ data: { collaboratorId: own.id, weekday: 0, isWorkingDay: true, startTime: '10:00', endTime: '17:30' } });
+  await prisma.collaboratorWeeklySchedule.create({ data: { collaboratorId: other.id, weekday: 1, isWorkingDay: true, startTime: '01:00', endTime: '02:00' } });
+  await prisma.collaboratorDayOverride.createMany({ data: [
+    { collaboratorId: own.id, date: new Date('2026-10-25T00:00:00Z'), isWorkingDay: false, isHoliday: true, note: 'PRIVATE-OVERRIDE-NOTE' },
+    { collaboratorId: own.id, date: new Date('2026-10-31T00:00:00Z'), isWorkingDay: true, startTime: '11:00', endTime: '15:00' },
+    { collaboratorId: own.id, date: new Date('2026-11-01T00:00:00Z'), isWorkingDay: false, note: 'OUTSIDE-RANGE' },
+    { collaboratorId: other.id, date: new Date('2026-10-24T00:00:00Z'), isWorkingDay: false, note: 'PRIVATE-OTHER-NOTE' },
+  ] });
+  await prisma.tenantHoliday.createMany({ data: [
+    { tenantId: company.id, date: new Date('2026-10-31T00:00:00Z'), name: 'PRIVATE-CLOSURE-LABEL' },
+    { tenantId: foreign.id, date: new Date('2026-10-24T00:00:00Z'), name: 'FOREIGN-CLOSURE' },
+  ] });
   const customer = await prisma.customer.create({ data: { tenantId: company.id, firstName: 'Own', lastName: 'Customer', notes: 'PRIVATE-CUSTOMER-NOTES', totalSpent: '99999' } });
   const foreignCustomer = await prisma.customer.create({ data: { tenantId: foreign.id, firstName: 'FOREIGN-CUSTOMER', lastName: 'Restricted' } });
   const service = await prisma.service.create({ data: { tenantId: company.id, name: 'Own service', durationMinutes: 30, basePrice: '999', internalDescription: 'PRIVATE-SERVICE-COST-NOTES' } });
@@ -46,6 +58,13 @@ async function main() {
   const response = await controller.overview(request, range);
   assert.equal(response.activity.totalAppointments, 2);assert.equal(response.activity.completedAppointments, 1);assert.equal(response.activity.attributedServices, 2);assert.equal(response.values, null);
   assert.equal(response.appointments.items.length, 2);
+  assert.deepEqual(response.schedule, { weekly: [{ weekday: 0, isWorkingDay: true, startTime: '10:00', endTime: '17:30' }], overrides: [
+    { date: '2026-10-25', isWorkingDay: false, isHoliday: true, startTime: null, endTime: null },
+    { date: '2026-10-31', isWorkingDay: true, isHoliday: false, startTime: '11:00', endTime: '15:00' },
+  ], closedDates: ['2026-10-31'] });
+  const dstDay = await controller.overview(request, { period: 'day', date: '2026-10-25' });
+  assert.equal(dstDay.schedule.overrides.length, 1);assert.deepEqual(dstDay.schedule.closedDates, []);
+
   const forbidden = ['internalNotes', 'finalPrice', 'estimatedPrice', 'basePrice', 'internalDescription', 'totalSpent', 'cost', 'paymentStatus'];
   function clean(value) { if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) { assert(!forbidden.includes(key), 'Sensitive field in personal response: '+key);clean(child); } }
   clean(response);assert(!JSON.stringify(response).includes('PRIVATE-'));assert(!JSON.stringify(response).includes('FOREIGN-'));
@@ -74,6 +93,6 @@ async function main() {
   assert.deepEqual(Object.keys(minimal).sort(), ['id', 'status'], 'Write-only personal permission must not disclose customer or monetary data');
   user.collaboratorId = null;
   await assert.rejects(controller.overview(request, range), /Agenda personale/);
-  console.log('PASS: personal PostgreSQL scope, sensitive projections, explicit economic grant, exact line sum, mixed/product/cancelled/cross-tenant exclusion, custom role scope, and concurrent reassignment protection. Synthetic identity; no Connect or user login.');
+  console.log('PASS: personal PostgreSQL scope, sensitive projections, explicit economic grant, exact line sum, mixed/product/cancelled/cross-tenant exclusion, custom role scope, concurrent reassignment protection, scoped schedules/closures and DST calendar filtering. Synthetic identity; no Connect or user login.');
 }
 main().catch(error => { console.error(error.message);process.exitCode = 1; }).finally(()=>prisma.$disconnect());
