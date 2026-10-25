@@ -80,10 +80,10 @@ interface LocalPolicyDraft { id: string; role: "manager" | "reception" | "collab
               <div class="flex flex-wrap justify-between gap-2"><strong>{{ user.displayName }}</strong><span class="text-xs">{{ user.accessRevoked ? 'Accesso revocato' : !user.identityEnabled || !user.membershipEnabled ? 'Account sospeso' : 'Account attivo' }}</span></div>
               <p class="mt-2 text-sm opacity-75">{{ userRoles(user) }}</p>
               <p *ngIf="localUser(user) as local" class="mt-1 text-xs opacity-65">{{ localRoleLabel(local.role) }} · {{ local.permissionsConfigured ? 'Permessi ALORA configurati' : 'Impostazioni precedenti conservate' }}</p>
-              <div *ngIf="canEditUser(user)" class="mt-3 flex flex-wrap gap-2"><button class="secondary-btn" type="button" [disabled]="busy" (click)="editUser(user)">Assegna ruoli</button>
+              <div *ngIf="canEditUser(user)" class="mt-3 flex flex-wrap gap-2"><button class="secondary-btn" type="button" [disabled]="busy" (click)="editUser(user)">{{ user.accessRevoked && !user.roles.length ? 'Assegna ruoli per riattivare' : 'Assegna ruoli' }}</button>
                 <button *ngIf="canEditLocalUser(user)" class="secondary-btn" type="button" [disabled]="busy" (click)="editLocalPolicy(user)">Visibilità in ALORA</button>
                 <button *ngIf="!user.accessRevoked" class="secondary-btn" type="button" [disabled]="busy" (click)="revokeSubject = user.subject">Revoca accesso ad ALORA</button>
-                <button *ngIf="user.accessRevoked" class="secondary-btn" type="button" [disabled]="busy" (click)="changeAccess(user, true)">Ripristina accesso</button>
+                <button *ngIf="user.accessRevoked && user.roles.length" class="secondary-btn" type="button" [disabled]="busy" (click)="changeAccess(user, true)">Ripristina accesso</button>
               </div>
               <div *ngIf="revokeSubject === user.subject" class="mt-3 border-t border-current/10 pt-3"><p class="text-sm">Revocare l’accesso a questa attività? L’identità e gli accessi alle altre app restano conservati.</p><div class="mt-2 flex gap-2"><button class="primary-btn" type="button" [disabled]="busy" (click)="changeAccess(user, false)">Conferma revoca</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="revokeSubject = ''">Annulla</button></div></div>
               <form *ngIf="localDraft?.id === user.localUserId && localDraft as draft" class="mt-4 grid gap-3 rounded-2xl border border-current/10 p-4" (ngSubmit)="saveLocalPolicy()">
@@ -97,8 +97,11 @@ interface LocalPolicyDraft { id: string; role: "manager" | "reception" | "collab
                 <div class="flex gap-2"><button class="primary-btn" type="submit" [disabled]="busy || !localDraftValid(user)">Salva visibilità</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="localDraft = null">Annulla</button></div>
               </form>
               <form *ngIf="editingSubject === user.subject" class="mt-3 grid gap-3 border-t border-current/10 pt-3" (ngSubmit)="saveAssignment(user)">
+                <p *ngIf="user.accessRevoked" class="text-sm opacity-75">Salvando almeno un ruolo riattivi l’accesso a questa attività. Verifica anche la visibilità configurata in ALORA.</p>
+                <p *ngIf="!team.roles.length" class="text-sm opacity-75">Crea prima un ruolo con le funzioni da concedere.</p>
                 <label *ngFor="let role of team.roles" class="flex items-center gap-2 text-sm"><input type="checkbox" [disabled]="busy || !canEditRole(role)" [checked]="assignedRoleIds.includes(role.id)" (change)="toggleRole(role.id, $any($event.target).checked)" />{{ role.name }}</label>
-                <div class="flex gap-2"><button type="submit" class="primary-btn" [disabled]="busy">Salva assegnazioni</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="editingSubject = ''">Annulla</button></div>
+                <label *ngIf="!assignedRoleIds.length" class="flex items-start gap-2 text-sm"><input type="checkbox" name="confirmEmptyRoles" [(ngModel)]="confirmEmptyRoles" [disabled]="busy" /><span>Confermo la rimozione di tutti i ruoli. L’account non potrà accedere a questa attività.</span></label>
+                <div class="flex gap-2"><button type="submit" class="primary-btn" [disabled]="busy || !assignedRoleIds.length && !confirmEmptyRoles">Salva assegnazioni</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="editingSubject = ''">Annulla</button></div>
               </form>
             </div>
           </article>
@@ -122,6 +125,7 @@ export class AdminTeamPageComponent implements OnInit {
   editingSubject = "";
   revokeSubject = "";
   assignedRoleIds: string[] = [];
+  confirmEmptyRoles = false;
   get canManage(): boolean { return !!this.overview?.canManage && this.session.can("team.manage"); }
   get canAssociateSelf(): boolean {
     const current = this.session.currentUser();
@@ -171,9 +175,9 @@ export class AdminTeamPageComponent implements OnInit {
   userRoles(user: TeamUser): string { return user.roles.map(role => role.name).join(" · ") || "Nessun ruolo assegnato"; }
   editRole(role?: TeamRole): void { this.deleteRoleId = ""; this.roleDraft = { id: role?.id || "", name: role?.name || "", permissions: [...(role?.permissions || [])] }; }
   togglePermission(key: string, checked: boolean): void { if (this.roleDraft) this.roleDraft.permissions = this.toggle(this.roleDraft.permissions, key, checked); }
-  toggleRole(id: string, checked: boolean): void { this.assignedRoleIds = this.toggle(this.assignedRoleIds, id, checked); }
+  toggleRole(id: string, checked: boolean): void { this.confirmEmptyRoles = false; this.assignedRoleIds = this.toggle(this.assignedRoleIds, id, checked); }
   private toggle(values: string[], value: string, checked: boolean): string[] { return checked ? [...new Set([...values, value])] : values.filter(item => item !== value); }
-  editUser(user: TeamUser): void { this.editingSubject = user.subject; this.assignedRoleIds = user.roles.map(role => role.id); }
+  editUser(user: TeamUser): void { this.confirmEmptyRoles = false; this.editingSubject = user.subject; this.assignedRoleIds = user.roles.map(role => role.id); }
   localUser(user: TeamUser): LocalTeamUser | undefined { return this.localContext?.users.find(item => item.id === user.localUserId); }
   localRoleLabel(role: string): string { return ({ collaborator: "Professionista", manager: "Responsabile", reception: "Reception", owner: "Titolare" } as Record<string, string>)[role] || role; }
   canEditLocalUser(user: TeamUser): boolean { const local = this.localUser(user); return this.canEditUser(user) && !!local && ["manager", "reception", "collaborator"].includes(local.role); }
@@ -223,7 +227,7 @@ export class AdminTeamPageComponent implements OnInit {
     await this.mutate(() => firstValueFrom(draft.id ? this.http.put(ADMIN_API_URL + "/team/roles/" + encodeURIComponent(draft.id), body) : this.http.post(ADMIN_API_URL + "/team/roles", body)));
   }
   async removeRole(role: TeamRole): Promise<void> { await this.mutate(() => firstValueFrom(this.http.delete(ADMIN_API_URL + "/team/roles/" + encodeURIComponent(role.id)))); }
-  async saveAssignment(user: TeamUser): Promise<void> { await this.mutate(() => firstValueFrom(this.http.put(ADMIN_API_URL + "/team/users/" + encodeURIComponent(user.subject) + "/roles", { roleIds: this.assignedRoleIds }))); }
+  async saveAssignment(user: TeamUser): Promise<void> { if (!this.assignedRoleIds.length && !this.confirmEmptyRoles) return; await this.mutate(() => firstValueFrom(this.http.put(ADMIN_API_URL + "/team/users/" + encodeURIComponent(user.subject) + "/roles", { roleIds: this.assignedRoleIds }))); }
   async changeAccess(user: TeamUser, restore: boolean): Promise<void> {
     const url = ADMIN_API_URL + "/team/users/" + encodeURIComponent(user.subject);
     await this.mutate(() => firstValueFrom(restore ? this.http.post(url + "/restore", {}) : this.http.delete(url + "/access")));
