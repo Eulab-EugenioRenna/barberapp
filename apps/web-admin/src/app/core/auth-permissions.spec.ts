@@ -40,6 +40,10 @@ describe("function-based route access", () => {
     expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/access-unavailable"} as RouterStateSnapshot)).toBe(true);
     expect(me).toHaveBeenCalledTimes(2);
   });
+  it("supports personal-only scopes for custom operational roles", async()=>{
+    expect(await visit("manager",["appointments.read.own"],"/my-agenda")).toBe(true);
+    expect(await visit("reception",["appointments.read.own"],"/dashboard")).toBe("/my-agenda");
+  });
   it("keeps platform and personal routes separate", async()=>{
     expect(await visit("platform_admin",[],"/dashboard")).toBe("/platform");
     expect(await visit("collaborator",["dashboard.revenue.read"],"/dashboard")).toBe("/my-agenda");

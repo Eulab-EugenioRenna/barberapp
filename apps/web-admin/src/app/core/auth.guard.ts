@@ -23,7 +23,7 @@ export const authGuard: CanActivateFn = async (_, state) => {
         return state.url.startsWith("/platform")
           ? true
           : router.createUrlTree(["/platform"]);
-      if (state.url.startsWith("/my-agenda") && user.role !== "collaborator")
+      if (state.url.startsWith("/my-agenda") && (!user.collaboratorId || !canUseLocalFunction(user, "appointments.read.own")))
         return router.createUrlTree(["/access-unavailable"]);
       const view = state.url.split("?")[0].split("/")[1];
       const required = VIEW_FUNCTIONS[view];
@@ -32,7 +32,7 @@ export const authGuard: CanActivateFn = async (_, state) => {
           canAccessLocalView(user, view),
         );
         return router.createUrlTree([
-          first ? `/${first[0]}` : "/access-unavailable",
+          first ? `/${first[0]}` : user.collaboratorId && canUseLocalFunction(user, "appointments.read.own") ? "/my-agenda" : "/access-unavailable",
         ]);
       }
       if (view === "platform")

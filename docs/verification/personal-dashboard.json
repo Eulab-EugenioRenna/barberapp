@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-25",
+  "unitTestsPassed": 157,
+  "unitSuites": 31,
+  "postgresFixture": "passed",
+  "profileScope": "tenant + active professional linked to authenticated user",
+  "economicValues": "explicit Connect and local grant; exact Decimal line sums",
+  "reassignmentRace": "old assignee update rejected",
+  "writeOnlyResponse": "id and status only",
+  "operationalAcceptance": false,
+  "realConnectUserFlowsRun": false,
+  "temporaryDatabaseRemoved": true
+}

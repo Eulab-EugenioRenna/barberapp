@@ -79,7 +79,7 @@ interface LocalPolicyDraft { id: string; role: "manager" | "reception" | "collab
                 <p class="text-sm opacity-75">Le scelte qui limitano i permessi assegnati dal ruolo Connect per questa attività.</p>
                 <label class="field"><span>Ambito operativo</span><select name="localRole" [(ngModel)]="draft.role" [disabled]="busy"><option value="collaborator">Professionista · solo dati personali</option><option value="reception">Reception</option><option value="manager">Responsabile</option></select></label>
                 <label class="field"><span>Professionista associato (facoltativo)</span><select name="localCollaborator" [(ngModel)]="draft.collaboratorId" [disabled]="busy"><option [ngValue]="null">Nessun professionista</option><option *ngFor="let person of localContext?.collaborators" [ngValue]="person.id" [disabled]="!person.isActive || !!person.userId && person.userId !== draft.id">{{ person.firstName }} {{ person.lastName }}{{ !person.isActive ? ' · non attivo' : person.userId && person.userId !== draft.id ? ' · già associato' : '' }}</option></select></label>
-                <p *ngIf="draft.role === 'collaborator' && draft.permissions.length && !draft.collaboratorId" class="text-sm">Associa un professionista per abilitare la sua agenda personale.</p>
+                <p *ngIf="localNeedsProfessional() && !draft.collaboratorId" class="text-sm">Associa un professionista per abilitare la sua agenda personale.</p>
                 <fieldset class="grid max-h-80 gap-2 overflow-auto" [disabled]="busy"><legend class="mb-2 text-sm font-semibold">Permessi consentiti in ALORA</legend><label *ngFor="let choice of localPermissionChoices(user)" class="flex items-start gap-2 text-sm"><input type="checkbox" [checked]="draft.permissions.includes(choice.key)" [disabled]="!choice.available && !draft.permissions.includes(choice.key)" (change)="toggleLocalPermission(choice.key, $any($event.target).checked)" /><span>{{ choice.name }}<span *ngIf="!choice.available" class="block text-xs opacity-65">Non concedibile con l’ambito o il ruolo attuale: deseleziona per salvare</span></span></label></fieldset>
                 <p class="text-xs opacity-75">Nessuna selezione significa nessun permesso operativo. I dati e l’account restano conservati.</p>
                 <div class="flex gap-2"><button class="primary-btn" type="submit" [disabled]="busy || !localDraftValid(user)">Salva visibilità</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="localDraft = null">Annulla</button></div>
@@ -160,13 +160,14 @@ export class AdminTeamPageComponent implements OnInit {
     if (!this.localDraft || !this.localContext) return [];
     const central = new Set(user.roles.flatMap(role => this.overview!.roles.find(item => item.id === role.id)?.permissions || []));
     const licensed = new Set(this.overview!.functions.filter(fn => fn.delegable).map(fn => fn.key));
-    const choices = this.localContext.functions.filter(fn => central.has(fn.key)).map(fn => ({ ...fn, available: licensed.has(fn.key) && (this.localDraft!.role !== "collaborator" || ["appointments.read.own", "appointments.update.own"].includes(fn.key)) }));
+    const choices = this.localContext.functions.filter(fn => central.has(fn.key)).map(fn => ({ ...fn, available: licensed.has(fn.key) && (this.localDraft!.role !== "collaborator" || ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(fn.key)) }));
     for (const key of this.localDraft.permissions) if (!choices.some(fn => fn.key === key)) choices.push({ key, name: this.overview?.functions.find(fn => fn.key === key)?.name || key, available: false });
     return choices;
   }
+  localNeedsProfessional(): boolean { return !!this.localDraft?.permissions.some(key => ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key)); }
   localDraftValid(user: TeamUser): boolean {
     const draft = this.localDraft;
-    return !!draft && draft.permissions.every(key => this.localPermissionChoices(user).some(fn => fn.key === key && fn.available)) && !(draft.role === "collaborator" && draft.permissions.length && !draft.collaboratorId);
+    return !!draft && draft.permissions.every(key => this.localPermissionChoices(user).some(fn => fn.key === key && fn.available)) && !(this.localNeedsProfessional() && !draft.collaboratorId);
   }
   toggleLocalPermission(key: string, checked: boolean): void { if (this.localDraft) this.localDraft.permissions = this.toggle(this.localDraft.permissions, key, checked); }
   async saveLocalPolicy(): Promise<void> {

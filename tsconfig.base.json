@@ -42,6 +42,9 @@
       ],
       "@eulab/connect/application": [
         "node_modules/@eulab/connect/dist/application.d.ts"
+      ],
+      "@barber/shared/personal": [
+        "apps/api/src/common/personal-appointment.ts"
       ]
     }
   }

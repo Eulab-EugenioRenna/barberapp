@@ -11,7 +11,7 @@ import {
   requireTenantId,
 } from "./request-session";
 
-import { canUseLocalFunction } from "./function-catalog";
+import { canUseLocalFunction, requiresOwnAppointmentScope } from "./function-catalog";
 import { operationDefinition } from "./operation-catalog";
 
 // Unknown handlers are denied even for owners and platform administrators.
@@ -47,6 +47,7 @@ export function authorizeLocalOperation(
   if (definition.kind === "function") {
     const key = user.role === "collaborator" ? definition.own : definition.key;
     if (key && canUseLocalFunction(user, key)) return;
+    if (user.role !== "collaborator" && definition.own && canUseLocalFunction(user, definition.own)) return;
   }
   throw new ForbiddenException("Permesso esplicito richiesto");
 }
@@ -67,13 +68,15 @@ export class LocalPolicyGuard implements CanActivate {
     authorizeLocalOperation(session, controller, operation);
     request.localSession = session;
     if (controller === "AppointmentsController" && request.params.id) {
+      const definition = operationDefinition(controller, operation)!;
+      const personal = definition.kind === "function" && !!definition.own && requiresOwnAppointmentScope(session.user, definition.key);
+      if (personal && !session.user?.collaboratorId) throw new ForbiddenException("Professionista non associato");
+      const tenantId = requireTenantId(session);
       const appointment = await this.prisma.appointment.findFirst({
         where: {
           id: request.params.id,
-          tenantId: requireTenantId(session),
-          ...(session.user?.role === "collaborator"
-            ? { collaboratorId: session.user.collaboratorId! }
-            : {}),
+          tenantId,
+          ...(personal ? { collaboratorId: session.user!.collaboratorId!, collaborator: { tenantId, userId: session.user!.id, isActive: true } } : {}),
         },
         select: { id: true },
       });

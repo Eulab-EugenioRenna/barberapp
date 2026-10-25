@@ -177,6 +177,8 @@ export function connectAccounts(
         user.collaborator.tenantId === user.tenantId
           ? user.collaborator.id
           : null;
+      const personalFunction = ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key);
+      if (personalFunction && !collaboratorId) return false;
       if (!canUseLocalFunction({ ...user, collaboratorId }, key)) return false;
       if (resource === null || resource === undefined) return true; // List queries must still apply their own tenant/owner predicates.
       if (
@@ -186,7 +188,7 @@ export function connectAccounts(
       )
         return false;
       return (
-        user.role !== "collaborator" ||
+        (user.role !== "collaborator" && !personalFunction) ||
         ("collaboratorId" in resource &&
           resource.collaboratorId === collaboratorId)
       );

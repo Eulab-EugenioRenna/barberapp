@@ -30,7 +30,7 @@ Verificare manualmente un ruolo entro delega, un tentativo fuori delega, assegna
 1. Implementata l’associazione esplicita e facoltativa di un professionista a un account già presente e collegato a Connect nella stessa azienda; nessuna unione per email. La creazione di nuovi account resta al punto 3.
 2. Implementata la configurazione delle restrizioni operative locali per manager/reception/collaboratori, intersecata con Connect e con la delega del chiamante. Collaudo dell’installazione reale ancora da eseguire.
 3. Creazione dell’account del collaboratore e mirror/provisioning: verificare il contratto esistente. Il mirror attuale crea local_links; il login-context richiede anche app_local_users. Non assumere che un mirror consenta da solo l’accesso sorgente e non costruire un onboarding parallelo per aggirare questo vincolo.
-4. Consolidamento della dashboard personale e verifica di assenza di dati aziendali o altrui.
+4. Dashboard personale consolidata con attività, righe servizio attribuite, valori separatamente autorizzati e aggiornamento dello stato operativo. Query/proiezioni/isolamento verificate su PostgreSQL sintetico; collaudo UI dell’utente pendente.
 5. Collaudo API/SDK/ruoli e browser sull’installazione effettiva prima della chiusura.
 
 ## Evidenze del primo blocco
@@ -60,3 +60,27 @@ L’adattatore team cattura i fallimenti dell’operazione all’interno della c
 - 41 test isolati passati in 5 suite; build API/admin e lint passati. Accettazione del form e prove di creazione account restano dell’utente.
 
 Controlli finali del runtime aggiornato: API 200; GET team e GET team/local-users senza sessione 401. In caso di errore di scrittura la pagina presenta un esito da verificare e invita a rileggere lo stato: un errore di rete dopo commit non viene dichiarato come garanzia di mancata modifica.
+
+## Terzo blocco: dashboard personale e aggiornamento dell’esecuzione
+
+La vista `/admin/#/my-agenda` ora usa GET `/dashboard/personal` invece del caricamento dell’agenda aziendale (che, con soli permessi personali, restituiva sempre un array vuoto). Offre giorno/settimana/mese nella zona dell’azienda, pagine da 25 appuntamenti e indicatori aggregati sull’intero periodo: appuntamenti, completati, assenze/annullati e quantità di righe servizio attribuite nei conti. Nessun ID professionista, cliente o azienda è accettato dalla query: viene usata la relazione attiva dell’account autenticato e tutti i filtri restano aziendali/personali, anche per responsabili o reception con soli permessi own.
+
+Il catalogo versione **3** espone **24 funzioni**. La nuova `dashboard.personal.values.read` richiede abilitazione esplicita Connect e permesso locale; per il collaboratore richiede anche permissionsConfigured=true. Senza concessione, la query degli importi non viene eseguita e values è null. La selezione economica riguarda soltanto la somma Decimal esatta delle lineTotal dei servizi attribuiti al professionista, con servizio e conto nella stessa azienda e conti non cancellati. Prodotti, righe senza servizio/attribuzione e conti di altre aziende restano fuori. Non si sommano importi degli appuntamenti per ricostruire vendite mancanti, non si deducono compensi/provvigioni e non si dichiara incassato questo valore. Gli sconti complessivi non vengono riallocati prima del dominio economico dedicato.
+
+Le proiezioni personali di lista, dettaglio e stato escludono prezzi, note interne, storico cliente, costi e altri campi aziendali anche sulle API legacy. La cache personale usa una nuova versione per non riutilizzare vecchie risposte più ampie. Le sole note visibili sono quelle operative del cliente per l’appuntamento assegnato. Riferimenti incrociati ad aziende diverse sono filtrati anche nelle relazioni cliente/servizio/stanza.
+
+POST `/appointments/:id/status` riusa l’endpoint esistente con il permesso own. In ambito personale ammette requested→confirmed, confirmed→checked_in/completed/no_show, checked_in→completed; non riapre terminali e non sostituisce la procedura aziendale di annullamento/riprogrammazione. La scrittura vincola atomicamente azienda, professionista, relazione attiva all’utente e stato precedente: una riassegnazione o transizione concorrente non viene aggiornata dal vecchio assegnatario. Un operatore con sola scrittura own riceve soltanto id/status, senza dettagli cliente. UI con conferma esplicita ed esito da verificare su errore, nessun reinvio automatico delle mutazioni.
+
+### Prove del terzo blocco
+
+- Suite Jest completa: 157 test passati su 31 suite, con fixture SDK/identità e nessun collaudo utente reale. Corrette due fixture auth/catalogo che ereditavano il presenter dal .env e non simulavano configuration.sync; ora coprono esplicitamente il presenter senza contattare servizi reali.
+- `scripts/check-personal-dashboard.cjs`: PostgreSQL isolato, dati sintetici di due aziende e più professionisti. Verifica proiezioni, quantità/importi esatti, prodotti/conti cancellati/riferimenti esterni esclusi, ambiti personalizzati manager, scrittura senza lettura e riassegnazione concorrente fra lettura e update. Identità, notifiche e cache sono fixture; non certifica il provider o la UI reale. Il database usa obbligatoriamente il prefisso barber_personal_dashboard_test_<cifre> ed è rimosso dopo la prova.
+- Compilazioni API/admin e lint passati. Nessuna nuova migrazione o concessione a utenti reali per questo blocco.
+
+### Creazione account: contratto da completare in Connect
+
+Il checkout conferma che mirror scrive local_links ma il login-context richiede app_local_users. Registrazione sorgente/azienda e assegnazione delegata non sono un unico contratto di creazione esposto dallo SDK 0.10.0. [Richiesta tecnica pronta per l’agente Connect](connect-delegated-account-request-step-5.md): estendere lo stesso mirror e la facciata, riusando binding e delega, senza API parallele o collegamenti per email. ALORA resta sul pacchetto pubblico 0.10.0 e non presenta un pulsante di creazione falsamente operativo. Questo requisito e il collaudo dell’utente tengono lo Step 5 aperto.
+
+L’adattatore SDK restrict vincola le risorse own al professionista autenticato anche quando il tipo operativo è manager/reception; non basta essere nella stessa azienda. Ulteriori test coprono assenza di associazione, risorsa di un altro professionista o tenant e conservazione dei controlli sulle normali funzioni aziendali.
+
+Runtime Docker aggiornato: API 200; catalogo pubblicato versione 3 con 24 funzioni; GET dashboard/personal senza sessione 401. Si tratta di controlli tecnici anonimi, non di un nuovo login o di una concessione sulla licenza reale.

@@ -13,6 +13,7 @@ module.exports = {
   },
   moduleFileExtensions: ["ts", "js", "json"],
   moduleNameMapper: {
+    "^@barber/shared/personal$": "<rootDir>/apps/api/src/common/personal-appointment.ts",
     "^@barber/shared/functions$": "<rootDir>/apps/api/src/common/function-catalog.ts",
     "^@barber/shared/utils$": "<rootDir>/libs/shared/utils/src/index.ts",
   },

@@ -35,7 +35,7 @@ export class TeamLocalPolicyService {
       const central = new Set(targetRoles.flatMap(role => role?.permissions || []));
       const licensed = new Set(team.functions.filter(fn => fn.delegable).map(fn => fn.key));
       const permissions = [...new Set(body.permissions)];
-      if (permissions.some(key => !canUseLocalFunction(actor, key) || !central.has(key) || !licensed.has(key) || (body.role === "collaborator" && !["appointments.read.own", "appointments.update.own"].includes(key)))) throw new ForbiddenException("Le restrizioni locali devono restare entro ruolo, licenza e delega Connect");
+      if (permissions.some(key => !canUseLocalFunction(actor, key) || !central.has(key) || !licensed.has(key) || (body.role === "collaborator" && !["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key)))) throw new ForbiddenException("Le restrizioni locali devono restare entro ruolo, licenza e delega Connect");
       return this.prisma.$transaction(async tx => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"team-policy:" + tenantId}, 0))`;
         const user = await tx.user.findFirst({ where: { id, tenantId, role: { in: [...editableRoles] } }, include: { collaborator: true } });
@@ -48,7 +48,7 @@ export class TeamLocalPolicyService {
           if (!professional) throw new NotFoundException("Professionista non disponibile in questa attività");
           if (professional.userId && professional.userId !== id) throw new ConflictException("Questo professionista è già associato a un altro account");
         }
-        if (body.role === "collaborator" && permissions.length && !collaboratorId) throw new BadRequestException("Associa un professionista per abilitare l’agenda personale");
+        if (permissions.some(key => ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key)) && !collaboratorId) throw new BadRequestException("Associa un professionista per abilitare l’agenda personale");
         if (body.collaboratorId !== undefined) {
           await tx.collaborator.updateMany({ where: { tenantId, userId: id }, data: { userId: null } });
           if (collaboratorId) await tx.collaborator.update({ where: { id: collaboratorId, tenantId }, data: { userId: id } });

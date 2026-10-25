@@ -1,7 +1,8 @@
+import type { PersonalDashboard } from "@barber/shared/personal";
 import { SessionStore } from "./session.store";
 import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
-import { Observable, forkJoin, of, map } from "rxjs";
+import { Observable, forkJoin, of, map, throwError } from "rxjs";
 import { ADMIN_API_URL } from "./api-config";
 
 @Injectable({ providedIn: "root" })
@@ -74,6 +75,17 @@ export class AdminApiService {
       collaborators: this.loadCollaboratorsPage(1),
       customers: this.loadCustomersPage(1),
     });
+  }
+
+  loadPersonalDashboard(period: "day" | "week" | "month", date = "", page = 1): Observable<PersonalDashboard> {
+    if (!this.session.can("appointments.read.own")) return throwError(() => new Error("Agenda personale non abilitata"));
+    const query = new URLSearchParams({ period, page: String(page) });
+    if (date) query.set("date", date);
+    return this.http.get<PersonalDashboard>(`${ADMIN_API_URL}/dashboard/personal?${query}`);
+  }
+
+  updatePersonalAppointmentStatus(id: string, status: string): Observable<unknown> {
+    return this.http.post(`${ADMIN_API_URL}/appointments/${encodeURIComponent(id)}/status`, { status });
   }
 
   loadAppointments(): Observable<any[]> {

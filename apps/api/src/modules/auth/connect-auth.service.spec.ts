@@ -24,7 +24,8 @@ describe("ALORA SDK HTTP orchestration", () => {
   const original = { ...process.env },
     origin = "http://localhost:5174",
     email = "user@example.test";
-  const signIn = jest.fn(),
+  const configurationSync = jest.fn(),
+    signIn = jest.fn(),
     submit = jest.fn(),
     callback = jest.fn(),
     exchange = jest.fn(),
@@ -42,6 +43,7 @@ describe("ALORA SDK HTTP orchestration", () => {
     jest.mocked(closeConnectApplication).mockResolvedValue(undefined);
     Object.assign(process.env, {
       NODE_ENV: "test",
+      ALORA_CONNECT_PRESENTER_ID: "synthetic-presenter",
       ALORA_CONNECT_APP_ID: "alora",
       ALORA_CONNECT_API_URL: "http://localhost:8088",
       ALORA_CONNECT_ISSUER: "http://localhost:8080/realms/eulab",
@@ -50,7 +52,9 @@ describe("ALORA SDK HTTP orchestration", () => {
       ALORA_AUTH_RETURN_URL: origin + "/admin/#/login",
       ALORA_CONNECT_ENCRYPTION_KEY: "a".repeat(64),
     });
+    configurationSync.mockResolvedValue({ status: "ready", appId: "alora" });
     jest.mocked(connectApplication).mockResolvedValue({
+      configuration: { sync: configurationSync },
       auth: { signIn, callback, exchange },
       migration: { submit },
     } as unknown as ConnectApplication);
@@ -100,6 +104,12 @@ describe("ALORA SDK HTTP orchestration", () => {
       "opaque",
       expect.objectContaining({ maxAge: 600000, httpOnly: true }),
     );
+  });
+  it("syncs approved presenter configuration through the same SDK before sign-in", async () => {
+    signIn.mockResolvedValue({ status: "pending", request: { requestId: "fixture", state: "pending" }, nextAction: "wait" });
+    await service.signIn({ email }, request, response);
+    expect(configurationSync).toHaveBeenCalledTimes(1);
+    expect(signIn).toHaveBeenCalledTimes(1);
   });
   it("does not expose local names from an unverified pending lookup", async () => {
     signIn.mockResolvedValue({

@@ -95,6 +95,11 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
       "name": "Utenze locali",
     },
     {
+      "description": "Consultare i valori registrati delle righe servizio attribuite al proprio professionista; esclusi incassi e compensi.",
+      "key": "dashboard.personal.values.read",
+      "name": "Valori dei propri servizi",
+    },
+    {
       "description": "Gestire ruoli, assegnazioni e accesso alla sola installazione entro la delega Connect.",
       "key": "team.manage",
       "name": "Ruoli e accessi della squadra",
@@ -121,6 +126,6 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
     },
   ],
   "schemaVersion": 1,
-  "version": 2,
+  "version": 3,
 }
 `;

@@ -4,6 +4,7 @@ export type OperationDefinition =
   | { kind: "function"; key: FunctionKey; own?: FunctionKey }
   | { kind: "public" | "session" | "tenant-context" | "platform" | "disabled" };
 export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
+  "PersonalDashboardController.overview": { kind: "function", key: "appointments.read.own", own: "appointments.read.own" },
   "TeamController.localUsers": { kind: "function", key: "users.manage" },
   "TeamController.saveLocalPolicy": { kind: "function", key: "team.manage" },
   "TeamController.overview": { kind: "function", key: "users.manage" },

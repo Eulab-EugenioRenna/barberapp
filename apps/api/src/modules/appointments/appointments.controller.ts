@@ -1,3 +1,6 @@
+import type { Prisma } from "@prisma/client";
+import { PERSONAL_APPOINTMENT_SELECT, PERSONAL_STATUS_TRANSITIONS } from "../../common/personal-appointment";
+import { canUseLocalFunction, requiresOwnAppointmentScope } from "../../common/function-catalog";
 import {
   LegacyWriteDto,
   AppointmentStatusDto,
@@ -5,6 +8,7 @@ import {
 import { assertTenantReferences } from "../../common/tenant-references";
 import {
   BadRequestException,
+  ForbiddenException,
   Body,
   Controller,
   Delete,
@@ -237,13 +241,12 @@ export class AppointmentsController {
     const tenantId = requireTenantId(session);
     const from = query["from"] ? new Date(query["from"]) : undefined;
     const to = query["to"] ? new Date(query["to"]) : undefined;
-    const ownCollaboratorId =
-      session.user?.role === "collaborator"
-        ? session.user.collaboratorId
-        : null;
+    const personal = requiresOwnAppointmentScope(session.user, "appointments.read.all");
+    const ownCollaboratorId = personal ? session.user?.collaboratorId : null;
+    if (personal && !ownCollaboratorId) throw new ForbiddenException("Professionista non associato");
     const where = {
       tenantId,
-      ...(ownCollaboratorId ? { collaboratorId: ownCollaboratorId } : {}),
+      ...(ownCollaboratorId ? { collaboratorId: ownCollaboratorId, collaborator: { tenantId, userId: session.user!.id, isActive: true }, customer: { tenantId }, service: { tenantId }, OR: [{ roomId: null }, { room: { tenantId } }] } : {}),
       ...(from && !Number.isNaN(from.getTime())
         ? { startsAt: { gte: from } }
         : {}),
@@ -260,51 +263,27 @@ export class AppointmentsController {
       : `:range:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`;
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.appointmentsList(tenantId)}:${ownCollaboratorId ?? "all"}${cacheSuffix}:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`,
+      `${cacheKeys.appointmentsList(tenantId)}:${ownCollaboratorId ? "ownv2:" + ownCollaboratorId : "all"}${cacheSuffix}:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`,
       CACHE_TTL_SECONDS.appointments,
       async () => {
-        const include = {
-          customer:
-            session.user?.role === "collaborator"
-              ? {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    phone: true,
-                  },
-                }
-              : true,
-          service: true,
-          collaborator:
-            session.user?.role === "collaborator"
-              ? {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    calendarColor: true,
-                  },
-                }
-              : true,
-          room: true,
-        } as const;
+        const findAppointments = (args: Prisma.AppointmentFindManyArgs) => this.prisma.appointment.findMany(args);
+        const projection = personal ? { select: PERSONAL_APPOINTMENT_SELECT } : { include: { customer: true, service: true, collaborator: true, room: true } as const };
 
         if (!paginated) {
-          return this.prisma.appointment.findMany({
+          return findAppointments({
             where,
             orderBy: { startsAt: "asc" },
-            include,
+            ...projection,
           });
         }
 
         const [items, total] = await Promise.all([
-          this.prisma.appointment.findMany({
+          findAppointments({
             where,
             orderBy: { startsAt: "desc" },
             skip,
             take,
-            include,
+            ...projection,
           }),
           this.prisma.appointment.count({ where }),
         ]);
@@ -460,47 +439,19 @@ export class AppointmentsController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    const personal = requiresOwnAppointmentScope(session.user, "appointments.read.all");
+    if (personal && !session.user?.collaboratorId) throw new ForbiddenException("Professionista non associato");
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.appointmentDetail(tenantId, id)}:${session.user?.role === "collaborator" ? "own:" + session.user.collaboratorId : "all"}`,
+      `${cacheKeys.appointmentDetail(tenantId, id)}:${personal ? "ownv2:" + session.user!.collaboratorId : "all"}`,
       CACHE_TTL_SECONDS.appointments,
-      () =>
-        this.prisma.appointment.findFirst({
-          where: {
-            id,
-            tenantId,
-            ...(session.user?.role === "collaborator"
-              ? { collaboratorId: session.user.collaboratorId! }
-              : {}),
-          },
-          include: {
-            customer:
-              session.user?.role === "collaborator"
-                ? {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      phone: true,
-                    },
-                  }
-                : true,
-            service: true,
-            collaborator:
-              session.user?.role === "collaborator"
-                ? {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      calendarColor: true,
-                    },
-                  }
-                : true,
-            room: true,
-            cancellations: true,
-          },
-        }),
+      () => {
+        const args: Prisma.AppointmentFindFirstArgs = {
+          where: { id, tenantId, ...(personal ? { collaboratorId: session.user!.collaboratorId!, collaborator: { tenantId, userId: session.user!.id, isActive: true }, customer: { tenantId }, service: { tenantId }, OR: [{ roomId: null }, { room: { tenantId } }] } : {}) },
+          ...(personal ? { select: PERSONAL_APPOINTMENT_SELECT } : { include: { customer: true, service: true, collaborator: true, room: true, cancellations: true } }),
+        };
+        return this.prisma.appointment.findFirst(args);
+      },
     );
   }
 
@@ -675,14 +626,21 @@ export class AppointmentsController {
     );
     const user = requireUser(session);
 
+    const tenantId = requireTenantId(session);
+    const personal = requiresOwnAppointmentScope(user, "appointments.update.all");
+    if (personal && (!user.collaboratorId || !canUseLocalFunction(user, "appointments.update.own"))) throw new ForbiddenException("Esecuzione personale non abilitata");
+    const scope = { id, tenantId, ...(personal ? { collaboratorId: user.collaboratorId!, collaborator: { tenantId, userId: user.id, isActive: true }, customer: { tenantId }, service: { tenantId }, OR: [{ roomId: null }, { room: { tenantId } }] } : {}) };
+    let previousStatus: AppointmentStatus | undefined;
+    if (personal) {
+      const current = await this.prisma.appointment.findFirst({ where: scope, select: { status: true } });
+      if (!current) throw new ForbiddenException("Appuntamento non assegnato");
+      if (!PERSONAL_STATUS_TRANSITIONS[current.status]?.includes(body.status)) throw new ForbiddenException("Questo stato richiede l’intervento del salone");
+      previousStatus = current.status as AppointmentStatus;
+    }
     const updated = await this.prisma.appointment.update({
-      where: { id, tenantId: requireTenantId(session) },
-      data: {
-        status: body.status,
-        updatedById: user.id,
-        finalPrice:
-          body.status === AppointmentStatus.Completed ? undefined : undefined,
-      },
+      where: { ...scope, ...(previousStatus ? { status: previousStatus } : {}) },
+      data: { status: body.status, updatedById: user.id },
+      ...(personal ? { select: canUseLocalFunction(user, "appointments.read.own") ? PERSONAL_APPOINTMENT_SELECT : { id: true, status: true } } : {}),
     });
 
     if (body.status === AppointmentStatus.Confirmed) {
@@ -772,6 +730,8 @@ export class AppointmentsController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    const personal = requiresOwnAppointmentScope(session.user, "appointments.read.all");
+    if (personal && !session.user?.collaboratorId) throw new ForbiddenException("Professionista non associato");
 
     return this.cacheService.getOrSet(
       cacheKeys.appointmentCancellationPolicy(tenantId, id),
@@ -781,8 +741,8 @@ export class AppointmentsController {
           where: {
             id,
             tenantId,
-            ...(session.user?.role === "collaborator"
-              ? { collaboratorId: session.user.collaboratorId! }
+            ...(personal
+              ? { collaboratorId: session.user!.collaboratorId!, collaborator: { tenantId, userId: session.user!.id, isActive: true } }
               : {}),
           },
         });

@@ -125,6 +125,12 @@ export const ALORA_FUNCTIONS = [
     legacy: true,
   },
   {
+    key: "dashboard.personal.values.read",
+    name: "Valori dei propri servizi",
+    description: "Consultare i valori registrati delle righe servizio attribuite al proprio professionista; esclusi incassi e compensi.",
+    legacy: false,
+  },
+  {
     key: "team.manage",
     name: "Ruoli e accessi della squadra",
     description: "Gestire ruoli, assegnazioni e accesso alla sola installazione entro la delega Connect.",
@@ -159,7 +165,7 @@ export const ALORA_FUNCTIONS = [
   },
 ] as const satisfies readonly FunctionDefinition[];
 export type FunctionKey = (typeof ALORA_FUNCTIONS)[number]["key"];
-export const FUNCTION_MATRIX_VERSION = 2;
+export const FUNCTION_MATRIX_VERSION = 3;
 export function canUseLocalFunction(
   user: LocalIdentity | null | undefined,
   key: string,
@@ -171,18 +177,20 @@ export function canUseLocalFunction(
   // In SSO sessions a local role/alias cannot grant a function denied by Connect.
   if (user.connectFunctions && !user.connectFunctions.includes(key))
     return false;
-  if (user.role === "collaborator")
-    return (
-      !!user.collaboratorId &&
-      ["appointments.read.own", "appointments.update.own"].includes(key) &&
-      (!user.permissionsConfigured || !!user.permissions?.includes(key))
-    );
+  if (user.role === "collaborator") {
+    if (!user.collaboratorId) return false;
+    if (key === "dashboard.personal.values.read") return !!user.permissionsConfigured && !!user.permissions?.includes(key);
+    return ["appointments.read.own", "appointments.update.own"].includes(key) && (!user.permissionsConfigured || !!user.permissions?.includes(key));
+  }
   if (user.role === "owner")
     return definition.legacy || !!user.connectFunctions?.includes(key);
   if (!["manager", "reception"].includes(user.role)) return false;
   return [key, ...(definition.aliases ?? [])].some((permission) =>
     user.permissions?.includes(permission),
   );
+}
+export function requiresOwnAppointmentScope(user: LocalIdentity | null | undefined, companyPermission: FunctionKey): boolean {
+  return user?.role === "collaborator" || !canUseLocalFunction(user, companyPermission);
 }
 export function createFunctionMatrix(appId: string) {
   if (!/^[a-z][a-z0-9_.:-]{0,79}$/.test(appId))

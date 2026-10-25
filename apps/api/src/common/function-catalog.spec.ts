@@ -70,6 +70,13 @@ describe("ALORA function catalog", () => {
     expect(canUseLocalFunction({ ...legacy, permissionsConfigured: true, permissions: ["dashboard.revenue.read"], connectFunctions: ["dashboard.revenue.read"] }, "dashboard.revenue.read")).toBe(false);
   });
 
+  it("requires explicit local configuration and Connect grant for personal economic values", () => {
+    const user = { role: "collaborator", collaboratorId: "own", permissions: ["dashboard.personal.values.read"], connectFunctions: ["dashboard.personal.values.read"] };
+    expect(canUseLocalFunction(user, "dashboard.personal.values.read")).toBe(false);
+    expect(canUseLocalFunction({ ...user, permissionsConfigured: true }, "dashboard.personal.values.read")).toBe(true);
+    expect(canUseLocalFunction({ ...user, permissionsConfigured: true, connectFunctions: [] }, "dashboard.personal.values.read")).toBe(false);
+  });
+
   it("projects only Connect contract fields, with a stable versioned document", () => {
     const matrix = createFunctionMatrix("alora-test");
     expect(Object.keys(matrix).sort()).toEqual([

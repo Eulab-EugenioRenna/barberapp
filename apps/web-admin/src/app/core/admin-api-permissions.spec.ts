@@ -49,6 +49,14 @@ describe("permission-aware admin data loading", () => {
     expect(data["services"]).toEqual([{ id: "s1", name: "Servizio" }]);
     expect(data["customers"]).toEqual({ items: [], total: 0, hasMore: false });
   });
+  it("loads the personal dashboard with own-only access and never calls company reports", async () => {
+    await firstValueFrom(api(["appointments.read.own"]).loadPersonalDashboard("week", "2026-10-25"));
+    expect(requests).toEqual(["/api/dashboard/personal?period=week&page=1&date=2026-10-25"]);
+  });
+  it("does not fetch a personal dashboard without own read permission", async () => {
+    await expect(firstValueFrom(api(["clients.read.full"]).loadPersonalDashboard("week"))).rejects.toThrow("Agenda personale non abilitata");
+    expect(requests).toEqual([]);
+  });
   it("does not issue forbidden secondary requests during global refresh", async () => {
     const service = api(["clients.read.full"]);
     await firstValueFrom(service.loadAdminCoreData());
