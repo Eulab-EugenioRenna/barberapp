@@ -15,6 +15,7 @@ export class LoginEmailDto {
   email!: string;
 }
 export class LoginDto extends LoginEmailDto {
+  @Transform(({ value }) => value === "" ? undefined : value)
   @IsOptional() @IsString() @Length(1, 4096) password?: string;
 }
 export class SignupDto extends LoginEmailDto {
