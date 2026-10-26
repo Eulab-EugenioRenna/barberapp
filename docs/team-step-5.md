@@ -2,6 +2,36 @@
 
 Stato storico al 25 ottobre 2026 (aggiornamento 0.11.0 in fondo): implementazione avviata su autorizzazione «procedi con il piano». Non concluso. L’accesso all’admin tramite Connect è stato confermato dall’utente nello Step 4; rinnovo, revoca e accettazione di produzione restano prove distinte.
 
+## Stato corrente — 26 ottobre, collaudo consumer reale
+
+Il Docker Connect è **schema 014**, con API/bootstrap della consegna, e ALORA
+esegue la candidata SDK **0.11.0** autorizzata da tarball. Catalogo versione 3,
+24 funzioni. L’utente ha abilitato le funzioni in Connect: non sono state modificate
+le licenze o i ruoli degli account preesistenti durante il collaudo.
+
+Passati sul consumer reale: creazione di ruolo/account dalla UI, login
+collaboratore e manager con Keycloak, mapping esplicito, agenda/orari personali,
+limiti locali ulteriori rispetto a Connect, valori dei soli servizi attribuiti,
+revoca di una sessione già aperta e riassegnazione esplicita per riattivare.
+Sei mutazioni fuori delega del manager restituiscono 403 conservando la sessione.
+Una risposta browser persa dopo creazione reale è recuperata sullo stesso ID,
+senza ripetizione automatica, duplicati o reset della password.
+
+[Evidenza strutturata](verification/team-real-consumer.json) e
+[checklist aggiornata](team-step-5-acceptance.md). Sono test del Docker effettivo,
+con identità reali e righe operative sintetiche; non sono prove del booking o di
+produzione. I tre account, le identità provider, i tre ruoli e i dati temporanei
+sono rimossi. Ripristino dei due backup provato in database isolati poi eliminati:
+14 tabelle ALORA e 15 Connect riconciliate, escludendo soltanto User.updatedAt e i
+due timestamp di controllo/sincronizzazione catalogo. Audit e sessioni runtime
+sono esclusi da questo confronto; lo storico audit viene conservato.
+
+La suite del sorgente corrente comprende 190 test su 34 suite. Step 5 **ancora
+aperto** per i sottocasi non eseguiti nella checklist e accettazione operativa.
+Le sezioni successive descrivono la sequenza storica: i riferimenti a schema 013,
+metodo SDK mancante o collaudo riservato esclusivamente all’utente sono superati
+dall’aggiornamento e dall’autorizzazione al collaudo del consumer.
+
 ## Primo blocco implementato: amministrazione delegata
 
 La pagina `/admin/#/team` («Accessi squadra») legge account e ruoli dell’installazione autenticata e permette creazione/modifica/eliminazione dei ruoli, sostituzione delle assegnazioni, revoca e ripristino dell’accesso ALORA. Le modifiche richiedono conferma dove distruttive e non vengono ripetute automaticamente. Account e assegnazioni fuori dalla delega non vengono proposti come modificabili; Connect applica comunque i controlli autorevoli sulle API.
@@ -131,4 +161,4 @@ Migrazione ALORA 20261026000000_team_account_intents: sola nuova tabella con FK,
 
 Suite ALORA 179 test su 33 suite, build API/admin, lint e Prisma validate passati. scripts/check-team-accounts.cjs usa PostgreSQL isolato obbligatoriamente barber_team_accounts_test_<cifre>, identità/SDK sostituiti da fixture: verifica profilo prima della chiamata, collisioni, rollback/finalizzazione, esito incoerente, password non persistita e invariata in ripetizione, sospensioni, policy/delega e ripresa sullo stesso ID. Non è un test del provider o del nuovo SDK contro Connect reale. I collaudi PostgreSQL/Keycloak della consegna Connect restano evidenze del produttore, distinte dal consumer ALORA.
 
-Il Docker Connect effettivo è stato letto senza modificarlo: schema **013**. Prima del test C1 occorre aggiornare quell’API, applicare schema **014** e bootstrap Keycloak degli attributi riservati secondo docs/DELEGATED-ACCOUNTS-STEP-5.md del repository Connect. Non è stato aggiornato il server Connect, eseguito un login o creato un utente reale. Step 5 ancora aperto per tale aggiornamento concordato e collaudo dell’utente; nessuna distribuzione in produzione.
+Il controllo iniziale aveva rilevato schema 013. L’aggiornamento successivo del server a schema 014/API/bootstrap è stato eseguito dall’agente Connect su indicazione dell’utente. Il consumer ALORA è poi stato collaudato realmente: creazione, login e recupero passati nei limiti elencati in apertura. Nessuna distribuzione in produzione; sottocasi ancora aperti nella checklist.

@@ -1,6 +1,43 @@
 # Collaudo operativo Step 5 — Ruoli e squadra
 
-Stato: **da eseguire dall’utente**, non prova già superata. Le verifiche automatiche e PostgreSQL sintetiche sono registrate in [team-step-5.md](team-step-5.md). Accesso SSO all’admin già confermato dall’utente nello Step 4; questo non certifica i casi seguenti.
+Stato: **collaudo tecnico del consumer eseguito in parte sul Docker reale**, dopo
+l’autorizzazione dell’utente al collaudo ALORA con Connect schema 014. Non equivale
+a chiusura dello Step 5 o accettazione di produzione.
+[Evidenze e perimetro](verification/team-real-consumer.json).
+
+## Esiti correnti — 26 ottobre 2026
+
+| Caso | Evidenza reale acquisita | Parte ancora da completare |
+| --- | --- | --- |
+| R1 | Squadra 200/canManage dopo abilitazione dell’utente in Connect | Accettazione finale utente |
+| R2 | Creazione ruolo dalla UI entro delega | Modifica positiva dalla UI |
+| R3 | Manager ristretto: creazione/modifica/eliminazione ruolo e assegnazione/revoca/restore del target fuori delega: sei 403, sessione valida, nessuna modifica al target | — |
+| R4 | Assegnazioni esplicite sull’account di prova | Destinatario con accesso anche a una seconda applicazione |
+| R5 | Revoca elimina i ruoli; ripristino con assegnazione esplicita | Deselezione manuale di tutti i ruoli e conferma UI |
+| R6–R7 | Revoca dalla UI nega la sessione già aperta; riassegnazione dalla UI e nuovo login riusciti, identità conservata | — |
+| L1–L2 | Profilo personale limitato; zero permessi locali nega API e indirizza ad Accesso da configurare | — |
+| L3 | Professionista di altra azienda rifiutato, associazione precedente conservata | Collisione con professionista già occupato |
+| L4 | Associazione corrente del titolare conservata | Comando UI di associazione/rimozione; non si è modificato il titolare esistente |
+| P1–P2 | Una sola assegnazione personale e solo turno proprio nella settimana di prova | Navigazione giorno/mese, paginazione e altre eccezioni nell’ambiente effettivo |
+| P3 | Senza consenso locale valori null anche con concessione Connect; con consenso locale 123,45 €, esclusi prodotto e servizio altrui; ricavi aziendali 403 | — |
+| P4 | Dopo concessione locale esplicita solo transizione propria; altri incarichi e transizione inversa vietati | Conferma della transizione dalla UI |
+| P5 | Caso concorrente coperto dalle fixture PostgreSQL documentate | Riassegnazione concorrente sul consumer effettivo |
+| P6 | Manager limitato dalla policy locale anche con concessione centrale | Manager/reception con propria assegnazione personale |
+| I1 | Altra azienda: lettura/modifica appuntamento e associazione professionista negate | Altri percorsi della checklist multi-azienda |
+| U1 | Agenda personale a 375×812, 768×1024, 1024×768, 1366×900: nessun overflow orizzontale, sezione orari visibile; screenshot telefono ispezionato | Interazione completa con form squadra/agenda e dispositivi reali |
+| C1 | Creazione UI → SDK → provider/mapping → login personale; nessuna password provider nel suo hash locale; connectAcceptedAt valorizzato al primo login. Risposta browser persa recuperata con stesso ID e password originale, nessun retry automatico o duplicato | Senza password iniziale, rifiuto password provider e altri conflitti/recuperi remoti elencati sotto |
+
+I test usano tre nuove identità di prova, un ruolo personale, uno per i valori e
+uno per il manager ristretto. Nessun privilegio di un account preesistente è
+alterato. Tutte le fixture sono state rimosse tramite API amministrativa Connect
+per provider/mapping/ruoli e transazione locale per i dati ALORA; cache coinvolte
+invalidate. I backup di entrambi i database sono ripristinati in database isolati,
+poi eliminati. Riconciliazione: 14 tabelle ALORA e 15 Connect; le sole differenze
+ammesse sono i timestamp di login User.updatedAt e di controllo/sync catalogo.
+Audit e record runtime di sessione sono fuori dal confronto; l’audit è conservato.
+Il test della risposta persa riguarda il tratto ALORA→browser, non simula un
+COMMIT remoto perso. Gli appuntamenti/conti sono fixture SQL, non prenotazioni
+passate dal motore operativo. Nessun collaudo di produzione o PWA nativa.
 
 ## Ambiente e prerequisiti
 
@@ -38,10 +75,13 @@ Se un prerequisito manca, segnare il caso «bloccato» e indicare quale. Non cre
 
 Per le prove API usare esclusivamente sessioni di collaudo e ID noti delle fixture. Non confondere un link nascosto con una protezione backend: annotare lo stato HTTP delle richieste negate. Gli stati terminali degli appuntamenti non vanno ripristinati artificialmente; usare un altro appuntamento di prova.
 
-## C1 — Nuovo account collaboratore (implementato, collaudo pendente)
+## C1 — Nuovo account collaboratore (percorso centrale verificato, sottocasi aperti)
 
-L’utente ha approvato la candidata locale SDK 0.11.0 per lo sviluppo. Il consumer ALORA ora chiama application.team.createUser; non è più bloccato per assenza del metodo. Prima della prova aggiornare il Docker Connect effettivo, ancora rilevato a schema 013: servono API della consegna, migrazione 014 e bootstrap degli attributi Keycloak riservati. [Consegna del produttore](../../eulab%20connect/docs/DELEGATED-ACCOUNTS-STEP-5.md). Nessuna di queste operazioni sul server Connect è implicita nell’installazione del tarball ALORA.
-
+L’utente ha approvato la candidata locale SDK 0.11.0 per lo sviluppo e il collaudo
+consumer. Il Docker Connect è ora verificato a schema 014; il caso centrale è
+passato come indicato nella tabella. I sottocasi seguenti restano requisiti
+separati: quelli non coperti non sono dichiarati superati.
+[Consegna produttore](../../eulab%20connect/docs/DELEGATED-ACCOUNTS-STEP-5.md).
 1. In Accessi squadra scegliere Crea account, compilare nome/cognome/email e ambito operativo, scegliere ruoli Connect concedibili e selezionare i permessi locali. Per l’agenda personale associare un professionista libero e attivo. Nessuna unione con un account esistente per email.
 2. Confermare con password iniziale di collaudo facoltativa. Verificare che la UI svuoti il campo. Se omessa, verificare l’indicazione di configurazione dell’accesso provider ancora necessaria; non è inviata un’email da questo form.
 3. Se rifiutata per policy, verificare sessione operatore conservata, profilo inattivo salvato e possibilità di riprendere lo stesso ID da Creazioni da completare. Non cambiare anagrafica/ruoli di una creazione già inviata; errori di binding o identità richiedono riconciliazione esplicita.
@@ -55,4 +95,4 @@ La preassegnazione EULAB Admin o un login locale non sostituiscono questo caso. 
 
 Per ogni ID registrare esito (non eseguito / passato / fallito / bloccato), ruolo e azienda di prova, browser/formato, comportamento osservato e sola evidenza priva di segreti. Data e versione devono identificare il collaudo; eventuali concessioni manuali vanno esplicitate. In caso di errore di rete dopo una scrittura, rileggere lo stato prima di un nuovo invio.
 
-Lo Step 5 si chiude solo dopo C1 e i casi applicabili superati, senza sostituire l’accettazione reale con le 179 prove automatiche attuali. Step 6 e successivi restano nel piano; il passaggio di fase segue evolve.md e richiede autorizzazione. Nessuna distribuzione in produzione è implicita nel collaudo locale.
+Lo Step 5 si chiude solo dopo C1 e i casi applicabili superati, senza sostituire l’accettazione reale con le 190 prove automatiche del sorgente corrente. Step 6 e successivi restano nel piano; il passaggio di fase segue evolve.md e richiede autorizzazione. Nessuna distribuzione in produzione è implicita nel collaudo locale.
