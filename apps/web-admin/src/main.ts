@@ -4,15 +4,18 @@ import { provideRouter, withHashLocation } from "@angular/router";
 import { AdminRootComponent } from "./app/admin-root.component";
 import { adminRoutes } from "./app/admin.routes";
 import { authInterceptor } from "./app/core/auth.interceptor";
+import { prepareRemoteOnly } from "./app/core/remote-only";
 import { AdminPwaService } from "./app/core/pwa.service";
 
-bootstrapApplication(AdminRootComponent, {
-  providers: [
-    provideRouter(adminRoutes, withHashLocation()),
-    provideHttpClient(withInterceptors([authInterceptor])),
-  ],
-})
-  // Instanzia il servizio PWA all'avvio per registrare il service worker e
-  // avviare il controllo aggiornamenti, anche prima del login.
+prepareRemoteOnly(window)
+  .then(() =>
+    bootstrapApplication(AdminRootComponent, {
+      providers: [
+        provideRouter(adminRoutes, withHashLocation()),
+        provideHttpClient(withInterceptors([authInterceptor])),
+      ],
+    }),
+  )
+  // Manifest/installazione e aggiornamenti; il worker gestisce solo push, mai richieste HTTP.
   .then((appRef) => appRef.injector.get(AdminPwaService))
   .catch((error) => console.error(error));

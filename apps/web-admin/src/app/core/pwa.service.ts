@@ -12,7 +12,7 @@ const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
 const OPEN_MODAL_SELECTOR = '[role="dialog"][aria-modal="true"]';
 
 /**
- * PWA installabile senza cache offline: richieste sempre in rete.
+ * PWA installabile con worker per le push, senza cache o intercettazione HTTP.
  * I deploy vengono rilevati confrontando index.html; il reload attende
  * la chiusura delle modali, mentre le cache storiche vengono eliminate.
  */
@@ -89,7 +89,6 @@ export class AdminPwaService {
       }
     });
 
-    this.registerServiceWorker(window);
     void this.clearCaches();
     void this.checkForUpdate();
     this.updateTimer = setInterval(
@@ -154,26 +153,6 @@ export class AdminPwaService {
     return false;
   }
 
-  private registerServiceWorker(window: Window): void {
-    const navigator = window.navigator as Navigator & {
-      serviceWorker?: ServiceWorkerContainer;
-    };
-
-    if (!navigator.serviceWorker) {
-      return;
-    }
-
-    navigator.serviceWorker
-      .register("service-worker.js", {
-        scope: "./",
-        updateViaCache: "none",
-      })
-      .then((registration) => registration.update().catch(() => undefined))
-      .catch(() => {
-        // La PWA resta comunque utilizzabile senza service worker.
-      });
-  }
-
   private async clearCaches(): Promise<void> {
     const window = this.document.defaultView;
     if (!window) return;
@@ -181,7 +160,7 @@ export class AdminPwaService {
       const keys = await window.caches?.keys();
       await Promise.all((keys ?? []).map((key) => window.caches.delete(key)));
     } catch {
-      // The worker also clears legacy caches when activated.
+      // HTTP responses remain no-store even when browser storage is unavailable.
     }
     window.navigator.serviceWorker?.controller?.postMessage({
       type: "CLEAR_CACHES",

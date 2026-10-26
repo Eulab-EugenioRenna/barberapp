@@ -62,7 +62,7 @@ Il processo è standardizzato nel contratto e il consumer ha eliminato le duplic
 
 ## PWA e risorse sviluppo
 
-Il service worker resta installabile ma usa solo la rete con cache no-store e cancella le precedenti Cache Storage all’attivazione. Anche Nginx invia Cache-Control: no-store. Non esiste un fallback offline. Le due risorse di sviluppo Vite sono esposte con percorsi esatti (HTTP 200), senza un proxy generico verso il filesystem. Dopo il deploy chiudere e riaprire la PWA per acquisire il nuovo worker.
+Il service worker gestisce esclusivamente push e clic sulle notifiche, senza handler fetch. Prima del bootstrap viene aggiornato e vengono cancellate le precedenti Cache Storage. Pagine e API usano la normale rete del browser. Anche Nginx invia Cache-Control: no-store. Non esiste un fallback offline. Le due risorse di sviluppo Vite sono esposte con percorsi esatti (HTTP 200), senza un proxy generico verso il filesystem. Dopo il deploy chiudere e riaprire la PWA per acquisire il nuovo worker.
 
 ### Diagnostica callback
 

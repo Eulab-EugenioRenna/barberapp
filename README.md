@@ -122,14 +122,14 @@ DEMO_RESET_CONFIRM=yes npm run demo:create -- --reset
 L'admin e installabile come PWA (`apps/web-admin/public/manifest.webmanifest`).
 
 La PWA usa **solo la rete, senza cache offline**. Il service worker
-(`apps/web-admin/public/service-worker.js`) non salva né recupera risposte:
-usa `fetch` con `cache: "no-store"` e cancella tutte le cache precedenti
-all’attivazione. L’app elimina le vecchie cache anche all’avvio. Nginx
-invia `Cache-Control: no-store`; senza rete il contenuto non viene sostituito
-con copie precedenti. L’installazione PWA resta disponibile.
+(`apps/web-admin/public/service-worker.js`) gestisce esclusivamente eventi push
+e clic sulle notifiche: non intercetta le richieste HTTP e non conserva risposte.
+Prima dell’avvio dell’app viene aggiornato il worker e vengono eliminate le cache
+storiche, mantenendo sessione e sottoscrizioni push. Nginx invia `Cache-Control: no-store`. Senza rete, pagine e API non hanno fallback. Installazione e manifest
+restano disponibili. Dettagli e limiti del collaudo: [PWA remota](docs/pwa-remote-only.md).
 
 Quando viene pubblicato un nuovo deploy, l'app confronta il build in esecuzione
-con `index.html` remoto, invalida le cache del service worker e si ricarica
+con `index.html` remoto, elimina eventuali cache storiche e si ricarica
 automaticamente. Se e aperto un modale, il refresh resta in coda fino alla
 chiusura dell'ultimo modale, cosi non interrompe un'operazione in corso.
 
