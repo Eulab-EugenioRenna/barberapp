@@ -1,6 +1,6 @@
 # Step 5 — Ruoli e squadra
 
-Stato 25 ottobre 2026: implementazione avviata su autorizzazione «procedi con il piano». Non concluso. L’accesso all’admin tramite Connect è stato confermato dall’utente nello Step 4; rinnovo, revoca e accettazione di produzione restano prove distinte.
+Stato storico al 25 ottobre 2026 (aggiornamento 0.11.0 in fondo): implementazione avviata su autorizzazione «procedi con il piano». Non concluso. L’accesso all’admin tramite Connect è stato confermato dall’utente nello Step 4; rinnovo, revoca e accettazione di produzione restano prove distinte.
 
 ## Primo blocco implementato: amministrazione delegata
 
@@ -29,7 +29,7 @@ Verificare manualmente un ruolo entro delega, un tentativo fuori delega, assegna
 
 1. Implementata l’associazione esplicita e facoltativa di un professionista a un account già presente e collegato a Connect nella stessa azienda; nessuna unione per email. La creazione di nuovi account resta al punto 3.
 2. Implementata la configurazione delle restrizioni operative locali per manager/reception/collaboratori, intersecata con Connect e con la delega del chiamante. Collaudo dell’installazione reale ancora da eseguire.
-3. Creazione dell’account del collaboratore e mirror/provisioning: verificare il contratto esistente. Il mirror attuale crea local_links; il login-context richiede anche app_local_users. Non assumere che un mirror consenta da solo l’accesso sorgente e non costruire un onboarding parallelo per aggirare questo vincolo.
+3. Aggiornamento 26 ottobre: creazione account e ripresa esplicita implementate con la candidata SDK 0.11.0 autorizzata nello sviluppo. Richiesti aggiornamento operativo Connect a schema 014/API/bootstrap e collaudo C1. Analisi precedente: Il mirror attuale crea local_links; il login-context richiede anche app_local_users. Non assumere che un mirror consenta da solo l’accesso sorgente e non costruire un onboarding parallelo per aggirare questo vincolo.
 4. Dashboard personale consolidata con attività, righe servizio attribuite, valori separatamente autorizzati e aggiornamento dello stato operativo. Query/proiezioni/isolamento verificate su PostgreSQL sintetico; collaudo UI dell’utente pendente.
 5. Collaudo API/SDK/ruoli e browser sull’installazione effettiva prima della chiusura.
 
@@ -108,3 +108,27 @@ Suite completa 167/167 su 32 suite, build API/admin e lint passati. Esteso il me
 ## Collaudo e dipendenza corrente
 
 [Checklist operativa per l’utente](team-step-5-acceptance.md): prerequisiti, ruoli, policy locale, agenda/orari/valori personali, revoche, isolamento, responsive e criterio di chiusura. Tutti i casi manuali restano da eseguire; la creazione di un nuovo account (C1) è bloccata sul metodo SDK completo. Ricontrollati i tipi della distribuzione pubblica installata: mirrorUser accetta il solo profilo legacy, senza contesto applicativo/roleIds, e application.team.createUser non è disponibile. Non è stata creata una variante locale per aggirare il contratto. Il seguito richiede la consegna Connect o un’esplicita scelta dell’utente di affidare a questo agente l’estensione nel repository Connect.
+
+## 26 ottobre — Creazione delegata con candidata SDK 0.11.0
+
+L’utente ha autorizzato «Usa il tarball in sviluppo». Il checksum della consegna Connect coincide: b75d3c46ba8fbcf17dc522083f172abc3d07928c2f697d0f0c8ba182b6b749d5. package.json/lockfile e Docker usano vendor/eulab-connect-0.11.0.tgz; non è una pubblicazione npm o approvazione di produzione. La facciata è la stessa ConnectApplication: TeamService chiama application.team.createUser fuori da services, evitando di riacquisire il medesimo lock SDK. Nessuna copia di OIDC, sessioni, mapping o policy centrali.
+
+In Accessi squadra il titolare/delegato sceglie anagrafica, ruolo operativo ALORA (responsabile/reception/professionista), ruoli Connect concedibili, limiti locali e professionista facoltativo. Password iniziale facoltativa, rimossa dal campo a ogni invio, mai salvata. Se manca, l’esito segnala la configurazione provider necessaria; il form non dichiara di aver inviato email di attivazione. Le credenziali di un’identità esistente non sono reimpostate.
+
+API, tutte con team.manage e verifica SDK dell’installazione:
+
+- POST /team/accounts: ID UUID stabile generato dal form; nessun cliente/installazione/sorgente scelto dal browser.
+- GET /team/accounts/pending: creazioni locali da completare della sola azienda autenticata, senza credenziali.
+- POST /team/accounts/:id/resume: ripresa esplicita dal profilo/ruoli salvati; solo nuova password transitoria facoltativa.
+
+La nuova tabella TeamAccountIntent è una ricevuta locale dell’intento (profilo esistente per ID, ruoli iniziali, binding, data ed eventuale completamento). Non duplica gli stati di identità/pratica Connect. Il profilo locale viene prima salvato inattivo, con passwordHash casuale inutilizzabile e permissionsConfigured=true. Associazione e ricevuta sono atomiche sotto il lock aziendale; email/ID occupati o professionista altrui non vengono adottati. Il profilo resta inattivo su errore o esito incerto. La finalizzazione controlla gli ID restituiti dal metodo SDK e il binding locale corrente, poi registra subject/installazione e attiva il solo profilo creato. connectAcceptedAt resta vuoto fino all’accesso personale effettivo. Audit richiesto/completato senza password, token o corpi remoti.
+
+Una ripetizione usa lo stesso ID e lo stesso profilo. Non genera altri account, non modifica credenziali o riattiva un profilo completato ma sospeso successivamente. La policy locale di un account ancora in creazione non è modificabile. Password rifiutata, conflitti/mapping/revoche e mancata configurazione provider producono messaggi ALORA ridotti; nessuna risposta remota con dati sensibili viene inoltrata. Nessuna mutazione è ripetuta automaticamente. Una risposta persa o finalizzazione SQL fallita rimane riprendibile da Creazioni da completare.
+
+### Migrazione, verifica e stato operativo
+
+Migrazione ALORA 20261026000000_team_account_intents: sola nuova tabella con FK, indici e metadati; nessuna colonna o riga precedente riscritta. Nel Docker ALORA di sviluppo: API fermata, dump privato .local/team-accounts-before-20261026.dump (0600), checkpoint analyze/apply/verify con scripts/team-policy-migration.cjs e riconciliazione delle tabelle originarie prima della riapertura. Backup ripristinato in database temporaneo e digest originari coincidenti; database di ripristino rimosso. Dopo nuove scritture non ripristinare il vecchio snapshot perdendo i nuovi profili: rollback applicativo compatibile conservando tabella/ricevute/mapping.
+
+Suite ALORA 179 test su 33 suite, build API/admin, lint e Prisma validate passati. scripts/check-team-accounts.cjs usa PostgreSQL isolato obbligatoriamente barber_team_accounts_test_<cifre>, identità/SDK sostituiti da fixture: verifica profilo prima della chiamata, collisioni, rollback/finalizzazione, esito incoerente, password non persistita e invariata in ripetizione, sospensioni, policy/delega e ripresa sullo stesso ID. Non è un test del provider o del nuovo SDK contro Connect reale. I collaudi PostgreSQL/Keycloak della consegna Connect restano evidenze del produttore, distinte dal consumer ALORA.
+
+Il Docker Connect effettivo è stato letto senza modificarlo: schema **013**. Prima del test C1 occorre aggiornare quell’API, applicare schema **014** e bootstrap Keycloak degli attributi riservati secondo docs/DELEGATED-ACCOUNTS-STEP-5.md del repository Connect. Non è stato aggiornato il server Connect, eseguito un login o creato un utente reale. Step 5 ancora aperto per tale aggiornamento concordato e collaudo dell’utente; nessuna distribuzione in produzione.

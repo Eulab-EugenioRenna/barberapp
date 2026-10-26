@@ -1,3 +1,5 @@
+> Stato corrente, 26 ottobre 2026: l’utente ha autorizzato la candidata locale 0.11.0 nello sviluppo ALORA. package.json, lockfile e Docker usano vendor/eulab-connect-0.11.0.tgz (SHA-256 b75d3c46ba8fbcf17dc522083f172abc3d07928c2f697d0f0c8ba182b6b749d5). application.team.createUser è integrato; API Connect/schema 014/bootstrap effettivi e collaudo C1 restano necessari. Le note seguenti sulla 0.10.0 pubblica descrivono la distribuzione precedente, non quella di sviluppo attuale.
+
 # Requisito trasversale — integrazione Connect rapida nelle prossime app
 
 ## Distribuzione npm adottata — 24 ottobre 2026

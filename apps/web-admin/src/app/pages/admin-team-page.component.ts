@@ -12,6 +12,7 @@ interface LocalTeamUser { id: string; firstName: string; lastName: string; role:
 interface LocalTeamContext { users: LocalTeamUser[]; collaborators: { id: string; firstName: string; lastName: string; userId: string | null; isActive: boolean }[]; functions: { key: string; name: string }[]; }
 interface LocalPolicyDraft { id: string; role: "manager" | "reception" | "collaborator"; permissions: string[]; collaboratorId: string | null; }
 
+interface TeamAccountDraft { id: string; email: string; firstName: string; lastName: string; role: "manager" | "reception" | "collaborator"; permissions: string[]; roleIds: string[]; collaboratorId: string | null; }
 @Component({
   selector: "alora-admin-team-page",
   standalone: true,
@@ -42,6 +43,19 @@ interface LocalPolicyDraft { id: string; role: "manager" | "reception" | "collab
             <p class="text-sm opacity-75">Confermi questo profilo per le tue attività? Gli appuntamenti mantengono il professionista assegnato.</p>
             <div class="flex gap-2"><button class="primary-btn" type="submit" [disabled]="busy">Conferma associazione</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="selfDraft = null">Annulla</button></div>
           </form>
+        </article>
+        <article *ngIf="canManage" class="panel grid gap-4 rounded-[2rem] p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="font-display text-2xl">Nuovo account</h3><p class="mt-2 text-sm opacity-75">Crea l’accesso personale di un responsabile, reception o professionista. I profili della squadra possono continuare a esistere senza account.</p></div><button class="primary-btn" type="button" [disabled]="busy || !!accountDraft" (click)="newAccount()">Crea account</button></div>
+          <form *ngIf="accountDraft as draft" class="grid gap-3 rounded-2xl border border-current/10 p-4" (ngSubmit)="createAccount()">
+            <fieldset class="grid gap-3 sm:grid-cols-2" [disabled]="busy || accountAttempted"><label class="field"><span>Nome</span><input name="accountFirstName" required maxlength="120" [(ngModel)]="draft.firstName" /></label><label class="field"><span>Cognome</span><input name="accountLastName" required maxlength="120" [(ngModel)]="draft.lastName" /></label><label class="field"><span>Email</span><input name="accountEmail" type="email" required maxlength="250" autocomplete="off" [(ngModel)]="draft.email" /></label><label class="field"><span>Ambito ALORA</span><select name="accountRole" [(ngModel)]="draft.role" (ngModelChange)="pruneAccountPermissions()"><option value="collaborator">Professionista · dati personali</option><option value="reception">Reception</option><option value="manager">Responsabile</option></select></label><label class="field sm:col-span-2"><span>Professionista associato (facoltativo)</span><select name="accountProfessional" [(ngModel)]="draft.collaboratorId"><option [ngValue]="null">Nessuno</option><option *ngFor="let person of localContext?.collaborators" [ngValue]="person.id" [disabled]="!person.isActive || !!person.userId">{{ person.firstName }} {{ person.lastName }}{{ person.userId ? ' · già associato' : '' }}</option></select></label></fieldset>
+            <fieldset class="grid gap-2" [disabled]="busy || accountAttempted"><legend class="mb-2 text-sm font-semibold">Ruoli Connect</legend><label *ngFor="let role of team.roles" class="flex items-start gap-2 text-sm"><input type="checkbox" [checked]="draft.roleIds.includes(role.id)" [disabled]="!canEditRole(role)" (change)="toggleAccountRole(role.id, $any($event.target).checked)" />{{ role.name }}</label></fieldset>
+            <fieldset class="grid max-h-64 gap-2 overflow-auto" [disabled]="busy || accountAttempted"><legend class="mb-2 text-sm font-semibold">Cosa può vedere e fare in ALORA</legend><label *ngFor="let fn of accountPermissionChoices()" class="flex items-start gap-2 text-sm"><input type="checkbox" [checked]="draft.permissions.includes(fn.key)" (change)="toggleAccountPermission(fn.key, $any($event.target).checked)" />{{ fn.name }}</label></fieldset>
+            <p class="text-xs opacity-75">Seleziona almeno un ruolo. I permessi ALORA limitano le funzioni di quel ruolo; nessun permesso locale selezionato significa nessun accesso operativo. L’agenda personale richiede un professionista associato.</p>
+            <label class="field"><span>Password iniziale (facoltativa)</span><input name="initialAccountPassword" type="password" autocomplete="new-password" maxlength="1024" [(ngModel)]="accountPassword" [disabled]="busy" /></label><p class="text-xs opacity-75">Senza password, la persona dovrà completare la configurazione dell’accesso con Connect. Non viene inviata un’email di attivazione da questo form. La password di un’identità esistente non viene sostituita.</p>
+            <p *ngIf="accountAttempted" class="text-sm">La creazione è stata inviata. Per verificare o riprendere usa questo stesso profilo; la password va inserita nuovamente solo se necessaria.</p>
+            <div class="flex flex-wrap gap-2"><button class="primary-btn" type="submit" [disabled]="busy || !accountDraftValid()">{{ accountAttempted ? 'Riprendi stessa creazione' : 'Conferma creazione' }}</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="closeAccountForm()">{{ accountAttempted ? 'Chiudi form' : 'Annulla' }}</button></div>
+          </form>
+          <div *ngIf="pendingAccounts.length" class="grid gap-3"><h4 class="font-display text-xl">Creazioni da completare</h4><p class="text-sm opacity-75">Questi profili sono salvati, ma l’accesso locale non è ancora attivo. Un esito incerto si riprende sullo stesso profilo.</p><div *ngFor="let pending of pendingAccounts" class="grid gap-2 rounded-2xl border border-current/10 p-4"><strong>{{ pending.firstName }} {{ pending.lastName }}</strong><p class="text-sm">{{ pending.email }} · {{ localRoleLabel(pending.role) }}</p><button type="button" class="secondary-btn justify-self-start" [disabled]="busy" (click)="selectPending(pending.id)">Riprendi creazione</button><form *ngIf="pendingAccountId === pending.id" class="grid gap-3" (ngSubmit)="resumeAccount(pending.id)"><label class="field"><span>Password iniziale (solo se necessaria)</span><input name="resumePassword" type="password" autocomplete="new-password" maxlength="1024" [(ngModel)]="recoveryPassword" [disabled]="busy" /></label><p class="text-xs opacity-75">Verifica o completa la creazione già inviata. Se l’identità esiste, la sua password resta invariata.</p><button class="primary-btn justify-self-start" type="submit" [disabled]="busy">Conferma ripresa</button></form></div></div>
         </article>
         <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <article class="panel rounded-[2rem] p-5">
@@ -117,6 +131,12 @@ export class AdminTeamPageComponent implements OnInit {
   localContext: LocalTeamContext | null = null;
   localDraft: LocalPolicyDraft | null = null;
   selfDraft: { id: string; collaboratorId: string | null } | null = null;
+  accountDraft: TeamAccountDraft | null = null;
+  pendingAccounts: TeamAccountDraft[] = [];
+  pendingAccountId = "";
+  accountAttempted = false;
+  accountPassword = "";
+  recoveryPassword = "";
   loading = false;
   busy = false;
   feedback = "";
@@ -155,14 +175,56 @@ export class AdminTeamPageComponent implements OnInit {
         firstValueFrom(this.http.get<LocalTeamContext>(ADMIN_API_URL + "/team/local-users")),
       ]);
       this.overview = overview; this.localContext = local;
+      if (this.canManage) this.pendingAccounts = await firstValueFrom(this.http.get<TeamAccountDraft[]>(ADMIN_API_URL + "/team/accounts/pending"));
+      else this.pendingAccounts = [];
     }
     catch (error) {
-      this.overview = null; this.localContext = null;
+      this.overview = null; this.localContext = null; this.pendingAccounts = [];
       this.feedback = error && typeof error === "object" && "status" in error && error.status === 403
         ? "Connect non ha abilitato la gestione della squadra per questo account. Verifica licenza, ruolo e delega."
         : "Squadra non disponibile. Verifica l’accesso o riprova con Aggiorna.";
     }
     finally { this.loading = false; }
+  }
+  newAccount(): void { this.accountDraft = { id: crypto.randomUUID(), email: "", firstName: "", lastName: "", role: "collaborator", permissions: [], roleIds: [], collaboratorId: null }; this.accountAttempted = false; this.accountPassword = ""; }
+  closeAccountForm(): void { this.accountDraft = null; this.accountPassword = ""; this.accountAttempted = false; }
+  toggleAccountRole(id: string, checked: boolean): void { if (this.accountDraft && !this.accountAttempted) this.accountDraft.roleIds = this.toggle(this.accountDraft.roleIds, id, checked); this.pruneAccountPermissions(); }
+  pruneAccountPermissions(): void { if (this.accountDraft && !this.accountAttempted) this.accountDraft.permissions = this.accountDraft.permissions.filter(key => this.accountPermissionChoices().some(fn => fn.key === key)); }
+  toggleAccountPermission(key: string, checked: boolean): void { if (this.accountDraft && !this.accountAttempted) this.accountDraft.permissions = this.toggle(this.accountDraft.permissions, key, checked); }
+  accountPermissionChoices(): { key: string; name: string }[] {
+    const draft = this.accountDraft;
+    if (!draft) return [];
+    const granted = new Set(draft.roleIds.flatMap(id => this.overview?.roles.find(role => role.id === id)?.permissions || []));
+    return (this.localContext?.functions || []).filter(fn => granted.has(fn.key) && (draft.role !== "collaborator" || ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(fn.key)));
+  }
+  accountDraftValid(): boolean {
+    const draft = this.accountDraft;
+    return !!draft && !!draft.email.trim() && !!draft.firstName.trim() && !!draft.lastName.trim() && !!draft.roleIds.length && draft.roleIds.every(id => this.overview?.roles.some(role => role.id === id && this.canEditRole(role))) && draft.permissions.every(key => this.accountPermissionChoices().some(fn => fn.key === key)) && (!draft.permissions.some(key => ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key)) || !!draft.collaboratorId);
+  }
+  selectPending(id: string): void { this.pendingAccountId = id; this.recoveryPassword = ""; }
+  async createAccount(): Promise<void> {
+    if (!this.accountDraftValid() || this.busy || !this.canManage) return;
+    const draft = this.accountDraft!, password = this.accountPassword;
+    this.accountPassword = ""; this.accountAttempted = true;
+    await this.accountOperation(() => firstValueFrom(this.http.post<{ ssoSetupRequired: boolean | null }>(ADMIN_API_URL + "/team/accounts", { ...draft, ...(password ? { initialPassword: password } : {}) })));
+  }
+  async resumeAccount(id: string): Promise<void> {
+    if (this.busy || !this.canManage) return;
+    const password = this.recoveryPassword; this.recoveryPassword = "";
+    await this.accountOperation(() => firstValueFrom(this.http.post<{ ssoSetupRequired: boolean | null }>(ADMIN_API_URL + "/team/accounts/" + encodeURIComponent(id) + "/resume", password ? { initialPassword: password } : {})));
+  }
+  private async accountOperation(operation: () => Promise<{ ssoSetupRequired: boolean | null }>): Promise<void> {
+    this.busy = true;
+    try {
+      const result = await operation();
+      this.closeAccountForm(); this.pendingAccountId = ""; this.recoveryPassword = "";
+      this.feedback = result.ssoSetupRequired ? "Account creato. La persona deve completare la configurazione dell’accesso in Connect; nessuna email è stata inviata dal form." : "Account creato e collegato a Connect. Verifica l’accesso con la persona interessata.";
+    } catch (error) {
+      const response = error && typeof error === "object" && "error" in error ? error.error : null;
+      const known = response && typeof response === "object" && "code" in response && typeof response.code === "string" && ["mirror_password_rejected", "mirror_identity_conflict", "mirror_profile_conflict", "mirror_mapping_conflict", "mirror_review_required", "mirror_mapping_disabled", "mirror_identity_suspended", "mirror_access_revoked", "account_review_required", "account_outcome_uncertain"].includes(response.code);
+      this.feedback = known && "message" in response && typeof response.message === "string" ? response.message : "Creazione non confermata. Aggiorna la squadra e verifica il profilo salvato prima di riprendere. Nessuna richiesta è stata ripetuta automaticamente.";
+    }
+    finally { await this.load(true); this.busy = false; }
   }
   canEditRole(role: TeamRole): boolean { return this.canManage && role.permissions.every(key => this.overview!.delegation.some(fn => fn.key === key)); }
   canEditUser(user: TeamUser): boolean {
@@ -180,7 +242,7 @@ export class AdminTeamPageComponent implements OnInit {
   editUser(user: TeamUser): void { this.confirmEmptyRoles = false; this.editingSubject = user.subject; this.assignedRoleIds = user.roles.map(role => role.id); }
   localUser(user: TeamUser): LocalTeamUser | undefined { return this.localContext?.users.find(item => item.id === user.localUserId); }
   localRoleLabel(role: string): string { return ({ collaborator: "Professionista", manager: "Responsabile", reception: "Reception", owner: "Titolare" } as Record<string, string>)[role] || role; }
-  canEditLocalUser(user: TeamUser): boolean { const local = this.localUser(user); return this.canEditUser(user) && !!local && ["manager", "reception", "collaborator"].includes(local.role); }
+  canEditLocalUser(user: TeamUser): boolean { const local = this.localUser(user); return this.canEditUser(user) && !!local && !this.pendingAccounts.some(pending => pending.id === local.id) && ["manager", "reception", "collaborator"].includes(local.role); }
   editLocalPolicy(user: TeamUser): void {
     const local = this.localUser(user);
     if (!local || !this.canEditLocalUser(user)) return;

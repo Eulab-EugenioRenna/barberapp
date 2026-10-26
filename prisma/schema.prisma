@@ -127,6 +127,7 @@ model Tenant {
   notificationProviderConfigs   NotificationProviderConfig[]
   subscriptions                 TenantSubscription[]
   holidays                      TenantHoliday[]
+  teamAccountIntents            TeamAccountIntent[]
 
   @@index([createdAt])
   @@index([isActive, isSuspended])
@@ -166,12 +167,31 @@ model User {
   connectAuthFlows            ConnectAuthFlow[]
   migrationChallenges         ConnectMigrationChallenge[]
   sessions                    LocalSession[]
+  accountIntent               TeamAccountIntent?
   collaborator                Collaborator?
   notificationInboxItems      NotificationInbox[]
   notificationPreferenceUsers NotificationPreferenceUser[]
 
   @@index([tenantId, role])
   @@unique([connectInstallationId, connectSubject])
+}
+
+// Local creation receipt only. Passwords and provider state remain in Connect.
+model TeamAccountIntent {
+  userId          String    @id
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceId        String
+  appId           String
+  customerId      String
+  installationId  String
+  roleIds         String[]
+  createdAt       DateTime  @default(now())
+  completedAt     DateTime?
+  ssoSetupRequired Boolean?
+
+  @@index([tenantId, completedAt])
 }
 
 model Collaborator {

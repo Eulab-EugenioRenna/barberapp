@@ -38,14 +38,21 @@ Se un prerequisito manca, segnare il caso «bloccato» e indicare quale. Non cre
 
 Per le prove API usare esclusivamente sessioni di collaudo e ID noti delle fixture. Non confondere un link nascosto con una protezione backend: annotare lo stato HTTP delle richieste negate. Gli stati terminali degli appuntamenti non vanno ripristinati artificialmente; usare un altro appuntamento di prova.
 
-## Caso ancora non eseguibile con lo SDK pubblico 0.10.0
+## C1 — Nuovo account collaboratore (implementato, collaudo pendente)
 
-**C1 — Nuovo account collaboratore:** dal titolare creare profilo locale, identità personale, mapping sorgente/installazione/azienda e ruoli, poi accedere come nuovo collaboratore senza interventi manuali di collegamento.
+L’utente ha approvato la candidata locale SDK 0.11.0 per lo sviluppo. Il consumer ALORA ora chiama application.team.createUser; non è più bloccato per assenza del metodo. Prima della prova aggiornare il Docker Connect effettivo, ancora rilevato a schema 013: servono API della consegna, migrazione 014 e bootstrap degli attributi Keycloak riservati. [Consegna del produttore](../../eulab%20connect/docs/DELEGATED-ACCOUNTS-STEP-5.md). Nessuna di queste operazioni sul server Connect è implicita nell’installazione del tarball ALORA.
 
-Il mirror corrente crea `local_links`, mentre il login sorgente richiede anche `app_local_users`. Lo SDK pubblicato non espone il metodo completo `application.team.createUser`. C1 resta **bloccato sul contratto Connect**, non superato mediante preassegnazione EULAB Admin o accesso locale. [Richiesta tecnica per l’agente Connect](connect-delegated-account-request-step-5.md). ALORA non mostra un form di creazione dichiarato operativo prima di tale consegna.
+1. In Accessi squadra scegliere Crea account, compilare nome/cognome/email e ambito operativo, scegliere ruoli Connect concedibili e selezionare i permessi locali. Per l’agenda personale associare un professionista libero e attivo. Nessuna unione con un account esistente per email.
+2. Confermare con password iniziale di collaudo facoltativa. Verificare che la UI svuoti il campo. Se omessa, verificare l’indicazione di configurazione dell’accesso provider ancora necessaria; non è inviata un’email da questo form.
+3. Se rifiutata per policy, verificare sessione operatore conservata, profilo inattivo salvato e possibilità di riprendere lo stesso ID da Creazioni da completare. Non cambiare anagrafica/ruoli di una creazione già inviata; errori di binding o identità richiedono riconciliazione esplicita.
+4. Su un esito incerto, rileggere la lista e usare Riprendi creazione sul medesimo profilo. Verificare assenza di duplicati e conservazione della password dell’identità eventualmente già creata. Non premere ripetutamente o predisporre retry automatici.
+5. Dopo conferma, verificare utente e associazione in ALORA, mapping sorgente/installazione/azienda e ruoli in Connect; accedere come nuovo collaboratore in un browser separato ed eseguire L1/P1/P2/P3. Il campo connectAcceptedAt sarà valorizzato dal vero accesso, non dal titolare.
+6. Verificare i rifiuti per email/ID occupati, professionista già associato, ruoli fuori delega, altre aziende e identità/mapping sospesi o revocati. Nessuna riattivazione è consentita dalla ripetizione di una creazione.
+
+La preassegnazione EULAB Admin o un login locale non sostituiscono questo caso. Le fixture ALORA attestano PostgreSQL e l’adattatore con SDK simulato, non l’accettazione C1 del provider/browser.
 
 ## Registrazione e chiusura
 
 Per ogni ID registrare esito (non eseguito / passato / fallito / bloccato), ruolo e azienda di prova, browser/formato, comportamento osservato e sola evidenza priva di segreti. Data e versione devono identificare il collaudo; eventuali concessioni manuali vanno esplicitate. In caso di errore di rete dopo una scrittura, rileggere lo stato prima di un nuovo invio.
 
-Lo Step 5 si chiude solo dopo C1 e i casi applicabili superati, senza sostituire l’accettazione reale con le 167 prove automatiche attuali. Step 6 e successivi restano nel piano; il passaggio di fase segue evolve.md e richiede autorizzazione. Nessuna distribuzione in produzione è implicita nel collaudo locale.
+Lo Step 5 si chiude solo dopo C1 e i casi applicabili superati, senza sostituire l’accettazione reale con le 179 prove automatiche attuali. Step 6 e successivi restano nel piano; il passaggio di fase segue evolve.md e richiede autorizzazione. Nessuna distribuzione in produzione è implicita nel collaudo locale.

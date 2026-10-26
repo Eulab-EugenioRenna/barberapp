@@ -1,4 +1,6 @@
 import { ConflictException, ForbiddenException, Injectable, HttpException, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import type { ApplicationTeamUserInput } from "@eulab/connect/application";
+import { canUseLocalFunction } from "../../common/function-catalog";
 import type { ConnectServer, TeamRoleInput } from "@eulab/connect/server";
 import { PrismaService } from "../../prisma/prisma.service";
 import { connectApplication } from "../../common/connect-application";
@@ -11,7 +13,7 @@ import { requireTenantId, requireUser, resolveRequestSession, RequestSession } f
 export class TeamService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async withTeam<T>(authorization: string | undefined, operation: (client: ConnectServer, token: string, session: RequestSession) => Promise<T>): Promise<T> {
+  private async sdkContext(authorization?: string) {
     const session = await resolveRequestSession(this.prisma, authorization);
     requireTenantId(session);
     const user = requireUser(session);
@@ -21,11 +23,20 @@ export class TeamService {
       select: { sdkSessionCipher: true },
     });
     if (!linked?.sdkSessionCipher) throw new UnauthorizedException("Ripeti l’accesso Connect");
+    return { session, application: await connectApplication(this.prisma), handle: openConnect(linked.sdkSessionCipher) };
+  }
+  async createUser(authorization: string | undefined, input: ApplicationTeamUserInput) {
+    const { session, application, handle } = await this.sdkContext(authorization);
+    if (!canUseLocalFunction(requireUser(session), "team.manage")) throw new ForbiddenException();
+    // Call the facade outside services: nesting would reacquire its same session lock.
+    return application.team.createUser(handle, input);
+  }
+  async withTeam<T>(authorization: string | undefined, operation: (client: ConnectServer, token: string, session: RequestSession) => Promise<T>): Promise<T> {
+    const { session, application, handle } = await this.sdkContext(authorization);
     try {
-      const application = await connectApplication(this.prisma);
-      // A rejected business operation must not look like a failed SDK session validation.
-      // The published facade revokes its session if a services callback throws.
-      const result = await application.services(openConnect(linked.sdkSessionCipher), async (client, token) => {
+      // Keep the Result boundary for consumers that also run SDK 0.10.0 during rollback.
+      // SDK 0.11.0 preserves business errors independently of session validation.
+      const result = await application.services(handle, async (client, token) => {
         try { return { ok: true as const, value: await operation(client, token, session) }; }
         catch (error) { return { ok: false as const, error }; }
       });

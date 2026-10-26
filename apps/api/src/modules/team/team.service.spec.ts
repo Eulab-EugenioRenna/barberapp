@@ -12,7 +12,7 @@ jest.mock("../../common/request-session", () => ({
 }));
 
 describe("Delegated team adapter", () => {
-  const findFirst = jest.fn(), teamOverview = jest.fn(), setTeamUserRoles = jest.fn();
+  const findFirst = jest.fn(), teamOverview = jest.fn(), setTeamUserRoles = jest.fn(), createUser = jest.fn();
   const service = new TeamService({ connectSession: { findFirst } } as unknown as PrismaService);
   const session: RequestSession = { tenantId: "company-a", connectSessionId: "linked-a", user: {
     id: "owner-a", tenantId: "company-a", email: "owner@example.test", firstName: "Owner", lastName: "A", role: "owner", permissions: [], connectFunctions: ["users.manage", "team.manage"],
@@ -23,6 +23,7 @@ describe("Delegated team adapter", () => {
     findFirst.mockResolvedValue({ sdkSessionCipher: "encrypted" });
     jest.mocked(openConnect).mockReturnValue("server-session-handle");
     jest.mocked(connectApplication).mockResolvedValue({
+      team: { createUser },
       services: jest.fn(async (_handle: string, operation: (client: unknown, token: string) => Promise<unknown>) => operation({ teamOverview, setTeamUserRoles }, "provider-token")),
     } as unknown as Awaited<ReturnType<typeof connectApplication>>);
   });
@@ -53,6 +54,15 @@ describe("Delegated team adapter", () => {
     await expect(service.withTeam("Bearer local-token", async () => { throw new ForbiddenException("Local policy denied"); })).rejects.toThrow("Local policy denied");
     expect(callbackRejected).toBe(false);
     expect(services).toHaveBeenCalledTimes(1);
+  });
+  it("uses the facade team method outside services without nested session locking", async () => {
+    const input = { localUser: { localUserId: "new-profile", email: "new@example.test", firstName: "New", lastName: "Person", role: "collaborator" as const, permissions: [] }, roleIds: ["role-id"] };
+    createUser.mockResolvedValue({ localUserId: "new-profile" });
+    await expect(service.createUser("Bearer local-token", input)).resolves.toEqual({ localUserId: "new-profile" });
+    expect(createUser).toHaveBeenCalledTimes(1);
+    expect(createUser).toHaveBeenCalledWith("server-session-handle", input);
+    const app = await jest.mocked(connectApplication).mock.results[0].value;
+    expect(app.services).not.toHaveBeenCalled();
   });
   it("requires an explicit Connect grant for the new write capability, even for owners", () => {
     const readOnly = { ...session, user: { ...session.user!, connectFunctions: ["users.manage"] } };

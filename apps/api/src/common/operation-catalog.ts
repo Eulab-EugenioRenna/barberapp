@@ -5,6 +5,9 @@ export type OperationDefinition =
   | { kind: "public" | "session" | "tenant-context" | "platform" | "disabled" };
 export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "PersonalDashboardController.overview": { kind: "function", key: "appointments.read.own", own: "appointments.read.own" },
+  "TeamController.pendingAccounts": { kind: "function", key: "team.manage" },
+  "TeamController.createAccount": { kind: "function", key: "team.manage" },
+  "TeamController.resumeAccount": { kind: "function", key: "team.manage" },
   "TeamController.localUsers": { kind: "function", key: "users.manage" },
   "TeamController.associateSelf": { kind: "function", key: "team.manage" },
   "TeamController.saveLocalPolicy": { kind: "function", key: "team.manage" },

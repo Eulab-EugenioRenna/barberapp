@@ -39,7 +39,8 @@ export class TeamLocalPolicyService {
       if (permissions.some(key => !canUseLocalFunction(actor, key) || !central.has(key) || !licensed.has(key) || (body.role === "collaborator" && !["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key)))) throw new ForbiddenException("Le restrizioni locali devono restare entro ruolo, licenza e delega Connect");
       return this.prisma.$transaction(async tx => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"team-policy:" + tenantId}, 0))`;
-        const user = await tx.user.findFirst({ where: { id, tenantId, role: { in: [...editableRoles] } }, include: { collaborator: true } });
+        const user = await tx.user.findFirst({ where: { id, tenantId, role: { in: [...editableRoles] } }, include: { collaborator: true, accountIntent: true } });
+        if (user?.accountIntent && !user.accountIntent.completedAt) throw new ConflictException("Completa la creazione prima di modificare la visibilità");
         if (!user) throw new NotFoundException("Account locale non modificabile in questa attività");
         if (user.collaborator && user.collaborator.tenantId !== tenantId) throw new ForbiddenException("Associazione precedente del professionista da riconciliare");
         if ((user.connectSubject && user.connectSubject !== target.subject) || (user.connectInstallationId && user.connectInstallationId !== team.installationId)) throw new ForbiddenException("Collegamento Connect dell’account non coerente");
@@ -49,7 +50,7 @@ export class TeamLocalPolicyService {
           const active = await tx.collaborator.findFirst({ where: { id: collaboratorId, tenantId, isActive: true, userId: id } });
           if (!active) throw new NotFoundException("Professionista non disponibile in questa attività");
         }
-        if (body.collaboratorId !== undefined) await this.setProfessional(tx, tenantId, id, collaboratorId);
+        if (body.collaboratorId !== undefined) await assignProfessional(tx, tenantId, id, collaboratorId);
         return tx.user.update({ where: { id, tenantId, role: { in: [...editableRoles] } }, data: { role: body.role, permissions, permissionsConfigured: true }, select: { id: true, role: true, permissions: true, permissionsConfigured: true, collaborator: { select: { id: true } } } });
       });
     });
@@ -68,12 +69,14 @@ export class TeamLocalPolicyService {
         if (!user) throw new NotFoundException("Titolare non disponibile in questa attività");
         if (user.connectSubject !== target.subject || user.connectInstallationId !== team.installationId) throw new ForbiddenException("Collegamento Connect dell’account non coerente");
         if (user.collaborator && user.collaborator.tenantId !== tenantId) throw new ForbiddenException("Associazione precedente del professionista da riconciliare");
-        await this.setProfessional(tx, tenantId, user.id, collaboratorId);
+        await assignProfessional(tx, tenantId, user.id, collaboratorId);
         return { id: user.id, collaborator: collaboratorId ? { id: collaboratorId } : null };
       });
     });
   }
-  private async setProfessional(tx: Prisma.TransactionClient, tenantId: string, userId: string, collaboratorId: string | null) {
+}
+
+export async function assignProfessional(tx: Prisma.TransactionClient, tenantId: string, userId: string, collaboratorId: string | null) {
     if (collaboratorId) {
       const professional = await tx.collaborator.findFirst({ where: { id: collaboratorId, tenantId, isActive: true } });
       if (!professional) throw new NotFoundException("Professionista non disponibile in questa attività");
@@ -85,5 +88,3 @@ export class TeamLocalPolicyService {
       if (assigned.count !== 1) throw new ConflictException("Associazione cambiata: aggiorna la squadra prima di riprovare");
     }
   }
-
-}
