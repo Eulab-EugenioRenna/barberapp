@@ -22,6 +22,7 @@ export interface ConnectOnboardingProfile {
   email: string;
   challenge: string;
   feedback?: string;
+  needsLegacyVerification?: boolean;
   request?: { requestId: string; state: string; nextAction?: string };
 }
 // Connect remains authoritative about whether the practice is still open.
@@ -140,6 +141,7 @@ export function canRequestConnectMigration(
         </h2>
       </header>
       <form
+        *ngIf="!profile.needsLegacyVerification"
         class="onboarding-body grid gap-4"
         #profileForm="ngForm"
         (ngSubmit)="confirm()"
@@ -278,6 +280,20 @@ export function canRequestConnectMigration(
           </button>
         </div>
       </form>
+      <form *ngIf="profile.needsLegacyVerification" class="onboarding-body grid gap-4"
+        (ngSubmit)="verifyLocal()">
+        <p class="text-sm text-[var(--muted)]">Se possiedi un account locale da migrare,
+          verifica la vecchia password per preparare la richiesta a Connect.
+          L’accesso resta bloccato fino all’approvazione EULAB.</p>
+        <p class="text-sm">{{ profile.email }}</p>
+        <label class="field"><span>Password dell’account locale</span>
+          <input name="legacyPassword" [(ngModel)]="localPassword" type="password"
+            autocomplete="current-password" required [disabled]="loading" /></label>
+        <p *ngIf="feedback" role="alert" class="text-sm">{{ feedback }}</p>
+        <button type="submit" class="primary-btn" [disabled]="loading || !localPassword">
+          {{ loading ? "Verifica in corso…" : "Verifica account locale" }}
+        </button>
+      </form>
     </dialog>
   `,
 })
@@ -287,6 +303,14 @@ export class ConnectOnboardingModalComponent
   @Input({ required: true }) profile!: ConnectOnboardingProfile;
   @Input() loading = false;
   @Input() feedback = "";
+  @Output() verifyLegacy = new EventEmitter<string>();
+  localPassword = "";
+  verifyLocal(): void {
+    if (this.loading || !this.localPassword) return;
+    const password = this.localPassword;
+    this.localPassword = "";
+    this.verifyLegacy.emit(password);
+  }
   @Output() accept = new EventEmitter<{
     firstName: string;
     lastName: string;
@@ -339,6 +363,7 @@ export class ConnectOnboardingModalComponent
     this.clearNewPassword();
   }
   private clearNewPassword(): void {
+    this.localPassword = "";
     this.newConnectPassword = "";
     this.confirmConnectPassword = "";
   }

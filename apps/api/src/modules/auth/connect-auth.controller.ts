@@ -64,7 +64,8 @@ export class ConnectAuthController {
     } catch {
       // Fixed server configuration only. Never return provider errors or query-selected URLs.
       const url = new URL(connectReturnUrl());
-      url.searchParams.set("connect_error", "access_failed");
+      // Hash routing must receive the error before Angular's default-route redirect.
+      url.hash = "/login?connect_error=access_failed";
       return response.redirect(303, url.href);
     }
   }

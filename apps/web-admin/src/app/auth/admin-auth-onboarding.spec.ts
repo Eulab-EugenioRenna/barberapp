@@ -210,9 +210,15 @@ describe("auth onboarding acceptance", () => {
     expect(p.loginForm.password).toBe("");
     expect(p.onboarding?.challenge).toBe("");
   });
+  it("sends only the email from the main login even if a password remains in memory", async () => {
+    const p = panel();
+    login.mockReturnValue(of({status: "connect_redirect", redirectUrl: "https://sso.example/auth"}));
+    await p.submit();
+    expect(login).toHaveBeenCalledWith({email: profile.email});
+    expect(p.loginForm.password).toBe("");
+  });
   it("uses the same button without sending a local password for migrated profiles", async () => {
     const p = panel();
-    p.connectLogin = true;
     login.mockReturnValue(
       of({
         status: "connect_redirect",
@@ -222,6 +228,25 @@ describe("auth onboarding acceptance", () => {
     await p.submit();
     expect(login).toHaveBeenCalledWith({ email: profile.email });
     expect(p.loginForm.password).toBe("");
+  });
+  it("sends the legacy password only when explicitly submitted from the migration modal", async () => {
+    const p = panel();
+    login.mockReturnValue(of({onboarding: profile}));
+    await p.submit("Explicit-legacy-proof-9!");
+    expect(login).toHaveBeenCalledWith({email: profile.email, password: "Explicit-legacy-proof-9!"});
+    expect(p.loginForm.password).toBe("Explicit-legacy-proof-9!");
+  });
+  it("clears the modal password before emitting proof and never emits while loading", () => {
+    const modal = new ConnectOnboardingModalComponent();
+    const emit = jest.spyOn(modal.verifyLegacy, "emit");
+    modal.localPassword = "Private-proof-9!";
+    modal.loading = true;
+    modal.verifyLocal();
+    expect(emit).not.toHaveBeenCalled();
+    modal.loading = false;
+    emit.mockImplementation(() => expect(modal.localPassword).toBe(""));
+    modal.verifyLocal();
+    expect(emit).toHaveBeenCalledWith("Private-proof-9!");
   });
   it("does not redirect after the auth component is destroyed while acceptance is pending", async () => {
     const p = panel();
@@ -328,6 +353,14 @@ describe("auth onboarding acceptance", () => {
     });
     expect(modal.newConnectPassword).toBe("");
     expect(modal.confirmConnectPassword).toBe("");
+  });
+  it("shows account guidance from a callback error in the hash route and clears it from the URL", () => {
+    window.location.href = "http://127.0.0.1/admin/#/login?connect_error=access_failed";
+    const p = panel();
+    p.ngOnInit();
+    expect(p.feedback).toContain("cambia account");
+    expect(window.history.replaceState).toHaveBeenCalledWith(null, "", "http://127.0.0.1/admin/#/login");
+    expect(exchangeConnect).not.toHaveBeenCalled();
   });
   it("removes a fragment handoff before posting it to the exchange endpoint", () => {
     window.location.href =

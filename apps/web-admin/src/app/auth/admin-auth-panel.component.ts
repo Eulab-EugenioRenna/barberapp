@@ -176,6 +176,7 @@ type AuthMode = "login" | "signup";
       [loading]="loading"
       [feedback]="onboardingFeedback"
       (accept)="acceptOnboarding($event)"
+      (verifyLegacy)="submit($event)"
     ></alora-connect-onboarding-modal>
     <section
       class="auth-scroll mx-auto grid max-w-7xl items-center gap-6 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8"
@@ -289,7 +290,7 @@ type AuthMode = "login" | "signup";
           [class.auth-form-signup]="authMode === 'signup'"
           (ngSubmit)="submit()"
         >
-          <div class="auth-extra" [class.is-open]="authMode === 'signup'">
+          <div class="auth-extra is-open" *ngIf="authMode === 'signup'">
             <div class="auth-extra-inner grid gap-3">
               <div class="grid gap-3 md:grid-cols-2">
                 <label class="field"
@@ -337,14 +338,12 @@ type AuthMode = "login" | "signup";
             ><input
               [(ngModel)]="loginForm.email"
               name="loginEmail"
-              (ngModelChange)="connectLogin = false"
-              (blur)="detectLoginMethod()"
               type="email"
               placeholder="direzione@atelier.it"
               autocomplete="email"
               required
           /></label>
-          <label class="field" *ngIf="!connectLogin || authMode === 'signup'"
+          <label class="field" *ngIf="authMode === 'signup'"
             ><span
               >Password
               <em
@@ -365,7 +364,7 @@ type AuthMode = "login" | "signup";
               [required]="authMode === 'signup'"
           /></label>
 
-          <div class="auth-extra" [class.is-open]="authMode === 'signup'">
+          <div class="auth-extra is-open" *ngIf="authMode === 'signup'">
             <div class="auth-extra-inner">
               <label class="field">
                 <span
@@ -386,8 +385,7 @@ type AuthMode = "login" | "signup";
           </div>
 
           <p *ngIf="authMode === 'login'" class="text-sm text-[var(--muted)]">
-            L’accesso usa EULAB Connect. Se possiedi solo un account locale,
-            inserisci anche la password per richiedere la migrazione.
+            Continua su EULAB Connect per completare l’accesso con il tuo account.
           </p>
           <p
             *ngIf="feedback"
@@ -431,7 +429,6 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
   signupForm = { companyName: "", firstName: "", lastName: "" };
   signupPasswordConfirm = "";
 
-  connectLogin = false;
   onboarding: ConnectOnboardingProfile | null = null;
   onboardingFeedback = "";
   private destroyed = false;
@@ -443,11 +440,6 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroyed = true;
     this.clearCredentials();
-  }
-
-  detectLoginMethod(): void {
-    // No email-only account enumeration. The server checks both authorities on submit.
-    this.connectLogin = false;
   }
 
   private clearCredentials(): void {
@@ -462,16 +454,17 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
     const [route,hashQuery=""] = url.hash.slice(1).split("?");
     const fragment = new URLSearchParams(hashQuery);
     const handoff = fragment.get("alora_connect") ?? url.searchParams.get("alora_connect");
-    const error = url.searchParams.get("connect_error");
+    const error = fragment.get("connect_error") ?? url.searchParams.get("connect_error");
     if (!handoff && !error) return;
     url.searchParams.delete("alora_connect");
     fragment.delete("alora_connect");
+    fragment.delete("connect_error");
     url.hash = route + (fragment.size ? "?" + fragment.toString() : "");
     url.searchParams.delete("connect_error");
     window.history.replaceState(null, "", url.href);
     if (error) {
       this.feedback =
-        "Accesso Connect non completato. Puoi riprovare dallo stesso pulsante.";
+        "Accesso Connect non completato. Se su Connect è attivo un altro account, cambia account e riprova con la stessa email inserita in ALORA.";
       return;
     }
     this.loading = true;
@@ -581,13 +574,14 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
       return;
     }
     this.authMode = mode;
-    this.connectLogin = false;
     this.clearCredentials();
     this.feedback = "";
     this.modeChange.emit(mode);
   }
 
-  async submit(): Promise<void> {
+  async submit(legacyPassword?: string): Promise<void> {
+    if (this.loading) return;
+    if (legacyPassword !== undefined) this.loginForm.password = legacyPassword;
     this.loading = true;
     this.feedback = "";
 
@@ -603,9 +597,8 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
         this.authMode === "login"
           ? await firstValueFrom(
               this.authApi.login(
-                this.connectLogin
-                  ? { email: this.loginForm.email }
-                  : this.loginForm,
+                { email: this.loginForm.email,
+                  ...(legacyPassword !== undefined ? { password: legacyPassword } : {}) },
               ),
             )
           : await firstValueFrom(
@@ -633,6 +626,10 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
         this.sessionStore.clear();
         this.onboarding = authResponse.onboarding;
         this.onboardingFeedback = authResponse.onboarding.feedback ?? "";
+        if (this.onboarding?.needsLegacyVerification) {
+          this.clearCredentials();
+          return;
+        }
         if (!canRequestConnectMigration(this.onboarding!)) {
           this.clearCredentials();
           return;
@@ -656,6 +653,7 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
         error?.error?.message ||
         error?.message ||
         "Non siamo riusciti a completare l'accesso. Riprova.";
+      if (this.onboarding?.needsLegacyVerification) this.onboardingFeedback = this.feedback;
     } finally {
       this.loading = false;
     }

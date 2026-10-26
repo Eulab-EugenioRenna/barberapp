@@ -1,5 +1,43 @@
 # Step 4 — flusso auth e collaudo manuale
 
+## Accesso solo email — 26 ottobre 2026
+
+Il form principale di login contiene solo l’email e invia esclusivamente quel
+campo. Per gli utenti collegati, lo SDK avvia il login Connect; la password viene
+inserita sul provider. Il callback verificato torna ad ALORA sotto `/admin/`, dove
+il passaggio monouso viene scambiato con la sessione e si apre la destinazione
+consentita dal profilo (dashboard o agenda personale). Nessuna password Connect
+viene acquisita da ALORA durante questo percorso.
+
+Per gli account ancora locali, il mancato accesso senza password apre la modale
+di verifica legacy, con risposta priva di nomi o dati locali anche per email
+sconosciute. Solo l’invio esplicito della vecchia password richiede la verifica
+allo SDK; dopo verifica positiva restano consenso e richiesta di migrazione.
+Il form di richiesta attivazione conserva il percorso già esistente.
+
+Un browser già autenticato su Connect come amministratore può restituire quella
+identità anche con login_hint demo. Il callback rifiuta l’identità diversa dal
+mapping atteso; non adotta account per email né chiude altre sessioni in automatico.
+Per cambiare persona occorre cambiare account sul provider. La PWA usa lo stesso
+flusso della scheda normale.
+
+Verifica locale: riprodotto il ritorno immediato `access_failed` con una sessione
+provider amministratore, poi accesso demo positivo da contesto isolato. Il form
+ha un solo input; `/auth/me` e dashboard personale restituiscono 200 dopo il
+ritorno. Il 403 di `/team` per team.manage mancante conserva la sessione.
+Il rifiuto torna nel frammento `#/login?connect_error=access_failed`, così il
+redirect iniziale Angular non perde il messaggio; il client rimuove il parametro
+dopo averlo letto. Il messaggio non contiene dettagli provider o token.
+
+190 test automatici, lint e build API/admin passati. Test browser della modale e
+del messaggio ripetibili con `scripts/check-auth-email-only.cjs`, usando le stesse
+variabili CDP/Playwright documentate in `pwa-remote-only.md`: API simulate, nessuna
+pratica reale inviata. Il login demo e il rifiuto dell’identità admin sono invece
+verifiche su Connect/Keycloak del Docker locale.
+L’SDK in sviluppo è la candidata locale 0.11.0, descritta nello Step 5; le note
+0.10.0 seguenti documentano i passaggi precedenti.
+
+
 ## Distribuzione npm adottata — 24 ottobre 2026
 
 ALORA dipende ora dalla versione esatta pubblica [@eulab/connect 0.10.0](https://www.npmjs.com/package/@eulab/connect/v/0.10.0), installata dal registry con integrità SHA-512 verificata e lockfile aggiornato. SHA-256 dell’archivio pubblico: `2e07f936a8d52b9ff47862dcd674e0afa39fe0a4c9919ffa37d4cd9380cc294d`. L’intero archivio pubblico coincide byte per byte con il tarball già collaudato manualmente dall’utente. I tarball vendor/ sono solo archivio storico; npm ci e Docker non dipendono da essi. Le note precedenti sulla candidata locale descrivono la fase precedente alla pubblicazione. Non è stato ripetuto il login dell’utente durante questo cambio di distribuzione.

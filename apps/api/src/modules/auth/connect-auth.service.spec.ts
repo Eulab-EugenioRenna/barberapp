@@ -1,3 +1,4 @@
+import { ConnectAuthController } from "./connect-auth.controller";
 import {
   ForbiddenException,
   ServiceUnavailableException,
@@ -77,6 +78,28 @@ describe("ALORA SDK HTTP orchestration", () => {
       service.signIn({ email, password: "legacy" }, request, response),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(findUnique).not.toHaveBeenCalled();
+  });
+  it("requests legacy proof separately after email-only lookup without exposing a local profile", async () => {
+    signIn.mockRejectedValue({ code: "invalid_credentials" });
+    const result = await service.signIn({ email }, request, response);
+    expect(result).toMatchObject({ status: "migration_required", onboarding: {
+      email, firstName: "", lastName: "", challenge: "", needsLegacyVerification: true,
+    } });
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+  it("keeps invalid legacy proof denied and does not expose profile details", async () => {
+    signIn.mockRejectedValue({code: "invalid_credentials"});
+    await expect(service.signIn({email, password: "wrong"}, request, response)).rejects.toMatchObject({status: 401});
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+  it("returns callback failures in the hash login route so Angular keeps the feedback", async () => {
+    process.env["ALORA_AUTH_RETURN_URL"] = origin + "/admin/";
+    callback.mockRejectedValue(new Error("private-provider-detail"));
+    const redirect = jest.fn();
+    const controller = new ConnectAuthController(service);
+    await controller.callback({state: "opaque-state", code: "private-code"}, request,
+      {...response, redirect, setHeader: jest.fn()} as AuthResponse);
+    expect(redirect).toHaveBeenCalledWith(303, origin + "/admin#/login?connect_error=access_failed");
   });
   it("translates a redirect and applies the SDK's actual cookie directives", async () => {
     signIn.mockResolvedValue({

@@ -63,6 +63,14 @@ export class ConnectAuthService implements OnModuleDestroy {
           await application.configuration.sync();
         result = await application.auth.signIn(body, ctx);
       } catch (error) {
+        // Email alone never reveals local profile data. Legacy proof is a separate modal step.
+        if (!body.password && error && typeof error === "object" &&
+            "code" in error && error.code === "invalid_credentials") {
+          return { status: "migration_required", onboarding: {
+            version: MIGRATION_CONSENT_VERSION, email: body.email,
+            firstName: "", lastName: "", challenge: "", needsLegacyVerification: true,
+          } };
+        }
         if (
           error &&
           typeof error === "object" &&
