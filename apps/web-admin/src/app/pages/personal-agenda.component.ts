@@ -2,7 +2,7 @@ import { AloraBrandComponent } from "@barber/shared/brand";
 import { CommonModule } from "@angular/common";
 import { Component, inject, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { Router, RouterLink } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import { PERSONAL_STATUS_TRANSITIONS } from "@barber/shared/personal";
 import type { PersonalAppointment, PersonalDashboard } from "@barber/shared/personal";
@@ -16,7 +16,7 @@ import { SessionStore } from "../core/session.store";
     <header class="panel rounded-[2rem] p-5 sm:p-7">
       <div class="flex flex-wrap items-center justify-between gap-4"><alora-brand></alora-brand><div class="flex flex-wrap gap-2"><a *ngIf="canOpenCompany" class="secondary-btn" [routerLink]="companyRoute">Area aziendale</a><button class="secondary-btn" type="button" (click)="logout()">Esci</button></div></div>
       <p class="eyebrow mt-6 text-[var(--accent)]">Il mio lavoro</p>
-      <h1 class="mt-1 font-display text-3xl sm:text-4xl">La mia agenda</h1>
+      <h1 class="mt-1 font-display text-3xl sm:text-4xl">{{ collaboratorId ? (data ? "Agenda di " + data.professional.firstName + " " + data.professional.lastName : "Agenda del profilo") : "La mia agenda" }}</h1>
       <p *ngIf="data" class="mt-2 text-sm opacity-75">{{ data.professional.firstName }} {{ data.professional.lastName }} · Orari {{ data.timezone }}</p>
       <form class="mt-5 flex flex-wrap items-end gap-3" (ngSubmit)="load(false, true)">
         <label class="field"><span>Periodo</span><select name="period" [(ngModel)]="period" [disabled]="loading || !!updatingId"><option value="day">Giorno</option><option value="week">Settimana</option><option value="month">Mese</option></select></label>
@@ -25,19 +25,19 @@ import { SessionStore } from "../core/session.store";
         <button class="secondary-btn" type="button" [disabled]="loading || !!updatingId" (click)="today()">Oggi</button>
         <button class="secondary-btn" type="button" [disabled]="loading || !!updatingId" (click)="load()">Aggiorna</button>
       </form>
-      <p *ngIf="loading" class="mt-4 text-sm" role="status">Caricamento delle tue attività…</p>
+      <p *ngIf="loading" class="mt-4 text-sm" role="status">Caricamento delle attività…</p>
       <p *ngIf="feedback" class="mt-4 text-sm" role="status" aria-live="polite">{{ feedback }}</p>
     </header>
     <ng-container *ngIf="data as dashboard">
-      <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Le mie attività nel periodo">
+      <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Attività nel periodo">
         <article class="panel rounded-3xl p-5"><p class="eyebrow">Appuntamenti</p><strong class="mt-2 block font-display text-3xl">{{ dashboard.activity.totalAppointments }}</strong></article>
         <article class="panel rounded-3xl p-5"><p class="eyebrow">Completati</p><strong class="mt-2 block font-display text-3xl">{{ dashboard.activity.completedAppointments }}</strong></article>
         <article class="panel rounded-3xl p-5"><p class="eyebrow">Servizi attribuiti</p><strong class="mt-2 block font-display text-3xl">{{ dashboard.activity.attributedServices }}</strong><p class="mt-1 text-xs opacity-65">Nei conti registrati nel periodo</p></article>
         <article class="panel rounded-3xl p-5"><p class="eyebrow">Assenze / annullati</p><strong class="mt-2 block font-display text-3xl">{{ dashboard.activity.noShows }} / {{ dashboard.activity.cancelledAppointments }}</strong></article>
       </section>
-      <article *ngIf="dashboard.values as values" class="panel rounded-3xl p-5"><p class="eyebrow">Valore registrato dei tuoi servizi</p><strong class="mt-2 block font-display text-3xl">{{ values.registeredServiceLineTotal | currency: values.currency }}</strong><p class="mt-2 text-sm opacity-75">Somma delle righe servizio attribuite a te, prima di eventuali sconti sul conto. Sono esclusi i servizi senza un conto registrato. Non indica incassi o compensi.</p></article>
+      <article *ngIf="dashboard.values as values" class="panel rounded-3xl p-5"><p class="eyebrow">Valore registrato dei servizi</p><strong class="mt-2 block font-display text-3xl">{{ values.registeredServiceLineTotal | currency: values.currency }}</strong><p class="mt-2 text-sm opacity-75">Somma delle righe servizio attribuite al profilo, prima di eventuali sconti sul conto. Sono esclusi i servizi senza un conto registrato. Non indica incassi o compensi.</p></article>
       <section class="panel rounded-[2rem] p-5 sm:p-6" aria-labelledby="personal-schedule-title">
-        <h2 id="personal-schedule-title" class="font-display text-2xl">I miei orari</h2>
+        <h2 id="personal-schedule-title" class="font-display text-2xl">{{ collaboratorId ? "Orari del profilo" : "I miei orari" }}</h2>
         <p class="mt-2 text-sm opacity-75">Turni configurati dal salone, in {{ dashboard.timezone }}. Gli appuntamenti e le altre risorse determinano gli slot ancora prenotabili.</p>
         <div class="mt-4 grid gap-5 md:grid-cols-2">
           <div><h3 class="text-sm font-semibold">Settimana tipo</h3><p *ngIf="!dashboard.schedule.weekly.length" class="mt-2 text-sm opacity-70">Nessun turno settimanale configurato.</p>
@@ -69,6 +69,8 @@ export class PersonalAgendaComponent implements OnInit {
   private readonly session = inject(SessionRefreshService);
   private readonly store = inject(SessionStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  get collaboratorId(): string { return this.route.snapshot.queryParamMap.get("collaboratorId") || ""; }
   data: PersonalDashboard | null = null;
   period: "day" | "week" | "month" = "week";
   referenceDate = "";
@@ -77,9 +79,9 @@ export class PersonalAgendaComponent implements OnInit {
   updatingId = "";
   pending: { id: string; status: string } | null = null;
   feedback = "";
-  get companyRoute(): string { return this.store.can("users.manage") ? "/team" : "/appointments"; }
+  get companyRoute(): string { return this.store.can("users.manage") ? "/collaborators" : "/appointments"; }
   get canOpenCompany(): boolean { return this.store.can("appointments.read.all") || this.store.can("users.manage"); }
-  get canUpdate(): boolean { return this.store.can("appointments.update.all") || this.store.can("appointments.update.own"); }
+  get canUpdate(): boolean { return this.store.can("appointments.update.all") || ((!this.collaboratorId || this.collaboratorId === this.store.currentUser()?.collaboratorId) && this.store.can("appointments.update.own")); }
   ngOnInit(): void { void this.load(); }
   async load(preserveFeedback = false, resetPage = false): Promise<void> {
     if (resetPage) this.page = 1;
@@ -87,11 +89,11 @@ export class PersonalAgendaComponent implements OnInit {
     this.pending = null;
     if (!preserveFeedback) this.feedback = "";
     try {
-      this.data = await firstValueFrom(this.api.loadPersonalDashboard(this.period, this.referenceDate, this.page));
+      this.data = await firstValueFrom(this.api.loadPersonalDashboard(this.period, this.referenceDate, this.page, this.collaboratorId));
       this.referenceDate = this.data.referenceDate;
     } catch {
       this.data = null;
-      this.feedback = "La tua agenda non è disponibile. Verifica l’associazione e i permessi con il titolare, oppure aggiorna la pagina.";
+      this.feedback = "L’agenda non è disponibile. Verifica l’associazione e i permessi con il titolare, oppure aggiorna la pagina.";
     } finally { this.loading = false; }
   }
   today(): void { this.referenceDate = ""; void this.load(false, true); }

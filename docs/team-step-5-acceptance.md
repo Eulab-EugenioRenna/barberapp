@@ -1,31 +1,58 @@
 # Collaudo operativo Step 5 — Ruoli e squadra
 
-Stato: **collaudo tecnico del consumer eseguito in parte sul Docker reale**, dopo
+Stato: **casi tecnici del consumer verificati sul Docker reale; accettazione operativa pendente**, dopo
 l’autorizzazione dell’utente al collaudo ALORA con Connect schema 014. Non equivale
 a chiusura dello Step 5 o accettazione di produzione.
-[Evidenze e perimetro](verification/team-real-consumer.json).
+[Prima evidenza](verification/team-real-consumer.json), [prosecuzione estesa](verification/team-extended-consumer.json) e [ultimo ciclo consumer](verification/team-final-consumer.json) e [controllo dopo riavvio](verification/team-post-restart.json).
+
+## Ripresa verificata — 4 novembre 2026
+
+Ripristinato il frontend aggiornato dalla copia `.local/web-admin`, conservata.
+Build API e admin passate; suite completa: 226 test su 40 suite, uno snapshot,
+tutti passati. Queste verifiche coprono il sorgente e non ripetono il collaudo
+SSO/browser del 26 ottobre.
+
+Riavviati i container locali esistenti senza ricreare volumi; nessuna migrazione
+pendente e bootstrap demo senza modifiche. Admin e pannello Connect rispondono
+200; team e auth/me anonimi rispondono 401. Connessione e autenticazione SMTP
+Connect verificate senza inviare email. Keycloak ha SMTP STARTTLS configurato;
+questo non prova la consegna del suo link di recupero.
+[Evidenza del runtime](verification/team-runtime-resume-2026-11-04.json).
+
+| Condizione di chiusura residua | Stato e prova necessaria |
+| --- | --- |
+| Recupero password delegato | Non eseguito: identificare un account collaboratore di collaudo e una casella controllata, con autorizzazione all'invio; verificare ricezione del link, cambio nel provider e accesso con nuova credenziale. Non pubblicare link, password o token. |
+| Squadra rivista | Accettazione utente pendente: preset Titolare/Collaboratore, ruolo personalizzato esplicito e gestione profilo/accesso sui dispositivi del salone. |
+| La mia agenda | Accettazione utente pendente: consultazione e operazioni consentite sul proprio profilo da dispositivi del salone. |
+
+Non ripetere le fixture già rimosse per sostituire queste prove. Non avviare
+lo Step 6 prima della chiusura e dell'autorizzazione prevista dal piano.
+
+## Revisione della UI dopo feedback
+
+La nuova pagina Squadra sostituisce Squadra + Accessi squadra; `/team` reindirizza a `/collaborators`. Preset Titolare/Collaboratore, custom soltanto dopo creazione, attività aggregate al posto dei codici dei permessi. [Revisione corrente](team-presets-passwords.md) ed [evidenza](verification/team-presets-passwords.json). Provato anche il cambio obbligatorio della password temporanea con Keycloak reale. Il recupero del collaboratore è un link provider con nuova abilitazione esplicita team.password.reset, abilitata esplicitamente nella licenza locale e nel ruolo Titolare dopo approvazione dell’utente. Pulsante attivo e conferma annullabile verificati su un collaboratore temporaneo, poi rimosso, senza inviare email. Consegna email non collaudata; cambio della propria password nelle impostazioni previsto nello Step 6. I risultati sotto documentano il collaudo precedente; la nuova UI resta da accettare dall’utente.
 
 ## Esiti correnti — 26 ottobre 2026
 
 | Caso | Evidenza reale acquisita | Parte ancora da completare |
 | --- | --- | --- |
 | R1 | Squadra 200/canManage dopo abilitazione dell’utente in Connect | Accettazione finale utente |
-| R2 | Creazione ruolo dalla UI entro delega | Modifica positiva dalla UI |
+| R2 | Creazione, modifica ed eliminazione dalla UI entro delega; conferma prima dell’eliminazione e altri ruoli conservati | — |
 | R3 | Manager ristretto: creazione/modifica/eliminazione ruolo e assegnazione/revoca/restore del target fuori delega: sei 403, sessione valida, nessuna modifica al target | — |
-| R4 | Assegnazioni esplicite sull’account di prova | Destinatario con accesso anche a una seconda applicazione |
-| R5 | Revoca elimina i ruoli; ripristino con assegnazione esplicita | Deselezione manuale di tutti i ruoli e conferma UI |
+| R4 | Stesso utente SSO reale su due app: cambio ruolo, revoca e ripristino ALORA conservano accesso e funzione qa.read dell’altra app | Catalogo della seconda app sintetico; controllo tramite SDK/API reali |
+| R5 | Deselezione di tutti i ruoli dalla UI: salvataggio disabilitato prima della conferma; zero ruoli verificati; riassegnazione esplicita riuscita | — |
 | R6–R7 | Revoca dalla UI nega la sessione già aperta; riassegnazione dalla UI e nuovo login riusciti, identità conservata | — |
 | L1–L2 | Profilo personale limitato; zero permessi locali nega API e indirizza ad Accesso da configurare | — |
-| L3 | Professionista di altra azienda rifiutato, associazione precedente conservata | Collisione con professionista già occupato |
-| L4 | Associazione corrente del titolare conservata | Comando UI di associazione/rimozione; non si è modificato il titolare esistente |
-| P1–P2 | Una sola assegnazione personale e solo turno proprio nella settimana di prova | Navigazione giorno/mese, paginazione e altre eccezioni nell’ambiente effettivo |
+| L3 | Professionista esterno o già occupato rifiutato; associazione e policy precedenti conservate | — |
+| L4 | Associazione/rimozione dalla UI su account temporaneo con ruolo locale owner predisposto come fixture; SSO reale e ruoli/permessi conservati | Il titolare preesistente non è stato modificato |
+| P1–P2 | Giorno/settimana/mese dalla UI, pagine 25+2 senza duplicati e totali coerenti; solo sette turni propri, eccezione personale e chiusura aziendale | — |
 | P3 | Senza consenso locale valori null anche con concessione Connect; con consenso locale 123,45 €, esclusi prodotto e servizio altrui; ricavi aziendali 403 | — |
-| P4 | Dopo concessione locale esplicita solo transizione propria; altri incarichi e transizione inversa vietati | Conferma della transizione dalla UI |
-| P5 | Caso concorrente coperto dalle fixture PostgreSQL documentate | Riassegnazione concorrente sul consumer effettivo |
-| P6 | Manager limitato dalla policy locale anche con concessione centrale | Manager/reception con propria assegnazione personale |
-| I1 | Altra azienda: lettura/modifica appuntamento e associazione professionista negate | Altri percorsi della checklist multi-azienda |
-| U1 | Agenda personale a 375×812, 768×1024, 1024×768, 1366×900: nessun overflow orizzontale, sezione orari visibile; screenshot telefono ispezionato | Interazione completa con form squadra/agenda e dispositivi reali |
-| C1 | Creazione UI → SDK → provider/mapping → login personale; nessuna password provider nel suo hash locale; connectAcceptedAt valorizzato al primo login. Risposta browser persa recuperata con stesso ID e password originale, nessun retry automatico o duplicato | Senza password iniziale, rifiuto password provider e altri conflitti/recuperi remoti elencati sotto |
+| P4 | Solo transizione propria; conferma esplicita dalla UI, stato invariato prima della conferma; altri incarichi e transizione inversa vietati | — |
+| P5 | Titolare riassegna tramite API reale mentre la UI precedente attende conferma: 403 al salvataggio; stato conservato, vecchia assegnazione assente al refresh | — |
+| P6 | Manager e reception con SSO reale leggono/modificano solo i propri appuntamenti; dati aziendali, altri incarichi e altra azienda negati | — |
+| I1 | Due aziende con SSO reale: dieci mutazioni incrociate su ruoli/utenti 404; policy esterne 403; associazioni e creazioni con professionista esterno 404; liste separate, nessun residuo e sessioni conservate | Azienda esterna predisposta tramite preassegnazione admin esplicita |
+| U1 | Agenda e form squadra a 375×812, 768×1024, 1024×768, 1366×900 senza overflow; campi compilabili, nessun invio involontario; screenshot telefono ispezionati | Collaudo completo su dispositivi fisici |
+| C1 | Creazione e login UI reali; password rifiutata dal provider (400), campo svuotato, ripresa UI sullo stesso ID e sessione titolare conservata; login con password recuperata dopo ripetizione della creazione. Account senza password, conflitti email/ID/professionista, mapping/identità sospesi e accesso revocato verificati senza riattivazione implicita | Per gli stati sospesi: SDK consumer reale rifiuta 409; la ripresa ALORA di un intento già completato restituisce il risultato storico senza modificare lo stato. COMMIT remoto perso verificato nel collaudo producer separato |
 
 I test usano tre nuove identità di prova, un ruolo personale, uno per i valori e
 uno per il manager ristretto. Nessun privilegio di un account preesistente è
@@ -39,10 +66,54 @@ Il test della risposta persa riguarda il tratto ALORA→browser, non simula un
 COMMIT remoto perso. Gli appuntamenti/conti sono fixture SQL, non prenotazioni
 passate dal motore operativo. Nessun collaudo di produzione o PWA nativa.
 
+## Prosecuzione e riconciliazione
+
+Il secondo ciclo usa quattro nuove identità, due ruoli e 28 appuntamenti sintetici
+in un periodo futuro. Tutte le fixture sono state rimosse. Ripristino dei due
+backup e riconciliazione 14/14 tabelle ALORA, 15/15 Connect passati. Oltre alle
+esclusioni del primo ciclo, i digest dei clienti escludono soltanto lastAlignedAt
+e updatedAt: la procedura ordinaria di riallineamento ha aggiornato questi due
+campi e nessun altro dato delle quattro anagrafiche esistenti. Audit conservato.
+
+Corretta la perdita di sessione dopo rate limit Connect: il consumer ora riceve
+503 e torna a 200 sulla medesima sessione quando il limite scade, senza nuovo
+login o retry automatico. Revoche e rinnovi ambigui continuano a negare l’accesso.
+Candidata SDK locale aggiornata come indicato in [Step 5](team-step-5.md).
+Il collaudo producer separato con PostgreSQL/Keycloak temporanei è passato;
+admin Connect e catalogo sono simulati in quella prova, browser consumer escluso.
+
+## Ultimo ciclo consumer prima del riavvio
+
+L’ultimo ciclo chiude le lacune tecniche R4, P6 manager, I1 e recupero UI C1.
+La policy temporanea `length(64)` del solo realm di sviluppo è stata ripristinata
+alla policy originale vuota, senza cambiare password preesistenti. Un account
+recuperato effettua il vero SSO con la password originale anche dopo la ripetizione
+della creazione. Il mirror SDK nega i replay su mapping sospesi, identità provider
+disabilitate e accessi revocati; l’API ALORA di ripresa degli intenti già completati
+non esegue un nuovo provisioning e non riattiva tali stati.
+
+Fixture rimosse: tre identità/provider, quattro ruoli, due installazioni e licenze,
+app secondaria e cliente esterno Connect; tre utenti/professionisti/appuntamenti,
+due clienti/servizi e azienda esterna ALORA. Riconciliazione estesa con backup
+ripristinati: 14/14 tabelle ALORA e 19/19 Connect. Verificati separatamente binding
+e segreto decifrato dell’installazione originale. La preassegnazione aveva
+normalizzato il solo slug descrittivo del binding sorgente preesistente: ripristino
+dal backup con guardia sul valore corrente, quindi tabella integralmente coincidente.
+Audit conservato. Il vecchio harness falliva senza verificare lo stato prima di
+leggere il corpo; aggiunte asserzioni esplicite. Dopo il riavvio il controllo finale
+passa: team e contesto locale 200, un utente/un ruolo/quattro professionisti
+originali, logout 201 e richieste anonime o con sessione disconnessa 401. Un 503
+precedente al controllo positivo non si è riprodotto durante la diagnostica:
+non è attribuito a una causa certa. Diagnostica temporanea e Chromium rimossi.
+
+Restano il collaudo dell’utente sui dispositivi reali e l’accettazione operativa.
+Il 26 ottobre l’utente ha confermato che tali prove non erano ancora eseguite.
+Questa conferma non viene sostituita dalle prove browser automatizzate.
+
 ## Ambiente e prerequisiti
 
 - ALORA sviluppo: [login](http://127.0.0.1:53020/admin/#/login), [Accessi squadra](http://127.0.0.1:53020/admin/#/team), [agenda personale](http://127.0.0.1:53020/admin/#/my-agenda).
-- Connect sviluppo: [pannello](http://localhost:8088). Identità, licenza, assegnazioni e delega dell’installazione devono essere attive. Sincronizzare il catalogo ALORA versione 3 (24 funzioni), poi abilitare esplicitamente le funzioni richieste. La sincronizzazione da sola non concede permessi.
+- Connect sviluppo: [pannello](http://localhost:8088). Identità, licenza, assegnazioni e delega dell’installazione devono essere attive. Sincronizzare il catalogo ALORA versione 4 (25 funzioni), poi abilitare esplicitamente le funzioni richieste. La sincronizzazione da sola non concede permessi.
 - Per amministrare la squadra servono `users.manage` in ALORA e `team.manage` effettivo in Connect e ALORA. Responsabile/reception richiedono anche la concessione locale esplicita. L’amministratore di piattaforma ALORA non è un titolare aziendale.
 - Usare account e dati di collaudo. Servono un titolare e, per i casi personali, un account già mappato a questa installazione e presente in ALORA, con un professionista attivo associabile. Per il caso fra aziende serve una seconda azienda di prova. Il seed demo non garantisce account SSO per ogni professionista: la presenza nell’anagrafica non costituisce credenziale o mapping.
 - Le prove modificano assegnazioni, policy e stati: annotare le impostazioni iniziali e usare appuntamenti di prova. Non azzerare il database o il seed per predisporle. Non pubblicare token, password o URL callback completi nelle evidenze.
@@ -75,12 +146,12 @@ Se un prerequisito manca, segnare il caso «bloccato» e indicare quale. Non cre
 
 Per le prove API usare esclusivamente sessioni di collaudo e ID noti delle fixture. Non confondere un link nascosto con una protezione backend: annotare lo stato HTTP delle richieste negate. Gli stati terminali degli appuntamenti non vanno ripristinati artificialmente; usare un altro appuntamento di prova.
 
-## C1 — Nuovo account collaboratore (percorso centrale verificato, sottocasi aperti)
+## C1 — Nuovo account collaboratore (casi tecnici verificati; accettazione utente pendente)
 
 L’utente ha approvato la candidata locale SDK 0.11.0 per lo sviluppo e il collaudo
 consumer. Il Docker Connect è ora verificato a schema 014; il caso centrale è
-passato come indicato nella tabella. I sottocasi seguenti restano requisiti
-separati: quelli non coperti non sono dichiarati superati.
+passato come indicato nella tabella. I sottocasi seguenti restano distinti per
+perimetro di prova: UI consumer, API/SDK consumer e provider temporaneo separato.
 [Consegna produttore](../../eulab%20connect/docs/DELEGATED-ACCOUNTS-STEP-5.md).
 1. In Accessi squadra scegliere Crea account, compilare nome/cognome/email e ambito operativo, scegliere ruoli Connect concedibili e selezionare i permessi locali. Per l’agenda personale associare un professionista libero e attivo. Nessuna unione con un account esistente per email.
 2. Confermare con password iniziale di collaudo facoltativa. Verificare che la UI svuoti il campo. Se omessa, verificare l’indicazione di configurazione dell’accesso provider ancora necessaria; non è inviata un’email da questo form.

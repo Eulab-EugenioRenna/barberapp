@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-26T14:12:27.911Z",
+  "checks": {
+    "originalTeamAvailable200": true,
+    "oneOriginalUserAndRole": true,
+    "fourOriginalProfessionals": true,
+    "qaOwnerSessionLoggedOut": true,
+    "loggedOutSessionDenied401": true,
+    "anonymousTeamDenied401": true,
+    "runtimeSdkSessionRecoveryPresent": true
+  },
+  "sdkSha256": "f36d25ab05dff8d8afde5181fdd68782d0b039c41b6c1708328510fa4aef3100",
+  "runtime": "existing development containers and volumes",
+  "priorProbe503": {
+    "observed": true,
+    "reproducedUnderDiagnostics": false,
+    "causeNotEstablished": true
+  },
+  "operationalAcceptance": false,
+  "realPhysicalDevices": false,
+  "production": false
+}

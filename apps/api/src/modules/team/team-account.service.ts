@@ -89,7 +89,7 @@ export class TeamAccountService {
     if (user.isActive || user.connectSubject || user.connectInstallationId) throw new ConflictException("Profilo modificato: creazione da riconciliare");
     this.validate(context, { role: user.role as CreateTeamAccountInput["role"], permissions: user.permissions, roleIds: intent.roleIds, collaboratorId: user.collaborator?.id || null });
     if (user.collaborator && !await this.prisma.collaborator.findFirst({ where: { id: user.collaborator.id, tenantId: context.tenantId, userId: user.id, isActive: true }, select: { id: true } })) throw new ConflictException("Professionista non più disponibile: creazione da riconciliare");
-    const input: ApplicationTeamUserInput = { localUser: { localUserId: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role as CreateTeamAccountInput["role"], permissions: user.permissions }, roleIds: intent.roleIds, ...(initialPassword === undefined ? {} : { initialPassword }) };
+    const input: ApplicationTeamUserInput = { localUser: { localUserId: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role as CreateTeamAccountInput["role"], permissions: user.permissions }, roleIds: intent.roleIds, initialPasswordTemporary: true, ...(initialPassword === undefined ? {} : { initialPassword }) };
     let result: ApplicationTeamUserResult;
     try { result = await this.team.createUser(authorization, input); }
     catch (error) { return this.failure(error, user.id); }

@@ -1,0 +1,376 @@
+{
+  "date": "2026-10-26",
+  "baseCommit": "114e1b1",
+  "sdkArtifact": "vendor/eulab-connect-0.11.0-session-recovery.tgz",
+  "checks": {
+    "password-policy-ui": {
+      "realConsumerUi": true,
+      "realKeycloakPolicyTemporarilySet": true,
+      "rejected400": true,
+      "providerIdentityAbsentAfterRejection": true,
+      "operatorSessionPreserved": true,
+      "passwordFieldCleared": true,
+      "inactiveDraftInPendingList": true,
+      "resumedThroughUiSameId": true,
+      "oneProviderIdentityAfterRecovery": true
+    },
+    "policy-login": {
+      "recoveredAccountRealSso": true,
+      "sameLocalId": true,
+      "originalRecoveryPasswordStillWorksAfterRepeat": true,
+      "emptyLocalPolicyEnforced": true
+    },
+    "second-app": {
+      "sameRealSsoUser": true,
+      "secondAppCatalogSynthetic": true,
+      "secondAppAccessAndFunctionVerified": true,
+      "aloraRoleChangeTakesEffect": true,
+      "aloraRevocationDeniesOnlyAlora": true,
+      "secondAppAccessAndFunctionsUnchanged": true,
+      "aloraRolesExplicitlyRestored": true
+    },
+    "isolation": {
+      "realSsoBothCompanies": true,
+      "checks": [
+        {
+          "kind": "foreignTeamMutation",
+          "method": "PUT",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "DELETE",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "PUT",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "DELETE",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "POST",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "PUT",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "DELETE",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "PUT",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "DELETE",
+          "status": 404
+        },
+        {
+          "kind": "foreignTeamMutation",
+          "method": "POST",
+          "status": 404
+        },
+        {
+          "kind": "foreignLocalPolicy",
+          "status": 403
+        },
+        {
+          "kind": "foreignLocalPolicy",
+          "status": 403
+        },
+        {
+          "kind": "foreignSelfProfessional",
+          "status": 404
+        },
+        {
+          "kind": "foreignSelfProfessional",
+          "status": 404
+        },
+        {
+          "kind": "foreignProfessionalOnCreation",
+          "status": 404
+        },
+        {
+          "kind": "foreignProfessionalOnCreation",
+          "status": 404
+        }
+      ],
+      "localListsIsolated": true,
+      "managerOwnReadAndWrite": true,
+      "managerCompanyAndOtherAssignmentsDenied": true,
+      "originalLocalPoliciesAndAssociationsPreserved": true,
+      "businessErrorsPreserveBothSessions": true
+    },
+    "replay-states": {
+      "cases": [
+        {
+          "kind": "mappingDisabled",
+          "sdkRefuses409": true,
+          "aloraHistoricalResumeDoesNotReactivate": true
+        },
+        {
+          "kind": "providerIdentityDisabled",
+          "sdkRefuses409": true,
+          "aloraHistoricalResumeDoesNotReactivate": true
+        },
+        {
+          "kind": "appAccessRevoked",
+          "sdkRefuses409": true,
+          "aloraHistoricalResumeDoesNotRestoreRoles": true
+        }
+      ],
+      "operatorSessionPreserved": true,
+      "explicitRestorationOnly": true
+    },
+    "delete-role-ui": {
+      "explicitConfirmation": true,
+      "rolePresentBeforeConfirmation": true,
+      "delegatedDelete200": true,
+      "otherRolesPreserved": true
+    },
+    "cleanup-connect": {
+      "fixtureIdentitiesRemoved": 3,
+      "fixtureRolesRemoved": 4,
+      "oneRoleRemovedByDelegatedUi": true,
+      "fixtureInstallationsRemoved": 2,
+      "fixtureLicensesRemoved": 2,
+      "fixtureApplicationRemoved": true,
+      "fixtureCustomerRemoved": true,
+      "providerIdentitiesAndMappingsRemovedThroughAdminApi": true,
+      "originalPasswordPolicyRestored": true
+    },
+    "cleanup-alora": {
+      "fixtureUsersRemoved": 3,
+      "fixtureProfessionalsRemoved": 3,
+      "fixtureAppointmentsRemoved": 3,
+      "fixtureCustomersRemoved": 2,
+      "fixtureServicesRemoved": 2,
+      "fixtureForeignTenantRemoved": true,
+      "rejectedCreationsLeftNoLocalUsers": true,
+      "allFixtureUsersAcceptedThroughRealSso": true,
+      "intentsSessionsAndForeignBindingRemoved": true,
+      "cachesInvalidated": true,
+      "auditPreserved": true
+    },
+    "reconciliation": {
+      "date": "2026-10-26T13:49:56.317Z",
+      "temporaryRestoreDatabasesRemoved": true,
+      "alora": [
+        {
+          "table": "Tenant",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "User",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Customer",
+          "count": 4,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Service",
+          "count": 4,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Product",
+          "count": 5,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Collaborator",
+          "count": 4,
+          "matchesBaseline": true
+        },
+        {
+          "table": "CollaboratorWeeklySchedule",
+          "count": 28,
+          "matchesBaseline": true
+        },
+        {
+          "table": "CollaboratorDayOverride",
+          "count": 0,
+          "matchesBaseline": true
+        },
+        {
+          "table": "TenantHoliday",
+          "count": 0,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Room",
+          "count": 0,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Appointment",
+          "count": 11,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Sale",
+          "count": 4,
+          "matchesBaseline": true
+        },
+        {
+          "table": "SaleItem",
+          "count": 8,
+          "matchesBaseline": true
+        },
+        {
+          "table": "TeamAccountIntent",
+          "count": 0,
+          "matchesBaseline": true
+        }
+      ],
+      "connect": [
+        {
+          "table": "customers",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "applications",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "installations",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "licenses",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "entitlements",
+          "count": 24,
+          "matchesBaseline": true
+        },
+        {
+          "table": "identities",
+          "count": 2,
+          "matchesBaseline": true
+        },
+        {
+          "table": "memberships",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "roles",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "role_permissions",
+          "count": 24,
+          "matchesBaseline": true
+        },
+        {
+          "table": "assignments",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "local_links",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "features",
+          "count": 24,
+          "matchesBaseline": true
+        },
+        {
+          "table": "permissions",
+          "count": 24,
+          "matchesBaseline": true
+        },
+        {
+          "table": "app_local_users",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "catalogs",
+          "count": 3,
+          "matchesBaseline": true
+        },
+        {
+          "table": "app_access_revocations",
+          "count": 0,
+          "matchesBaseline": true
+        },
+        {
+          "table": "connect_sources",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "source_installation_bindings",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "source_tenant_bindings",
+          "count": 1,
+          "matchesBaseline": true
+        }
+      ],
+      "customerComparisonExcludesOnlyAlignmentTimestamps": true,
+      "userComparisonExcludesOnlyLoginUpdatedAt": true,
+      "applicationComparisonExcludesOnlyCatalogCheckAndSyncTimestamps": true,
+      "auditAndRuntimeSessionHistoryExcluded": true
+    },
+    "binding-reconciliation": {
+      "originalBindingAndDecryptedSecretPreserved": true,
+      "count": 1
+    },
+    "source-label-restoration": {
+      "preassignmentRefreshedExistingDisplayLabels": true,
+      "onlyLocalSlugDiffered": true,
+      "restoredFromVerifiedBackupWithCurrentValueGuard": true,
+      "identityCustomerAndInstallationBindingsUnchanged": true,
+      "fullSourceTenantTableMatchesBaseline": true
+    },
+    "pause-cleanup": {
+      "qaOwnerLogoutStatus": 201,
+      "disposableChromiumRemoved": true,
+      "finalRuntimeProbeHarnessFailed": true
+    }
+  },
+  "scope": {
+    "realConsumerAndProvider": true,
+    "secondAppCatalogAndOperationalRowsSynthetic": true,
+    "foreignCompanyExplicitAdminPreassignment": true,
+    "providerPolicyRestored": true,
+    "realPhysicalDevices": false,
+    "production": false
+  },
+  "status": "technical_cases_verified_operational_acceptance_pending",
+  "operationalAcceptance": false,
+  "history": {
+    "pausedByUserBeforePcRestart": true,
+    "resumed": true
+  },
+  "postRestartEvidence": "team-post-restart.json"
+}

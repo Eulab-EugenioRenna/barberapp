@@ -1,3 +1,4 @@
+import { isTransientAuthError } from "./auth-errors";
 import { canAccessLocalView, canUseLocalFunction, VIEW_FUNCTIONS } from "@barber/shared/functions";
 import { firstValueFrom } from "rxjs";
 import { AuthApiService } from "./auth-api.service";
@@ -11,10 +12,14 @@ export const authGuard: CanActivateFn = async (_, state) => {
 
   const auth = inject(AuthApiService);
   if (sessionStore.isAuthenticated()) {
+    if (state.url.split("?")[0] === "/access-unavailable" && new URLSearchParams(state.url.split("?")[1] || "").get("reason") === "temporary") return true;
     try {
       // Re-read operational restrictions on navigation; the server remains authoritative.
       const user = await firstValueFrom(auth.me());
       sessionStore.setCurrentUser(user);
+      const selectedProfile = new URLSearchParams(state.url.split("?")[1] || "").get("collaboratorId");
+      const teamAgenda = state.url.split("?")[0] === "/my-agenda" && !!selectedProfile;
+      if (teamAgenda && !canUseLocalFunction(user, "appointments.read.all")) return router.createUrlTree(["/access-unavailable"]);
       if (user.role === "collaborator") {
         const destination = canUseLocalFunction(user, "appointments.read.own") ? "/my-agenda" : "/access-unavailable";
         return state.url.split("?")[0] === destination ? true : router.createUrlTree([destination]);
@@ -23,7 +28,7 @@ export const authGuard: CanActivateFn = async (_, state) => {
         return state.url.startsWith("/platform")
           ? true
           : router.createUrlTree(["/platform"]);
-      if (state.url.startsWith("/my-agenda") && (!user.collaboratorId || !canUseLocalFunction(user, "appointments.read.own")))
+      if (state.url.startsWith("/my-agenda") && !teamAgenda && (!user.collaboratorId || !canUseLocalFunction(user, "appointments.read.own")))
         return router.createUrlTree(["/access-unavailable"]);
       const view = state.url.split("?")[0].split("/")[1];
       const required = VIEW_FUNCTIONS[view];
@@ -38,7 +43,11 @@ export const authGuard: CanActivateFn = async (_, state) => {
       if (view === "platform")
         return router.createUrlTree(["/access-unavailable"]);
       return true;
-    } catch {
+    } catch (error) {
+      if (isTransientAuthError(error)) {
+        sessionStore.rememberRequestedUrl(state.url);
+        return router.createUrlTree(["/access-unavailable"], { queryParams: { reason: "temporary" } });
+      }
       sessionStore.clear();
     }
   }

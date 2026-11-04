@@ -55,6 +55,20 @@ describe("Delegated team adapter", () => {
     expect(callbackRejected).toBe(false);
     expect(services).toHaveBeenCalledTimes(1);
   });
+  it("requires a distinct reset grant and a same-company non-owner target", async () => {
+    const send = jest.fn().mockResolvedValue({requested:true}), lookup = jest.fn().mockResolvedValue({id:"worker-a"});
+    const resetService = new TeamService({connectSession:{findFirst},user:{findFirst:lookup}} as unknown as PrismaService);
+    await expect(resetService.passwordReset("Bearer local-token","worker-subject")).rejects.toBeInstanceOf(ForbiddenException);
+    expect(send).not.toHaveBeenCalled();
+    jest.mocked(resolveRequestSession).mockResolvedValue({...session,user:{...session.user!,connectFunctions:["users.manage","team.manage","team.password.reset"]}});
+    jest.mocked(connectApplication).mockResolvedValue({services:jest.fn(async(_handle,operation)=>operation({requestTeamPasswordReset:send},"provider-token"))} as unknown as Awaited<ReturnType<typeof connectApplication>>);
+    await expect(resetService.passwordReset("Bearer local-token","worker-subject")).resolves.toEqual({requested:true});
+    expect(lookup).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({tenantId:"company-a",connectSubject:"worker-subject",role:{in:["collaborator","manager","reception"]}})}));
+    expect(send).toHaveBeenCalledTimes(1);
+    lookup.mockResolvedValue(null);await expect(resetService.passwordReset("Bearer local-token","foreign-subject")).rejects.toBeInstanceOf(ForbiddenException);
+    lookup.mockResolvedValue({id:session.user!.id});await expect(resetService.passwordReset("Bearer local-token","self-subject")).rejects.toBeInstanceOf(ForbiddenException);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
   it("uses the facade team method outside services without nested session locking", async () => {
     const input = { localUser: { localUserId: "new-profile", email: "new@example.test", firstName: "New", lastName: "Person", role: "collaborator" as const, permissions: [] }, roleIds: ["role-id"] };
     createUser.mockResolvedValue({ localUserId: "new-profile" });

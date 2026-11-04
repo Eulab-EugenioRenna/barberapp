@@ -46,6 +46,13 @@ export class AuthApiService {
     });
   }
 
+  exchangeTechnicalAccess(handoff: string): Observable<any> {
+    return this.http.post(
+      `${ADMIN_API_URL}/auth/connect/technical/exchange`,
+      { handoff },
+    );
+  }
+
   me(): Observable<any> {
     return this.http.get(`${ADMIN_API_URL}/auth/me`);
   }

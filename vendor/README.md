@@ -1,6 +1,12 @@
-# Historical Connect SDK artifacts
+# Connect SDK artifacts
 
-ALORA now installs **[@eulab/connect@0.10.0 from npm](https://www.npmjs.com/package/@eulab/connect/v/0.10.0)**. The root package pins the exact version; the lockfile contains the public registry URL and SHA-512 integrity. Docker dependency stages use npm ci and do not copy vendor/ before installing.
+The active development dependency is `eulab-connect-0.11.0-team-security.tgz`, a local 0.11.0 candidate built from the Connect checkout. SHA-256: `d84f5290c27fd877c4874c836af321e3add9df832817daa9b1c9b8f0dd3b3574`.
+
+This candidate adds optional temporary initial passwords for new delegated identities and a delegated password-recovery API. Existing credentials are never rewritten by provisioning replay. It also preserves sessions on transient authorization-read failures while denying the request. Revocation and ambiguous rotating grants still invalidate the session. It is not published to npm or accepted for production. The package lock pins its integrity and all Docker dependency stages copy this exact artifact.
+
+# Historical artifacts
+
+The previous approved distribution installed **[@eulab/connect@0.10.0 from npm](https://www.npmjs.com/package/@eulab/connect/v/0.10.0)**.
 
 The tarballs here preserve the earlier integration snapshots only. They are not the active dependency. The local 0.10.0 snapshot SHA-256 is `2e07f936a8d52b9ff47862dcd674e0afa39fe0a4c9919ffa37d4cd9380cc294d`; the public registry artifact was verified byte-for-byte identical to this accepted local snapshot.
 

@@ -4,6 +4,8 @@ export interface LocalIdentity {
   permissions?: readonly string[];
   permissionsConfigured?: boolean;
   connectFunctions?: readonly string[];
+  /** EULab Admin access-as: native owner role grants every implemented function. */
+  technicalAccess?: boolean;
   collaboratorId?: string | null;
 }
 export interface FunctionDefinition {
@@ -137,6 +139,12 @@ export const ALORA_FUNCTIONS = [
     legacy: false,
   },
   {
+    key: "team.password.reset",
+    name: "Recupero accessi dei collaboratori",
+    description: "Richiedere al provider un link di cambio password per un collaboratore amministrabile, senza leggere o impostare la sua password.",
+    legacy: false,
+  },
+  {
     key: "audit.read",
     name: "Consultazione audit",
     description: "Consultare le operazioni registrate per la propria azienda.",
@@ -165,7 +173,7 @@ export const ALORA_FUNCTIONS = [
   },
 ] as const satisfies readonly FunctionDefinition[];
 export type FunctionKey = (typeof ALORA_FUNCTIONS)[number]["key"];
-export const FUNCTION_MATRIX_VERSION = 3;
+export const FUNCTION_MATRIX_VERSION = 4;
 export function canUseLocalFunction(
   user: LocalIdentity | null | undefined,
   key: string,
@@ -183,7 +191,11 @@ export function canUseLocalFunction(
     return ["appointments.read.own", "appointments.update.own"].includes(key) && (!user.permissionsConfigured || !!user.permissions?.includes(key));
   }
   if (user.role === "owner")
-    return definition.legacy || !!user.connectFunctions?.includes(key);
+    return (
+      definition.legacy ||
+      user.technicalAccess === true ||
+      !!user.connectFunctions?.includes(key)
+    );
   if (!["manager", "reception"].includes(user.role)) return false;
   return [key, ...(definition.aliases ?? [])].some((permission) =>
     user.permissions?.includes(permission),
@@ -222,6 +234,7 @@ export function canAccessLocalView(
   user: LocalIdentity | null | undefined,
   view: string,
 ): boolean {
+  if (view === "collaborators") return canUseLocalFunction(user, "collaborators.read") || canUseLocalFunction(user, "users.manage");
   if (view === "services")
     return (
       canUseLocalFunction(user, "services.read") ||

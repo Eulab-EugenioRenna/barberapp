@@ -1,4 +1,10 @@
+import { resolveWithinRequest } from "./request-session-scope";
 import { resolveConnectPermissions } from "./connect-runtime";
+import {
+  assertTechnicalGrantActive,
+  assertTechnicalOperator,
+  forgetTechnicalOperator,
+} from "./connect-technical";
 import {
   ForbiddenException,
   NotFoundException,
@@ -21,6 +27,7 @@ export interface RequestSession {
     permissions?: string[];
     permissionsConfigured?: boolean;
     connectFunctions?: string[];
+    technicalAccess?: boolean;
     collaboratorId?: string | null;
   } | null;
   tenantId: string | null;
@@ -30,6 +37,10 @@ export async function resolveRequestSession(
   prisma: PrismaService,
   authorization?: string,
 ): Promise<RequestSession> {
+  return resolveWithinRequest(prisma, authorization, () => loadRequestSession(prisma, authorization));
+}
+
+async function loadRequestSession(prisma: PrismaService, authorization?: string): Promise<RequestSession> {
   const token = bearerToken(authorization);
   if (!token) throw new UnauthorizedException("Accedi per continuare");
   const stored = await prisma.localSession.findUnique({
@@ -42,6 +53,37 @@ export async function resolveRequestSession(
     stored.accessExpiresAt <= new Date()
   ) {
     throw new UnauthorizedException("Sessione scaduta o revocata");
+  }
+  if (stored.technicalAccessId) {
+    try {
+      const grant = await prisma.connectTechnicalAccess.findUnique({
+        where: { id: stored.technicalAccessId },
+      });
+      assertTechnicalGrantActive(grant);
+      if (grant.targetUserId !== stored.userId)
+        throw new UnauthorizedException("Accesso come profilo non valido");
+      await assertTechnicalOperator(prisma, grant);
+    } catch (error) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException
+      ) {
+        await prisma.localSession
+          .updateMany({
+            where: { familyId: stored.familyId },
+            data: { revokedAt: new Date() },
+          })
+          .catch(() => undefined);
+        await prisma.connectTechnicalAccess
+          .updateMany({
+            where: { id: stored.technicalAccessId, revokedAt: null },
+            data: { revokedAt: new Date() },
+          })
+          .catch(() => undefined);
+        forgetTechnicalOperator(stored.technicalAccessId);
+      }
+      throw error;
+    }
   }
   const user = await prisma.user.findUnique({
     where: { id: stored.userId },
@@ -67,11 +109,16 @@ export async function resolveRequestSession(
     }
   }
 
-  if (user.role !== UserRole.PlatformAdmin && !stored.connectSessionId)
+  if (
+    user.role !== UserRole.PlatformAdmin &&
+    !stored.connectSessionId &&
+    !stored.technicalAccessId
+  )
     throw new UnauthorizedException("Accedi tramite Connect");
-  const connectFunctions = stored.connectSessionId
-    ? await resolveConnectPermissions(prisma, stored.connectSessionId, user)
-    : undefined;
+  const connectFunctions =
+    stored.connectSessionId && !stored.technicalAccessId
+      ? await resolveConnectPermissions(prisma, stored.connectSessionId, user)
+      : undefined;
 
   return {
     connectSessionId: stored.connectSessionId,
@@ -85,6 +132,7 @@ export async function resolveRequestSession(
       permissions: user.permissions,
       permissionsConfigured: user.permissionsConfigured,
       ...(connectFunctions ? { connectFunctions } : {}),
+      ...(stored.technicalAccessId ? { technicalAccess: true } : {}),
       collaboratorId:
         user.collaborator?.isActive &&
         user.collaborator.tenantId === user.tenantId

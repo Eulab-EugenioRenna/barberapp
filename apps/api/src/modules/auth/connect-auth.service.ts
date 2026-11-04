@@ -35,6 +35,10 @@ export class ConnectAuthService implements OnModuleDestroy {
   constructor(private readonly prisma: PrismaService) {
     this.pruneTimer = setInterval(() => {
       void pruneConnectApplication(this.prisma).catch(() => undefined);
+      const expiredGrants = this.prisma.connectTechnicalAccess?.deleteMany({
+        where: { expiresAt: { lt: new Date(Date.now() - 24 * 60 * 60_000) } },
+      });
+      if (expiredGrants) void expiredGrants.catch(() => undefined);
     }, 5 * 60_000);
     this.pruneTimer.unref();
   }

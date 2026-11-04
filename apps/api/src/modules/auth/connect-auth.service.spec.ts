@@ -96,7 +96,7 @@ describe("ALORA SDK HTTP orchestration", () => {
     process.env["ALORA_AUTH_RETURN_URL"] = origin + "/admin/";
     callback.mockRejectedValue(new Error("private-provider-detail"));
     const redirect = jest.fn();
-    const controller = new ConnectAuthController(service);
+    const controller = new ConnectAuthController(service, {} as never);
     await controller.callback({state: "opaque-state", code: "private-code"}, request,
       {...response, redirect, setHeader: jest.fn()} as AuthResponse);
     expect(redirect).toHaveBeenCalledWith(303, origin + "/admin#/login?connect_error=access_failed");

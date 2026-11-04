@@ -1,3 +1,4 @@
+import { inFlightGetInterceptor } from "./app/core/in-flight-get.interceptor";
 import { provideHttpClient, withInterceptors } from "@angular/common/http";
 import { bootstrapApplication } from "@angular/platform-browser";
 import { provideRouter, withHashLocation } from "@angular/router";
@@ -12,7 +13,7 @@ prepareRemoteOnly(window)
     bootstrapApplication(AdminRootComponent, {
       providers: [
         provideRouter(adminRoutes, withHashLocation()),
-        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClient(withInterceptors([authInterceptor, inFlightGetInterceptor])),
       ],
     }),
   )

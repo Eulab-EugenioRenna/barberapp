@@ -1,4 +1,4 @@
-> Stato corrente, 26 ottobre 2026: l’utente ha autorizzato la candidata locale 0.11.0 nello sviluppo ALORA. package.json, lockfile e Docker usano vendor/eulab-connect-0.11.0.tgz (SHA-256 b75d3c46ba8fbcf17dc522083f172abc3d07928c2f697d0f0c8ba182b6b749d5). application.team.createUser è integrato; API Connect/schema 014/bootstrap effettivi e collaudo C1 restano necessari. Le note seguenti sulla 0.10.0 pubblica descrivono la distribuzione precedente, non quella di sviluppo attuale.
+> Stato corrente, 26 ottobre 2026: l’utente ha autorizzato la candidata locale 0.11.0 nello sviluppo ALORA. package.json, lockfile e Docker usano vendor/eulab-connect-0.11.0-team-security.tgz (SHA-256 d84f5290c27fd877c4874c836af321e3add9df832817daa9b1c9b8f0dd3b3574). application.team.createUser e il recupero della sessione dopo errori transitori sono integrati; Connect/schema 014 e il percorso C1 principale sono verificati nel Docker locale. I sottocasi ancora aperti sono elencati nella checklist Step 5. Le note seguenti sulla 0.10.0 pubblica descrivono la distribuzione precedente, non quella di sviluppo attuale.
 
 # Requisito trasversale — integrazione Connect rapida nelle prossime app
 

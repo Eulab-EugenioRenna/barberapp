@@ -4,7 +4,7 @@ export type OperationDefinition =
   | { kind: "function"; key: FunctionKey; own?: FunctionKey }
   | { kind: "public" | "session" | "tenant-context" | "platform" | "disabled" };
 export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
-  "PersonalDashboardController.overview": { kind: "function", key: "appointments.read.own", own: "appointments.read.own" },
+  "PersonalDashboardController.overview": { kind: "function", key: "appointments.read.all", own: "appointments.read.own" },
   "TeamController.pendingAccounts": { kind: "function", key: "team.manage" },
   "TeamController.createAccount": { kind: "function", key: "team.manage" },
   "TeamController.resumeAccount": { kind: "function", key: "team.manage" },
@@ -17,12 +17,15 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "TeamController.removeRole": { kind: "function", key: "team.manage" },
   "TeamController.assignRoles": { kind: "function", key: "team.manage" },
   "TeamController.revoke": { kind: "function", key: "team.manage" },
+  "TeamController.passwordReset": { kind: "function", key: "team.password.reset" },
   "TeamController.restore": { kind: "function", key: "team.manage" },
 
   "AuthController.method": { kind: "public" },
   "ConnectAuthController.accept": { kind: "public" },
   "ConnectAuthController.callback": { kind: "public" },
   "ConnectAuthController.exchange": { kind: "public" },
+  "ConnectAuthController.exchangeTechnical": { kind: "public" },
+  "ConnectTechnicalController.start": { kind: "public" },
   "AppointmentsController.context": {
     kind: "function",
     key: "appointments.read.all",
@@ -67,6 +70,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "products.manage",
   },
+  "CollaboratorsController.findOne": { kind: "function", key: "collaborators.read" },
   "CollaboratorsController.findAll": {
     kind: "function",
     key: "collaborators.read",

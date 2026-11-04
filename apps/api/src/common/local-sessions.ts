@@ -49,6 +49,7 @@ export async function createLocalSession(
   familyId: string = randomUUID(),
   refreshExpiresAt = new Date(Date.now() + REFRESH_TTL_MS),
   connectSessionId: string | null = null,
+  technicalAccess: { id: string; expiresAt: Date } | null = null,
 ) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"user:" + userId}, 0))`;
   const user = await tx.user.findUnique({
@@ -56,20 +57,31 @@ export async function createLocalSession(
     select: sessionUserSelect,
   });
   assertActiveUser(user);
-  if (user?.role !== "platform_admin" && !connectSessionId)
+  if (
+    user?.role !== "platform_admin" &&
+    !connectSessionId &&
+    !technicalAccess
+  )
     throw new UnauthorizedException("Accedi tramite Connect");
+  if (technicalAccess && technicalAccess.expiresAt <= new Date())
+    throw new UnauthorizedException("Accesso come profilo scaduto");
   const accessToken = randomBytes(32).toString("base64url");
   const refreshToken = randomBytes(32).toString("base64url");
-  const accessExpiresAt = new Date(Date.now() + ACCESS_TTL_MS);
+  const accessExpiresAt = technicalAccess
+    ? technicalAccess.expiresAt
+    : new Date(Date.now() + ACCESS_TTL_MS);
   await tx.localSession.create({
     data: {
       userId,
       familyId,
       connectSessionId,
+      technicalAccessId: technicalAccess?.id ?? null,
       accessHash: tokenHash(accessToken),
       refreshHash: tokenHash(refreshToken),
       accessExpiresAt,
-      refreshExpiresAt,
+      refreshExpiresAt: technicalAccess
+        ? technicalAccess.expiresAt
+        : refreshExpiresAt,
     },
   });
   return {
@@ -107,6 +119,13 @@ export async function rotateLocalSession(
       where: { refreshHash: tokenHash(refreshToken) },
     });
     if (!current) return null;
+    if (current.technicalAccessId) {
+      await tx.localSession.updateMany({
+        where: { familyId: current.familyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return null;
+    }
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"user:" + current.userId}, 0))`;
     // Serialize every transition in this family, including concurrent replay/logout.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${current.familyId}, 0))`;

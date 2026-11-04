@@ -77,10 +77,11 @@ export class AdminApiService {
     });
   }
 
-  loadPersonalDashboard(period: "day" | "week" | "month", date = "", page = 1): Observable<PersonalDashboard> {
-    if (!this.session.can("appointments.read.own")) return throwError(() => new Error("Agenda personale non abilitata"));
+  loadPersonalDashboard(period: "day" | "week" | "month", date = "", page = 1, collaboratorId = ""): Observable<PersonalDashboard> {
+    if (!(collaboratorId ? this.session.can("appointments.read.all") : this.session.can("appointments.read.own"))) return throwError(() => new Error("Agenda personale non abilitata"));
     const query = new URLSearchParams({ period, page: String(page) });
     if (date) query.set("date", date);
+    if (collaboratorId) query.set("collaboratorId", collaboratorId);
     return this.http.get<PersonalDashboard>(`${ADMIN_API_URL}/dashboard/personal?${query}`);
   }
 

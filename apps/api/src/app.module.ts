@@ -1,3 +1,4 @@
+import { RequestSessionInterceptor } from "./common/request-session.interceptor";
 import { TeamModule } from "./modules/team/team.module";
 import { AuthAttemptGuard } from "./modules/auth/auth-attempt.guard";
 import { FunctionCatalogController } from "./modules/function-catalog/function-catalog.controller";
@@ -57,6 +58,7 @@ import { UsersModule } from "./modules/users/users.module";
     { provide: APP_FILTER, useClass: PrismaErrorFilter },
     { provide: APP_GUARD, useClass: AuthAttemptGuard },
     { provide: APP_GUARD, useClass: LocalPolicyGuard },
+    { provide: APP_INTERCEPTOR, useClass: RequestSessionInterceptor },
     { provide: APP_INTERCEPTOR, useClass: SecurityAuditInterceptor },
   ],
 })

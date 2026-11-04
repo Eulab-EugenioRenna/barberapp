@@ -1,6 +1,8 @@
+import { AdminTeamPageComponent } from "./admin-team-page.component";
+import { SessionStore } from "../core/session.store";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
@@ -10,6 +12,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
   selector: "barber-admin-collaborators-page",
   standalone: true,
   imports: [
+    AdminTeamPageComponent,
     FunctionAccessDirective,
     CommonModule,
     FormsModule,
@@ -18,7 +21,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
     UiIconComponent,
   ],
   template: `
-    <section class="grid gap-4">
+    <alora-admin-team-page *ngIf="canManageAccounts" [professionals]="collaborators" (editProfessional)="openEdit($event)" (newProfessional)="openNew()"></alora-admin-team-page>
+    <section *ngIf="!canManageAccounts" class="grid gap-4">
       <article class="panel rounded-[2rem] p-4 sm:p-5">
         <div class="page-head">
           <div class="min-w-0">
@@ -36,7 +40,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             class="primary-btn"
             (click)="openNew()"
           >
-            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo professionista
+            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo collaboratore
           </button>
         </div>
         <label class="field mt-4">
@@ -62,7 +66,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 {{ collaborator.lastName }}</strong
               >
               <p class="mt-1 text-sm text-[var(--muted)]">
-                {{ collaborator.email || "Accesso non associato" }}
+                {{ collaborator.email || "Profilo professionista" }}
               </p>
             </div>
             <div class="mt-3 flex flex-wrap gap-2">
@@ -121,8 +125,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               <barber-ui-icon name="save"></barber-ui-icon>
               {{
                 collaboratorForm.id
-                  ? "Modifica professionista"
-                  : "Nuovo professionista"
+                  ? "Modifica collaboratore"
+                  : "Nuovo collaboratore"
               }}
             </h2>
           </div>
@@ -378,7 +382,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               [disabled]="loading"
               (click)="openNew()"
             >
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo professionista
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo collaboratore
             </button>
           </div>
         </form>
@@ -387,6 +391,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
   `,
 })
 export class AdminCollaboratorsPageComponent {
+  private readonly session = inject(SessionStore);
+  get canManageAccounts(): boolean { return this.session.can("users.manage"); }
   @Input() collaborators: any[] = [];
   @Input() collaboratorForm: any = {};
   @Input() defaultCollaboratorId = "";

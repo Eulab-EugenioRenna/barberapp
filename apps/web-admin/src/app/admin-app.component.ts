@@ -32,7 +32,6 @@ import { AdminAppointmentsEditorModalComponent } from "./appointments/admin-appo
 import { AppointmentsFacade } from "./appointments/appointments.facade";
 import { CustomSelectComponent } from "./custom-select.component";
 import { AdminAppointmentsPageComponent } from "./pages/admin-appointments-page.component";
-import { AdminTeamPageComponent } from "./pages/admin-team-page.component";
 import { AdminCollaboratorsPageComponent } from "./pages/admin-collaborators-page.component";
 import { AdminCustomersPageComponent } from "./pages/admin-customers-page.component";
 import { AdminDashboardPageComponent } from "./pages/admin-dashboard-page.component";
@@ -83,7 +82,6 @@ type ViewKey =
     AdminCustomersPageComponent,
     AdminServicesPageComponent,
     AdminCollaboratorsPageComponent,
-    AdminTeamPageComponent,
     AdminPlatformPageComponent,
     AdminSettingsPageComponent,
     PendingOrdersQueueComponent,
@@ -478,7 +476,6 @@ type ViewKey =
               (loadMore)="loadMoreCollaborators()"
             ></barber-admin-collaborators-page>
 
-            <alora-admin-team-page *ngIf="activeView === 'team'"></alora-admin-team-page>
 
             <barber-admin-platform-page
               *ngIf="
@@ -774,8 +771,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       hint: "servizi e prodotti",
       icon: "L",
     },
-    { key: "collaborators", label: "Squadra", hint: "orari", icon: "S" },
-    { key: "team", label: "Accessi squadra", hint: "ruoli e deleghe", icon: "U" },
+    { key: "collaborators", label: "Squadra", hint: "persone e ruoli", icon: "S" },
     {
       key: "settings",
       label: "Il tuo salone",

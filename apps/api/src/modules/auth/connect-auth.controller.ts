@@ -21,6 +21,10 @@ import { Transform } from "class-transformer";
 
 import { AuthResponse, ConnectAuthService } from "./connect-auth.service";
 import { ConnectRequest } from "../../common/connect-http";
+import { ConnectTechnicalService } from "./connect-technical.service";
+class TechnicalExchangeDto {
+  @IsString() @Length(43, 43) handoff!: string;
+}
 class AcceptConnectDto {
   @IsBoolean() @Equals(true) accepted!: boolean;
   @IsString() @Equals(MIGRATION_CONSENT_VERSION) consentVersion!: string;
@@ -41,7 +45,10 @@ class ConnectExchangeDto {
 }
 @Controller("auth/connect")
 export class ConnectAuthController {
-  constructor(private readonly connect: ConnectAuthService) {}
+  constructor(
+    private readonly connect: ConnectAuthService,
+    private readonly technical: ConnectTechnicalService,
+  ) {}
   @Post("accept")
   @Header("Cache-Control", "no-store")
   accept(@Body() body: AcceptConnectDto, @Req() request: ConnectRequest) {
@@ -78,5 +85,10 @@ export class ConnectAuthController {
   ) {
     const result = await this.connect.exchange(body.handoff, request, response);
     return result;
+  }
+  @Post("technical/exchange")
+  @Header("Cache-Control", "no-store")
+  async exchangeTechnical(@Body() body: TechnicalExchangeDto) {
+    return this.technical.exchange(body.handoff);
   }
 }

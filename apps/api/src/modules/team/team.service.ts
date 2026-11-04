@@ -60,5 +60,14 @@ export class TeamService {
   removeRole(authorization: string | undefined, id: string) { return this.withTeam(authorization, (client, token) => client.deleteTeamRole(token, id)); }
   assignRoles(authorization: string | undefined, subject: string, roleIds: string[]) { return this.withTeam(authorization, (client, token) => client.setTeamUserRoles(token, subject, roleIds)); }
   revoke(authorization: string | undefined, subject: string) { return this.withTeam(authorization, (client, token) => client.revokeTeamUser(token, subject)); }
+  passwordReset(authorization: string | undefined, subject: string) {
+    return this.withTeam(authorization, async (client, token, session) => {
+      const actor = requireUser(session);
+      if (!canUseLocalFunction(actor, "team.password.reset") || !canUseLocalFunction(actor, "team.manage")) throw new ForbiddenException();
+      const target = await this.prisma.user.findFirst({ where: { tenantId: requireTenantId(session), connectSubject: subject, isActive: true, role: { in: ["collaborator", "manager", "reception"] } }, select: { id: true } });
+      if (!target || target.id === actor.id) throw new ForbiddenException("Usa le impostazioni personali per la tua password");
+      return client.requestTeamPasswordReset(token, subject);
+    });
+  }
   restore(authorization: string | undefined, subject: string) { return this.withTeam(authorization, (client, token) => client.restoreTeamUser(token, subject)); }
 }

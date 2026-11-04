@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-04",
+  "scope": "Ripresa runtime locale esistente; nessuna accettazione operativa o produzione",
+  "containers": {
+    "strategy": "docker start dei container esistenti; nessuna ricreazione di container o volumi",
+    "alora": ["postgres", "redis", "mailhog", "api", "web-admin", "web-public-booking", "nginx"],
+    "connect": ["postgres", "redis", "keycloak", "api", "web", "runner"]
+  },
+  "aloraStartup": {
+    "migrationsFound": 14,
+    "pendingMigrations": false,
+    "existingDemoTenant": "bootstrap dichiara nessuna modifica effettuata"
+  },
+  "http": {
+    "admin": 200,
+    "connectWeb": 200,
+    "anonymousTeam": 401,
+    "anonymousAuthMe": 401
+  },
+  "email": {
+    "connectSmtpConnectionAndAuthentication": "passed via nodemailer.verify nel container API",
+    "keycloakRealm": "eulab",
+    "keycloakTransport": "smtp.gmail.com:587 STARTTLS, autenticazione abilitata",
+    "emailSent": false,
+    "deliveryVerified": false,
+    "passwordResetLinkVerified": false
+  },
+  "limitations": [
+    "CUA indisponibile: CUA_REPL_ENABLED_SURFACES is required",
+    "Nessun nuovo login autenticato verificato in questo ciclo",
+    "Collaudo utente su dispositivi fisici e accettazione operativa pendenti",
+    "Verifica SMTP del consumer Connect non dimostra invio Keycloak o consegna email"
+  ],
+  "step5Complete": false,
+  "step6Started": false
+}

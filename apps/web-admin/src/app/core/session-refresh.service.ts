@@ -1,3 +1,4 @@
+import { isTransientAuthError } from "./auth-errors";
 import { HttpBackend, HttpClient } from "@angular/common/http";
 import { inject, Injectable } from "@angular/core";
 import {
@@ -42,7 +43,7 @@ export class SessionRefreshService {
           this.store.setSession(response);
         } catch (error) {
           this.store.syncFromStorage();
-          if (this.store.refreshToken() === originalRefresh) this.store.clear();
+          if (this.store.refreshToken() === originalRefresh && !isTransientAuthError(error)) this.store.clear();
           throw error;
         }
       };

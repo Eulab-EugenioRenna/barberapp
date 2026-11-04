@@ -1,0 +1,825 @@
+<section class="grid gap-5" aria-labelledby="team-title">
+  <header class="panel rounded-[2rem] p-5 sm:p-7">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="min-w-0">
+        <p class="eyebrow text-[var(--accent)]">Le persone del salone</p>
+        <h2 id="team-title" class="mt-2 font-display text-3xl sm:text-4xl">
+          La tua squadra.
+        </h2>
+        <p class="mt-2 max-w-xl text-sm text-[var(--muted)]">
+          Persone, ruoli, orari e accessi. Tutto nella stessa scheda.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button
+          *ngIf="canManage"
+          type="button"
+          class="secondary-btn"
+          (click)="rolePanel = true"
+        >
+          Gestisci ruoli</button
+        ><button
+          *ngIf="canEditProfiles"
+          type="button"
+          class="primary-btn"
+          [disabled]="busy"
+          (click)="newProfessional.emit()"
+        >
+          Aggiungi collaboratore
+        </button>
+      </div>
+    </div>
+    <div class="mt-5 flex flex-wrap items-end gap-3">
+      <label class="field min-w-0 flex-1"
+        ><span>Cerca una persona</span
+        ><input
+          name="teamSearch"
+          type="search"
+          [(ngModel)]="query"
+          placeholder="Nome e cognome" /></label
+      ><button
+        type="button"
+        class="secondary-btn"
+        [disabled]="loading || busy"
+        (click)="load()"
+      >
+        Aggiorna
+      </button>
+    </div>
+    <p *ngIf="loading" class="mt-4 text-sm" role="status">
+      Caricamento della squadra…
+    </p>
+    <p
+      *ngIf="feedback"
+      class="mt-4 rounded-2xl bg-[var(--surface)] p-3 text-sm"
+      role="status"
+      aria-live="polite"
+    >
+      {{ feedback }}
+    </p>
+  </header>
+  <div
+    *ngIf="!loading || people.length"
+    class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+  >
+    <article
+      *ngFor="let person of people; trackBy: trackPerson"
+      class="panel flex min-w-0 items-start gap-4 rounded-[1.75rem] p-5 transition hover:shadow-md"
+    >
+      <a
+        *ngIf="
+          person.professional &&
+          (canReadTeamAgenda || (isSelf(person) && canReadOwnAgenda))
+        "
+        routerLink="/my-agenda"
+        [queryParams]="
+          isSelf(person) && canReadOwnAgenda
+            ? null
+            : { collaboratorId: person.professional.id }
+        "
+        [attr.aria-label]="'Apri agenda di ' + person.name"
+        class="secondary-btn shrink-0 self-start"
+        >Agenda <span aria-hidden="true">↗</span></a
+      >
+      <button
+        type="button"
+        class="min-w-0 flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4"
+        (click)="open(person)"
+      >
+        <div class="flex items-start gap-3">
+          <span
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/10 font-display text-xl text-[var(--accent)]"
+            >{{ person.name.slice(0, 1) }}</span
+          >
+          <div class="min-w-0">
+            <strong class="block break-words font-display text-xl">{{
+              person.name
+            }}</strong>
+            <p class="mt-1 text-sm text-[var(--muted)]">
+              {{ label(person) }}<span *ngIf="isSelf(person)"> · Tu</span>
+            </p>
+          </div>
+        </div>
+        <div class="mt-5 flex flex-wrap gap-2">
+          <span
+            class="status-pill"
+            [class.status-pill-green]="
+              person.user &&
+              !person.user.accessRevoked &&
+              person.user.identityEnabled &&
+              person.user.membershipEnabled
+            "
+            [class.status-pill-neutral]="
+              !person.user || person.user.accessRevoked
+            "
+            >{{ accessLabel(person) }}</span
+          >
+        </div>
+        <p class="mt-4 text-xs text-[var(--muted)]">
+          {{
+            person.professional
+              ? "Servizi, orari e accesso personale"
+              : "Ruolo e accesso personale"
+          }}
+          <span aria-hidden="true">↗</span>
+        </p>
+      </button>
+    </article>
+    <p
+      *ngIf="!people.length"
+      class="panel rounded-3xl p-6 text-sm text-[var(--muted)]"
+    >
+      Nessuna persona trovata.
+    </p>
+  </div>
+  <div
+    *ngIf="canManage"
+    class="flex flex-wrap items-center justify-between gap-3 px-2"
+  >
+    <p class="max-w-xl text-sm text-[var(--muted)]">
+      Un collaboratore può far parte della squadra anche senza accedere al
+      gestionale.
+    </p>
+    <button
+      type="button"
+      class="secondary-btn"
+      [disabled]="busy"
+      (click)="createAccess()"
+    >
+      Crea un accesso
+    </button>
+  </div>
+  <article *ngIf="pending.length" class="panel grid gap-3 rounded-[2rem] p-5">
+    <h3 class="font-display text-xl">Creazioni da completare</h3>
+    <p class="text-sm text-[var(--muted)]">
+      Riprendi la persona già salvata, senza creare un altro account.
+    </p>
+    <div
+      *ngFor="let draft of pending"
+      class="rounded-2xl border border-[var(--line)] p-4"
+    >
+      <strong>{{ draft.firstName }} {{ draft.lastName }}</strong>
+      <p class="break-all text-sm text-[var(--muted)]">{{ draft.email }}</p>
+      <button
+        type="button"
+        class="secondary-btn mt-3"
+        [disabled]="busy"
+        (click)="pendingId = draft.id; recoveryPassword = ''"
+      >
+        Riprendi creazione
+      </button>
+      <form
+        *ngIf="pendingId === draft.id"
+        class="mt-3 grid gap-3"
+        (ngSubmit)="resumeAccount(draft.id)"
+      >
+        <label class="field"
+          ><span>Password iniziale, se necessaria</span
+          ><input
+            name="recoveryPassword"
+            type="password"
+            autocomplete="new-password"
+            [(ngModel)]="recoveryPassword"
+            [disabled]="busy" /></label
+        ><button class="primary-btn justify-self-start" [disabled]="busy">
+          Conferma ripresa
+        </button>
+      </form>
+    </div>
+  </article>
+</section>
+
+<div *ngIf="selected as person" class="confirm-overlay">
+  <button
+    type="button"
+    class="confirm-backdrop"
+    aria-label="Chiudi scheda persona"
+    [disabled]="busy"
+    (click)="close()"
+  ></button>
+  <article
+    barberAutofocusFirst
+    class="confirm-dialog panel max-h-[85vh] overflow-auto !w-[min(40rem,100%)]"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="person-title"
+  >
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <p class="eyebrow text-[var(--accent)]">Squadra</p>
+        <h2 id="person-title" class="mt-2 break-words font-display text-3xl">
+          {{ person.name }}
+        </h2>
+        <p class="mt-2 text-sm text-[var(--muted)]">
+          {{ label(person) }} · {{ accessLabel(person) }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="pill-btn"
+        [disabled]="busy"
+        (click)="close()"
+      >
+        Chiudi
+      </button>
+    </div>
+    <p *ngIf="feedback" class="mt-4 text-sm" role="alert">{{ feedback }}</p>
+    <div
+      *ngIf="person.professional"
+      class="mt-6 rounded-3xl border border-[var(--line)] p-4"
+    >
+      <h3 class="font-display text-xl">Il lavoro in salone</h3>
+      <p class="mt-2 text-sm text-[var(--muted)]">
+        Servizi eseguiti, disponibilità e orari della persona.
+      </p>
+      <button
+        *ngIf="canEditProfiles"
+        type="button"
+        class="secondary-btn mt-4"
+        [disabled]="busy"
+        (click)="editProfile(person)"
+      >
+        Profilo, servizi e orari
+      </button>
+    </div>
+    <div class="mt-5 rounded-3xl border border-[var(--line)] p-4">
+      <h3 class="font-display text-xl">Accesso al gestionale</h3>
+      <ng-container *ngIf="!person.user"
+        ><p class="mt-2 text-sm text-[var(--muted)]">
+          Può lavorare in salone senza un account. Attiva l’accesso solo se deve
+          usare il gestionale.
+        </p>
+        <button
+          *ngIf="canManage && !isPending(person)"
+          type="button"
+          class="primary-btn mt-4"
+          (click)="createAccess(person)"
+        >
+          Attiva accesso
+        </button></ng-container
+      >
+      <ng-container *ngIf="person.user"
+        ><p class="mt-2 text-sm text-[var(--muted)]">
+          {{
+            label(person) === "Collaboratore"
+              ? "Vede la propria agenda e aggiorna le attività assegnate. Nessun accesso ai dati degli altri o ai report del salone."
+              : "Le attività disponibili dipendono dal ruolo assegnato."
+          }}
+        </p>
+        <div *ngIf="canEditPerson(person)" class="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="primary-btn"
+            [disabled]="busy"
+            (click)="editAccess()"
+          >
+            {{
+              person.user.accessRevoked
+                ? "Riattiva con un ruolo"
+                : "Cambia ruolo"
+            }}</button
+          ><button
+            *ngIf="!person.user.accessRevoked"
+            type="button"
+            class="secondary-btn"
+            [disabled]="busy"
+            (click)="confirmRevoke = true"
+          >
+            Revoca accesso
+          </button>
+        </div>
+        <p
+          *ngIf="person.local?.role === 'owner'"
+          class="mt-3 text-sm text-[var(--muted)]"
+        >
+          Il profilo del titolare e le sue credenziali sono conservati.
+        </p></ng-container
+      >
+    </div>
+    <form
+      *ngIf="policyOpen"
+      class="mt-5 grid gap-4 rounded-3xl bg-[var(--surface)] p-4"
+      (ngSubmit)="saveAccess()"
+    >
+      <h3 class="font-display text-xl">Scegli il ruolo</h3>
+      <label class="field"
+        ><span>Ruolo della persona</span
+        ><select name="personRole" [(ngModel)]="choice" [disabled]="busy">
+          <option value="" disabled>
+            Scegli un ruolo per sostituire le assegnazioni attuali
+          </option>
+          <option
+            value="preset:collaborator"
+            [disabled]="!choiceAvailable('preset:collaborator')"
+          >
+            Collaboratore
+          </option>
+          <option
+            value="preset:owner"
+            [disabled]="!choiceAvailable('preset:owner')"
+          >
+            Titolare
+          </option>
+          <option
+            *ngFor="let role of customRoles"
+            [value]="role.id"
+            [disabled]="!canEditRole(role)"
+          >
+            {{ role.name }}
+          </option>
+        </select></label
+      ><label class="field"
+        ><span>Profilo professionista</span
+        ><select
+          name="personProfessional"
+          [(ngModel)]="professionalId"
+          [disabled]="busy"
+        >
+          <option [ngValue]="null">Nessuno</option>
+          <option
+            *ngFor="let pro of profileChoices"
+            [ngValue]="pro.id"
+            [disabled]="
+              pro.isActive === false ||
+              (!!pro.userId && pro.userId !== person.local?.id)
+            "
+          >
+            {{ pro.firstName }} {{ pro.lastName
+            }}{{
+              pro.userId && pro.userId !== person.local?.id
+                ? " · già associato"
+                : ""
+            }}
+          </option>
+        </select></label
+      >
+      <p class="text-sm text-[var(--muted)]">
+        Il ruolo Collaboratore richiede un profilo per mostrare soltanto la sua
+        agenda. La conferma sostituisce il ruolo e le impostazioni di accesso
+        attuali.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          class="primary-btn"
+          [disabled]="
+            busy ||
+            !choiceAvailable(choice) ||
+            (requiresProfile && !professionalId)
+          "
+        >
+          Conferma ruolo</button
+        ><button
+          type="button"
+          class="secondary-btn"
+          [disabled]="busy"
+          (click)="policyOpen = false"
+        >
+          Annulla
+        </button>
+      </div>
+    </form>
+    <section
+      *ngIf="canEditPerson(person)"
+      class="mt-5 rounded-3xl border border-[var(--line)] p-4"
+    >
+      <h3 class="font-display text-xl">Password dimenticata?</h3>
+      <p class="mt-2 text-sm text-[var(--muted)]">
+        Il collaboratore riceve un link da Connect e sceglie la nuova password.
+        Non vedrai né la password attuale né quella nuova.
+      </p>
+      <button
+        type="button"
+        class="secondary-btn mt-3"
+        [disabled]="busy || !canResetPassword(person)"
+        (click)="confirmPasswordReset = true"
+      >
+        Reimposta password
+      </button>
+      <p
+        *ngIf="!canResetPassword(person)"
+        class="mt-2 text-xs text-[var(--muted)]"
+      >
+        Il recupero richiede un accesso attivo e l’abilitazione al recupero
+        password dei collaboratori.
+      </p>
+      <div *ngIf="confirmPasswordReset" class="mt-4">
+        <p class="text-sm">
+          Confermi la richiesta di recupero per {{ person.name }}? L’invio del
+          link non revoca e non riattiva l’accesso al salone.
+        </p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="primary-btn"
+            [disabled]="busy"
+            (click)="resetPassword()"
+          >
+            Conferma recupero password</button
+          ><button
+            type="button"
+            class="secondary-btn"
+            [disabled]="busy"
+            (click)="confirmPasswordReset = false"
+          >
+            Annulla
+          </button>
+        </div>
+      </div>
+    </section>
+    <form
+      *ngIf="canAssociateSelf"
+      class="mt-5 grid gap-3"
+      (ngSubmit)="saveSelf()"
+    >
+      <label class="field"
+        ><span>Il mio profilo professionista</span
+        ><select
+          name="selfProfessional"
+          [(ngModel)]="professionalId"
+          [disabled]="busy"
+        >
+          <option [ngValue]="null">Nessun profilo</option>
+          <option
+            *ngFor="let pro of profileChoices"
+            [ngValue]="pro.id"
+            [disabled]="
+              pro.isActive === false ||
+              (!!pro.userId && pro.userId !== person.local?.id)
+            "
+          >
+            {{ pro.firstName }} {{ pro.lastName }}
+          </option>
+        </select></label
+      ><button class="secondary-btn justify-self-start" [disabled]="busy">
+        Conferma associazione
+      </button>
+    </form>
+    <div
+      *ngIf="confirmRevoke"
+      class="mt-5 rounded-3xl border border-[var(--line)] p-4"
+    >
+      <p class="text-sm">
+        Revocare l’accesso? L’account, il profilo professionista e gli accessi
+        ad altre applicazioni sono conservati.
+      </p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="primary-btn"
+          [disabled]="busy"
+          (click)="revoke()"
+        >
+          Conferma revoca</button
+        ><button
+          type="button"
+          class="secondary-btn"
+          [disabled]="busy"
+          (click)="confirmRevoke = false"
+        >
+          Annulla
+        </button>
+      </div>
+    </div>
+  </article>
+</div>
+
+<div *ngIf="account as draft" class="confirm-overlay">
+  <button
+    type="button"
+    class="confirm-backdrop"
+    aria-label="Chiudi creazione accesso"
+    [disabled]="busy"
+    (click)="close()"
+  ></button>
+  <article
+    barberAutofocusFirst
+    class="confirm-dialog panel max-h-[85vh] overflow-auto !w-[min(42rem,100%)]"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="account-title"
+  >
+    <div class="flex justify-between gap-4">
+      <div>
+        <p class="eyebrow text-[var(--accent)]">Accesso personale</p>
+        <h2 id="account-title" class="mt-2 font-display text-3xl">
+          Una persona, un ruolo.
+        </h2>
+      </div>
+      <button
+        type="button"
+        class="pill-btn"
+        [disabled]="busy"
+        (click)="close()"
+      >
+        Chiudi
+      </button>
+    </div>
+    <p *ngIf="feedback" class="mt-4 text-sm" role="alert">{{ feedback }}</p>
+    <form class="mt-5 grid gap-4" (ngSubmit)="createAccount()">
+      <fieldset
+        class="grid gap-3 sm:grid-cols-2"
+        [disabled]="busy || accountAttempted"
+      >
+        <label class="field"
+          ><span>Nome</span
+          ><input
+            name="accountFirstName"
+            required
+            maxlength="120"
+            [(ngModel)]="draft.firstName" /></label
+        ><label class="field"
+          ><span>Cognome</span
+          ><input
+            name="accountLastName"
+            required
+            maxlength="120"
+            [(ngModel)]="draft.lastName" /></label
+        ><label class="field sm:col-span-2"
+          ><span>Email per accedere</span
+          ><input
+            name="accountEmail"
+            type="email"
+            required
+            maxlength="250"
+            autocomplete="off"
+            [(ngModel)]="draft.email" /></label
+        ><label class="field"
+          ><span>Ruolo</span
+          ><select name="accountRole" [(ngModel)]="choice">
+            <option
+              value="preset:collaborator"
+              [disabled]="!choiceAvailable('preset:collaborator')"
+            >
+              Collaboratore
+            </option>
+            <option
+              value="preset:owner"
+              [disabled]="!choiceAvailable('preset:owner')"
+            >
+              Titolare
+            </option>
+            <option
+              *ngFor="let role of customRoles"
+              [value]="role.id"
+              [disabled]="!canEditRole(role)"
+            >
+              {{ role.name }}
+            </option>
+          </select></label
+        ><label class="field"
+          ><span>Profilo professionista</span
+          ><select
+            name="accountProfessional"
+            [(ngModel)]="draft.collaboratorId"
+          >
+            <option [ngValue]="null">Nessuno</option>
+            <option
+              *ngFor="let pro of profileChoices"
+              [ngValue]="pro.id"
+              [disabled]="pro.isActive === false || !!pro.userId"
+            >
+              {{ pro.firstName }} {{ pro.lastName }}
+            </option>
+          </select></label
+        >
+      </fieldset>
+      <p class="rounded-2xl bg-[var(--surface)] p-4 text-sm">
+        {{
+          choice === "preset:collaborator"
+            ? "La persona vedrà soltanto la propria agenda e potrà aggiornare le attività assegnate. Cassa, clienti completi, dati economici e impostazioni del salone sono esclusi."
+            : choice === "preset:owner"
+              ? "Gestione completa delle funzioni abilitate per il salone. Assegna questo ruolo soltanto a chi deve amministrare l’attività."
+              : "Si applicano le attività del ruolo personalizzato che hai creato."
+        }}
+      </p>
+      <p *ngIf="requiresProfile && !draft.collaboratorId" class="text-sm">
+        Seleziona il profilo della persona per attivare la sua agenda.
+      </p>
+      <p class="text-sm text-[var(--muted)]">
+        Per un ruolo diverso, chiudi il form e scegli Gestisci ruoli → Crea
+        ruolo personalizzato.
+      </p>
+      <label class="field"
+        ><span>Password iniziale temporanea</span
+        ><input
+          name="initialAccountPassword"
+          [type]="showInitialPassword ? 'text' : 'password'"
+          autocomplete="new-password"
+          maxlength="512"
+          [(ngModel)]="accountPassword"
+          [disabled]="busy || accountAttempted"
+      /></label>
+      <button
+        type="button"
+        class="secondary-btn justify-self-start"
+        [disabled]="busy || accountAttempted"
+        (click)="showInitialPassword = !showInitialPassword"
+      >
+        {{
+          showInitialPassword ? "Nascondi password" : "Mostra password iniziale"
+        }}
+      </button>
+      <p class="text-xs text-[var(--muted)]">
+        Consegna questa password direttamente alla persona: al primo accesso
+        dovrà sceglierne una nuova. Il form non invia email e non sostituisce
+        credenziali esistenti.
+      </p>
+      <p *ngIf="accountAttempted" class="text-sm">
+        Richiesta già inviata: chiudi il form e verifica la persona nelle
+        creazioni da completare prima di riprendere.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          class="primary-btn"
+          [disabled]="busy || accountAttempted || !accountValid"
+        >
+          Conferma creazione</button
+        ><button
+          type="button"
+          class="secondary-btn"
+          [disabled]="busy"
+          (click)="close()"
+        >
+          Annulla
+        </button>
+      </div>
+    </form>
+  </article>
+</div>
+
+<div *ngIf="rolePanel" class="confirm-overlay">
+  <button
+    type="button"
+    class="confirm-backdrop"
+    aria-label="Chiudi ruoli"
+    [disabled]="busy"
+    (click)="rolePanel = false; roleDraft = null"
+  ></button>
+  <article
+    barberAutofocusFirst
+    class="confirm-dialog panel max-h-[85vh] overflow-auto !w-[min(52rem,100%)]"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="roles-title"
+  >
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <p class="eyebrow text-[var(--accent)]">Semplice da assegnare</p>
+        <h2 id="roles-title" class="mt-2 font-display text-3xl">
+          I ruoli della squadra.
+        </h2>
+      </div>
+      <button
+        type="button"
+        class="pill-btn"
+        [disabled]="busy"
+        (click)="rolePanel = false; roleDraft = null"
+      >
+        Chiudi
+      </button>
+    </div>
+    <p *ngIf="feedback" class="mt-4 text-sm" role="alert">{{ feedback }}</p>
+    <div class="mt-5 grid gap-3 sm:grid-cols-2">
+      <div class="rounded-3xl bg-[var(--surface)] p-5">
+        <span class="eyebrow text-[var(--accent)]">Predefinito</span>
+        <h3 class="mt-2 font-display text-2xl">Titolare</h3>
+        <p class="mt-2 text-sm text-[var(--muted)]">
+          Gestisce le funzioni abilitate per l’attività, la squadra e gli
+          accessi.
+        </p>
+      </div>
+      <div class="rounded-3xl bg-[var(--surface)] p-5">
+        <span class="eyebrow text-[var(--accent)]">Predefinito</span>
+        <h3 class="mt-2 font-display text-2xl">Collaboratore</h3>
+        <p class="mt-2 text-sm text-[var(--muted)]">
+          La propria agenda e le attività assegnate. Nessun dato degli altri o
+          incasso aziendale.
+        </p>
+      </div>
+    </div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+      <h3 class="font-display text-xl">I tuoi ruoli personalizzati</h3>
+      <button
+        type="button"
+        class="primary-btn"
+        [disabled]="busy"
+        (click)="editCustom()"
+      >
+        Crea ruolo personalizzato
+      </button>
+    </div>
+    <p *ngIf="!customRoles.length" class="mt-3 text-sm text-[var(--muted)]">
+      Non hai ancora creato ruoli personalizzati. Compariranno qui dopo il
+      salvataggio.
+    </p>
+    <div
+      *ngFor="let role of customRoles"
+      class="mt-3 rounded-2xl border border-[var(--line)] p-4"
+    >
+      <div class="flex flex-wrap justify-between gap-3">
+        <strong>{{ role.name }}</strong>
+        <div *ngIf="canEditRole(role)" class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="secondary-btn"
+            [disabled]="busy"
+            (click)="editCustom(role)"
+          >
+            Modifica</button
+          ><button
+            type="button"
+            class="secondary-btn"
+            [disabled]="busy"
+            (click)="deleteRoleId = role.id"
+          >
+            Elimina
+          </button>
+        </div>
+      </div>
+      <div *ngIf="deleteRoleId === role.id" class="mt-3">
+        <p class="text-sm">
+          Eliminare il ruolo e le sue assegnazioni? Le persone rimangono in
+          squadra.
+        </p>
+        <button
+          type="button"
+          class="secondary-btn mt-3"
+          [disabled]="busy"
+          (click)="deleteCustom(role)"
+        >
+          Conferma eliminazione
+        </button>
+      </div>
+    </div>
+    <form
+      barberAutofocusFirst
+      *ngIf="roleDraft as draft"
+      class="mt-6 grid gap-4 border-t border-[var(--line)] pt-5"
+      (ngSubmit)="saveCustom()"
+    >
+      <h3 class="font-display text-2xl">
+        {{ draft.id ? "Modifica il ruolo" : "Crea il tuo ruolo" }}
+      </h3>
+      <label class="field"
+        ><span>Come si chiama?</span
+        ><input
+          name="customRoleName"
+          required
+          maxlength="120"
+          placeholder="Es. Responsabile di sala"
+          [(ngModel)]="draft.name"
+          [disabled]="busy"
+      /></label>
+      <p *ngIf="draft.name.trim() && !customNameValid" class="text-sm">
+        Usa un nome diverso da Titolare e Collaboratore, già disponibili come
+        ruoli predefiniti.
+      </p>
+      <p class="text-sm text-[var(--muted)]">
+        Scegli le attività consentite. Le opzioni non disponibili richiedono
+        un’abilitazione per l’attività.
+      </p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label
+          *ngFor="let option of options"
+          class="flex items-start gap-3 rounded-2xl border border-[var(--line)] p-4"
+          ><input
+            type="checkbox"
+            class="mt-1"
+            [checked]="optionSelected(option)"
+            [disabled]="busy || !optionAvailable(option)"
+            (change)="toggleOption(option, $any($event.target).checked)"
+          /><span
+            ><strong class="block text-sm">{{ option.name }}</strong
+            ><span class="mt-1 block text-xs text-[var(--muted)]">{{
+              option.description
+            }}</span
+            ><span *ngIf="optionPartial(option)" class="mt-1 block text-xs"
+              >Configurazione esistente parziale: conservata finché non la
+              modifichi.</span
+            ><span *ngIf="!optionAvailable(option)" class="mt-1 block text-xs"
+              >Non disponibile con le abilitazioni attuali.</span
+            ></span
+          ></label
+        >
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          class="primary-btn"
+          [disabled]="busy || !customNameValid || !draft.permissions.length"
+        >
+          Salva ruolo personalizzato</button
+        ><button
+          type="button"
+          class="secondary-btn"
+          [disabled]="busy"
+          (click)="roleDraft = null"
+        >
+          Annulla
+        </button>
+      </div>
+    </form>
+  </article>
+</div>

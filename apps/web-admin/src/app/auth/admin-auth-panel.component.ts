@@ -1,3 +1,4 @@
+import { isTransientAuthError } from "../core/auth-errors";
 import {
   ConnectOnboardingModalComponent,
   ConnectOnboardingProfile,
@@ -455,10 +456,14 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
     const fragment = new URLSearchParams(hashQuery);
     const handoff = fragment.get("alora_connect") ?? url.searchParams.get("alora_connect");
     const error = fragment.get("connect_error") ?? url.searchParams.get("connect_error");
-    if (!handoff && !error) return;
+    const technicalHandoff = fragment.get("alora_technical");
+    const technicalError = fragment.get("alora_technical_error");
+    if (!handoff && !error && !technicalHandoff && !technicalError) return;
     url.searchParams.delete("alora_connect");
     fragment.delete("alora_connect");
     fragment.delete("connect_error");
+    fragment.delete("alora_technical");
+    fragment.delete("alora_technical_error");
     url.hash = route + (fragment.size ? "?" + fragment.toString() : "");
     url.searchParams.delete("connect_error");
     window.history.replaceState(null, "", url.href);
@@ -467,16 +472,26 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
         "Accesso Connect non completato. Se su Connect è attivo un altro account, cambia account e riprova con la stessa email inserita in ALORA.";
       return;
     }
+    if (technicalError) {
+      this.feedback =
+        "Accesso come profilo non riuscito. Genera un nuovo ticket da Connect: il ticket scade in 60 secondi ed è monouso.";
+      return;
+    }
     this.loading = true;
     try {
-      const session = await firstValueFrom(
-        this.authApi.exchangeConnect(handoff!),
-      );
+      const session = technicalHandoff
+        ? await firstValueFrom(
+            this.authApi.exchangeTechnicalAccess(technicalHandoff),
+          )
+        : await firstValueFrom(this.authApi.exchangeConnect(handoff!));
       if (this.destroyed) return;
       this.sessionStore.setSession(session);
       await this.enterApplication();
     } catch {
-      this.feedback = "Accesso Connect da ripetere. Premi nuovamente Accedi.";
+      if (technicalHandoff) this.sessionStore.clear();
+      this.feedback = technicalHandoff
+        ? "Accesso come profilo scaduto o revocato. Genera un nuovo ticket da Connect."
+        : "Accesso Connect da ripetere. Premi nuovamente Accedi.";
     } finally {
       this.loading = false;
     }
@@ -536,7 +551,13 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
   }
 
   private async enterApplication(): Promise<void> {
-    const currentUser = await firstValueFrom(this.authApi.me());
+    let currentUser;
+    try { currentUser = await firstValueFrom(this.authApi.me()); }
+    catch (error) {
+      if (!isTransientAuthError(error)) throw error;
+      await this.router.navigateByUrl("/access-unavailable?reason=temporary");
+      return;
+    }
     this.sessionStore.setCurrentUser(currentUser);
     const pending = this.sessionStore.consumeRequestedUrl();
     await this.router.navigateByUrl(

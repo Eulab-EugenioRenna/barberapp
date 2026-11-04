@@ -120,6 +120,12 @@ describe("shared session renewal", () => {
     expect(mockPost).not.toHaveBeenCalled();
     expect(store.token()).toBe("access-other-tab");
   });
+  it("keeps credentials after a temporary refresh failure but clears a definitively rejected session", async () => {
+    store.setSession(response("old",true));mockPost.mockReturnValue(throwError(()=>({status:503})));
+    await expect(firstValueFrom(service.refresh())).rejects.toEqual({status:503});expect(store.token()).toBe("access-old");
+    mockPost.mockReturnValue(throwError(()=>({status:401})));
+    await expect(firstValueFrom(service.refresh())).rejects.toEqual({status:401});expect(store.isAuthenticated()).toBe(false);
+  });
   it("renews after a failed mutation without resending it", async () => {
     store.setSession(response("old"));
     mockPost.mockReturnValue(of(response("new")));

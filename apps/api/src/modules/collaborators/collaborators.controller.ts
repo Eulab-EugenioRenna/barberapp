@@ -1,6 +1,7 @@
 import { LegacyWriteDto } from "../../common/legacy-write.dto";
 import {
   BadRequestException,
+  NotFoundException,
   Body,
   Controller,
   Delete,
@@ -69,6 +70,14 @@ export class CollaboratorsController {
         return buildPaginatedResult(items, total, page, pageSize);
       },
     );
+  }
+
+  @Get(":id")
+  async findOne(@Req() request: { headers: { authorization?: string } }, @Param("id") id: string): Promise<unknown> {
+    const session = await resolveRequestSession(this.prisma, request.headers.authorization);
+    const person = await this.prisma.collaborator.findFirst({ where: { id, tenantId: requireTenantId(session) }, include: { weeklySchedules: { orderBy: { weekday: "asc" } }, dayOverrides: { orderBy: { date: "asc" } } } });
+    if (!person) throw new NotFoundException("Professionista non disponibile in questa attività");
+    return person;
   }
 
   @Post()

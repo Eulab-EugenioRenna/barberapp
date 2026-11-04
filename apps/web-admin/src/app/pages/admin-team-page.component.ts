@@ -1,297 +1,755 @@
+import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { CommonModule } from "@angular/common";
 import { HttpClient } from "@angular/common/http";
-import { Component, OnInit, inject } from "@angular/core";
-import { RouterLink } from "@angular/router";
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnInit,
+  Output,
+  OnChanges,
+  HostListener,
+  inject,
+} from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { RouterLink } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import type { TeamOverview, TeamRole, TeamUser } from "@eulab/connect/server";
 import { ADMIN_API_URL } from "../core/api-config";
 import { SessionStore } from "../core/session.store";
+import {
+  ROLE_OPTIONS,
+  COLLABORATOR_FUNCTIONS,
+  PERSONAL_FUNCTIONS,
+  changeRoleOption,
+  sameFunctions,
+  roleScope,
+} from "./team-role-options";
 
-interface LocalTeamUser { id: string; firstName: string; lastName: string; role: string; permissions: string[]; permissionsConfigured: boolean; collaborator: { id: string } | null; }
-interface LocalTeamContext { users: LocalTeamUser[]; collaborators: { id: string; firstName: string; lastName: string; userId: string | null; isActive: boolean }[]; functions: { key: string; name: string }[]; }
-interface LocalPolicyDraft { id: string; role: "manager" | "reception" | "collaborator"; permissions: string[]; collaboratorId: string | null; }
-
-interface TeamAccountDraft { id: string; email: string; firstName: string; lastName: string; role: "manager" | "reception" | "collaborator"; permissions: string[]; roleIds: string[]; collaboratorId: string | null; }
+interface Professional {
+  id: string;
+  firstName: string;
+  lastName: string;
+  userId?: string | null;
+  isActive?: boolean;
+  email?: string;
+  weeklySchedules?: unknown[];
+  [key: string]: unknown;
+}
+interface LocalUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  permissions: string[];
+  permissionsConfigured: boolean;
+  collaborator: { id: string } | null;
+}
+interface LocalContext {
+  users: LocalUser[];
+  collaborators: Professional[];
+}
+interface Person {
+  id: string;
+  name: string;
+  professional: Professional | null;
+  user: TeamUser | null;
+  local: LocalUser | null;
+}
+interface AccountDraft {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  collaboratorId: string | null;
+}
+interface Pending extends AccountDraft {
+  role: string;
+  roleIds: string[];
+}
 @Component({
   selector: "alora-admin-team-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
-  template: `
-    <section class="grid gap-4" aria-labelledby="team-title">
-      <header class="panel rounded-[2rem] p-5 sm:p-6">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div><p class="eyebrow text-[var(--accent)]">Squadra · Accessi</p>
-            <h2 id="team-title" class="mt-1 font-display text-3xl">Le persone, i loro ruoli.</h2>
-            <p class="mt-2 max-w-2xl text-sm opacity-75">Gestisci l’accesso a questa attività e le funzioni assegnate a ciascuna persona.</p>
-          </div>
-          <button class="secondary-btn" type="button" [disabled]="busy || loading" (click)="load()">Aggiorna</button>
-        </div>
-        <p *ngIf="loading" class="mt-4 text-sm" role="status">Caricamento della squadra…</p>
-        <p *ngIf="feedback" class="mt-4 text-sm" role="status" aria-live="polite">{{ feedback }}</p>
-        <p *ngIf="overview && !canManage" class="mt-4 rounded-2xl border border-current/10 p-3 text-sm">Puoi consultare la squadra. Per modificarla serve l’abilitazione alla gestione di ruoli e accessi.</p>
-      </header>
-
-      <ng-container *ngIf="overview as team">
-        <article *ngIf="canAssociateSelf" class="panel grid gap-3 rounded-[2rem] p-5">
-          <h3 class="font-display text-2xl">Il mio profilo professionista</h3>
-          <p class="text-sm opacity-75">Se esegui servizi, associa il tuo account al tuo profilo nella squadra per consultare le attività assegnate a te.</p>
-          <p class="text-sm">{{ selfProfessionalLabel }}</p>
-          <div class="flex flex-wrap gap-2"><button class="secondary-btn" type="button" [disabled]="busy" (click)="editSelfProfessional()">Cambia associazione</button><a *ngIf="hasPersonalAgenda" class="secondary-btn" routerLink="/my-agenda">Apri la mia agenda</a></div>
-          <form *ngIf="selfDraft as draft" class="grid gap-3 rounded-2xl border border-current/10 p-4" (ngSubmit)="saveSelfProfessional()">
-            <label class="field"><span>Il tuo professionista</span><select name="selfProfessional" [(ngModel)]="draft.collaboratorId" [disabled]="busy"><option [ngValue]="null">Nessun professionista</option><option *ngFor="let person of localContext?.collaborators" [ngValue]="person.id" [disabled]="!person.isActive || !!person.userId && person.userId !== draft.id">{{ person.firstName }} {{ person.lastName }}{{ !person.isActive ? ' · non attivo' : person.userId && person.userId !== draft.id ? ' · già associato' : '' }}</option></select></label>
-            <p class="text-sm opacity-75">Confermi questo profilo per le tue attività? Gli appuntamenti mantengono il professionista assegnato.</p>
-            <div class="flex gap-2"><button class="primary-btn" type="submit" [disabled]="busy">Conferma associazione</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="selfDraft = null">Annulla</button></div>
-          </form>
-        </article>
-        <article *ngIf="canManage" class="panel grid gap-4 rounded-[2rem] p-5">
-          <div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="font-display text-2xl">Nuovo account</h3><p class="mt-2 text-sm opacity-75">Crea l’accesso personale di un responsabile, reception o professionista. I profili della squadra possono continuare a esistere senza account.</p></div><button class="primary-btn" type="button" [disabled]="busy || !!accountDraft" (click)="newAccount()">Crea account</button></div>
-          <form *ngIf="accountDraft as draft" class="grid gap-3 rounded-2xl border border-current/10 p-4" (ngSubmit)="createAccount()">
-            <fieldset class="grid gap-3 sm:grid-cols-2" [disabled]="busy || accountAttempted"><label class="field"><span>Nome</span><input name="accountFirstName" required maxlength="120" [(ngModel)]="draft.firstName" /></label><label class="field"><span>Cognome</span><input name="accountLastName" required maxlength="120" [(ngModel)]="draft.lastName" /></label><label class="field"><span>Email</span><input name="accountEmail" type="email" required maxlength="250" autocomplete="off" [(ngModel)]="draft.email" /></label><label class="field"><span>Ambito ALORA</span><select name="accountRole" [(ngModel)]="draft.role" (ngModelChange)="pruneAccountPermissions()"><option value="collaborator">Professionista · dati personali</option><option value="reception">Reception</option><option value="manager">Responsabile</option></select></label><label class="field sm:col-span-2"><span>Professionista associato (facoltativo)</span><select name="accountProfessional" [(ngModel)]="draft.collaboratorId"><option [ngValue]="null">Nessuno</option><option *ngFor="let person of localContext?.collaborators" [ngValue]="person.id" [disabled]="!person.isActive || !!person.userId">{{ person.firstName }} {{ person.lastName }}{{ person.userId ? ' · già associato' : '' }}</option></select></label></fieldset>
-            <fieldset class="grid gap-2" [disabled]="busy || accountAttempted"><legend class="mb-2 text-sm font-semibold">Ruoli Connect</legend><label *ngFor="let role of team.roles" class="flex items-start gap-2 text-sm"><input type="checkbox" [checked]="draft.roleIds.includes(role.id)" [disabled]="!canEditRole(role)" (change)="toggleAccountRole(role.id, $any($event.target).checked)" />{{ role.name }}</label></fieldset>
-            <fieldset class="grid max-h-64 gap-2 overflow-auto" [disabled]="busy || accountAttempted"><legend class="mb-2 text-sm font-semibold">Cosa può vedere e fare in ALORA</legend><label *ngFor="let fn of accountPermissionChoices()" class="flex items-start gap-2 text-sm"><input type="checkbox" [checked]="draft.permissions.includes(fn.key)" (change)="toggleAccountPermission(fn.key, $any($event.target).checked)" />{{ fn.name }}</label></fieldset>
-            <p class="text-xs opacity-75">Seleziona almeno un ruolo. I permessi ALORA limitano le funzioni di quel ruolo; nessun permesso locale selezionato significa nessun accesso operativo. L’agenda personale richiede un professionista associato.</p>
-            <label class="field"><span>Password iniziale (facoltativa)</span><input name="initialAccountPassword" type="password" autocomplete="new-password" maxlength="1024" [(ngModel)]="accountPassword" [disabled]="busy" /></label><p class="text-xs opacity-75">Senza password, la persona dovrà completare la configurazione dell’accesso con Connect. Non viene inviata un’email di attivazione da questo form. La password di un’identità esistente non viene sostituita.</p>
-            <p *ngIf="accountAttempted" class="text-sm">La creazione è stata inviata. Per verificare o riprendere usa questo stesso profilo; la password va inserita nuovamente solo se necessaria.</p>
-            <div class="flex flex-wrap gap-2"><button class="primary-btn" type="submit" [disabled]="busy || !accountDraftValid()">{{ accountAttempted ? 'Riprendi stessa creazione' : 'Conferma creazione' }}</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="closeAccountForm()">{{ accountAttempted ? 'Chiudi form' : 'Annulla' }}</button></div>
-          </form>
-          <div *ngIf="pendingAccounts.length" class="grid gap-3"><h4 class="font-display text-xl">Creazioni da completare</h4><p class="text-sm opacity-75">Questi profili sono salvati, ma l’accesso locale non è ancora attivo. Un esito incerto si riprende sullo stesso profilo.</p><div *ngFor="let pending of pendingAccounts" class="grid gap-2 rounded-2xl border border-current/10 p-4"><strong>{{ pending.firstName }} {{ pending.lastName }}</strong><p class="text-sm">{{ pending.email }} · {{ localRoleLabel(pending.role) }}</p><button type="button" class="secondary-btn justify-self-start" [disabled]="busy" (click)="selectPending(pending.id)">Riprendi creazione</button><form *ngIf="pendingAccountId === pending.id" class="grid gap-3" (ngSubmit)="resumeAccount(pending.id)"><label class="field"><span>Password iniziale (solo se necessaria)</span><input name="resumePassword" type="password" autocomplete="new-password" maxlength="1024" [(ngModel)]="recoveryPassword" [disabled]="busy" /></label><p class="text-xs opacity-75">Verifica o completa la creazione già inviata. Se l’identità esiste, la sua password resta invariata.</p><button class="primary-btn justify-self-start" type="submit" [disabled]="busy">Conferma ripresa</button></form></div></div>
-        </article>
-        <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <article class="panel rounded-[2rem] p-5">
-            <div class="flex items-center justify-between gap-3"><h3 class="font-display text-2xl">Ruoli</h3>
-              <button *ngIf="canManage" type="button" class="primary-btn" [disabled]="busy" (click)="editRole()">Nuovo ruolo</button>
-            </div>
-            <p *ngIf="!team.roles.length" class="mt-4 text-sm opacity-70">Non ci sono ancora ruoli per questa attività.</p>
-            <div *ngFor="let role of team.roles" class="mt-3 rounded-2xl border border-current/10 p-4">
-              <div class="flex flex-wrap items-center justify-between gap-2"><strong>{{ role.name }}</strong>
-                <div *ngIf="canEditRole(role)" class="flex gap-2">
-                  <button type="button" class="secondary-btn" [disabled]="busy" (click)="editRole(role)">Modifica</button>
-                  <button type="button" class="secondary-btn" [disabled]="busy" (click)="deleteRoleId = role.id">Elimina</button>
-                </div>
-              </div>
-              <p class="mt-2 text-sm opacity-75">{{ roleSummary(role) }}</p>
-              <div *ngIf="deleteRoleId === role.id" class="mt-3 border-t border-current/10 pt-3">
-                <p class="text-sm">Eliminare questo ruolo e le sue assegnazioni?</p>
-                <div class="mt-2 flex gap-2"><button type="button" class="primary-btn" [disabled]="busy" (click)="removeRole(role)">Conferma eliminazione</button><button type="button" class="secondary-btn" [disabled]="busy" (click)="deleteRoleId = ''">Annulla</button></div>
-              </div>
-            </div>
-
-            <form *ngIf="roleDraft && canManage" class="mt-5 grid gap-3 rounded-2xl border border-current/10 p-4" (ngSubmit)="saveRole()">
-              <h4 class="font-display text-xl">{{ roleDraft.id ? 'Modifica ruolo' : 'Nuovo ruolo' }}</h4>
-              <label class="field"><span>Nome del ruolo</span><input name="roleName" required maxlength="120" [(ngModel)]="roleDraft.name" [disabled]="busy" /></label>
-              <fieldset class="grid max-h-80 gap-2 overflow-auto" [disabled]="busy"><legend class="mb-2 text-sm font-semibold">Funzioni concedibili</legend>
-                <label *ngFor="let fn of team.functions" class="flex items-start gap-2 text-sm"><input type="checkbox" [disabled]="!fn.delegable" [checked]="roleDraft.permissions.includes(fn.key)" (change)="togglePermission(fn.key, $any($event.target).checked)" /><span>{{ fn.name }}<span *ngIf="!fn.delegable" class="block text-xs opacity-60">Fuori dalla tua delega</span></span></label>
-              </fieldset>
-              <div class="flex flex-wrap gap-2"><button class="primary-btn" type="submit" [disabled]="busy || !roleDraft.name.trim()">Salva ruolo</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="roleDraft = null">Annulla</button></div>
-            </form>
-          </article>
-
-          <article class="panel rounded-[2rem] p-5"><h3 class="font-display text-2xl">Account associati</h3>
-            <p class="mt-2 text-sm opacity-75">I professionisti senza account continuano a essere gestiti nella sezione Squadra.</p>
-            <p *ngIf="!team.users.length" class="mt-4 text-sm opacity-70">Nessun account associato a questa installazione.</p>
-            <div *ngFor="let user of team.users" class="mt-3 rounded-2xl border border-current/10 p-4">
-              <div class="flex flex-wrap justify-between gap-2"><strong>{{ user.displayName }}</strong><span class="text-xs">{{ user.accessRevoked ? 'Accesso revocato' : !user.identityEnabled || !user.membershipEnabled ? 'Account sospeso' : 'Account attivo' }}</span></div>
-              <p class="mt-2 text-sm opacity-75">{{ userRoles(user) }}</p>
-              <p *ngIf="localUser(user) as local" class="mt-1 text-xs opacity-65">{{ localRoleLabel(local.role) }} · {{ local.permissionsConfigured ? 'Permessi ALORA configurati' : 'Impostazioni precedenti conservate' }}</p>
-              <div *ngIf="canEditUser(user)" class="mt-3 flex flex-wrap gap-2"><button class="secondary-btn" type="button" [disabled]="busy" (click)="editUser(user)">{{ user.accessRevoked && !user.roles.length ? 'Assegna ruoli per riattivare' : 'Assegna ruoli' }}</button>
-                <button *ngIf="canEditLocalUser(user)" class="secondary-btn" type="button" [disabled]="busy" (click)="editLocalPolicy(user)">Visibilità in ALORA</button>
-                <button *ngIf="!user.accessRevoked" class="secondary-btn" type="button" [disabled]="busy" (click)="revokeSubject = user.subject">Revoca accesso ad ALORA</button>
-                <button *ngIf="user.accessRevoked && user.roles.length" class="secondary-btn" type="button" [disabled]="busy" (click)="changeAccess(user, true)">Ripristina accesso</button>
-              </div>
-              <div *ngIf="revokeSubject === user.subject" class="mt-3 border-t border-current/10 pt-3"><p class="text-sm">Revocare l’accesso a questa attività? L’identità e gli accessi alle altre app restano conservati.</p><div class="mt-2 flex gap-2"><button class="primary-btn" type="button" [disabled]="busy" (click)="changeAccess(user, false)">Conferma revoca</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="revokeSubject = ''">Annulla</button></div></div>
-              <form *ngIf="localDraft?.id === user.localUserId && localDraft as draft" class="mt-4 grid gap-3 rounded-2xl border border-current/10 p-4" (ngSubmit)="saveLocalPolicy()">
-                <h4 class="font-display text-xl">Cosa può vedere e fare</h4>
-                <p class="text-sm opacity-75">Le scelte qui limitano i permessi assegnati dal ruolo Connect per questa attività.</p>
-                <label class="field"><span>Ambito operativo</span><select name="localRole" [(ngModel)]="draft.role" [disabled]="busy"><option value="collaborator">Professionista · solo dati personali</option><option value="reception">Reception</option><option value="manager">Responsabile</option></select></label>
-                <label class="field"><span>Professionista associato (facoltativo)</span><select name="localCollaborator" [(ngModel)]="draft.collaboratorId" [disabled]="busy"><option [ngValue]="null">Nessun professionista</option><option *ngFor="let person of localContext?.collaborators" [ngValue]="person.id" [disabled]="!person.isActive || !!person.userId && person.userId !== draft.id">{{ person.firstName }} {{ person.lastName }}{{ !person.isActive ? ' · non attivo' : person.userId && person.userId !== draft.id ? ' · già associato' : '' }}</option></select></label>
-                <p *ngIf="localNeedsProfessional() && !draft.collaboratorId" class="text-sm">Associa un professionista per abilitare la sua agenda personale.</p>
-                <fieldset class="grid max-h-80 gap-2 overflow-auto" [disabled]="busy"><legend class="mb-2 text-sm font-semibold">Permessi consentiti in ALORA</legend><label *ngFor="let choice of localPermissionChoices(user)" class="flex items-start gap-2 text-sm"><input type="checkbox" [checked]="draft.permissions.includes(choice.key)" [disabled]="!choice.available && !draft.permissions.includes(choice.key)" (change)="toggleLocalPermission(choice.key, $any($event.target).checked)" /><span>{{ choice.name }}<span *ngIf="!choice.available" class="block text-xs opacity-65">Non concedibile con l’ambito o il ruolo attuale: deseleziona per salvare</span></span></label></fieldset>
-                <p class="text-xs opacity-75">Nessuna selezione significa nessun permesso operativo. I dati e l’account restano conservati.</p>
-                <div class="flex gap-2"><button class="primary-btn" type="submit" [disabled]="busy || !localDraftValid(user)">Salva visibilità</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="localDraft = null">Annulla</button></div>
-              </form>
-              <form *ngIf="editingSubject === user.subject" class="mt-3 grid gap-3 border-t border-current/10 pt-3" (ngSubmit)="saveAssignment(user)">
-                <p *ngIf="user.accessRevoked" class="text-sm opacity-75">Salvando almeno un ruolo riattivi l’accesso a questa attività. Verifica anche la visibilità configurata in ALORA.</p>
-                <p *ngIf="!team.roles.length" class="text-sm opacity-75">Crea prima un ruolo con le funzioni da concedere.</p>
-                <label *ngFor="let role of team.roles" class="flex items-center gap-2 text-sm"><input type="checkbox" [disabled]="busy || !canEditRole(role)" [checked]="assignedRoleIds.includes(role.id)" (change)="toggleRole(role.id, $any($event.target).checked)" />{{ role.name }}</label>
-                <label *ngIf="!assignedRoleIds.length" class="flex items-start gap-2 text-sm"><input type="checkbox" name="confirmEmptyRoles" [(ngModel)]="confirmEmptyRoles" [disabled]="busy" /><span>Confermo la rimozione di tutti i ruoli. L’account non potrà accedere a questa attività.</span></label>
-                <div class="flex gap-2"><button type="submit" class="primary-btn" [disabled]="busy || !assignedRoleIds.length && !confirmEmptyRoles">Salva assegnazioni</button><button class="secondary-btn" type="button" [disabled]="busy" (click)="editingSubject = ''">Annulla</button></div>
-              </form>
-            </div>
-          </article>
-        </div>
-      </ng-container>
-    </section>
-  `,
+  imports: [CommonModule, FormsModule, RouterLink, AutofocusFirstDirective],
+  templateUrl: "./admin-team-page.component.html",
 })
-export class AdminTeamPageComponent implements OnInit {
+export class AdminTeamPageComponent implements OnInit, OnChanges {
   private readonly http = inject(HttpClient);
   private readonly session = inject(SessionStore);
+  @Input() professionals: Professional[] = [];
+  @Output() editProfessional = new EventEmitter<Professional>();
+  @Output() newProfessional = new EventEmitter<void>();
   overview: TeamOverview | null = null;
-  localContext: LocalTeamContext | null = null;
-  localDraft: LocalPolicyDraft | null = null;
-  selfDraft: { id: string; collaboratorId: string | null } | null = null;
-  accountDraft: TeamAccountDraft | null = null;
-  pendingAccounts: TeamAccountDraft[] = [];
-  pendingAccountId = "";
-  accountAttempted = false;
-  accountPassword = "";
-  recoveryPassword = "";
+  local: LocalContext | null = null;
+  pending: Pending[] = [];
+  selected: Person | null = null;
+  private initialized = false;
+  query = "";
   loading = false;
   busy = false;
   feedback = "";
+  rolePanel = false;
   roleDraft: { id: string; name: string; permissions: string[] } | null = null;
+  account: AccountDraft | null = null;
+  accountAttempted = false;
+  accountPassword = "";
+  recoveryPassword = "";
+  pendingId = "";
+  choice = "preset:collaborator";
+  policyOpen = false;
+  professionalId: string | null = null;
+  confirmPasswordReset = false;
+  showInitialPassword = false;
+  confirmRevoke = false;
   deleteRoleId = "";
-  editingSubject = "";
-  revokeSubject = "";
-  assignedRoleIds: string[] = [];
-  confirmEmptyRoles = false;
-  get canManage(): boolean { return !!this.overview?.canManage && this.session.can("team.manage"); }
-  get canAssociateSelf(): boolean {
-    const current = this.session.currentUser();
-    const linked = this.overview?.users.find(user => user.localUserId === current?.id);
-    return this.canManage && current?.role === "owner" && !!linked && !linked.accessRevoked && linked.identityEnabled && linked.membershipEnabled;
+  readonly options = ROLE_OPTIONS;
+  get canManage(): boolean {
+    return !!this.overview?.canManage && this.session.can("team.manage");
   }
-  get selfLocalUser(): LocalTeamUser | undefined { return this.localContext?.users.find(user => user.id === this.session.currentUser()?.id); }
-  get selfProfessionalLabel(): string {
-    const professional = this.localContext?.collaborators.find(person => person.id === this.selfLocalUser?.collaborator?.id);
-    return professional ? `${professional.firstName} ${professional.lastName}${professional.isActive ? "" : " · non attivo"}` : "Nessun professionista associato";
+  get canEditProfiles(): boolean {
+    return (
+      this.session.can("collaborators.manage") &&
+      this.session.can("collaborators.read")
+    );
   }
-  get hasPersonalAgenda(): boolean { return this.session.can("appointments.read.own") && !!this.localContext?.collaborators.some(person => person.id === this.selfLocalUser?.collaborator?.id && person.isActive); }
-  editSelfProfessional(): void { const user = this.selfLocalUser; if (this.canAssociateSelf && user) this.selfDraft = { id: user.id, collaboratorId: user.collaborator?.id || null }; }
-  async saveSelfProfessional(): Promise<void> {
-    if (!this.selfDraft || !this.canAssociateSelf) return;
-    const collaboratorId = this.selfDraft.collaboratorId;
-    await this.mutate(() => firstValueFrom(this.http.put(ADMIN_API_URL + "/team/me/professional", { collaboratorId })));
+  get ownerFunctions(): string[] {
+    return (
+      this.overview?.functions
+        .filter((fn) => fn.delegable && this.session.can(fn.key))
+        .map((fn) => fn.key) || []
+    );
   }
-  ngOnInit(): void { void this.load(); }
-  async load(preserveFeedback = false): Promise<void> {
-    if (!this.session.can("users.manage")) return;
-    if (!preserveFeedback) this.feedback = "";
+  isPreset(role: TeamRole, kind: "owner" | "collaborator"): boolean {
+    const name = kind === "owner" ? "Titolare" : "Collaboratore";
+    if (role.name.toLocaleLowerCase() !== name.toLocaleLowerCase())
+      return false;
+    if (kind === "owner")
+      return ["team.manage", "users.manage"].every((key) =>
+        role.permissions.includes(key),
+      );
+    return sameFunctions(role.permissions, COLLABORATOR_FUNCTIONS);
+  }
+  get customRoles(): TeamRole[] {
+    const ownerRoles = new Set(
+      (this.overview?.users || [])
+        .filter((user) =>
+          this.local?.users.some(
+            (local) => local.id === user.localUserId && local.role === "owner",
+          ),
+        )
+        .flatMap((user) => user.roles.map((role) => role.id)),
+    );
+    return (
+      this.overview?.roles.filter(
+        (role) =>
+          !ownerRoles.has(role.id) &&
+          !this.isPreset(role, "collaborator") &&
+          !this.isPreset(role, "owner"),
+      ) || []
+    );
+  }
+  get profileChoices(): Professional[] {
+    const known = this.local?.collaborators || [];
+    return [
+      ...known.map((pro) => ({
+        ...this.professionals.find((p) => p.id === pro.id),
+        ...pro,
+      })),
+      ...this.professionals.filter(
+        (pro) => !known.some((item) => item.id === pro.id),
+      ),
+    ];
+  }
+  isPending(person: Person): boolean {
+    return this.pending.some((draft) => draft.id === person.local?.id);
+  }
+  get people(): Person[] {
+    const users = this.overview?.users || [],
+      locals = this.local?.users || [];
+    const result: Person[] = this.profileChoices.map((pro) => {
+      const professional = {
+        ...this.professionals.find((p) => p.id === pro.id),
+        ...pro,
+      };
+      const local = locals.find((u) => u.collaborator?.id === pro.id) || null;
+      return {
+        id: pro.id,
+        name: pro.firstName + " " + pro.lastName,
+        professional,
+        local,
+        user: users.find((u) => u.localUserId === local?.id) || null,
+      };
+    });
+    for (const user of users) {
+      if (result.some((p) => p.user?.subject === user.subject)) continue;
+      const local = locals.find((u) => u.id === user.localUserId) || null;
+      result.push({
+        id: user.subject,
+        name: local ? local.firstName + " " + local.lastName : user.displayName,
+        professional: null,
+        user,
+        local,
+      });
+    }
+    return result.filter((p) =>
+      p.name
+        .toLocaleLowerCase()
+        .includes(this.query.trim().toLocaleLowerCase()),
+    );
+  }
+  label(person: Person): string {
+    if (person.local?.role === "owner") return "Titolare";
+    if (!person.user) return "Collaboratore";
+    const role =
+      person.user.roles.length === 1
+        ? this.overview?.roles.find((r) => r.id === person.user!.roles[0].id)
+        : undefined;
+    if (role && this.isPreset(role, "collaborator")) return "Collaboratore";
+    if (role && this.isPreset(role, "owner")) return "Titolare";
+    return (
+      person.user.roles.map((r) => r.name).join(" · ") || "Ruolo da assegnare"
+    );
+  }
+  accessLabel(person: Person): string {
+    if (this.isPending(person)) return "Creazione da completare";
+    if (!this.overview) return "Accesso da verificare";
+    if (!person.user) return "Senza accesso";
+    if (person.user.accessRevoked) return "Accesso revocato";
+    if (!person.user.identityEnabled || !person.user.membershipEnabled)
+      return "Accesso sospeso";
+    return "Accesso attivo";
+  }
+  trackPerson(_index: number, person: Person): string { return person.id; }
+  get canReadOwnAgenda(): boolean { return this.session.can("appointments.read.own"); }
+  get canReadTeamAgenda(): boolean { return this.session.can("appointments.read.all"); }
+  isSelf(person: Person): boolean {
+    return person.local?.id === this.session.currentUser()?.id;
+  }
+  canEditRole(role: TeamRole): boolean {
+    return (
+      this.canManage &&
+      role.permissions.every((key) =>
+        this.overview!.delegation.some((fn) => fn.key === key),
+      )
+    );
+  }
+  canEditPerson(person: Person): boolean {
+    return (
+      this.canManage &&
+      !!person.user &&
+      !this.isSelf(person) &&
+      !!person.local &&
+      person.local.role !== "owner" &&
+      person.user.roles.every((r) => {
+        const role = this.overview?.roles.find((item) => item.id === r.id);
+        return !!role && this.canEditRole(role);
+      })
+    );
+  }
+  functions(user: TeamUser): string[] {
+    return [
+      ...new Set(
+        user.roles.flatMap(
+          (r) =>
+            this.overview?.roles.find((role) => role.id === r.id)
+              ?.permissions || [],
+        ),
+      ),
+    ];
+  }
+  ngOnInit(): void {
+    this.initialized = true;
+    void this.load();
+  }
+  ngOnChanges(): void {
+    if (this.initialized && !this.busy) void this.load();
+  }
+  async load(): Promise<void> {
     this.loading = true;
     try {
-      const [overview, local] = await Promise.all([
+      const [overview, local] = await Promise.allSettled([
         firstValueFrom(this.http.get<TeamOverview>(ADMIN_API_URL + "/team")),
-        firstValueFrom(this.http.get<LocalTeamContext>(ADMIN_API_URL + "/team/local-users")),
+        firstValueFrom(
+          this.http.get<LocalContext>(ADMIN_API_URL + "/team/local-users"),
+        ),
       ]);
-      this.overview = overview; this.localContext = local;
-      if (this.canManage) this.pendingAccounts = await firstValueFrom(this.http.get<TeamAccountDraft[]>(ADMIN_API_URL + "/team/accounts/pending"));
-      else this.pendingAccounts = [];
+      this.overview = overview.status === "fulfilled" ? overview.value : null;
+      this.local = local.status === "fulfilled" ? local.value : null;
+      if (!this.overview)
+        this.feedback =
+          "Ruoli e accessi non disponibili: verifica le abilitazioni dell’attività. I profili caricati restano consultabili.";
+      this.pending = this.canManage
+        ? await firstValueFrom(
+            this.http.get<Pending[]>(ADMIN_API_URL + "/team/accounts/pending"),
+          )
+        : [];
+    } catch {
+      this.feedback =
+        "La squadra non è disponibile. Premi Aggiorna o verifica le abilitazioni dell’attività.";
+    } finally {
+      this.loading = false;
     }
-    catch (error) {
-      this.overview = null; this.localContext = null; this.pendingAccounts = [];
-      this.feedback = error && typeof error === "object" && "status" in error && error.status === 403
-        ? "Connect non ha abilitato la gestione della squadra per questo account. Verifica licenza, ruolo e delega."
-        : "Squadra non disponibile. Verifica l’accesso o riprova con Aggiorna.";
+  }
+  open(person: Person): void {
+    this.feedback = "";
+    this.selected = person;
+    this.policyOpen = false;
+    this.confirmRevoke = false;
+    this.confirmPasswordReset = false;
+    this.professionalId = person.professional?.id || null;
+  }
+  close(): void {
+    if (!this.busy) {
+      this.selected = null;
+      this.account = null;
+      this.accountPassword = "";
+      this.policyOpen = false;
     }
-    finally { this.loading = false; }
   }
-  newAccount(): void { this.accountDraft = { id: crypto.randomUUID(), email: "", firstName: "", lastName: "", role: "collaborator", permissions: [], roleIds: [], collaboratorId: null }; this.accountAttempted = false; this.accountPassword = ""; }
-  closeAccountForm(): void { this.accountDraft = null; this.accountPassword = ""; this.accountAttempted = false; }
-  toggleAccountRole(id: string, checked: boolean): void { if (this.accountDraft && !this.accountAttempted) this.accountDraft.roleIds = this.toggle(this.accountDraft.roleIds, id, checked); this.pruneAccountPermissions(); }
-  pruneAccountPermissions(): void { if (this.accountDraft && !this.accountAttempted) this.accountDraft.permissions = this.accountDraft.permissions.filter(key => this.accountPermissionChoices().some(fn => fn.key === key)); }
-  toggleAccountPermission(key: string, checked: boolean): void { if (this.accountDraft && !this.accountAttempted) this.accountDraft.permissions = this.toggle(this.accountDraft.permissions, key, checked); }
-  accountPermissionChoices(): { key: string; name: string }[] {
-    const draft = this.accountDraft;
-    if (!draft) return [];
-    const granted = new Set(draft.roleIds.flatMap(id => this.overview?.roles.find(role => role.id === id)?.permissions || []));
-    return (this.localContext?.functions || []).filter(fn => granted.has(fn.key) && (draft.role !== "collaborator" || ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(fn.key)));
+  @HostListener("document:keydown.escape") dismiss(): void {
+    if (this.busy) return;
+    this.close();
+    this.rolePanel = false;
+    this.roleDraft = null;
   }
-  accountDraftValid(): boolean {
-    const draft = this.accountDraft;
-    return !!draft && !!draft.email.trim() && !!draft.firstName.trim() && !!draft.lastName.trim() && !!draft.roleIds.length && draft.roleIds.every(id => this.overview?.roles.some(role => role.id === id && this.canEditRole(role))) && draft.permissions.every(key => this.accountPermissionChoices().some(fn => fn.key === key)) && (!draft.permissions.some(key => ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key)) || !!draft.collaboratorId);
+  async editProfile(person: Person): Promise<void> {
+    if (!person.professional || !this.canEditProfiles || this.busy) return;
+    try {
+      // Fetch the complete record: a minimal team projection must never overwrite schedules.
+      const profile = await firstValueFrom(
+        this.http.get<Professional>(
+          ADMIN_API_URL +
+            "/collaborators/" +
+            encodeURIComponent(person.professional.id),
+        ),
+      );
+      this.selected = null;
+      this.editProfessional.emit(profile);
+    } catch {
+      this.feedback =
+        "Scheda non disponibile. Aggiorna la squadra prima di riprovare.";
+    }
   }
-  selectPending(id: string): void { this.pendingAccountId = id; this.recoveryPassword = ""; }
+  createAccess(person?: Person): void {
+    if (!this.canManage || (person && this.isPending(person))) return;
+    this.feedback = "";
+    this.selected = null;
+    this.choice = "preset:collaborator";
+    this.accountAttempted = false;
+    this.accountPassword =
+      "Aa1!" +
+      Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) =>
+        value.toString(16).padStart(8, "0"),
+      ).join("");
+    this.showInitialPassword = false;
+    this.account = {
+      id: crypto.randomUUID(),
+      firstName: person?.professional?.firstName || "",
+      lastName: person?.professional?.lastName || "",
+      email: person?.professional?.email || "",
+      collaboratorId: person?.professional?.id || null,
+    };
+  }
+  choiceFunctions(choice = this.choice): string[] {
+    if (choice === "preset:collaborator") return [...COLLABORATOR_FUNCTIONS];
+    if (choice === "preset:owner")
+      return this.overview?.functions.map((fn) => fn.key) || [];
+    return [
+      ...(this.overview?.roles.find((r) => r.id === choice)?.permissions || []),
+    ];
+  }
+  choiceAvailable(choice: string): boolean {
+    const keys = this.choiceFunctions(choice);
+    if (!keys.length) return false;
+    if (
+      choice === "preset:owner" &&
+      !["team.manage", "users.manage"].every((key) => keys.includes(key))
+    )
+      return false;
+    return keys.every(
+      (key) =>
+        this.overview?.functions.some((fn) => fn.key === key && fn.delegable) &&
+        this.session.can(key),
+    );
+  }
+  get requiresProfile(): boolean {
+    return roleScope(this.choiceFunctions()) === "collaborator";
+  }
+  choiceLocalFunctions(): string[] {
+    // A company role can also work without a personal schedule association.
+    return this.choiceFunctions().filter(
+      (key) => !!this.professionalId || !PERSONAL_FUNCTIONS.includes(key),
+    );
+  }
+  get accountValid(): boolean {
+    return (
+      !!this.accountPassword &&
+      !!this.account?.firstName.trim() &&
+      !!this.account?.lastName.trim() &&
+      !!this.account?.email.trim() &&
+      this.choiceAvailable(this.choice) &&
+      (!this.requiresProfile || !!this.account.collaboratorId)
+    );
+  }
+  private async resolveRole(): Promise<string> {
+    if (!this.choiceAvailable(this.choice))
+      throw Error("Ruolo non disponibile");
+    if (!this.choice.startsWith("preset:")) return this.choice;
+    const permissions = this.choiceFunctions();
+    const existing = this.overview?.roles.find(
+      (role) =>
+        this.canEditRole(role) &&
+        this.isPreset(
+          role,
+          this.choice === "preset:owner" ? "owner" : "collaborator",
+        ) &&
+        sameFunctions(role.permissions, permissions),
+    );
+    if (existing) return existing.id;
+    // Created only on explicit confirmation, never on page load. No mutation retry.
+    const role = await firstValueFrom(
+      this.http.post<TeamRole>(ADMIN_API_URL + "/team/roles", {
+        name: this.choice === "preset:owner" ? "Titolare" : "Collaboratore",
+        permissions,
+      }),
+    );
+    this.overview!.roles.push(role);
+    return role.id;
+  }
   async createAccount(): Promise<void> {
-    if (!this.accountDraftValid() || this.busy || !this.canManage) return;
-    const draft = this.accountDraft!, password = this.accountPassword;
-    this.accountPassword = ""; this.accountAttempted = true;
-    await this.accountOperation(() => firstValueFrom(this.http.post<{ ssoSetupRequired: boolean | null }>(ADMIN_API_URL + "/team/accounts", { ...draft, ...(password ? { initialPassword: password } : {}) })));
+    if (
+      this.busy ||
+      !this.canManage ||
+      !this.accountValid ||
+      this.accountAttempted
+    )
+      return;
+    this.busy = true;
+    const draft = { ...this.account! },
+      password = this.accountPassword;
+    this.accountPassword = "";
+    this.accountAttempted = true;
+    try {
+      const roleId = await this.resolveRole();
+      const keys = this.choiceFunctions(),
+        role = this.choice === "preset:owner" ? "manager" : roleScope(keys);
+      const permissions = draft.collaboratorId
+        ? keys
+        : keys.filter((key) => !PERSONAL_FUNCTIONS.includes(key));
+      const result = await firstValueFrom(
+        this.http.post<{ ssoSetupRequired: boolean }>(
+          ADMIN_API_URL + "/team/accounts",
+          {
+            ...draft,
+            role,
+            permissions,
+            roleIds: [roleId],
+            ...(password ? { initialPassword: password } : {}),
+          },
+        ),
+      );
+      this.account = null;
+      this.feedback = result.ssoSetupRequired
+        ? "Accesso creato con password temporanea. Al primo accesso la persona dovrà scegliere una nuova password."
+        : "Accesso creato. La persona può accedere con il proprio account.";
+    } catch {
+      this.feedback =
+        "Esito da verificare. Aggiorna la squadra e controlla le creazioni da completare prima di riprovare. Nessun invio è stato ripetuto.";
+    } finally {
+      await this.load();
+      this.busy = false;
+    }
   }
   async resumeAccount(id: string): Promise<void> {
     if (this.busy || !this.canManage) return;
-    const password = this.recoveryPassword; this.recoveryPassword = "";
-    await this.accountOperation(() => firstValueFrom(this.http.post<{ ssoSetupRequired: boolean | null }>(ADMIN_API_URL + "/team/accounts/" + encodeURIComponent(id) + "/resume", password ? { initialPassword: password } : {})));
-  }
-  private async accountOperation(operation: () => Promise<{ ssoSetupRequired: boolean | null }>): Promise<void> {
     this.busy = true;
+    const password = this.recoveryPassword;
+    this.recoveryPassword = "";
     try {
-      const result = await operation();
-      this.closeAccountForm(); this.pendingAccountId = ""; this.recoveryPassword = "";
-      this.feedback = result.ssoSetupRequired ? "Account creato. La persona deve completare la configurazione dell’accesso in Connect; nessuna email è stata inviata dal form." : "Account creato e collegato a Connect. Verifica l’accesso con la persona interessata.";
-    } catch (error) {
-      const response = error && typeof error === "object" && "error" in error ? error.error : null;
-      const known = response && typeof response === "object" && "code" in response && typeof response.code === "string" && ["mirror_password_rejected", "mirror_identity_conflict", "mirror_profile_conflict", "mirror_mapping_conflict", "mirror_review_required", "mirror_mapping_disabled", "mirror_identity_suspended", "mirror_access_revoked", "account_review_required", "account_outcome_uncertain"].includes(response.code);
-      this.feedback = known && "message" in response && typeof response.message === "string" ? response.message : "Creazione non confermata. Aggiorna la squadra e verifica il profilo salvato prima di riprendere. Nessuna richiesta è stata ripetuta automaticamente.";
+      await firstValueFrom(
+        this.http.post(
+          ADMIN_API_URL +
+            "/team/accounts/" +
+            encodeURIComponent(id) +
+            "/resume",
+          password ? { initialPassword: password } : {},
+        ),
+      );
+      this.pendingId = "";
+      this.feedback =
+        "Creazione completata. Verifica l’accesso con la persona.";
+    } catch {
+      this.feedback =
+        "Creazione da verificare. Il profilo e l’ID rimangono gli stessi; nessun invio è stato ripetuto.";
+    } finally {
+      await this.load();
+      this.busy = false;
     }
-    finally { await this.load(true); this.busy = false; }
   }
-  canEditRole(role: TeamRole): boolean { return this.canManage && role.permissions.every(key => this.overview!.delegation.some(fn => fn.key === key)); }
-  canEditUser(user: TeamUser): boolean {
-    return this.canManage && user.localUserId !== this.session.currentUser()?.id && user.roles.every(role => {
-      const found = this.overview!.roles.find(item => item.id === role.id);
-      return !!found && this.canEditRole(found);
-    });
+  editAccess(): void {
+    const person = this.selected;
+    if (!person || !this.canEditPerson(person)) return;
+    const role =
+      person.user!.roles.length === 1
+        ? this.overview?.roles.find(
+            (role) => role.id === person.user!.roles[0].id,
+          )
+        : undefined;
+    this.choice =
+      role && this.isPreset(role, "collaborator")
+        ? "preset:collaborator"
+        : role && this.isPreset(role, "owner")
+          ? "preset:owner"
+          : role?.id || "";
+    this.professionalId = person.local?.collaborator?.id || null;
+    this.policyOpen = true;
   }
-  roleSummary(role: TeamRole): string { return role.permissions.map(key => this.overview?.functions.find(fn => fn.key === key)?.name || key).join(" · ") || "Nessuna funzione assegnata"; }
-  userRoles(user: TeamUser): string { return user.roles.map(role => role.name).join(" · ") || "Nessun ruolo assegnato"; }
-  editRole(role?: TeamRole): void { this.deleteRoleId = ""; this.roleDraft = { id: role?.id || "", name: role?.name || "", permissions: [...(role?.permissions || [])] }; }
-  togglePermission(key: string, checked: boolean): void { if (this.roleDraft) this.roleDraft.permissions = this.toggle(this.roleDraft.permissions, key, checked); }
-  toggleRole(id: string, checked: boolean): void { this.confirmEmptyRoles = false; this.assignedRoleIds = this.toggle(this.assignedRoleIds, id, checked); }
-  private toggle(values: string[], value: string, checked: boolean): string[] { return checked ? [...new Set([...values, value])] : values.filter(item => item !== value); }
-  editUser(user: TeamUser): void { this.confirmEmptyRoles = false; this.editingSubject = user.subject; this.assignedRoleIds = user.roles.map(role => role.id); }
-  localUser(user: TeamUser): LocalTeamUser | undefined { return this.localContext?.users.find(item => item.id === user.localUserId); }
-  localRoleLabel(role: string): string { return ({ collaborator: "Professionista", manager: "Responsabile", reception: "Reception", owner: "Titolare" } as Record<string, string>)[role] || role; }
-  canEditLocalUser(user: TeamUser): boolean { const local = this.localUser(user); return this.canEditUser(user) && !!local && !this.pendingAccounts.some(pending => pending.id === local.id) && ["manager", "reception", "collaborator"].includes(local.role); }
-  editLocalPolicy(user: TeamUser): void {
-    const local = this.localUser(user);
-    if (!local || !this.canEditLocalUser(user)) return;
-    const role = local.role as LocalPolicyDraft["role"];
-    const central = new Set(user.roles.flatMap(role => this.overview!.roles.find(item => item.id === role.id)?.permissions || []));
-    const permissions = role === "collaborator" && !local.permissionsConfigured
-      ? ["appointments.read.own", "appointments.update.own"].filter(key => central.has(key)) : [...local.permissions];
-    this.localDraft = { id: local.id, role, permissions, collaboratorId: local.collaborator?.id || null };
+  async saveAccess(): Promise<void> {
+    const person = this.selected;
+    if (
+      !person ||
+      !this.canEditPerson(person) ||
+      this.busy ||
+      !this.choiceAvailable(this.choice) ||
+      (this.requiresProfile && !this.professionalId)
+    )
+      return;
+    this.busy = true;
+    const id = person.local!.id,
+      collaboratorId = this.professionalId;
+    try {
+      const roleId = await this.resolveRole();
+      // Restrict before changing central grants. On partial failure, never leave broader local access.
+      await firstValueFrom(
+        this.http.put(
+          ADMIN_API_URL +
+            "/team/local-users/" +
+            encodeURIComponent(id) +
+            "/policy",
+          { role: "collaborator", permissions: [], collaboratorId },
+        ),
+      );
+      await firstValueFrom(
+        this.http.put(
+          ADMIN_API_URL +
+            "/team/users/" +
+            encodeURIComponent(person.user!.subject) +
+            "/roles",
+          { roleIds: [roleId] },
+        ),
+      );
+      const permissions = this.choiceLocalFunctions();
+      await firstValueFrom(
+        this.http.put(
+          ADMIN_API_URL +
+            "/team/local-users/" +
+            encodeURIComponent(id) +
+            "/policy",
+          {
+            role: roleScope(this.choiceFunctions()),
+            permissions,
+            collaboratorId,
+          },
+        ),
+      );
+      this.selected = null;
+      this.policyOpen = false;
+      this.feedback = "Ruolo e accesso aggiornati.";
+    } catch {
+      this.feedback =
+        "Modifica da completare: per sicurezza l’accesso può essere limitato. Aggiorna e verifica il ruolo prima di confermare di nuovo. Nessuna richiesta è stata ripetuta.";
+    } finally {
+      await this.load();
+      this.busy = false;
+    }
   }
-  localPermissionChoices(user: TeamUser): { key: string; name: string; available: boolean }[] {
-    if (!this.localDraft || !this.localContext) return [];
-    const central = new Set(user.roles.flatMap(role => this.overview!.roles.find(item => item.id === role.id)?.permissions || []));
-    const licensed = new Set(this.overview!.functions.filter(fn => fn.delegable).map(fn => fn.key));
-    const choices = this.localContext.functions.filter(fn => central.has(fn.key)).map(fn => ({ ...fn, available: licensed.has(fn.key) && (this.localDraft!.role !== "collaborator" || ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(fn.key)) }));
-    for (const key of this.localDraft.permissions) if (!choices.some(fn => fn.key === key)) choices.push({ key, name: this.overview?.functions.find(fn => fn.key === key)?.name || key, available: false });
-    return choices;
+  canResetPassword(person: Person): boolean {
+    return (
+      this.canEditPerson(person) &&
+      this.session.can("team.password.reset") &&
+      !!person.user?.identityEnabled &&
+      !!person.user.membershipEnabled &&
+      !person.user.accessRevoked
+    );
   }
-  localNeedsProfessional(): boolean { return !!this.localDraft?.permissions.some(key => ["appointments.read.own", "appointments.update.own", "dashboard.personal.values.read"].includes(key)); }
-  localDraftValid(user: TeamUser): boolean {
-    const draft = this.localDraft;
-    return !!draft && draft.permissions.every(key => this.localPermissionChoices(user).some(fn => fn.key === key && fn.available)) && !(this.localNeedsProfessional() && !draft.collaboratorId);
-  }
-  toggleLocalPermission(key: string, checked: boolean): void { if (this.localDraft) this.localDraft.permissions = this.toggle(this.localDraft.permissions, key, checked); }
-  async saveLocalPolicy(): Promise<void> {
-    const draft = this.localDraft;
-    if (!draft) return;
-    await this.mutate(() => firstValueFrom(this.http.put(ADMIN_API_URL + "/team/local-users/" + encodeURIComponent(draft.id) + "/policy", { role: draft.role, permissions: draft.permissions, collaboratorId: draft.collaboratorId })));
-  }
-  private async mutate(operation: () => Promise<unknown>): Promise<void> {
-    if (this.busy || !this.canManage) return;
+  async resetPassword(): Promise<void> {
+    const person = this.selected;
+    if (
+      !person ||
+      !this.confirmPasswordReset ||
+      !this.canResetPassword(person) ||
+      this.busy
+    )
+      return;
     this.busy = true;
     try {
-      await operation();
-      this.selfDraft = null; this.localDraft = null; this.roleDraft = null; this.editingSubject = ""; this.deleteRoleId = ""; this.revokeSubject = "";
-      this.feedback = "Modifica salvata.";
-      await this.load(true);
-    } catch { this.feedback = "Esito della modifica da verificare. Aggiorna l’elenco e controlla la delega prima di riprovare. La richiesta non è stata ripetuta automaticamente."; }
-    finally { this.busy = false; }
+      await firstValueFrom(
+        this.http.post(
+          ADMIN_API_URL +
+            "/team/users/" +
+            encodeURIComponent(person.user!.subject) +
+            "/password-reset",
+          {},
+        ),
+      );
+      this.confirmPasswordReset = false;
+      this.feedback =
+        "Recupero richiesto a Connect. Verifica con la persona la ricezione del link: la password cambia solo quando completa la procedura.";
+    } catch {
+      this.feedback =
+        "Richiesta non confermata. Verifica la ricezione del link con la persona prima di un nuovo invio; nessuna richiesta è stata ripetuta automaticamente.";
+    } finally {
+      this.busy = false;
+    }
   }
-  async saveRole(): Promise<void> {
+  async revoke(): Promise<void> {
+    const person = this.selected;
+    if (
+      !person ||
+      !this.canEditPerson(person) ||
+      !this.confirmRevoke ||
+      this.busy
+    )
+      return;
+    this.busy = true;
+    try {
+      await firstValueFrom(
+        this.http.delete(
+          ADMIN_API_URL +
+            "/team/users/" +
+            encodeURIComponent(person.user!.subject) +
+            "/access",
+        ),
+      );
+      this.selected = null;
+      this.feedback =
+        "Accesso revocato. Il profilo della persona è conservato.";
+    } catch {
+      this.feedback =
+        "Esito da verificare. Aggiorna la squadra prima di un’altra operazione.";
+    } finally {
+      await this.load();
+      this.busy = false;
+    }
+  }
+  get canAssociateSelf(): boolean {
+    return (
+      !!this.selected &&
+      this.isSelf(this.selected) &&
+      this.selected.local?.role === "owner" &&
+      this.canManage
+    );
+  }
+  async saveSelf(): Promise<void> {
+    if (!this.canAssociateSelf || this.busy) return;
+    this.busy = true;
+    try {
+      await firstValueFrom(
+        this.http.put(ADMIN_API_URL + "/team/me/professional", {
+          collaboratorId: this.professionalId,
+        }),
+      );
+      this.selected = null;
+      this.feedback = "Profilo professionista aggiornato.";
+    } catch {
+      this.feedback =
+        "Associazione da verificare. Aggiorna prima di riprovare.";
+    } finally {
+      await this.load();
+      this.busy = false;
+    }
+  }
+  editCustom(role?: TeamRole): void {
+    this.feedback = "";
+    this.rolePanel = true;
+    this.deleteRoleId = "";
+    this.roleDraft = {
+      id: role?.id || "",
+      name: role?.name || "",
+      permissions: [...(role?.permissions || [])],
+    };
+  }
+  optionSelected(option: (typeof ROLE_OPTIONS)[number]): boolean {
+    return option.keys.every((key) =>
+      this.roleDraft?.permissions.includes(key),
+    );
+  }
+  optionPartial(option: (typeof ROLE_OPTIONS)[number]): boolean {
+    return (
+      !this.optionSelected(option) &&
+      option.keys.some((key) => this.roleDraft?.permissions.includes(key))
+    );
+  }
+  optionAvailable(option: (typeof ROLE_OPTIONS)[number]): boolean {
+    return option.keys.every((key) => this.ownerFunctions.includes(key));
+  }
+  toggleOption(option: (typeof ROLE_OPTIONS)[number], checked: boolean): void {
+    if (this.roleDraft)
+      this.roleDraft.permissions = changeRoleOption(
+        this.roleDraft.permissions,
+        option,
+        checked,
+      );
+  }
+  get customNameValid(): boolean {
+    return (
+      !!this.roleDraft?.name.trim() &&
+      !["titolare", "collaboratore"].includes(
+        this.roleDraft.name.trim().toLocaleLowerCase(),
+      )
+    );
+  }
+  async saveCustom(): Promise<void> {
     const draft = this.roleDraft;
-    if (!draft?.name.trim()) return;
-    const body = { name: draft.name.trim(), permissions: draft.permissions };
-    await this.mutate(() => firstValueFrom(draft.id ? this.http.put(ADMIN_API_URL + "/team/roles/" + encodeURIComponent(draft.id), body) : this.http.post(ADMIN_API_URL + "/team/roles", body)));
+    if (
+      !draft ||
+      !this.customNameValid ||
+      this.busy ||
+      !this.canManage ||
+      !draft.permissions.length ||
+      draft.permissions.some((key) => !this.ownerFunctions.includes(key))
+    )
+      return;
+    this.busy = true;
+    try {
+      const body = { name: draft.name.trim(), permissions: draft.permissions };
+      await firstValueFrom(
+        draft.id
+          ? this.http.put(
+              ADMIN_API_URL + "/team/roles/" + encodeURIComponent(draft.id),
+              body,
+            )
+          : this.http.post(ADMIN_API_URL + "/team/roles", body),
+      );
+      this.roleDraft = null;
+      this.feedback =
+        "Ruolo personalizzato salvato. Ora puoi assegnarlo alle persone.";
+    } catch {
+      this.feedback =
+        "Esito del ruolo da verificare. Aggiorna l’elenco prima di riprovare.";
+    } finally {
+      await this.load();
+      this.busy = false;
+    }
   }
-  async removeRole(role: TeamRole): Promise<void> { await this.mutate(() => firstValueFrom(this.http.delete(ADMIN_API_URL + "/team/roles/" + encodeURIComponent(role.id)))); }
-  async saveAssignment(user: TeamUser): Promise<void> { if (!this.assignedRoleIds.length && !this.confirmEmptyRoles) return; await this.mutate(() => firstValueFrom(this.http.put(ADMIN_API_URL + "/team/users/" + encodeURIComponent(user.subject) + "/roles", { roleIds: this.assignedRoleIds }))); }
-  async changeAccess(user: TeamUser, restore: boolean): Promise<void> {
-    const url = ADMIN_API_URL + "/team/users/" + encodeURIComponent(user.subject);
-    await this.mutate(() => firstValueFrom(restore ? this.http.post(url + "/restore", {}) : this.http.delete(url + "/access")));
+  async deleteCustom(role: TeamRole): Promise<void> {
+    if (this.deleteRoleId !== role.id || !this.canEditRole(role) || this.busy)
+      return;
+    this.busy = true;
+    try {
+      await firstValueFrom(
+        this.http.delete(
+          ADMIN_API_URL + "/team/roles/" + encodeURIComponent(role.id),
+        ),
+      );
+      this.deleteRoleId = "";
+      this.feedback =
+        "Ruolo eliminato. Verifica le persone a cui era assegnato.";
+    } catch {
+      this.feedback = "Esito da verificare. Aggiorna prima di riprovare.";
+    } finally {
+      await this.load();
+      this.busy = false;
+    }
   }
 }

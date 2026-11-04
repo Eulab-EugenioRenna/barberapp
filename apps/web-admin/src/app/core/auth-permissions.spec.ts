@@ -1,4 +1,4 @@
-import { of } from "rxjs";
+import { of, throwError } from "rxjs";
 const providers = new Map<unknown, unknown>();
 jest.mock("@angular/core", () => ({Injectable: () => (target: unknown) => target, inject: (token: unknown) => providers.get(token)}));
 jest.mock("@angular/common/http", () => ({HttpClient: class {}}));
@@ -40,13 +40,33 @@ describe("function-based route access", () => {
     expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/access-unavailable"} as RouterStateSnapshot)).toBe(true);
     expect(me).toHaveBeenCalledTimes(2);
   });
+  it("admits the single people page for either profiles or account administration", async () => {
+    expect(await visit("manager", ["users.manage"], "/collaborators")).toBe(true);
+    expect(await visit("reception", ["collaborators.read"], "/collaborators")).toBe(true);
+    expect(await visit("manager", ["appointments.read.all"], "/collaborators")).toBe("/appointments");
+  });
   it("supports personal-only scopes for custom operational roles", async()=>{
     expect(await visit("manager",["appointments.read.own"],"/my-agenda")).toBe(true);
     expect(await visit("reception",["appointments.read.own"],"/dashboard")).toBe("/my-agenda");
+  });
+  it("allows selected-profile agendas only with company scope", async()=>{
+    expect(await visit("manager",["appointments.read.all"],"/my-agenda?collaboratorId=c2")).toBe(true);
+    expect(await visit("manager",["appointments.read.own"],"/my-agenda?collaboratorId=c2")).toBe("/access-unavailable");
+    expect(await visit("collaborator",["appointments.read.own"],"/my-agenda?collaboratorId=c2")).toBe("/access-unavailable");
   });
   it("keeps platform and personal routes separate", async()=>{
     expect(await visit("platform_admin",[],"/dashboard")).toBe("/platform");
     expect(await visit("collaborator",["dashboard.revenue.read"],"/dashboard")).toBe("/my-agenda");
     expect(await visit("manager",[],"/my-agenda")).toBe("/access-unavailable");
   });
+  it("keeps the session on a temporary provider failure and offers a retry without a redirect loop", async()=>{
+    const clear=jest.fn(),remember=jest.fn(),me=jest.fn(()=>throwError(()=>({status:503})));
+    providers.set(SessionStore,{isAuthenticated:()=>true,clear,rememberRequestedUrl:remember});
+    providers.set(AuthApiService,{me});providers.set(Router,{createUrlTree:(paths:string[])=>paths[0]});
+    expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/collaborators"} as RouterStateSnapshot)).toBe("/access-unavailable");
+    expect(clear).not.toHaveBeenCalled();expect(remember).toHaveBeenCalledWith("/collaborators");
+    expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/access-unavailable?reason=temporary"} as RouterStateSnapshot)).toBe(true);
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
 });

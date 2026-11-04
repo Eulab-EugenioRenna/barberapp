@@ -165,6 +165,7 @@ model User {
   connectActivatedAt          DateTime?
   connectSessions             ConnectSession[]
   connectAuthFlows            ConnectAuthFlow[]
+  connectTechnicalAccesses    ConnectTechnicalAccess[]
   migrationChallenges         ConnectMigrationChallenge[]
   sessions                    LocalSession[]
   accountIntent               TeamAccountIntent?
@@ -626,6 +627,8 @@ model LocalSession {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   connectSessionId String?
   connectSession   ConnectSession? @relation(fields: [connectSessionId], references: [id], onDelete: Cascade)
+  technicalAccessId String? @unique
+  technicalAccess   ConnectTechnicalAccess? @relation(fields: [technicalAccessId], references: [id], onDelete: Cascade)
   familyId         String
   accessHash       String   @unique
   refreshHash      String   @unique
@@ -674,6 +677,28 @@ model ConnectAuthFlow {
   connectSession   ConnectSession? @relation(fields: [connectSessionId], references: [id], onDelete: Cascade)
   createdAt        DateTime @default(now())
   @@index([userId, expiresAt])
+}
+
+// EULab Admin access-as grant. The operator token is encrypted, never used as
+// an application session and rechecked against Connect for every request.
+model ConnectTechnicalAccess {
+  id                  String   @id @default(uuid())
+  handoffHash         String   @unique
+  installationId      String
+  targetUserId        String
+  targetUser          User     @relation(fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetSubject       String
+  operatorSubject     String
+  operatorTokenCipher String
+  handoffExpiresAt    DateTime
+  expiresAt           DateTime
+  exchangedAt         DateTime?
+  revokedAt           DateTime?
+  createdAt           DateTime @default(now())
+  sessions            LocalSession[]
+
+  @@index([targetUserId])
+  @@index([expiresAt])
 }
 
 // Server-authorized SaaS binding. The browser cannot select or change it.

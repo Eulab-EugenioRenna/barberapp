@@ -1,0 +1,332 @@
+{
+  "date": "2026-10-26",
+  "baseCommit": "114e1b1",
+  "sourceState": "working tree with local SDK session-recovery correction",
+  "sdk": {
+    "version": "0.11.0 local candidate",
+    "artifact": "vendor/eulab-connect-0.11.0-session-recovery.tgz",
+    "sha256": "f36d25ab05dff8d8afde5181fdd68782d0b039c41b6c1708328510fa4aef3100",
+    "published": false
+  },
+  "checks": {
+    "rate-limit": {
+      "statuses": [
+        503
+      ],
+      "limitedRequestDenied": true,
+      "recovered": true,
+      "sameBrowserSessionWithoutLogin": true
+    },
+    "role-ui": {
+      "createdAndEditedThroughUi": true
+    },
+    "without-password": {
+      "uiCreationPreviouslyPerformed": true,
+      "ssoSetupRequired": true,
+      "completedMapping": true,
+      "sameIdOnExplicitResume": true
+    },
+    "collision": {
+      "occupiedProfessionalRejected": true,
+      "originalAssociationAndPolicyPreserved": true
+    },
+    "personal-ui": {
+      "dayWeekMonth": true,
+      "pagination25Plus2": true,
+      "noDuplicates": true,
+      "periodTotalsIndependentOfPage": true,
+      "onlyOwnException": true,
+      "companyClosure": true,
+      "sevenOwnWeeklyShifts": true,
+      "privateFieldsExcluded": true,
+      "statusUnchangedBeforeConfirmation": true,
+      "confirmedStatusChangeThroughUi": true
+    },
+    "race": {
+      "reassignedViaOwnerApi": true,
+      "staleUiConfirmationDenied403": true,
+      "statePreserved": true,
+      "oldAssignmentAbsentOnRefresh": true
+    },
+    "reception": {
+      "realSso": true,
+      "onlyOwnAssignments": true,
+      "companyDataDenied": true,
+      "ownWriteAllowed": true
+    },
+    "self-ui": {
+      "syntheticLocalOwnerFixture": true,
+      "realSso": true,
+      "associationAndRemovalThroughUi": true,
+      "localRoleAndPermissionsPreserved": true,
+      "centralRolesPreserved": true,
+      "existingOwnerUntouched": true
+    },
+    "empty-roles": {
+      "saveDisabledBeforeExplicitConfirmation": true,
+      "emptyAssignmentSubmittedThroughUi": true,
+      "zeroRolesVerified": true,
+      "explicitRoleRestoredThroughUi": true
+    },
+    "team-responsive": {
+      "dimensions": [
+        {
+          "width": 375,
+          "height": 812,
+          "overflow": false
+        },
+        {
+          "width": 768,
+          "height": 1024,
+          "overflow": false
+        },
+        {
+          "width": 1024,
+          "height": 768,
+          "overflow": false
+        },
+        {
+          "width": 1366,
+          "height": 900,
+          "overflow": false
+        }
+      ],
+      "noSubmissionDuringEditing": true
+    },
+    "negative-creation": {
+      "duplicateEmail409": true,
+      "occupiedId409": true,
+      "occupiedProfessional409": true,
+      "unknownRole403": true,
+      "operatorSessionPreserved": true
+    },
+    "cleanup-connect": {
+      "identityCleanupThroughExistingAdminApi": true,
+      "providerAndMappingsRemoved": true,
+      "removedFixtureIdentities": 4,
+      "removedFixtureRoles": 2,
+      "originalLicenseAndRolesNotChanged": true
+    },
+    "cleanup-alora": {
+      "fixtureUsersRemoved": 4,
+      "fixtureProfessionalsRemoved": 3,
+      "fixtureAppointmentsRemoved": 28,
+      "fixtureCustomerServiceAndHolidayRemoved": true,
+      "accountIntentsAndSessionsRemoved": true,
+      "tenantCachesInvalidated": true,
+      "auditHistoryPreserved": true
+    },
+    "reconciliation": {
+      "date": "2026-10-26T13:28:59.385Z",
+      "temporaryRestoreDatabasesRemoved": true,
+      "alora": [
+        {
+          "table": "Tenant",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "User",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Customer",
+          "count": 4,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Service",
+          "count": 4,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Product",
+          "count": 5,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Collaborator",
+          "count": 4,
+          "matchesBaseline": true
+        },
+        {
+          "table": "CollaboratorWeeklySchedule",
+          "count": 28,
+          "matchesBaseline": true
+        },
+        {
+          "table": "CollaboratorDayOverride",
+          "count": 0,
+          "matchesBaseline": true
+        },
+        {
+          "table": "TenantHoliday",
+          "count": 0,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Room",
+          "count": 0,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Appointment",
+          "count": 11,
+          "matchesBaseline": true
+        },
+        {
+          "table": "Sale",
+          "count": 4,
+          "matchesBaseline": true
+        },
+        {
+          "table": "SaleItem",
+          "count": 8,
+          "matchesBaseline": true
+        },
+        {
+          "table": "TeamAccountIntent",
+          "count": 0,
+          "matchesBaseline": true
+        }
+      ],
+      "connect": [
+        {
+          "table": "customers",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "applications",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "installations",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "licenses",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "entitlements",
+          "count": 24,
+          "matchesBaseline": true
+        },
+        {
+          "table": "identities",
+          "count": 2,
+          "matchesBaseline": true
+        },
+        {
+          "table": "memberships",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "roles",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "role_permissions",
+          "count": 24,
+          "matchesBaseline": true
+        },
+        {
+          "table": "assignments",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "local_links",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "features",
+          "count": 24,
+          "matchesBaseline": true
+        },
+        {
+          "table": "permissions",
+          "count": 24,
+          "matchesBaseline": true
+        },
+        {
+          "table": "app_local_users",
+          "count": 1,
+          "matchesBaseline": true
+        },
+        {
+          "table": "catalogs",
+          "count": 3,
+          "matchesBaseline": true
+        }
+      ],
+      "customerComparisonExcludesOnlyAlignmentTimestamps": true,
+      "userComparisonExcludesOnlyLoginUpdatedAt": true,
+      "applicationComparisonExcludesOnlyCatalogCheckAndSyncTimestamps": true,
+      "auditAndRuntimeSessionHistoryExcluded": true
+    },
+    "final-runtime": {
+      "ownerTeam200": true,
+      "originalOnlyUserAndRole": true
+    }
+  },
+  "providerIsolatedVerification": {
+    "at": "2026-10-26T13:27:15.596Z",
+    "status": "passed",
+    "checks": [
+      "Connect migrations 001\u2013014 applied twice via actual migrator on disposable PostgreSQL; no operational database used",
+      "12 facade cases with real PostgreSQL shared store, simulated OIDC/Connect; crash injection uses test store only",
+      "Provider proof attributes configured twice with the same bootstrap helper; reserved metadata is admin-only",
+      "Delegated accounts with real PostgreSQL and Keycloak: password rejection before identity creation; mirror to app_local_users/roles/login-context; original password login; lost provider response and failed SQL COMMIT recovery; replay and suspension preserved",
+      "Packaged independent Workshop BFF: offline installation, migration, diagnostics, seed, real SSO, tenant-isolated projects, refresh/logout, legacy hash preservation",
+      "Real Keycloak: password rejection, no identity, fresh recovery, new password SSO/PKCE, signed ID token, concurrent refresh, required actions, license revocation, logout"
+    ],
+    "realProvider": "disposable Keycloak",
+    "sdkStore": "disposable PostgreSQL",
+    "connectDatabase": "PGlite for onboarding lifecycle; isolated real PostgreSQL schema for delegated accounts",
+    "connectAdminAuthentication": "simulated",
+    "catalog": "injected fixture",
+    "realBrowser": false,
+    "production": false,
+    "cleanupVerified": true
+  },
+  "validation": {
+    "aloraTests": 190,
+    "aloraSuites": 34,
+    "connectTests": 160,
+    "apiBuild": true,
+    "adminProductionBuild": true,
+    "publicProductionBuild": true,
+    "lint": true,
+    "threeDockerDevelopmentImagesBuilt": true,
+    "threeDockerImagesContainSessionRecovery": true,
+    "diffCheck": true
+  },
+  "scope": {
+    "consumerUsesRealConnectAndKeycloak": true,
+    "operationalRowsSynthetic": true,
+    "ownerAssociationUsesDisposableLocalOwnerFixture": true,
+    "existingOwnerAssociationUntouched": true,
+    "providerPasswordPolicyOnConsumerRealm": null,
+    "providerPolicyRejectionTestedOnDisposableRealmOnly": true,
+    "bookingEngineAcceptance": false,
+    "sameFixtureSecondApplicationOnConsumer": false,
+    "realDeviceAcceptance": false,
+    "production": false
+  },
+  "operationalAcceptance": false,
+  "remaining": [
+    "Same consumer user with access to a second application",
+    "Consumer UI password-policy rejection and recovery (provider proof passed separately)",
+    "Remaining cross-company paths in I1",
+    "Full acceptance on physical devices and final user acceptance"
+  ]
+}

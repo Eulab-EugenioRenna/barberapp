@@ -70,6 +70,27 @@ describe("ALORA function catalog", () => {
     expect(canUseLocalFunction({ ...legacy, permissionsConfigured: true, permissions: ["dashboard.revenue.read"], connectFunctions: ["dashboard.revenue.read"] }, "dashboard.revenue.read")).toBe(false);
   });
 
+  it("preserves the native owner role for a short EULab access-as session", () => {
+    expect(
+      canUseLocalFunction(
+        { role: "owner", technicalAccess: true },
+        "services.manage",
+      ),
+    ).toBe(true);
+    expect(
+      canUseLocalFunction(
+        { role: "owner", technicalAccess: true },
+        "not-a-real-function",
+      ),
+    ).toBe(false);
+    expect(
+      canUseLocalFunction(
+        { role: "manager", technicalAccess: true, permissions: [] },
+        "services.manage",
+      ),
+    ).toBe(false);
+  });
+
   it("requires explicit local configuration and Connect grant for personal economic values", () => {
     const user = { role: "collaborator", collaboratorId: "own", permissions: ["dashboard.personal.values.read"], connectFunctions: ["dashboard.personal.values.read"] };
     expect(canUseLocalFunction(user, "dashboard.personal.values.read")).toBe(false);

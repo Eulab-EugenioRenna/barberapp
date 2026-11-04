@@ -55,4 +55,29 @@ describe("Personal activity projection", () => {
     await expect(controller.overview({ headers: {} }, {})).rejects.toBeInstanceOf(ForbiddenException);
     expect(findMany).not.toHaveBeenCalled();expect(aggregate).not.toHaveBeenCalled();
   });
+  it("rejects another profile for own-only access before reading any data", async () => {
+    await expect(controller.overview({ headers: {} }, { collaboratorId: "professional-b" })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(professional).not.toHaveBeenCalled();expect(findMany).not.toHaveBeenCalled();expect(aggregate).not.toHaveBeenCalled();
+  });
+  it("lets a company reader without a personal association inspect an unlinked professional, scoped to their tenant", async () => {
+    jest.mocked(resolveRequestSession).mockResolvedValue({ tenantId: "company-a", user: { ...user, role: "manager", collaboratorId: null, permissions: ["appointments.read.all", "dashboard.personal.values.read"], connectFunctions: ["appointments.read.all", "dashboard.personal.values.read"] } });
+    const result = await controller.overview({ headers: {} }, { collaboratorId: "professional-b" });
+    expect(professional).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "professional-b", tenantId: "company-a", isActive: true } }));
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ collaboratorId: "professional-b", tenantId: "company-a", collaborator: { tenantId: "company-a", isActive: true } }) }));
+    expect(aggregate).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ collaboratorId: "professional-b", collaborator: { tenantId: "company-a", isActive: true }, sale: expect.objectContaining({ tenantId: "company-a" }) }) }));
+    expect(result.values).toBeNull();expect(aggregate).toHaveBeenCalledTimes(1);
+  });
+  it("does not resolve another tenant's or unavailable professional for a company reader", async () => {
+    jest.mocked(resolveRequestSession).mockResolvedValue({ tenantId: "company-a", user: { ...user, role: "manager", permissions: ["appointments.read.all"], connectFunctions: ["appointments.read.all"] } });
+    professional.mockResolvedValue(null);
+    await expect(controller.overview({ headers: {} }, { collaboratorId: "foreign-professional" })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(professional).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "foreign-professional", tenantId: "company-a", isActive: true } }));
+    expect(findMany).not.toHaveBeenCalled();expect(aggregate).not.toHaveBeenCalled();
+  });
+  it("requires company revenue access for another profile's monetary values", async () => {
+    jest.mocked(resolveRequestSession).mockResolvedValue({ tenantId: "company-a", user: { ...user, role: "manager", permissions: ["appointments.read.all", "dashboard.revenue.read"], connectFunctions: ["appointments.read.all", "dashboard.revenue.read"] } });
+    const result = await controller.overview({ headers: {} }, { collaboratorId: "professional-b" });
+    expect(result.values).toEqual({ registeredServiceLineTotal: "0.30", currency: "EUR" });
+  });
+
 });

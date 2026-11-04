@@ -84,6 +84,9 @@ export function connectHttpError(error: unknown): never {
     )
   )
     throw new UnauthorizedException("Ripeti l’accesso Connect");
+  if (code === "provider_unavailable") throw new ServiceUnavailableException(
+    "Connect è temporaneamente occupato o non raggiungibile. Attendi qualche istante e riprova.",
+  );
   // Already-redacted local HTTP errors contain no provider/database details.
   if (
     error instanceof ForbiddenException ||

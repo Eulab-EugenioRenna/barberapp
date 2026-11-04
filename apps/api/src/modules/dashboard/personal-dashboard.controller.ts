@@ -1,6 +1,6 @@
 import { Controller, ForbiddenException, Get, Query, Req } from "@nestjs/common";
 import { Type } from "class-transformer";
-import { IsDateString, IsIn, IsInt, IsOptional, Matches, Max, Min } from "class-validator";
+import { IsDateString, IsIn, IsInt, IsOptional, IsUUID, Matches, Max, Min } from "class-validator";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { requireTenantId, requireUser, resolveRequestSession } from "../../common/request-session";
@@ -9,6 +9,7 @@ import { PERSONAL_APPOINTMENT_SELECT, type PersonalDashboard } from "../../commo
 import { zonedDateKey } from "../../common/zoned-time";
 import { getRevenueRange } from "./revenue-report.logic";
 class PersonalRangeDto {
+  @IsOptional() @IsUUID() collaboratorId?: string;
   @IsOptional() @IsIn(["day", "week", "month"]) period?: "day" | "week" | "month";
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true }) date?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(10000) page?: number;
@@ -20,23 +21,27 @@ export class PersonalDashboardController {
   async overview(@Req() request: { headers: { authorization?: string } }, @Query() query: PersonalRangeDto): Promise<PersonalDashboard> {
     const session = await resolveRequestSession(this.prisma, request.headers.authorization);
     const tenantId = requireTenantId(session), user = requireUser(session);
-    if (!user.collaboratorId || !canUseLocalFunction(user, "appointments.read.own")) throw new ForbiddenException("Agenda personale non abilitata o professionista non associato");
+    const collaboratorId = query.collaboratorId || user.collaboratorId;
+    const ownProfile = collaboratorId === user.collaboratorId;
+    const companyRead = canUseLocalFunction(user, "appointments.read.all");
+    if (!collaboratorId || (!ownProfile && !companyRead) || (ownProfile && !companyRead && !canUseLocalFunction(user, "appointments.read.own"))) throw new ForbiddenException("Agenda non abilitata o professionista non associato");
+    const profileScope = { tenantId, ...(ownProfile ? { userId: user.id } : {}), isActive: true };
     const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { timezone: true, currency: true } });
     const referenceDate = query.date || zonedDateKey(new Date(), tenant.timezone);
     const range = getRevenueRange(query.period || "week", referenceDate, tenant.timezone);
     // Schedule dates are stored as UTC calendar dates, not tenant-midnight instants.
     const calendarRange = { gte: new Date(zonedDateKey(range.start!, tenant.timezone) + "T00:00:00.000Z"), lte: new Date(zonedDateKey(range.end!, tenant.timezone) + "T00:00:00.000Z") };
     const professional = await this.prisma.collaborator.findFirst({
-      where: { id: user.collaboratorId, tenantId, userId: user.id, isActive: true },
+      where: { id: collaboratorId, ...profileScope },
       select: { firstName: true, lastName: true,
         weeklySchedules: { orderBy: { weekday: "asc" }, select: { weekday: true, isWorkingDay: true, startTime: true, endTime: true } },
         dayOverrides: { where: { date: calendarRange }, orderBy: { date: "asc" }, select: { date: true, isWorkingDay: true, isHoliday: true, startTime: true, endTime: true } },
       },
     });
     if (!professional) throw new ForbiddenException("Professionista personale non disponibile");
-    const where = { tenantId, OR: [{ roomId: null }, { room: { tenantId } }], customer: { tenantId }, service: { tenantId }, collaboratorId: user.collaboratorId, collaborator: { tenantId, userId: user.id, isActive: true }, startsAt: { gte: range.start!, lte: range.end! } };
-    const saleWhere: Prisma.SaleItemWhereInput = { collaboratorId: user.collaboratorId, collaborator: { tenantId, userId: user.id, isActive: true }, serviceId: { not: null }, service: { tenantId }, sale: { tenantId, soldAt: { gte: range.start!, lte: range.end! }, paymentStatus: { not: "cancelled" } } };
-    const valuesAllowed = canUseLocalFunction(user, "dashboard.personal.values.read");
+    const where = { tenantId, OR: [{ roomId: null }, { room: { tenantId } }], customer: { tenantId }, service: { tenantId }, collaboratorId, collaborator: profileScope, startsAt: { gte: range.start!, lte: range.end! } };
+    const saleWhere: Prisma.SaleItemWhereInput = { collaboratorId, collaborator: profileScope, serviceId: { not: null }, service: { tenantId }, sale: { tenantId, soldAt: { gte: range.start!, lte: range.end! }, paymentStatus: { not: "cancelled" } } };
+    const valuesAllowed = canUseLocalFunction(user, ownProfile ? "dashboard.personal.values.read" : "dashboard.revenue.read");
     const page = query.page || 1, pageSize = 25;
     const [groups, items, services, amounts, holidays] = await Promise.all([
       this.prisma.appointment.groupBy({ by: ["status"], where, _count: { _all: true } }),

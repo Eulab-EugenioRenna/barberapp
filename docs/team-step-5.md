@@ -2,6 +2,10 @@
 
 Stato storico al 25 ottobre 2026 (aggiornamento 0.11.0 in fondo): implementazione avviata su autorizzazione «procedi con il piano». Non concluso. L’accesso all’admin tramite Connect è stato confermato dall’utente nello Step 4; rinnovo, revoca e accettazione di produzione restano prove distinte.
 
+## Revisione richiesta dall’utente — Squadra e ruoli
+
+La UI è stata rivista dopo il feedback dell’utente: unica Squadra, preset Titolare/Collaboratore e ruolo personalizzato da creare esplicitamente. Password iniziale temporanea con cambio obbligatorio nel provider e recupero delegato tramite link Connect. Stato corrente: [revisione e limiti](team-presets-passwords.md), [evidenze](verification/team-presets-passwords.json). Il catalogo ora è versione 4 con 25 funzioni; la nuova team.password.reset richiede concessione esplicita e non è stata assegnata automaticamente agli utenti esistenti. Le sezioni successive restano la cronologia delle verifiche precedenti.
+
 ## Stato corrente — 26 ottobre, collaudo consumer reale
 
 Il Docker Connect è **schema 014**, con API/bootstrap della consegna, e ALORA
@@ -26,11 +30,94 @@ sono rimossi. Ripristino dei due backup provato in database isolati poi eliminat
 due timestamp di controllo/sincronizzazione catalogo. Audit e sessioni runtime
 sono esclusi da questo confronto; lo storico audit viene conservato.
 
-La suite del sorgente corrente comprende 190 test su 34 suite. Step 5 **ancora
-aperto** per i sottocasi non eseguiti nella checklist e accettazione operativa.
+La suite del sorgente corrente comprende 190 test su 34 suite; la prosecuzione del collaudo è documentata nella sezione seguente. Step 5 **ancora
+aperto** per il collaudo dell’utente sui dispositivi del salone e l’accettazione operativa. I casi tecnici residui sono documentati come verificati nell’ultimo ciclo e nel controllo dopo riavvio.
 Le sezioni successive descrivono la sequenza storica: i riferimenti a schema 013,
 metodo SDK mancante o collaudo riservato esclusivamente all’utente sono superati
 dall’aggiornamento e dall’autorizzazione al collaudo del consumer.
+
+## Prosecuzione del collaudo — 26 ottobre
+
+La nuova [evidenza estesa](verification/team-extended-consumer.json) aggiunge:
+modifica positiva del ruolo, conferma della rimozione di tutti i ruoli, account
+senza password con mapping completato e setup richiesto, conflitti email/ID e
+professionista occupato, giorno/settimana/mese, pagine 25+2, eccezioni personali,
+chiusure aziendali, conferma stato UI e riassegnazione reale tramite API del titolare.
+La conferma rimasta aperta al precedente assegnatario riceve 403 e conserva lo stato.
+Reception con SSO reale vede e modifica soltanto le proprie assegnazioni.
+Associazione/rimozione personale passa dalla UI su un account temporaneo con ruolo
+locale owner predisposto come fixture; non si modifica il titolare esistente.
+Form squadra verificato a quattro viewport e screenshot telefono ispezionato.
+
+Durante le letture ripetute, il limite Connect di 120 richieste/minuto restituiva
+429 e lo SDK invalidava la sessione. Corretto nel sorgente SDK Connect: gli errori
+transitori di lettura del contesto/accesso negano la richiesta con
+provider_unavailable, mantenendo la sessione prima dell’inizio di un rinnovo.
+Revoche, binding incoerenti e rinnovi ambigui restano fail-closed. Nessun retry
+automatico o autorizzazione dalla cache. Regressione riprodotta prima della
+correzione; 12 test facciata e suite Connect completa 160/160 passati.
+Nel consumer: 503 al limite, poi 200 sulla stessa sessione senza login.
+
+Dipendenza corrente: `vendor/eulab-connect-0.11.0-session-recovery.tgz`, SHA-256
+`f36d25ab05dff8d8afde5181fdd68782d0b039c41b6c1708328510fa4aef3100`.
+È una revisione locale della candidata 0.11.0, non una nuova pubblicazione npm.
+Package/lock e tutti i Dockerfile usano questo archivio. Build API/admin/pubblica,
+lint e ricostruzione delle tre immagini di sviluppo passati; 190/190 test ALORA.
+Nessuna nuova migrazione.
+
+Anche `node scripts/check-sdk-real-provider.mjs` nel checkout Connect passa:
+PostgreSQL e Keycloak temporanei, migrazioni 001–014 ripetute, password rifiutata,
+recupero, risposta provider persa e COMMIT fallito, conservazione password,
+SSO/PKCE, rinnovo concorrente, revoca e logout. Autenticazione admin Connect e
+catalogo sono fixture in quel collaudo; non sostituisce i sottocasi UI del consumer.
+Il realm consumer non ha una password policy configurata: non è stata cambiata
+per forzare un rifiuto durante la prova.
+
+Pulizia verificata: quattro identità/provider/mapping e due ruoli Connect rimossi;
+quattro utenti, tre professionisti, 28 appuntamenti, cliente/servizio/chiusura
+sintetici ALORA rimossi. Backup ripristinati in database isolati, poi eliminati:
+14 tabelle ALORA e 15 Connect riconciliate. Esclusi dal digest solo User.updatedAt,
+Customer.lastAlignedAt/updatedAt e i due timestamp catalogo già documentati.
+Le quattro righe cliente preesistenti differivano esclusivamente nei timestamp
+aggiornati dalla normale procedura di riallineamento dopo la riassegnazione;
+nessun altro campo cliente è escluso. Audit e sessioni runtime restano fuori dal
+confronto; audit conservato. Step 5 rimane aperto per i casi residui della checklist.
+
+## Ultimo ciclo — isolamento tra applicazioni e aziende, recupero account
+
+L’[evidenza finale del consumer](verification/team-final-consumer.json) completa
+R4, P6 manager, I1 e il percorso UI di rifiuto password/ripresa sullo stesso ID.
+Lo stesso utente SSO mantiene accesso e funzione della seconda app durante cambio
+ruolo, revoca e ripristino ALORA. Con due aziende SSO reali sono negati gli ID
+esterni per ruoli, utenti, policy, associazioni e creazioni; un manager con propria
+assegnazione non ottiene dati aziendali o altri incarichi. Il catalogo della
+seconda app e le righe operative sono fixture; l’azienda esterna usa una
+preassegnazione admin esplicita, non il percorso C1 di creazione delegata.
+
+Dalla UI reale, una password corta è rifiutata dalla policy temporanea del provider:
+nessuna identità creata, campo svuotato, profilo salvato in Creazioni da completare,
+sessione titolare valida. La ripresa completa lo stesso ID; login personale reale
+riuscito con la password recuperata anche dopo una ripetizione della creazione.
+Policy originale ripristinata e verificata; nessuna password preesistente cambiata.
+SDK consumer reale: replay su mapping sospeso, identità disabilitata e accesso
+revocato negati 409. La ripresa ALORA di un intento già completato restituisce
+il risultato storico e non cambia questi stati. Ripristini soltanto espliciti.
+Verificata anche l’eliminazione positiva di un ruolo dalla UI con conferma.
+
+Fixture eliminate e ripristino dei backup dimostrato: 14/14 tabelle ALORA,
+19/19 Connect riconciliate; binding e segreto decifrato originali confrontati a
+parte. Il solo slug descrittivo del binding sorgente, normalizzato dalla
+preassegnazione di prova, è ripristinato dal backup con guardia sul valore attuale;
+nessun collegamento identitario è cambiato. Le esclusioni dei timestamp restano
+quelle già dichiarate nei cicli precedenti. Audit conservato.
+
+Il 26 ottobre l’utente ha chiesto di fermarsi prima del riavvio e ha confermato
+che il collaudo sui dispositivi del salone non è ancora eseguito. Lo Step 5 resta
+aperto per accettazione operativa; Step 6 non avviato. Il [controllo dopo riavvio](verification/team-post-restart.json) passa con login reale, team e contesto locale
+200, consistenza delle anagrafiche originali, logout 201 e accesso successivo
+negato 401. Il 503 osservato prima del passaggio non si è riprodotto durante la
+diagnostica e non è assegnato a una causa certa. Nessun nuovo fix applicativo
+introdotto per questo episodio. Rimossi logging temporaneo e browser QA.
 
 ## Primo blocco implementato: amministrazione delegata
 

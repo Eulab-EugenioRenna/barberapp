@@ -57,6 +57,13 @@ describe("permission-aware admin data loading", () => {
     await expect(firstValueFrom(api(["clients.read.full"]).loadPersonalDashboard("week"))).rejects.toThrow("Agenda personale non abilitata");
     expect(requests).toEqual([]);
   });
+  it("requests a selected professional only with company agenda access", async () => {
+    await firstValueFrom(api(["appointments.read.all"]).loadPersonalDashboard("week", "", 1, "professional-b"));
+    expect(requests).toEqual(["/api/dashboard/personal?period=week&page=1&collaboratorId=professional-b"]);
+    requests.length=0;
+    await expect(firstValueFrom(api(["appointments.read.own"]).loadPersonalDashboard("week", "", 1, "professional-b"))).rejects.toThrow();
+    expect(requests).toEqual([]);
+  });
   it("does not issue forbidden secondary requests during global refresh", async () => {
     const service = api(["clients.read.full"]);
     await firstValueFrom(service.loadAdminCoreData());

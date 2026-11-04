@@ -130,6 +130,44 @@ export async function loadConnectConfig(
       })
     : null;
 }
+/**
+ * Resolves the installation selected by the signed technical ticket. The
+ * installation ID is never trusted as a tenant: env mappings and persisted
+ * bindings remain the only source of the tenant/customer association.
+ */
+export async function loadConnectConfigByInstallation(
+  prisma: PrismaClient,
+  installationId: string,
+): Promise<ConnectTenantConfig | null> {
+  if (!installationId || !process.env["ALORA_CONNECT_TENANTS_JSON"])
+    return loadPersistedConnectBinding(prisma, installationId);
+  const all = JSON.parse(process.env["ALORA_CONNECT_TENANTS_JSON"]) as Record<
+    string,
+    { customerId: string; installationId: string; secret: string }
+  >;
+  for (const tenantId of Object.keys(all)) {
+    if (all[tenantId]?.installationId !== installationId) continue;
+    const config = connectConfig(tenantId);
+    if (config) return config;
+  }
+  return loadPersistedConnectBinding(prisma, installationId);
+}
+async function loadPersistedConnectBinding(
+  prisma: PrismaClient,
+  installationId: string,
+): Promise<ConnectTenantConfig | null> {
+  if (!installationId) return null;
+  const binding = await prisma.connectTenantBinding.findUnique({
+    where: { installationId },
+  });
+  return binding
+    ? connectConfigFromBinding(binding.tenantId, {
+        customerId: binding.customerId,
+        installationId: binding.installationId,
+        secret: openConnect(binding.secretCipher),
+      })
+    : null;
+}
 function encryptionKey(): Buffer {
   const value = required("ALORA_CONNECT_ENCRYPTION_KEY");
   if (!/^[a-fA-F0-9]{64}$/.test(value))

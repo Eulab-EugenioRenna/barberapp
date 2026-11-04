@@ -54,5 +54,6 @@ export class TeamController {
   @Delete("roles/:id") removeRole(@Req() request: TeamRequest, @Param() params: IdentifierDto) { return this.team.removeRole(request.headers.authorization, params.id); }
   @Put("users/:id/roles") assignRoles(@Req() request: TeamRequest, @Param() params: IdentifierDto, @Body() body: AssignmentDto) { return this.team.assignRoles(request.headers.authorization, params.id, body.roleIds); }
   @Delete("users/:id/access") revoke(@Req() request: TeamRequest, @Param() params: IdentifierDto) { return this.team.revoke(request.headers.authorization, params.id); }
+  @Post("users/:id/password-reset") passwordReset(@Req() request: TeamRequest, @Param() params: IdentifierDto) { return this.team.passwordReset(request.headers.authorization, params.id); }
   @Post("users/:id/restore") restore(@Req() request: TeamRequest, @Param() params: IdentifierDto) { return this.team.restore(request.headers.authorization, params.id); }
 }
