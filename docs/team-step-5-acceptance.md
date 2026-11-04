@@ -1,6 +1,6 @@
 # Collaudo operativo Step 5 — Ruoli e squadra
 
-Stato: **casi tecnici del consumer verificati sul Docker reale; accettazione operativa pendente**, dopo
+Stato: **casi tecnici del consumer verificati sul Docker reale; collaudo operativo Squadra/La mia agenda accettato dall’utente il 4 novembre 2026; prova email pendente**, dopo
 l’autorizzazione dell’utente al collaudo ALORA con Connect schema 014. Non equivale
 a chiusura dello Step 5 o accettazione di produzione.
 [Prima evidenza](verification/team-real-consumer.json), [prosecuzione estesa](verification/team-extended-consumer.json) e [ultimo ciclo consumer](verification/team-final-consumer.json) e [controllo dopo riavvio](verification/team-post-restart.json).
@@ -22,11 +22,13 @@ questo non prova la consegna del suo link di recupero.
 | Condizione di chiusura residua | Stato e prova necessaria |
 | --- | --- |
 | Recupero password delegato | Non eseguito: identificare un account collaboratore di collaudo e una casella controllata, con autorizzazione all'invio; verificare ricezione del link, cambio nel provider e accesso con nuova credenziale. Non pubblicare link, password o token. |
-| Squadra rivista | Accettazione utente pendente: preset Titolare/Collaboratore, ruolo personalizzato esplicito e gestione profilo/accesso sui dispositivi del salone. |
-| La mia agenda | Accettazione utente pendente: consultazione e operazioni consentite sul proprio profilo da dispositivi del salone. |
+| Squadra rivista | Collaudo operativo sui dispositivi del salone confermato dall’utente il 4 novembre 2026. |
+| La mia agenda | Collaudo operativo sui dispositivi del salone confermato dall’utente il 4 novembre 2026. |
 
 Non ripetere le fixture già rimosse per sostituire queste prove. Non avviare
 lo Step 6 prima della chiusura e dell'autorizzazione prevista dal piano.
+
+L’utente ha risposto «Confermo anche il collaudo operativo» alla domanda esplicita su Squadra e La mia agenda sui dispositivi del salone. Questa conferma supera le indicazioni storiche di accettazione pendente sotto. Non attesta la ricezione o l’utilizzo del link password, che resta da verificare separatamente.
 
 ## Revisione della UI dopo feedback
 
