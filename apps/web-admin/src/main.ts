@@ -4,6 +4,7 @@ import { bootstrapApplication } from "@angular/platform-browser";
 import { provideRouter, withHashLocation } from "@angular/router";
 import { AdminRootComponent } from "./app/admin-root.component";
 import { adminRoutes } from "./app/admin.routes";
+import { apiNetworkInterceptor } from "./app/core/api-network.interceptor";
 import { authInterceptor } from "./app/core/auth.interceptor";
 import { prepareRemoteOnly } from "./app/core/remote-only";
 import { AdminPwaService } from "./app/core/pwa.service";
@@ -13,7 +14,7 @@ prepareRemoteOnly(window)
     bootstrapApplication(AdminRootComponent, {
       providers: [
         provideRouter(adminRoutes, withHashLocation()),
-        provideHttpClient(withInterceptors([authInterceptor, inFlightGetInterceptor])),
+        provideHttpClient(withInterceptors([authInterceptor, inFlightGetInterceptor, apiNetworkInterceptor])),
       ],
     }),
   )

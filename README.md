@@ -32,16 +32,14 @@ npm run serve:admin
 npm run serve:public
 ```
 
-## Docker Dev Setup
+## Docker: build e aggiornamento
 
-`docker compose` ora e ottimizzato per sviluppo:
-
-- bind mount del workspace locale in `/app`
-- volumi persistenti per `node_modules`
-- cache persistenti `npm` e `.angular`
-- volume `dist` persistente per evitare rebuild completi inutili
-- volume persistente `uploads` per logo e cover tenant su filesystem
-- API e frontend avviati in watch mode dentro i container
+Compose esegue i frontend compilati con Nginx e l'API compilata con Node,
+senza server Angular di sviluppo, watch mode o bind mount dei sorgenti.
+I tre target usano `docker/app.Dockerfile`: la fase condivisa `deps` contiene
+`node_modules` ed è riutilizzata dalla cache Docker finché `package.json` e
+`package-lock.json` non cambiano. Anche i download npm restano nella cache
+BuildKit; il tarball SDK Connect è un ulteriore input della fase `deps`. Non usare `--no-cache` per gli aggiornamenti ordinari.
 
 Primo avvio:
 
@@ -49,18 +47,35 @@ Primo avvio:
 docker compose up -d --build
 ```
 
-Poi, durante lo sviluppo normale, basta:
+Dopo ogni modifica ai sorgenti:
 
 ```bash
-docker compose up -d
+./scripts/update.sh
 ```
 
-Le modifiche ai file locali vengono riutilizzate dai container senza rifare l'immagine ogni volta.
+Lo script compila prima le immagini, poi ricrea soltanto API e frontend e
+ricarica Nginx. Se la build fallisce, i container correnti restano in servizio.
+Per riavviare senza modifiche basta `docker compose up -d`.
 
-Nota:
+I volumi `postgres_data`, `redis_data` e `uploads_data` mantengono gli stessi
+nomi e contenuti. Lo script non ferma PostgreSQL e non rimuove volumi.
+I vecchi volumi di sviluppo sono conservati, ma non montati nell'app.
+Non usare `docker compose down -v` o `docker volume prune` su questa installazione.
 
-- `docker compose up` ora esegue automaticamente `prisma generate` e un bootstrap Prisma verificato prima di avviare l'API. Il bootstrap crea lo schema da zero su un volume nuovo; su un volume legacy senza cronologia registra soltanto la baseline e poi applica le migrazioni mancanti. Se rileva uno stato non riconosciuto, si ferma senza modificare dati. Non usare `prisma db push --force-reset` su un database con dati.
-- Compose di sviluppo crea la demo completa prima dell’avvio API (`DEMO_BOOTSTRAP=1`, default). Configura `DEMO_OWNER_PASSWORD` nel `.env`; `DEMO_BOOTSTRAP=0` disabilita la creazione. Se la demo esiste già, ID, profilo, password e dati vengono conservati. Il seed amministrativo resta manuale.
+All'avvio l'API applica soltanto le migrazioni Prisma mancanti tramite il
+bootstrap esistente; non esegue reset né seed automatici. Il bootstrap conserva
+anche il riconoscimento delle installazioni legacy e si ferma su stati sconosciuti.
+La generazione del client Prisma avviene nella build. Il seed amministrativo e la
+creazione della demo restano comandi espliciti descritti sotto.
+
+La build include il tarball SDK Connect già approvato per ALORA. Per il trasporto
+Connect locale, il file `.env` usa
+`COMPOSE_FILE=docker-compose.yml:docker-compose.connect-local.yml`; l'override monta
+soltanto il certificato CA nel container API, senza includerlo nelle immagini,
+e imposta `NODE_ENV=development` per mantenere i callback HTTP su localhost.
+L’immagine di base mantiene `NODE_ENV=production`.
+Il merge dei sorgenti non ricrea i container già avviati: il passaggio dal vecchio
+watch mode al runtime compilato avviene al successivo aggiornamento esplicito.
 
 La porta locale è configurabile con `ALORA_HTTP_PORT` (default `53020`); aggiorna anche `APP_ORIGIN` se la cambi. Non occorrono processi Node sull’host.
 
@@ -88,7 +103,7 @@ Prima che il tenant esista, lancia (dentro il container API, che ha gia
 docker compose exec api npm run demo:create
 ```
 
-Se lanciato due volte con lo stesso slug non cambia nulla. Configura `DEMO_OWNER_PASSWORD` nel solo file locale `.env`: le password non vengono stampate. Il Compose di sviluppo richiama lo stesso generatore automaticamente; per produzione resta un comando esplicito. `prisma/seed.ts` con `SEED_DEMO=1` usa lo stesso generatore completo, evitando dataset duplicati.
+Se lanciato due volte con lo stesso slug non cambia nulla. Configura `DEMO_OWNER_PASSWORD` nel solo file locale `.env`: le password non vengono stampate. Con il runtime compilato la creazione della demo è un comando esplicito anche in locale. `prisma/seed.ts` con `SEED_DEMO=1` usa lo stesso generatore completo, evitando dataset duplicati.
 
 La demo segue lo schema attuale: squadra con turni, servizi, prodotti, clienti, agenda, vendite con righe e attribuzioni, conferme e abbonamento. Ogni evoluzione di questi domini deve aggiornare `scripts/create-demo-account.ts`, unica sorgente del dataset. Il generatore crea una demo assente; non applica aggiornamenti impliciti a una demo modificata dall’utente. Il reset resta esplicito e confermato.
 

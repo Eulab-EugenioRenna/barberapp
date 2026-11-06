@@ -312,7 +312,7 @@ export class AdminDashboardPageComponent {
   @Input() activityHasMore = false;
   @Input() activityLoading = false;
   @Input() revenueFilters: any = {
-    period: "month",
+    period: "day",
     date: "",
     customerId: "",
     collaboratorId: "",

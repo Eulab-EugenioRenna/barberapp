@@ -1,6 +1,6 @@
 import { SessionStore } from "../core/session.store";
-import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, OnInit, Output, inject } from "@angular/core";
+import { CommonModule, DOCUMENT } from "@angular/common";
+import { Component, EventEmitter, HostListener, OnInit, Output, inject } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import { AdminAppointmentsDrawerComponent } from "./admin-appointments-drawer.component";
 import { AdminAppointmentsQuickRescheduleModalComponent } from "./admin-appointments-quick-reschedule-modal.component";
@@ -264,6 +264,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
   private readonly session = inject(SessionStore);
 
   readonly appointmentsFacade = inject(AppointmentsFacade);
+  private readonly document = inject(DOCUMENT);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   @Output() createOrder = new EventEmitter<any>();
@@ -280,6 +281,20 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.reloadViewData();
+  }
+
+  @HostListener("document:visibilitychange")
+  @HostListener("window:online")
+  async refreshOnResume(): Promise<void> {
+    if (this.document.hidden || !this.document.defaultView?.navigator.onLine ||
+        this.appointmentsFacade.loading()) {
+      return;
+    }
+    try {
+      await this.appointmentsFacade.loadViewData();
+    } catch {
+      // The facade exposes the load error; preserve the current editor state.
+    }
   }
 
   async reloadViewData(): Promise<void> {

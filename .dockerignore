@@ -13,3 +13,11 @@ tmp
 .git
 
 .local/
+
+uploads
+.agents
+.codex
+.aws
+backups
+*.dump
+*.sql.gz

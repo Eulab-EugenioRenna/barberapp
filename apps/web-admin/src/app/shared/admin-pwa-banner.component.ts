@@ -17,8 +17,8 @@ import { AdminPwaService } from "../core/pwa.service";
         <div class="pwa-banner-copy">
           <strong>Sei offline</strong>
           <span
-            >I dati mostrati potrebbero non essere aggiornati. Le modifiche
-            riprenderanno appena torni online.</span
+            >Serve una connessione per aggiornare i dati e salvare le modifiche.
+            Le modifiche non salvate devono essere inviate di nuovo quando torni online.</span
           >
         </div>
       </section>

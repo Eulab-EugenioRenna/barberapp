@@ -87,6 +87,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "collaborators.manage",
   },
+  "CustomersController.options": {
+    kind: "function",
+    key: "clients.read.full",
+  },
   "CustomersController.findAll": {
     kind: "function",
     key: "clients.read.full",

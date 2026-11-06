@@ -663,7 +663,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   customerHistory: any = null;
   customerHistoryLoading = false;
   revenueFilters = {
-    period: "month",
+    period: "day",
     date: toLocalDateKey(new Date()),
     customerId: "",
     collaboratorId: "",
@@ -676,6 +676,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   dashboardActivityLoading = false;
   private dashboardActivityPage = 1;
   private dashboardActivityRequestId = 0;
+  private dashboardRefreshInFlight = 0;
   private dashboardRefreshTimer: ReturnType<typeof setInterval> | null = null;
   platformTenants: any[] = [];
   selectedPlatformTenant: any = null;
@@ -856,7 +857,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   get customerSelectOptions(): Array<{ value: string; label: string }> {
-    return this.adminData().customers.map((customer) => ({
+    return this.adminFacade.customerOptions().map((customer) => ({
       value: customer.id,
       label: `${customer.firstName} ${customer.lastName}`.trim(),
     }));
@@ -1067,6 +1068,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   @HostListener("document:visibilitychange")
+  @HostListener("window:online")
   onDocumentVisibilityChange(): void {
     if (this.canAutoRefreshDashboard()) {
       void this.refreshDashboardQueries();
@@ -1081,6 +1083,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     if (this.quickOrderCustomerSearchTimer) {
       clearTimeout(this.quickOrderCustomerSearchTimer);
     }
+    if (this.customerSearchTimer) {
+      clearTimeout(this.customerSearchTimer);
+    }
     this.appointmentOrderNotifications.stop();
   }
 
@@ -1090,6 +1095,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.sessionStore.isAuthenticated() &&
       this.currentUser?.role !== "platform_admin" &&
       !this.document.hidden &&
+      window.navigator.onLine &&
+      !this.loading &&
+      !this.dashboardRefreshInFlight &&
       !this.adminFacade.loading() &&
       !this.dashboardActivityLoading
     );
@@ -2516,7 +2524,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.dashboardActivityLoading = true;
     if (reset) {
       this.dashboardActivityPage = 1;
-      this.dashboardActivity = [];
     }
 
     try {
@@ -2548,6 +2555,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async refreshDashboardQueries(): Promise<void> {
+    this.dashboardRefreshInFlight += 1;
     this.syncAutoRevenueDate();
     try {
       await Promise.all([
@@ -2564,6 +2572,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         error?.error?.message ||
         error?.message ||
         "Aggiornamento della panoramica non riuscito";
+    } finally {
+      this.dashboardRefreshInFlight -= 1;
     }
   }
 
@@ -2586,7 +2596,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   resetRevenueFilters(): void {
     this.revenueFilters = {
-      period: "month",
+      period: "day",
       date: toLocalDateKey(new Date()),
       customerId: "",
       collaboratorId: "",

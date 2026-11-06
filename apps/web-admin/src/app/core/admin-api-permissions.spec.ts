@@ -27,6 +27,7 @@ describe("permission-aware admin data loading", () => {
           });
         if (url.endsWith("/tenant/context"))
           return of({ id: "t1", name: "Attività" });
+        if (url.endsWith("/customers/options")) return of([{ id: "customer-51", firstName: "Mario", lastName: "Rossi" }]);
         if (url.endsWith("/appointments")) return of([{ id: "a1" }]);
         return of({ items: [], total: 0, hasMore: false });
       },
@@ -48,6 +49,19 @@ describe("permission-aware admin data loading", () => {
     ]);
     expect(data["services"]).toEqual([{ id: "s1", name: "Servizio" }]);
     expect(data["customers"]).toEqual({ items: [], total: 0, hasMore: false });
+  });
+  it("does not fetch customer filter names without full client access", async () => {
+    for (const load of ["loadAdminCoreData", "loadAdminData"] as const) {
+      const data = await firstValueFrom(api(["appointments.read.all"])[load]());
+      expect(data["customerOptions"]).toEqual([]);
+    }
+    expect(requests.some((url) => url.includes("/customers"))).toBe(false);
+  });
+  it("loads complete customer names independently of the paginated list", async () => {
+    const data = await firstValueFrom(api(["clients.read.full"]).loadAdminCoreData());
+    expect(data["customers"]).toEqual({ items: [], total: 0, hasMore: false });
+    expect(data["customerOptions"]).toEqual([{ id: "customer-51", firstName: "Mario", lastName: "Rossi" }]);
+    expect(requests).toContain("/api/customers/options");
   });
   it("loads the personal dashboard with own-only access and never calls company reports", async () => {
     await firstValueFrom(api(["appointments.read.own"]).loadPersonalDashboard("week", "2026-10-25"));

@@ -51,12 +51,14 @@ export class CustomersController {
       tenantId,
       ...(search
         ? {
-            OR: [
-              { firstName: { contains: search, mode: "insensitive" as const } },
-              { lastName: { contains: search, mode: "insensitive" as const } },
-              { email: { contains: search, mode: "insensitive" as const } },
-              { phone: { contains: search, mode: "insensitive" as const } },
-            ],
+            AND: search.split(/\s+/).map((term) => ({
+              OR: [
+                { firstName: { contains: term, mode: "insensitive" as const } },
+                { lastName: { contains: term, mode: "insensitive" as const } },
+                { email: { contains: term, mode: "insensitive" as const } },
+                { phone: { contains: term, mode: "insensitive" as const } },
+              ],
+            })),
           }
         : {}),
     };
@@ -78,6 +80,23 @@ export class CustomersController {
         return buildPaginatedResult(items, total, page, pageSize);
       },
     );
+  }
+
+  @Get("options")
+  async options(
+    @Req() request: { headers: { authorization?: string } },
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+
+    return this.prisma.customer.findMany({
+      where: { tenantId },
+      select: { id: true, firstName: true, lastName: true },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }, { id: "asc" }],
+    });
   }
 
   @Post()

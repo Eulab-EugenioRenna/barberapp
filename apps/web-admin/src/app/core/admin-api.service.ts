@@ -64,6 +64,7 @@ export class AdminApiService {
       products: this.loadProductsPage(1),
       collaborators: this.loadCollaboratorsPage(1),
       customers: this.loadCustomersPage(1),
+      customerOptions: this.loadCustomerOptions(),
     });
   }
 
@@ -74,6 +75,7 @@ export class AdminApiService {
       services: this.loadServicesPage(1),
       collaborators: this.loadCollaboratorsPage(1),
       customers: this.loadCustomersPage(1),
+      customerOptions: this.loadCustomerOptions(),
     });
   }
 
@@ -93,6 +95,14 @@ export class AdminApiService {
     return this.allowed<any[]>(
       "appointments.read.all",
       () => this.http.get<any[]>(`${ADMIN_API_URL}/appointments`),
+      [],
+    );
+  }
+
+  private loadCustomerOptions(): Observable<any[]> {
+    return this.allowed<any[]>(
+      "clients.read.full",
+      () => this.http.get<any[]>(`${ADMIN_API_URL}/customers/options`),
       [],
     );
   }

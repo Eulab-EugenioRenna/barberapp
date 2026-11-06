@@ -23,6 +23,8 @@ RUN apk add --no-cache openssl netcat-openbsd
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist/apps/api ./dist/apps/api
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/package.json /app/package-lock.json ./
+COPY --from=build /app/scripts/prisma-bootstrap.js ./scripts/prisma-bootstrap.js
 COPY docker/api-entrypoint.sh ./docker/api-entrypoint.sh
 RUN chmod +x ./docker/api-entrypoint.sh
 EXPOSE 3000

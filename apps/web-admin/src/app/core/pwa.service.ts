@@ -21,6 +21,7 @@ export class AdminPwaService {
   private readonly document = inject(DOCUMENT);
 
   private deferredPrompt: BeforeInstallPromptEvent | null = null;
+  private checkingUpdate = false;
   private updateTimer: ReturnType<typeof setInterval> | null = null;
   private readonly updateReloadQueue: UpdateReloadQueue | null;
 
@@ -127,13 +128,17 @@ export class AdminPwaService {
    */
   async checkForUpdate(): Promise<boolean> {
     const window = this.document.defaultView;
-    if (!window || this.offline()) {
+    if (!window || this.offline() || this.document.hidden || this.checkingUpdate) {
       return false;
     }
 
+    this.checkingUpdate = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
     try {
       const response = await window.fetch("./index.html", {
         cache: "no-store",
+        signal: controller.signal,
       });
       if (!response.ok) {
         return false;
@@ -148,6 +153,9 @@ export class AdminPwaService {
       }
     } catch {
       // Rete non disponibile: riproveremo al prossimo check.
+    } finally {
+      clearTimeout(timer);
+      this.checkingUpdate = false;
     }
 
     return false;
@@ -172,7 +180,7 @@ export class AdminPwaService {
       .map((script) => script.getAttribute("src") || "")
       .sort();
 
-    return this.hash(sources.join("|"));
+    return sources.length ? this.hash(sources.join("|")) : "";
   }
 
   private buildIdFromHtml(html: string): string {
@@ -182,7 +190,7 @@ export class AdminPwaService {
       sources.push(match[1]);
     }
 
-    return this.hash(sources.sort().join("|"));
+    return sources.length ? this.hash(sources.sort().join("|")) : "";
   }
 
   private hash(value: string): string {

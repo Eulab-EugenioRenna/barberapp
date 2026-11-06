@@ -3,9 +3,13 @@
 services:
   api:
     environment:
+      # Keep localhost HTTP callbacks allowed only in this development override.
+      NODE_ENV: development
       ALORA_CONNECT_API_URL: https://nginx
       ALORA_CONNECT_OIDC_TRANSPORT_ORIGIN: https://nginx
       NODE_EXTRA_CA_CERTS: /app/.local/connect-dev/ca.crt
+    volumes:
+      - ./.local/connect-dev/ca.crt:/app/.local/connect-dev/ca.crt:ro
   nginx:
     networks:
       - app

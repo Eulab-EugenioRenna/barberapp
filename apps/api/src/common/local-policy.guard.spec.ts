@@ -70,6 +70,13 @@ describe("transitional local authorization", () => {
       ).toThrow();
     },
   );
+  it("requires full client access for customer filter names", () => {
+    for (const role of ["manager", "reception", "collaborator"]) {
+      expect(() => authorizeLocalOperation(session(role, ["appointments.read.all"]), "CustomersController", "options")).toThrow();
+    }
+    expect(() => authorizeLocalOperation(session("manager", ["clients.read.full"]), "CustomersController", "options")).not.toThrow();
+    expect(() => authorizeLocalOperation(session("platform_admin"), "CustomersController", "options")).toThrow();
+  });
   it("keeps platform administration separate", () => {
     expect(() =>
       authorizeLocalOperation(
