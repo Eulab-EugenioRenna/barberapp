@@ -5,3 +5,15 @@ dist
 coverage
 tmp
 *.log
+
+.git
+.env
+.env.*
+!.env.example
+uploads
+.agents
+.codex
+.aws
+backups
+*.dump
+*.sql.gz

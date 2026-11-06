@@ -12,16 +12,15 @@ const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
 /**
  * Stato PWA dell'admin.
  *
- * La cache e volutamente non aggressiva: il service worker lavora
- * network-first e qui rileviamo i nuovi deploy confrontando il build corrente
- * con `index.html` remoto. Quando cambia, l'utente puo invalidare le cache e
- * ricaricare l'app.
+ * Il service worker serve solo all'installazione e rimuove le vecchie cache.
+ * I nuovi deploy sono rilevati confrontando il build con `index.html` remoto.
  */
 @Injectable({ providedIn: "root" })
 export class AdminPwaService {
   private readonly document = inject(DOCUMENT);
 
   private deferredPrompt: BeforeInstallPromptEvent | null = null;
+  private checkingUpdate = false;
   private updateTimer: ReturnType<typeof setInterval> | null = null;
 
   readonly installAvailable = signal(false);
@@ -113,13 +112,17 @@ export class AdminPwaService {
    */
   async checkForUpdate(): Promise<boolean> {
     const window = this.document.defaultView;
-    if (!window || this.offline()) {
+    if (!window || this.offline() || this.document.hidden || this.checkingUpdate) {
       return false;
     }
 
+    this.checkingUpdate = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
     try {
       const response = await window.fetch("./index.html", {
         cache: "no-store",
+        signal: controller.signal,
       });
       if (!response.ok) {
         return false;
@@ -134,6 +137,9 @@ export class AdminPwaService {
       }
     } catch {
       // Rete non disponibile: riproveremo al prossimo check.
+    } finally {
+      clearTimeout(timer);
+      this.checkingUpdate = false;
     }
 
     return false;
@@ -142,8 +148,11 @@ export class AdminPwaService {
   /** Invalida le cache del browser/service worker e ricarica l'app. */
   async applyUpdate(): Promise<void> {
     this.applyingUpdate.set(true);
-    await this.clearCaches();
-    this.document.defaultView?.location.reload();
+    try {
+      await this.clearCaches();
+    } finally {
+      this.document.defaultView?.location.reload();
+    }
   }
 
   private registerServiceWorker(window: Window): void {
@@ -166,24 +175,20 @@ export class AdminPwaService {
       });
   }
 
-  private clearCaches(): Promise<void> {
-    return new Promise((resolve) => {
-      const controller = this.document.defaultView?.navigator.serviceWorker
-        ?.controller;
-
-      if (!controller) {
-        resolve();
-        return;
-      }
-
-      const channel = new MessageChannel();
-      const timer = setTimeout(() => resolve(), 1500);
-      channel.port1.onmessage = () => {
-        clearTimeout(timer);
-        resolve();
-      };
-      controller.postMessage({ type: "CLEAR_CACHES" }, [channel.port2]);
-    });
+  private async clearCaches(): Promise<void> {
+    const cacheStorage = this.document.defaultView?.caches;
+    if (!cacheStorage) {
+      return;
+    }
+    try {
+      const keys = await cacheStorage.keys();
+      await Promise.all(
+        keys.filter((key) => key.startsWith("barber-admin"))
+          .map((key) => cacheStorage.delete(key)),
+      );
+    } catch {
+      // Cache Storage may be unavailable in restricted browser contexts.
+    }
   }
 
   private currentBuildId(): string {
@@ -191,7 +196,7 @@ export class AdminPwaService {
       .map((script) => script.getAttribute("src") || "")
       .sort();
 
-    return this.hash(sources.join("|"));
+    return sources.length ? this.hash(sources.join("|")) : "";
   }
 
   private buildIdFromHtml(html: string): string {
@@ -201,7 +206,7 @@ export class AdminPwaService {
       sources.push(match[1]);
     }
 
-    return this.hash(sources.sort().join("|"));
+    return sources.length ? this.hash(sources.sort().join("|")) : "";
   }
 
   private hash(value: string): string {

@@ -3,13 +3,14 @@ import { bootstrapApplication } from "@angular/platform-browser";
 import { provideRouter, withHashLocation } from "@angular/router";
 import { AdminRootComponent } from "./app/admin-root.component";
 import { adminRoutes } from "./app/admin.routes";
+import { apiNetworkInterceptor } from "./app/core/api-network.interceptor";
 import { authInterceptor } from "./app/core/auth.interceptor";
 import { AdminPwaService } from "./app/core/pwa.service";
 
 bootstrapApplication(AdminRootComponent, {
   providers: [
     provideRouter(adminRoutes, withHashLocation()),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, apiNetworkInterceptor])),
   ],
 })
   // Instanzia il servizio PWA all'avvio per registrare il service worker e

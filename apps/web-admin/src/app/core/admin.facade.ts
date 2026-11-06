@@ -26,6 +26,7 @@ export class AdminFacade {
   readonly products = signal<any[]>([]);
   readonly collaborators = signal<any[]>([]);
   readonly customers = signal<any[]>([]);
+  readonly customerOptions = signal<any[]>([]);
   readonly platformTenants = signal<any[]>([]);
   readonly platformPlans = signal<any[]>([]);
   readonly platformSubscriptions = signal<any[]>([]);
@@ -42,6 +43,8 @@ export class AdminFacade {
     collaborators: 1,
   };
   private customerSearch = "";
+  private customerRequestId = 0;
+  private loadingMoreCustomers = false;
   private statsRequestId = 0;
   readonly dashboardData = computed(() => ({
     revenueMetrics: this.revenueMetrics(),
@@ -155,7 +158,10 @@ export class AdminFacade {
     this.collaboratorsHasMore.set(collaborators.hasMore);
     this.loadedPages.collaborators = 1;
 
+    ++this.customerRequestId;
+    this.customerSearch = "";
     const customers = unwrapPage(input["customers"]);
+    this.customerOptions.set(input["customerOptions"] || []);
     this.customers.set(customers.items);
     this.customersHasMore.set(customers.hasMore);
     this.loadedPages.customers = 1;
@@ -194,25 +200,38 @@ export class AdminFacade {
 
   async reloadCustomers(search = ""): Promise<void> {
     this.customerSearch = search;
+    const requestId = ++this.customerRequestId;
     const response = await firstValueFrom(
       this.adminApi.loadCustomersPage(1, search),
     );
+    if (requestId !== this.customerRequestId) {
+      return;
+    }
     this.customers.set(response?.items || []);
     this.customersHasMore.set(Boolean(response?.hasMore));
     this.loadedPages.customers = 1;
   }
 
   async loadMoreCustomers(): Promise<void> {
-    if (!this.customersHasMore()) {
+    if (!this.customersHasMore() || this.loadingMoreCustomers) {
       return;
     }
+    this.loadingMoreCustomers = true;
+    const requestId = this.customerRequestId;
     const nextPage = this.loadedPages.customers + 1;
-    const response = await firstValueFrom(
-      this.adminApi.loadCustomersPage(nextPage, this.customerSearch),
-    );
-    this.customers.update((items) => [...items, ...(response?.items || [])]);
-    this.customersHasMore.set(Boolean(response?.hasMore));
-    this.loadedPages.customers = nextPage;
+    try {
+      const response = await firstValueFrom(
+        this.adminApi.loadCustomersPage(nextPage, this.customerSearch),
+      );
+      if (requestId !== this.customerRequestId) {
+        return;
+      }
+      this.customers.update((items) => [...items, ...(response?.items || [])]);
+      this.customersHasMore.set(Boolean(response?.hasMore));
+      this.loadedPages.customers = nextPage;
+    } finally {
+      this.loadingMoreCustomers = false;
+    }
   }
 
   async loadMoreSales(): Promise<void> {

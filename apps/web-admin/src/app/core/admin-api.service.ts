@@ -37,6 +37,7 @@ export class AdminApiService {
       services: this.loadServicesPage(1),
       collaborators: this.loadCollaboratorsPage(1),
       customers: this.loadCustomersPage(1),
+      customerOptions: this.http.get<any[]>(`${ADMIN_API_URL}/customers/options`),
     });
   }
 

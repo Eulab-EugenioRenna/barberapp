@@ -12,6 +12,8 @@ count=1
 while [ "$count" -le "$attempts" ]; do
   if nc -z "$host" "$port" >/dev/null 2>&1; then
     echo "Database reachable at ${host}:${port}"
+    # Applies only pending migrations; never resets or seeds existing data.
+    node scripts/prisma-bootstrap.js
     exec node dist/apps/api/main.js
   fi
 

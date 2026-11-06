@@ -23,16 +23,14 @@ npm run serve:admin
 npm run serve:public
 ```
 
-## Docker Dev Setup
+## Docker: build e aggiornamento
 
-`docker compose` ora e ottimizzato per sviluppo:
-
-- bind mount del workspace locale in `/app`
-- volumi persistenti per `node_modules`
-- cache persistenti `npm` e `.angular`
-- volume `dist` persistente per evitare rebuild completi inutili
-- volume persistente `uploads` per logo e cover tenant su filesystem
-- API e frontend avviati in watch mode dentro i container
+Compose esegue i frontend compilati con Nginx e l'API compilata con Node,
+senza server Angular di sviluppo, watch mode o bind mount dei sorgenti.
+I tre target usano `docker/app.Dockerfile`: la fase condivisa `deps` contiene
+`node_modules` ed è riutilizzata dalla cache Docker finché `package.json` e
+`package-lock.json` non cambiano. Anche i download npm restano nella cache
+BuildKit. Non usare `--no-cache` per gli aggiornamenti ordinari.
 
 Primo avvio:
 
@@ -40,18 +38,30 @@ Primo avvio:
 docker compose up -d --build
 ```
 
-Poi, durante lo sviluppo normale, basta:
+Dopo ogni modifica ai sorgenti:
 
 ```bash
-docker compose up -d
+./scripts/update.sh
 ```
 
-Le modifiche ai file locali vengono riutilizzate dai container senza rifare l'immagine ogni volta.
+Lo script compila prima le immagini, poi ricrea soltanto API e frontend e
+ricarica Nginx. Se la build fallisce, i container correnti restano in servizio.
+Per riavviare senza modifiche basta `docker compose up -d`.
 
-Nota:
+I volumi `postgres_data`, `redis_data` e `uploads_data` mantengono gli stessi
+nomi e contenuti. Lo script non ferma PostgreSQL e non rimuove volumi.
+I vecchi volumi di sviluppo sono conservati, ma non montati nell'app.
+Non usare `docker compose down -v` o `docker volume prune` su questa installazione.
 
-- `docker compose up` ora esegue automaticamente `prisma generate`, un bootstrap Prisma verificato e `seed:platform-demo` prima di avviare l'API. Il bootstrap crea lo schema da zero su un volume nuovo; su un volume legacy senza cronologia registra soltanto la baseline e poi applica le migrazioni mancanti. Se rileva uno stato non riconosciuto, si ferma senza modificare dati. Non usare `prisma db push --force-reset` su un database con dati.
-- Il seed e idempotente: ricrea in modo coerente l'accesso `platform_admin` e il tenant demo vendibile.
+All'avvio l'API applica soltanto le migrazioni Prisma mancanti tramite il
+bootstrap esistente; non esegue reset né seed automatici. La generazione del
+client Prisma avviene nella build. Su una nuova installazione il seed iniziale è un'operazione esplicita:
+
+```bash
+docker compose exec api npm run seed:platform-demo
+```
+
+Per creare un tenant demo separato usa invece il comando della sezione successiva.
 
 ## Accesso unico via Nginx
 
@@ -114,22 +124,15 @@ DEMO_RESET_CONFIRM=yes npm run demo:create -- --reset
 
 L'admin e installabile come PWA (`apps/web-admin/public/manifest.webmanifest`).
 
-La cache e volutamente **non aggressiva**: il service worker
-(`apps/web-admin/public/service-worker.js`) lavora **network-first**, non fa
-precache dei bundle e non intercetta mai `/api/**`. La cache serve solo come
-fallback offline.
+Il service worker (`apps/web-admin/public/service-worker.js`) serve solo
+all'installazione: elimina le vecchie cache e non intercetta le richieste.
+Nginx serve i file compilati compressi e con `Cache-Control: no-store`.
+Non sono previsti fallback offline o salvataggi differiti.
 
 Quando viene pubblicato un nuovo deploy, l'app confronta il build in esecuzione
-con `index.html` remoto e mostra il banner "Nuova versione disponibile". Il
-pulsante **Aggiorna** invalida le cache del service worker e ricarica, cosi il
-browser non continua a servire file vecchi.
-
-Perche l'invalidazione funzioni:
-
-- l'admin e compilato con `outputHashing: "all"`, quindi i bundle hanno nomi
-  con hash e cambiano ad ogni build;
-- Nginx non mette in cache `index.html`, `service-worker.js` e
-  `manifest.webmanifest` (`docker/nginx.conf`).
+con `index.html` remoto e mostra il banner "Nuova versione disponibile".
+Il pulsante **Aggiorna** ricarica l'app. I bundle admin hanno nomi con hash
+che cambiano a ogni build.
 
 Su mobile la shell usa `100dvh`, rispetta le safe area del dispositivo, espone
 una bottom navigation con le sezioni principali e impedisce lo zoom automatico
