@@ -18,26 +18,37 @@
       <div>
         <p class="eyebrow text-[var(--accent)]">
           {{
-            isEditing
-              ? "Modifica vendita"
-              : isLinkedToAppointment
-                ? "Fine servizio"
-                : "Vendita al banco"
+            sale?.orderStatus === "cancelled"
+              ? "Prenotazione annullata"
+              : sale?.orderStatus === "open"
+                ? "Conto prenotato"
+                : isEditing
+                  ? "Modifica vendita"
+                  : isLinkedToAppointment
+                    ? "Fine servizio"
+                    : "Vendita al banco"
           }}
         </p>
         <h2 id="quick-order-title" class="font-display text-4xl">
           {{
-            isEditing
-              ? "Modifica vendita"
-              : isLinkedToAppointment
-                ? "Chiudi il conto"
-                : "Vendita veloce"
+            sale?.orderStatus === "cancelled"
+              ? "Conto conservato"
+              : sale?.orderStatus === "open"
+                ? "Conto prenotato"
+                : isEditing
+                  ? "Modifica vendita"
+                  : isLinkedToAppointment
+                    ? "Chiudi il conto"
+                    : "Vendita veloce"
           }}
         </h2>
-        <p class="mt-1 text-sm text-[var(--muted)]">
+        <p
+          *ngIf="sale?.orderStatus !== 'cancelled'"
+          class="mt-1 text-sm text-[var(--muted)]"
+        >
           <ng-container *ngIf="isLinkedToAppointment; else quickIntro">
-            La vendita verrà collegata all'appuntamento e chiuderà il conto del
-            cliente.
+            Servizi e prodotti restano nello stesso conto. Puoi salvarlo aperto
+            o registrare la vendita a fine servizio.
           </ng-container>
           <ng-template #quickIntro>
             Registra in pochi tocchi servizi e prodotti acquistati senza
@@ -55,216 +66,464 @@
       </button>
     </header>
 
-    <div class="quick-order-layout">
-      <div class="quick-order-catalog">
-        <label class="field">
-          <span>1 · Cliente</span>
-          <barber-custom-select
-            [value]="customerId"
-            (valueChange)="customerId = $event"
-            [options]="customerOptions"
-            label="Cliente"
-            placeholder="Seleziona il cliente"
-            [createLabel]="
-              session.can('clients.manage') ? 'Aggiungi nuovo cliente' : ''
-            "
-            [remoteSearch]="true"
-            (searchChange)="customerSearchChange.emit($event)"
-            (createRequest)="quickCreateKind = 'customer'"
-          ></barber-custom-select>
-        </label>
-        <div>
-          <div class="flex items-center justify-between gap-3">
-            <p class="quick-order-step">2 · Tocca servizi o prodotti</p>
-            <div class="flex gap-2">
-              <button
-                aloraFunction="services.manage"
-                type="button"
-                class="pill-btn"
-                (click)="quickCreateKind = 'service'"
-              >
-                + Servizio
-              </button>
-              <button
-                aloraFunction="products.manage"
-                type="button"
-                class="pill-btn"
-                (click)="quickCreateKind = 'product'"
-              >
-                + Prodotto
-              </button>
-            </div>
-          </div>
-          <div class="touch-grid">
-            <button
-              *ngFor="let service of catalogServices"
-              type="button"
-              class="touch-card service-card"
-              (click)="addService(service)"
-            >
-              <span class="touch-card-kind">Servizio</span>
-              <strong>{{ service.name }}</strong>
-              <span>€{{ Number(service.basePrice || 0).toFixed(2) }}</span>
-            </button>
-            <button
-              *ngFor="let product of catalogProducts"
-              type="button"
-              class="touch-card product-card"
-              (click)="addProduct(product)"
-            >
-              <span class="touch-card-kind">Prodotto</span>
-              <strong>{{ product.name }}</strong>
-              <span>{{
-                product.price === null || product.price === undefined
-                  ? "Prezzo da inserire"
-                  : "€" + Number(product.price).toFixed(2)
-              }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <aside class="quick-order-cart">
-        <div class="quick-order-cart-scroll">
-          <p class="quick-order-step">3 · Riepilogo vendita</p>
-          <div class="cart-empty" *ngIf="!items.length">
-            Tocca un servizio o un prodotto per iniziare.
-          </div>
-          <article *ngFor="let item of items; let i = index" class="cart-line">
-            <div class="cart-line-head">
-              <div>
-                <span class="touch-card-kind">{{
-                  item.kind === "service" ? "Servizio" : "Prodotto"
-                }}</span>
-                <strong>{{ item.label }}</strong>
-              </div>
-              <button type="button" class="remove-line" (click)="removeItem(i)">
-                Rimuovi
-              </button>
-            </div>
-            <div class="cart-line-fields">
-              <label>
-                <span>Q.tà</span>
-                <input
-                  [(ngModel)]="item.quantity"
-                  [name]="'quickQty' + i"
-                  type="number"
-                  min="1"
-                  inputmode="numeric"
-                />
-              </label>
-              <label>
-                <span>Prezzo</span>
-                <input
-                  [(ngModel)]="item.unitPrice"
-                  [name]="'quickPrice' + i"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  inputmode="decimal"
-                  (focus)="pricePadIndex = i"
-                />
-              </label>
-              <label *ngIf="item.kind === 'service'" class="cart-collaborator">
-                <span>Professionista</span>
-                <barber-custom-select
-                  [value]="item.collaboratorId"
-                  (valueChange)="item.collaboratorId = $event"
-                  [options]="collaboratorOptions"
-                  [label]="'Professionista per ' + item.label"
-                  placeholder="Scegli il professionista"
-                ></barber-custom-select>
-              </label>
-            </div>
-          </article>
-
-          <div
-            *ngIf="pricePadIndex >= 0 && items[pricePadIndex]"
-            class="price-pad"
-          >
-            <div class="price-pad-title">
-              <span>Prezzo · {{ items[pricePadIndex].label }}</span>
-              <button type="button" (click)="pricePadIndex = -1">OK</button>
-            </div>
-            <div class="price-pad-grid">
-              <button
-                *ngFor="
-                  let key of [
-                    '1',
-                    '2',
-                    '3',
-                    '4',
-                    '5',
-                    '6',
-                    '7',
-                    '8',
-                    '9',
-                    '0',
-                    '.',
-                  ]
-                "
-                type="button"
-                (click)="appendPrice(key)"
-              >
-                {{ key }}
-              </button>
-              <button type="button" (click)="clearPrice()">C</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="checkout-bar">
-          <label class="field">
-            <span>Pagamento</span>
-            <select [(ngModel)]="paymentMethod" name="quickPaymentMethod">
-              <option value="cash">Contanti</option>
-              <option value="card">Carta</option>
-              <option value="mixed">Misto</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Stato</span>
-            <select [(ngModel)]="paymentStatus" name="quickPaymentStatus">
-              <option value="paid">Pagato</option>
-              <option value="unpaid">Da pagare</option>
-              <option value="partial">Parziale</option>
-              <option value="refunded">Rimborsato</option>
-              <option value="cancelled">Annullato</option>
-            </select>
-          </label>
-          <div class="checkout-total">
-            <span>Totale</span><strong>€{{ total.toFixed(2) }}</strong>
-          </div>
-          <p
-            *ngIf="appointmentWindowLabel && !isLinkedToAppointment"
-            class="text-xs text-[var(--muted)]"
-          >
-            Orario attribuito al servizio:
-            <strong>{{ appointmentWindowLabel }}</strong>
-            (calcolato in base alla durata dei servizi)
-          </p>
-          <button
-            type="button"
-            class="primary-btn"
-            [disabled]="loading || !canSubmit()"
-            (click)="submit()"
-          >
-            {{
-              loading
-                ? "Salvataggio..."
-                : isEditing
-                  ? "Salva vendita"
-                  : "Registra vendita"
-            }}
-          </button>
-        </div>
-      </aside>
+    <div
+      *ngIf="writeState.kind !== 'empty'"
+      class="creation-recovery"
+      role="status"
+    >
+      <p>
+        L’invio precedente è ancora da verificare. Recupera lo stesso conto
+        prima di effettuare altre modifiche o registrazioni.
+      </p>
+      <button
+        type="button"
+        class="primary-btn"
+        [disabled]="loading || writeState.kind !== 'pending'"
+        (click)="sale?.id ? retryUpdate.emit() : retryCreation.emit()"
+      >
+        {{
+          sale?.id
+            ? "Verifica modifica precedente"
+            : "Verifica vendita precedente"
+        }}
+      </button>
     </div>
+    <article
+      *ngIf="sale?.orderStatus === 'cancelled'"
+      class="m-5 grid gap-4 rounded-2xl border border-[var(--line)] p-5"
+      aria-label="Conto annullato"
+    >
+      <p>
+        Il conto conserva servizi, prodotti e valore originario. L'annullamento
+        libera le risorse prenotate; rimborsi e resi si registrano
+        separatamente.
+      </p>
+      <p *ngFor="let item of sale.items">
+        {{ item.label }} · {{ item.quantity }} · €{{
+          +item.lineTotal + +item.taxTotal | number: "1.2-2"
+        }}
+      </p>
+      <strong>Valore originario €{{ sale.total | number: "1.2-2" }}</strong>
+      <fieldset
+        [disabled]="writeState.kind !== 'empty'"
+        style="border: 0; padding: 0; min-width: 0"
+      >
+        <alora-account-payments
+          *ngIf="session.can('sales.read')"
+          [saleId]="sale.id"
+          (updated)="onPaymentsUpdated($event)"
+          (pending)="paymentPending = $event"
+        />
+      </fieldset>
+    </article>
+    <fieldset
+      *ngIf="sale?.orderStatus !== 'cancelled'"
+      style="border: 0; padding: 0; margin: 0; min-width: 0; display: contents"
+      [disabled]="writeState.kind !== 'empty'"
+    >
+      <label class="field px-5"
+        ><span>Sede del conto</span
+        ><select
+          aria-label="Sede del conto"
+          [(ngModel)]="locationId"
+          [disabled]="!!sale || !!appointment"
+        >
+          <option value="">Seleziona una sede</option>
+          <option
+            *ngFor="let location of context.locations()"
+            [value]="location.id"
+          >
+            {{ location.name }}
+          </option>
+        </select></label
+      >
+      <div class="quick-order-layout">
+        <div class="quick-order-catalog">
+          <label class="field">
+            <span>1 · Cliente</span>
+            <barber-custom-select
+              [value]="customerId"
+              (valueChange)="customerId = $event"
+              [options]="customerOptions"
+              label="Cliente"
+              placeholder="Seleziona il cliente"
+              [createLabel]="
+                session.can('clients.manage') ? 'Aggiungi nuovo cliente' : ''
+              "
+              [remoteSearch]="true"
+              (searchChange)="customerSearchChange.emit($event)"
+              (createRequest)="quickCreateKind = 'customer'"
+            ></barber-custom-select>
+          </label>
+          <label class="field">
+            <span>Scansiona o inserisci un barcode e premi Invio</span>
+            <input
+              #barcodeInput
+              type="text"
+              autocomplete="off"
+              (keydown.enter)="
+                $event.preventDefault();
+                $event.stopPropagation();
+                scanner.inject(barcodeInput.value);
+                barcodeInput.value = ''
+              "
+            />
+          </label>
+          <div>
+            <div class="flex items-center justify-between gap-3">
+              <p class="quick-order-step">2 · Tocca servizi o prodotti</p>
+              <div class="flex gap-2">
+                <button
+                  aloraFunction="services.manage"
+                  type="button"
+                  class="pill-btn"
+                  (click)="quickCreateKind = 'service'"
+                >
+                  + Servizio
+                </button>
+                <button
+                  aloraFunction="products.manage"
+                  type="button"
+                  class="pill-btn"
+                  (click)="quickCreateKind = 'product'"
+                >
+                  + Prodotto
+                </button>
+              </div>
+            </div>
+            <div class="touch-grid">
+              <button
+                *ngFor="let service of catalogServices"
+                type="button"
+                class="touch-card service-card"
+                (click)="addService(service)"
+              >
+                <span class="touch-card-kind">Servizio</span>
+                <strong>{{ service.name }}</strong>
+                <span>€{{ Number(service.basePrice || 0).toFixed(2) }}</span>
+              </button>
+              <button
+                *ngFor="let product of catalogProducts"
+                type="button"
+                class="touch-card product-card"
+                (click)="addProduct(product)"
+              >
+                <span class="touch-card-kind">Prodotto</span>
+                <strong>{{ product.name }}</strong>
+                <span>{{
+                  product.price === null || product.price === undefined
+                    ? "Prezzo da inserire"
+                    : "€" + Number(product.price).toFixed(2)
+                }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="quick-order-cart">
+            <div class="quick-order-cart-scroll" #cartScroll>
+            <p class="quick-order-step">3 · Riepilogo vendita</p>
+            <div class="scan-feedback" *ngIf="scanFeedback" role="status" [attr.aria-live]="scanFeedbackKind === 'error' ? 'assertive' : 'polite'" [class]="scanFeedbackKind">
+              {{ scanFeedback }}
+            </div>
+            <div *ngIf="!online" role="alert" aria-live="assertive" class="notice notice-error">
+              Rete assente: verifica la connessione e riprova l'invio.
+            </div>
+            <div class="cart-empty" *ngIf="!items.length" role="status" aria-live="polite">
+              Tocca un servizio o un prodotto per iniziare.
+            </div>
+            <article
+              *ngFor="let item of items; let i = index"
+              class="cart-line"
+            >
+              <div class="cart-line-head">
+                <div>
+                  <span class="touch-card-kind">{{
+                    item.kind === "service" ? "Servizio" : "Prodotto"
+                  }}</span>
+                  <strong>{{ item.label }}</strong>
+                </div>
+                <button
+                  type="button"
+                  class="remove-line"
+                  [disabled]="!!item.booking"
+                  (click)="removeItem(i)"
+                >
+                  Rimuovi
+                </button>
+              </div>
+              <div class="cart-line-fields">
+                <label>
+                  <span>Q.tà</span>
+                  <input
+                    [(ngModel)]="item.quantity"
+                    (ngModelChange)="queueQuote()"
+                    [name]="'quickQty' + i"
+                    type="number"
+                    min="1"
+                    inputmode="numeric"
+                  />
+                </label>
+                <p
+                  *ngIf="nonPerformed(item)"
+                  class="text-sm cart-nonperformance"
+                >
+                  Servizio non eseguito. Non genera consumi o resi automatici.
+                </p>
+                <label *ngIf="nonPerformed(item)" class="cart-nonperformance"
+                  ><span>Motivo della quota per mancata prestazione</span
+                  ><input
+                    [(ngModel)]="item.nonPerformanceChargeReason"
+                    [name]="'nonPerformanceReason' + i"
+                    [attr.aria-label]="'Motivo quota non eseguita ' + (i + 1)"
+                    maxlength="500"
+                    (ngModelChange)="queueQuote()"
+                    placeholder="Se mantieni un importo per il servizio non eseguito"
+                /></label>
+                <alora-sector-picker
+                  *ngIf="item.kind === 'product'"
+                  [(value)]="item.sectorId"
+                  [locationId]="locationId"
+                  [disabled]="!!item.id"
+                ></alora-sector-picker>
+                <label>
+                  <span>Prezzo</span>
+                  <input
+                    [(ngModel)]="item.unitPrice"
+                    (ngModelChange)="queueQuote()"
+                    [name]="'quickPrice' + i"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputmode="decimal"
+                    (focus)="pricePadIndex = i"
+                  />
+                </label>
+                <label
+                  ><span>Prezzo inserito</span
+                  ><select
+                    [(ngModel)]="item.priceMode"
+                    [name]="'mode' + i"
+                    (ngModelChange)="queueQuote()"
+                  >
+                    <option value="legacy">Valore storico</option>
+                    <option value="net">IVA esclusa</option>
+                    <option value="gross">IVA inclusa</option>
+                  </select></label
+                >
+                <label *ngIf="item.priceMode !== 'legacy'"
+                  ><span>IVA (%)</span
+                  ><input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    [(ngModel)]="item.vatRate"
+                    [name]="'vat' + i"
+                    (ngModelChange)="queueQuote()"
+                /></label>
+                <label
+                  ><span>Sconto riga</span
+                  ><input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    [(ngModel)]="item.discount"
+                    [name]="'discount' + i"
+                    (ngModelChange)="queueQuote()"
+                /></label>
+                <label
+                  ><span>Motivo modifica prezzo / IVA</span
+                  ><input
+                    [(ngModel)]="item.priceOverrideReason"
+                    [name]="'priceReason' + i"
+                    maxlength="500"
+                    (ngModelChange)="queueQuote()"
+                    placeholder="Se modifichi prezzo o aliquota"
+                /></label>
+                <label
+                  *ngIf="item.kind === 'service' && !nonPerformed(item)"
+                  class="cart-collaborator"
+                >
+                  <span>Esecutore effettivo</span>
+                  <barber-custom-select
+                    [value]="item.collaboratorId"
+                    (valueChange)="item.collaboratorId = $event"
+                    [options]="collaboratorOptionsFor(item)"
+                    [label]="'Professionista per ' + item.label"
+                    placeholder="Scegli il professionista"
+                  ></barber-custom-select>
+                  <button
+                    *ngIf="item.booking?.collaboratorId && !item.collaboratorId"
+                    type="button"
+                    class="pill-btn"
+                    (click)="confirmPlannedPerformer(item)"
+                  >
+                    Conferma esecutore prenotato
+                  </button>
+                </label>
+              </div>
+            </article>
+
+            <div
+              *ngIf="pricePadIndex >= 0 && items[pricePadIndex]"
+              class="price-pad"
+            >
+              <div class="price-pad-title">
+                <span>Prezzo · {{ items[pricePadIndex].label }}</span>
+                <button type="button" (click)="pricePadIndex = -1">OK</button>
+              </div>
+              <div class="price-pad-grid">
+                <button
+                  *ngFor="
+                    let key of [
+                      '1',
+                      '2',
+                      '3',
+                      '4',
+                      '5',
+                      '6',
+                      '7',
+                      '8',
+                      '9',
+                      '0',
+                      '.',
+                    ]
+                  "
+                  type="button"
+                  (click)="appendPrice(key)"
+                >
+                  {{ key }}
+                </button>
+                <button type="button" (click)="clearPrice()">C</button>
+              </div>
+            </div>
+            <label class="field"
+              ><span>Sconto complessivo sul totale</span
+              ><input
+                type="number"
+                min="0"
+                step="0.01"
+                name="orderDiscount"
+                [(ngModel)]="orderDiscount"
+                (ngModelChange)="queueQuote()"
+            /></label>
+            <p *ngIf="quoteBusy" role="status">Calcolo del conto…</p>
+            <p *ngIf="quoteError" role="status" class="quote-error">
+              {{ quoteError }}
+            </p>
+            <details
+              *ngIf="sale?.id && session.can('sales.read')"
+              class="price-history"
+            >
+              <summary (click)="loadPriceHistory()">
+                Variazioni prezzi del conto
+              </summary>
+              <p *ngIf="priceHistoryFeedback" role="status">
+                {{ priceHistoryFeedback }}
+              </p>
+              <ol>
+                <li *ngFor="let row of priceHistory">
+                  <strong>{{
+                    row.createdAt | date: "dd/MM/yyyy HH:mm"
+                  }}</strong>
+                  · {{ row.snapshot.label }}<br />Prezzo
+                  {{ row.snapshot.unitPrice }} · IVA
+                  {{ row.snapshot.vatRate ?? "non definita" }} · {{ row.reason
+                  }}<small>{{
+                    row.source === "migration_observation"
+                      ? "Valori osservati alla migrazione"
+                      : row.source === "public_booking"
+                        ? "Prenotazione pubblica"
+                        : row.actorUserId
+                          ? "Autore registrato nell’audit"
+                          : "Valori osservati nel database"
+                  }}</small>
+                </li>
+              </ol>
+              <button
+                type="button"
+                class="pill-btn"
+                *ngIf="priceHistoryMore"
+                (click)="morePriceHistory()"
+              >
+                Variazioni precedenti
+              </button>
+            </details>
+            <alora-account-payments
+              *ngIf="sale?.id && session.can('sales.read')"
+              [saleId]="sale.id"
+              (updated)="onPaymentsUpdated($event)"
+              (pending)="paymentPending = $event"
+            />
+          </div>
+          <div class="checkout-bar">
+            <label class="field" *ngIf="!sale">
+              <span>Pagamento</span>
+              <select [(ngModel)]="paymentMethod" name="quickPaymentMethod">
+                <option value="cash">Contanti</option>
+                <option value="card">Carta</option>
+                <option value="bank">Bonifico ricevuto</option>
+                <option value="other">Altro</option>
+              </select>
+            </label>
+            <label class="field" *ngIf="!sale">
+              <span>Stato</span>
+              <select [(ngModel)]="paymentStatus" name="quickPaymentStatus">
+                <option value="paid">Pagato</option>
+                <option value="unpaid">Da pagare</option>
+              </select>
+            </label>
+            <div class="checkout-total">
+              <span>Totale conto</span
+              ><strong>{{
+                quoteBusy ? "Calcolo…" : "€" + total.toFixed(2)
+              }}</strong>
+            </div>
+            <p
+              *ngIf="appointmentWindowLabel && !isLinkedToAppointment"
+              class="text-xs text-[var(--muted)]"
+            >
+              Orario attribuito al servizio:
+              <strong>{{ appointmentWindowLabel }}</strong>
+              (calcolato in base alla durata dei servizi)
+            </p>
+            <button
+              *ngIf="sale?.orderStatus === 'open'"
+              type="button"
+              class="keep-order-open"
+              [disabled]="loading || !canSubmit(true)"
+              (click)="submit(true)"
+            >
+              Salva conto aperto
+            </button>
+            <button
+              type="button"
+              class="primary-btn"
+              [disabled]="loading || !canSubmit()"
+              (click)="submit()"
+            >
+              {{
+                loading
+                  ? "Salvataggio..."
+                  : isEditing
+                    ? sale?.orderStatus === "open"
+                      ? "Registra vendita"
+                      : "Salva vendita"
+                    : "Registra vendita"
+              }}
+            </button>
+          </div>
+        </aside>
+      </div>
+    </fieldset>
   </section>
   <barber-quick-create-dialog
     *ngIf="quickCreateKind"
     [kind]="quickCreateKind"
-    (cancel)="quickCreateKind = null"
+    [prefill]="quickCreatePrefill"
+    [products]="catalogProducts"
+    (cancel)="cancelQuickCreate()"
     (created)="onQuickCreated($event)"
   ></barber-quick-create-dialog>
 </div>

@@ -1,3 +1,5 @@
+import { OperationalContextService } from "./core/operational-context.service";
+import { OperationalSelectorComponent } from "./shared/operational-selector.component";
 import { canAccessLocalView } from "@barber/shared/functions";
 import { AloraBrandComponent } from "@barber/shared/brand";
 import {
@@ -18,7 +20,7 @@ import {
   inject,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { ActivatedRoute, Router } from "@angular/router";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { toLocalDateKey } from "@barber/shared/utils";
 import { firstValueFrom } from "rxjs";
 import { CalendarInputComponent } from "./calendar-input.component";
@@ -67,7 +69,9 @@ type ViewKey =
   standalone: true,
   imports: [
     AloraBrandComponent,
+    OperationalSelectorComponent,
     CommonModule,
+    RouterLink,
     FormsModule,
     NgClass,
     DecimalPipe,
@@ -94,11 +98,12 @@ type ViewKey =
   template: `
     <main class="admin-shell min-h-screen">
       <barber-quick-order-modal
-        *ngIf="quickOrderOpen"
+        *ngIf="quickOrderOpen || quickOrderClosing"
+        [class.quick-order-closing]="quickOrderClosing"
         [customers]="quickOrderCustomers"
         [services]="adminData().services"
         [products]="adminData().products"
-        [collaborators]="adminData().collaborators"
+        [collaborators]="quickOrderCollaborators"
         [defaultCollaboratorId]="
           adminData().tenant?.defaultCollaboratorId || ''
         "
@@ -107,6 +112,8 @@ type ViewKey =
         [loading]="loading"
         (close)="closeQuickOrder()"
         (submitOrder)="saveQuickOrder($event)"
+        (retryCreation)="retryQuickOrderCreation()"
+        (retryUpdate)="retryQuickOrderUpdate()"
         (customerSearchChange)="searchQuickOrderCustomers($event)"
         (catalogChanged)="refreshAll()"
       ></barber-quick-order-modal>
@@ -227,6 +234,10 @@ type ViewKey =
             </div>
           </div>
 
+          <alora-operational-selector *ngIf="currentUser?.role !== 'platform_admin'"></alora-operational-selector>
+          <a *ngIf="can('locations.read')" routerLink="/locations" class="nav-btn">Sedi e settori</a>
+          <a *ngIf="can('inventory.read')" routerLink="/inventory" class="nav-btn">Magazzino</a>
+          <a *ngIf="can('whatsapp.read')" routerLink="/whatsapp" class="nav-btn">WhatsApp</a>
           <div class="sidebar-nav">
             <button
               *ngFor="let item of visibleNavItems"
@@ -252,6 +263,7 @@ type ViewKey =
           <article
             class="sidebar-footer rounded-[1.6rem] border border-white/10 bg-white/6 p-4 text-white/78"
           >
+            <a *ngIf="currentUser?.role !== 'platform_admin' && !currentUser?.technicalAccess" routerLink="/account" class="secondary-btn mb-4 w-full" title="Il mio account">Il mio account</a>
             <p class="text-xs uppercase tracking-[0.28em] text-white/40">
               Prenotazioni online
             </p>
@@ -368,6 +380,7 @@ type ViewKey =
               {{ feedback }}
             </p>
 
+            <p *ngIf="activeView === 'dashboard' && currentUser?.role !== 'owner'" class="panel rounded-xl p-4">Il report comprende solo i conti interamente accessibili negli ambiti autorizzati.</p>
             <barber-admin-dashboard-page
               *ngIf="activeView === 'dashboard'"
               [revenueMetrics]="dashboardData().revenueMetrics"
@@ -380,7 +393,6 @@ type ViewKey =
               [activityHasMore]="dashboardActivityHasMore"
               [activityLoading]="dashboardActivityLoading"
               [customerOptions]="customerSelectOptions"
-              [collaboratorOptions]="collaboratorSelectOptions"
               [loading]="loading"
               (editAppointment)="editAppointment($event)"
               (applyRevenueFilters)="loadRevenueReport()"
@@ -594,6 +606,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   @ViewChild(AdminAppointmentsFeaturePageComponent)
   private readonly appointmentsFeaturePage?: AdminAppointmentsFeaturePageComponent;
 
+  readonly operationalContext = inject(OperationalContextService);
   private readonly http = inject(HttpClient);
   private readonly adminFacade = inject(AdminFacade);
   private readonly adminApi = inject(AdminApiService);
@@ -652,9 +665,11 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   collaborators: any[] = this.adminFacade.collaborators();
   customers: any[] = this.adminFacade.customers();
   quickOrderOpen = false;
+  quickOrderClosing = false;
   quickOrderAppointment: any = null;
   quickOrderSale: any = null;
   quickOrderCustomers: any[] = [];
+  quickOrderCollaborators: any[] = [];
   private quickOrderCustomerSearchTimer: ReturnType<typeof setTimeout> | null =
     null;
   private quickOrderCustomerRequestId = 0;
@@ -714,6 +729,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     mode: "optional",
     quantity: 1,
     priceLocked: false,
+    consumptionUnits:"",
   };
   platformTenantForm = this.emptyPlatformTenantForm();
   platformPlanForm = this.emptyPlatformPlanForm();
@@ -864,7 +880,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   get collaboratorSelectOptions(): Array<{ value: string; label: string }> {
-    return this.adminData().collaborators.map((collaborator) => ({
+    const sectorId = this.adminData().services.find((service) => service.id === this.appointmentForm.serviceId)?.sectorId;
+    return this.adminData().collaborators.filter((person) => !sectorId || person.sectors?.some((membership: any) => membership.sectorId === sectorId)).map((collaborator) => ({
       value: collaborator.id,
       label: `${collaborator.firstName} ${collaborator.lastName}`.trim(),
     }));
@@ -960,6 +977,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       .services.slice(0, 3)
       .map((service, index) => ({
         name: service.name,
+      sectorId: service.sectorId,
+      requiresRoom: service.requiresRoom,
         description:
           service.publicDescription || "Prenotazione online disponibile",
         price: Number(service.basePrice || 0).toFixed(2),
@@ -1204,7 +1223,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   private emptyServiceForm() {
     return {
+      priceMode:"legacy",vatRate:"",priceChangeReason:"",isActive:true,
       id: "",
+      sectorId: "",
+      requiresRoom: false,
       name: "",
       publicDescription: "",
       durationMinutes: 30,
@@ -1218,6 +1240,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   private emptyProductForm() {
     return {
+      priceMode:"legacy",vatRate:"",isActive:true,cost:null as number|null,costMode:"legacy",purchaseVatRate:"",stockTracked:false,priceChangeReason:"",
       id: "",
       name: "",
       description: "",
@@ -1228,6 +1251,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   private emptyCollaboratorForm() {
     return {
       id: "",
+      sectorId: "",
       firstName: "",
       lastName: "",
       email: "",
@@ -1315,6 +1339,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       }
 
       this.tenant = this.adminFacade.tenant();
+      void this.operationalContext.loadTotals().catch(() => undefined);
       this.appointmentOrderNotifications.connect(this.sessionStore.token());
       this.revenueMetrics = this.adminFacade.revenueMetrics();
       this.revenueReport = this.adminFacade.revenueReport();
@@ -1918,8 +1943,11 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   editService(service: any): void {
     this.serviceForm = {
+      priceMode:service.priceMode||"legacy",vatRate:service.vatRate??"",priceChangeReason:"",isActive:service.isActive!==false,
       id: service.id,
       name: service.name,
+      sectorId: service.sectorId,
+      requiresRoom: service.requiresRoom,
       publicDescription: service.publicDescription || "",
       durationMinutes: Number(service.durationMinutes || 30),
       basePrice: Number(service.basePrice || 0),
@@ -1935,11 +1963,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       mode: "optional",
       quantity: 1,
       priceLocked: false,
+      consumptionUnits:"",
     };
   }
 
   editProduct(product: any): void {
     this.productForm = {
+      priceMode:product.priceMode||"legacy",vatRate:product.vatRate??"",isActive:product.isActive!==false,cost:product.cost===null||product.cost===undefined?null:Number(product.cost),costMode:product.costMode||"legacy",purchaseVatRate:product.purchaseVatRate??"",stockTracked:Boolean(product.stockTracked),priceChangeReason:"",
       id: product.id,
       name: product.name || "",
       description: product.description || "",
@@ -1953,6 +1983,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   editCollaborator(collaborator: any): void {
     this.collaboratorForm = {
       id: collaborator.id,
+      sectorId: collaborator.sectors?.[0]?.sectorId || "",
       firstName: collaborator.firstName,
       lastName: collaborator.lastName,
       email: collaborator.email || "",
@@ -2058,9 +2089,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           )
           .toPromise();
       } else {
-        await this.http
-          .post(`${this.apiUrl}/appointments`, payload, this.authHeaders())
-          .toPromise();
+        await firstValueFrom(this.adminApi.createAppointment(payload));
       }
 
       this.feedback = this.appointmentForm.id
@@ -2496,22 +2525,26 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.collaboratorForm = this.emptyCollaboratorForm();
   }
 
+  private revenueReportRequestId = 0;
+
   async loadRevenueReport(): Promise<void> {
+    const requestId = ++this.revenueReportRequestId;
     this.syncAutoRevenueDate();
     this.loading = true;
     try {
-      const [report] = await Promise.all([
-        firstValueFrom(this.adminApi.loadRevenueReport(this.revenueFilters)),
+      await Promise.all([
+        this.adminFacade.refreshRevenueReport({ ...this.revenueFilters }),
         this.loadDashboardActivity(true),
       ]);
-      this.revenueReport = report;
+      if (requestId !== this.revenueReportRequestId) return;
+      this.revenueReport = this.adminFacade.revenueReport();
       this.revenueMetrics = this.revenueReport?.metrics || [];
       this.adminFacade.setRevenueReport(this.revenueReport);
     } catch (error: any) {
-      this.feedback =
-        error?.error?.message || "Caricamento degli incassi non riuscito";
+      if (requestId === this.revenueReportRequestId) this.feedback =
+        error?.error?.message || "Caricamento del report non riuscito";
     } finally {
-      this.loading = false;
+      if (requestId === this.revenueReportRequestId) this.loading = false;
     }
   }
 
@@ -2620,6 +2653,20 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.autoRevenueDate = today;
   }
 
+  async retryQuickOrderCreation():Promise<void> {
+    if(!this.can("sales.manage"))return;
+    this.loading=true;
+    try{await firstValueFrom(this.adminApi.retrySaleCreation());this.closeQuickOrder();this.feedback="Esito della vendita recuperato";await this.refreshAll();}
+    catch(error:any){this.feedback=error?.error?.message || error?.message || "Esito non disponibile";}
+    finally{this.loading=false;}
+  }
+  async retryQuickOrderUpdate():Promise<void>{
+    if(!this.quickOrderSale?.id || !this.can("sales.manage"))return;
+    this.loading=true;
+    try{await firstValueFrom(this.adminApi.retrySaleUpdate(this.quickOrderSale.id));this.closeQuickOrder();this.feedback="Modifica del conto recuperata";await this.refreshAll();}
+    catch(error:any){this.feedback=error?.error?.message || error?.message || "Esito non disponibile";}
+    finally{this.loading=false;}
+  }
   async saveQuickOrder(payload: Record<string, unknown>): Promise<void> {
     if (!this.can("sales.manage")) return;
     this.loading = true;
@@ -2635,18 +2682,36 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         this.appointmentOrderNotifications.dismiss(appointmentId);
       }
       this.closeQuickOrder();
-      this.feedback = isEditing ? "Vendita aggiornata" : "Vendita registrata";
+      this.feedback = payload["orderStatus"] === "open" ? "Conto salvato, incasso ancora aperto" : isEditing ? "Conto aggiornato" : "Vendita registrata";
       await this.refreshAll();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || "Registrazione della vendita non riuscita";
+        error?.error?.message || error?.message || "Registrazione della vendita non riuscita";
     } finally {
       this.loading = false;
     }
   }
 
-  openQuickOrder(appointment: any = null, sale: any = null): void {
+  async openQuickOrder(appointment: any = null, sale: any = null): Promise<void> {
     if (!this.can("sales.manage")) return;
+    try {
+      const [, people] = await Promise.all([
+        this.adminFacade.reloadProducts(),
+        firstValueFrom(this.adminApi.loadCollaboratorOptions()),
+      ]);
+      this.quickOrderCollaborators = people;
+    } catch (error: any) {
+      this.feedback = error?.error?.message || "Caricamento del catalogo per la cassa non riuscito";
+      return;
+    }
+    if (appointment && !sale) {
+      try {
+        sale = await firstValueFrom(this.adminApi.orderForAppointment(appointment.id));
+      } catch (error: any) {
+        this.feedback = error?.error?.message || "Apertura del conto non riuscita";
+        return;
+      }
+    }
     this.quickOrderAppointment = appointment;
     this.quickOrderSale = sale;
     this.quickOrderOpen = true;
@@ -2754,10 +2819,15 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.quickOrderCustomerSearchTimer = null;
     }
     this.quickOrderCustomerRequestId += 1;
-    this.quickOrderOpen = false;
-    this.quickOrderAppointment = null;
-    this.quickOrderSale = null;
-    this.quickOrderCustomers = [];
+    if (!this.quickOrderOpen) return;
+    this.quickOrderClosing = true;
+    setTimeout(() => {
+      this.quickOrderClosing = false;
+      this.quickOrderOpen = false;
+      this.quickOrderAppointment = null;
+      this.quickOrderSale = null;
+      this.quickOrderCustomers = [];
+    }, 220);
   }
 
   deleteSale(sale: any): void {
@@ -2789,6 +2859,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       mode: "optional",
       quantity: 1,
       priceLocked: false,
+      consumptionUnits:"",
     };
   }
 
@@ -2809,6 +2880,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
             mode: this.serviceProductForm.mode,
             quantity: Number(this.serviceProductForm.quantity || 1),
             priceLocked: this.serviceProductForm.priceLocked,
+            ...(this.can("inventory.manage")?{consumptionUnits:this.serviceProductForm.consumptionUnits||null}:{}),
           },
           this.authHeaders(),
         )
@@ -2870,9 +2942,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     try {
       const payload = {
         name: this.serviceForm.name,
+      sectorId: this.serviceForm.sectorId,
+      requiresRoom: this.serviceForm.requiresRoom,
         publicDescription: this.serviceForm.publicDescription,
         durationMinutes: Number(this.serviceForm.durationMinutes),
-        basePrice: Number(this.serviceForm.basePrice),
+        basePrice: String(this.serviceForm.basePrice),
+        isActive:this.serviceForm.isActive,
+        priceMode:this.serviceForm.priceMode,vatRate:this.serviceForm.vatRate===""?null:String(this.serviceForm.vatRate),priceChangeReason:this.serviceForm.priceChangeReason,
         color: this.serviceForm.color,
         isPublic: this.serviceForm.isPublic,
         isBookableOnline: this.serviceForm.isBookableOnline,
@@ -2918,6 +2994,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         this.adminApi.createOrUpdateProduct(this.productForm.id, {
           name: this.productForm.name.trim(),
           description: this.productForm.description || undefined,
+          isActive:this.productForm.isActive,
+          priceMode:this.productForm.priceMode,vatRate:this.productForm.vatRate===""?null:String(this.productForm.vatRate),cost:this.productForm.cost,costMode:this.productForm.costMode,purchaseVatRate:this.productForm.purchaseVatRate===""?null:String(this.productForm.purchaseVatRate),priceChangeReason:this.productForm.priceChangeReason,
+          ...(this.can("inventory.manage")?{stockTracked:this.productForm.stockTracked}:{}),
           price:
             this.productForm.price === null ||
             String(this.productForm.price).trim() === ""
@@ -2941,16 +3020,16 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   removeProduct(): void {
     if (!this.productForm.id) return;
     this.openDeleteDialog(
-      "Eliminare questo prodotto?",
-      `Stai per eliminare ${this.productForm.name || "il prodotto selezionato"}.`,
-      "Elimina prodotto",
+      "Disattivare questo prodotto?",
+      `Disattiva ${this.productForm.name || "il prodotto selezionato"} conservando prezzi e movimenti storici.`,
+      "Disattiva prodotto",
       async () => {
         this.loading = true;
         try {
           await firstValueFrom(
             this.adminApi.deleteProduct(this.productForm.id),
           );
-          this.feedback = "Prodotto eliminato";
+          this.feedback = "Prodotto disattivato; storico conservato";
           this.resetProductForm();
           await this.refreshAll();
         } finally {
@@ -2966,9 +3045,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     }
 
     this.openDeleteDialog(
-      "Eliminare questo servizio?",
-      `Stai per eliminare il servizio ${this.serviceForm.name || "selezionato"}.`,
-      "Elimina servizio",
+      "Disattivare questo servizio?",
+      `Disattiva il servizio ${this.serviceForm.name || "selezionato"} conservando il suo storico.`,
+      "Disattiva servizio",
       async () => {
         this.loading = true;
 
@@ -2979,7 +3058,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
               this.authHeaders(),
             )
             .toPromise();
-          this.feedback = "Servizio eliminato";
+          this.feedback = "Servizio disattivato; storico conservato";
           this.serviceForm = this.emptyServiceForm();
           await this.refreshAll();
         } catch (error: any) {
@@ -3001,6 +3080,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     try {
       const payload = {
         firstName: this.collaboratorForm.firstName,
+      sectorId: this.collaboratorForm.sectorId,
         lastName: this.collaboratorForm.lastName,
         email: this.collaboratorForm.email || undefined,
         phone: this.collaboratorForm.phone || undefined,

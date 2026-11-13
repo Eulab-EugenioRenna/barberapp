@@ -1,0 +1,990 @@
+import {
+  Component,
+  OnInit,
+  inject,
+  OnDestroy,
+  ElementRef,
+  ViewChild,
+  ChangeDetectorRef,
+} from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { FormsModule } from "@angular/forms";
+import { RouterLink } from "@angular/router";
+import { HttpClient } from "@angular/common/http";
+import { firstValueFrom } from "rxjs";
+import { SessionStore } from "../core/session.store";
+import { OperationalContextService } from "../core/operational-context.service";
+import { ADMIN_API_URL } from "../core/api-config";
+import { BarcodeScannerService } from "../core/barcode-scanner.service";
+import { AdminApiService } from "../core/admin-api.service";
+
+@Component({
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterLink],
+  template: ` <main class="inventory-shell">
+    <header class="page-heading">
+      <div>
+        <p class="eyebrow">Prodotti e risorse</p>
+        <h1>Magazzino</h1>
+        <p>Quantità e valore, una sede alla volta.</p>
+      </div>
+      <nav>
+        <a
+          *ngIf="session.can('products.read') || session.can('services.read')"
+          routerLink="/services"
+          class="pill-btn"
+          >Listino e prezzi</a
+        ><a routerLink="/appointments" class="pill-btn">Agenda</a>
+      </nav>
+    </header>
+    <label *ngIf="session.can('inventory.read')" class="field">
+      <span>Scansiona o inserisci un barcode e premi Invio</span>
+      <input
+        #barcodeInput
+        type="text"
+        autocomplete="off"
+        (keydown.enter)="
+          $event.preventDefault();
+          $event.stopPropagation();
+          scanner.inject(barcodeInput.value);
+          barcodeInput.value = ''
+        "
+      />
+    </label>
+    <p *ngIf="scanFeedback" role="status" [class]="scanFeedbackKind">
+      {{ scanFeedback }}
+    </p>
+    <p *ngIf="!session.can('inventory.read')" class="notice">
+      La consultazione del magazzino non è abilitata.
+    </p>
+    <ng-container *ngIf="session.can('inventory.read')">
+      <section class="panel context-panel">
+        <label
+          >Sede<select
+            aria-label="Sede"
+            [(ngModel)]="locationId"
+            (ngModelChange)="changeLocation()"
+            [disabled]="busy || attempted"
+          >
+            <option value="">Scegli una sede</option>
+            <option *ngFor="let loc of context.locations()" [value]="loc.id">
+              {{ loc.name }}
+            </option>
+          </select></label
+        >
+        <div>
+          <strong>{{ rows.length }}</strong
+          ><span>prodotti tracciati</span>
+        </div>
+        <div>
+          <strong>{{ initializedCount }}</strong
+          ><span>giacenze aperte</span>
+        </div>
+        <button
+          class="pill-btn"
+          (click)="load()"
+          [disabled]="busy || !locationId"
+        >
+          Aggiorna
+        </button>
+      </section>
+      <p *ngIf="feedback" role="status" class="notice">{{ feedback }}</p>
+      <p *ngIf="loading" role="status">Caricamento magazzino…</p>
+      <div class="inventory-layout" *ngIf="locationId">
+        <section class="panel balances">
+          <div class="section-heading">
+            <h2>Giacenze</h2>
+            <label class="search"
+              >Cerca prodotto<input
+                [(ngModel)]="query"
+                type="search"
+                placeholder="Nome o codice"
+            /></label>
+          </div>
+          <p *ngIf="!rows.length" class="empty">
+            Nessun prodotto tracciato. Abilita il tracciamento dal listino; poi
+            registra l'inventario iniziale.
+          </p>
+          <div class="stock-list" #stockList>
+            <button
+              *ngFor="let row of filteredRows"
+              type="button"
+              class="stock-card"
+              [class.selected]="productId === row.id"
+              (click)="selectProduct(row.id)"
+              [disabled]="busy || attempted"
+            >
+              <div>
+                <strong>{{ row.name }}</strong
+                ><span
+                  >{{ row.barcode || row.sku || "Senza codice" }}
+                  <em *ngIf="!row.isActive">· disattivato</em></span
+                >
+              </div>
+              <div class="stock-numbers">
+                <strong>{{
+                  row.initialized ? number(row.quantity, 3) : "Da inventariare"
+                }}</strong
+                ><span>{{
+                  row.initialized
+                    ? "Valore netto € " + number(row.value, 2)
+                    : "Quantità iniziale non registrata"
+                }}</span>
+              </div>
+            </button>
+          </div>
+        </section>
+        <section
+          class="panel operation-panel"
+          *ngIf="session.can('inventory.manage') && selectedProduct"
+        >
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Nuovo movimento</p>
+              <h2>{{ selectedProduct.name }}</h2>
+            </div>
+          </div>
+          <form (ngSubmit)="submit()">
+            <fieldset [disabled]="busy || attempted">
+              <label
+                >Operazione<select
+                  aria-label="Operazione"
+                  [(ngModel)]="form.kind"
+                  name="kind"
+                >
+                  <option
+                    value="opening"
+                    [disabled]="selectedProduct.initialized"
+                  >
+                    Inventario iniziale
+                  </option>
+                  <option value="receipt">Carico acquisto</option>
+                  <option value="issue">Scarico interno</option>
+                  <option value="adjust">Rettifica inventario</option>
+                  <option value="transfer">Trasferimento</option>
+                  <option value="return">Reso da scarico</option>
+                </select></label
+              >
+              <p class="hint" *ngIf="form.kind === 'opening'">
+                Inserisci la quantità contata e il costo unitario netto. Non
+                vengono ricostruiti acquisti o IVA passati.
+              </p>
+              <p class="hint" *ngIf="form.kind === 'adjust'">
+                Inserisci la giacenza contata. Sarà registrata la differenza;
+                per quantità aggiunte indica il costo netto unitario.
+              </p>
+              <label
+                >{{ form.kind === "adjust" ? "Giacenza contata" : "Quantità"
+                }}<input
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  #movementQuantity
+                  name="quantity"
+                  [(ngModel)]="form.quantity"
+                  required
+              /></label>
+              <label
+                *ngIf="
+                  form.kind === 'opening' ||
+                  form.kind === 'receipt' ||
+                  form.kind === 'adjust'
+                "
+                >{{
+                  form.kind === "receipt"
+                    ? "Costo unitario di acquisto"
+                    : "Costo netto unitario"
+                }}<input
+                  type="number"
+                  min="0"
+                  step="0.000001"
+                  name="unitCost"
+                  [(ngModel)]="form.unitCost"
+              /></label>
+              <div class="two-fields" *ngIf="form.kind === 'receipt'">
+                <label
+                  >Modalità costo<select
+                    aria-label="Modalità costo"
+                    name="costMode"
+                    [(ngModel)]="form.costMode"
+                  >
+                    <option value="net">IVA esclusa</option>
+                    <option value="gross">IVA inclusa</option>
+                  </select></label
+                ><label
+                  >IVA acquisto (%)<input
+                    name="purchaseVatRate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    [(ngModel)]="form.purchaseVatRate"
+                    required
+                /></label>
+              </div>
+              <label *ngIf="form.kind === 'transfer'"
+                >Sede di destinazione<select
+                  aria-label="Sede di destinazione"
+                  name="toLocation"
+                  [(ngModel)]="form.toLocationId"
+                  required
+                >
+                  <option value="">Scegli la sede</option>
+                  <option *ngFor="let loc of destinations" [value]="loc.id">
+                    {{ loc.name }}
+                  </option>
+                </select></label
+              >
+              <label *ngIf="form.kind === 'return'"
+                >Scarico da restituire<select
+                  aria-label="Scarico da restituire"
+                  name="returnOf"
+                  [(ngModel)]="form.returnOfId"
+                  required
+                >
+                  <option value="">Scegli il movimento</option>
+                  <option *ngFor="let row of returnable" [value]="row.id">
+                    {{ row.createdAt | date: "dd/MM/yyyy HH:mm" }} ·
+                    {{ label(row.kind) }} ·
+                    {{ number(row.returnableQuantity, 3) }}
+                  </option>
+                </select></label
+              >
+              <label
+                >Motivo<textarea
+                  [(ngModel)]="form.reason"
+                  name="reason"
+                  maxlength="500"
+                  minlength="3"
+                  required
+                  placeholder="Documento, conteggio o motivo della rettifica"
+                ></textarea>
+              </label>
+            </fieldset>
+            <div class="form-actions">
+              <button
+                type="submit"
+                class="primary-btn"
+                [disabled]="busy || !form.reason.trim() || form.quantity === ''"
+              >
+                {{
+                  busy
+                    ? "Registrazione…"
+                    : attempted
+                      ? "Ripeti la stessa operazione"
+                      : "Registra movimento"
+                }}</button
+              ><button
+                type="button"
+                class="pill-btn"
+                [disabled]="busy"
+                (click)="newOperation()"
+              >
+                Nuova operazione
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+      <section class="panel movements" *ngIf="selectedProduct">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Registro movimenti</p>
+            <h2>{{ selectedProduct.name }}</h2>
+          </div>
+          <p>
+            Costo medio netto:
+            {{
+              selectedProduct.initialized
+                ? "€ " + number(selectedProduct.averageCost, 6)
+                : "da definire"
+            }}
+          </p>
+        </div>
+        <p class="hint">
+          La giacenza è dell’intera sede. Il registro mostra i movimenti
+          generali e quelli dei settori autorizzati nel contesto scelto.
+        </p>
+        <p *ngIf="!movements.length" class="empty">
+          Nessun movimento registrato per questo prodotto nella sede.
+        </p>
+        <div class="table-scroll" #tableScroll *ngIf="movements.length">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Operazione</th>
+                <th>Quantità</th>
+                <th>Valore netto</th>
+                <th>Giacenza dopo</th>
+                <th>Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of movements">
+                <td>{{ row.createdAt | date: "dd/MM/yy HH:mm" }}</td>
+                <td>{{ label(row.kind) }}</td>
+                <td [class.negative]="Number(row.quantityDelta) < 0">
+                  {{ number(row.quantityDelta, 3) }}
+                </td>
+                <td>€ {{ number(row.valueDelta, 6) }}</td>
+                <td>{{ number(row.quantityAfter, 3) }}</td>
+                <td>{{ row.operation.reason }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <button
+          *ngIf="hasMore"
+          class="pill-btn"
+          (click)="loadMore()"
+          [disabled]="loading"
+        >
+          Carica altri movimenti
+        </button>
+      </section>
+    </ng-container>
+  </main>`,
+  styles: [
+    `
+      :host {
+        display: block;
+        background: var(--page);
+        min-height: 100vh;
+      }
+      .inventory-shell {
+        max-width: 1380px;
+        margin: auto;
+        padding: clamp(var(--space-xs), 3vw, var(--space-3xl));
+        color: var(--ink);
+      }
+      h1 {
+        font-family: var(--font-display, serif);
+        font-size: clamp(2.5rem, 4vw, 4rem);
+        line-height: 1.1;
+        margin: var(--space-2xs) 0 var(--space-xs);
+      }
+      h2 {
+        font-size: 1.2rem;
+        font-weight: 750;
+      }
+      p {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .page-heading,
+      .section-heading,
+      nav,
+      .form-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-md);
+        flex-wrap: wrap;
+      }
+      .page-heading {
+        margin-bottom: var(--space-xl);
+      }
+      nav {
+        justify-content: flex-end;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 1.5rem;
+        padding: var(--space-lg);
+        min-width: 0;
+      }
+      .context-panel {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xl);
+        flex-wrap: wrap;
+        margin-bottom: var(--space-md);
+      }
+      .context-panel label {
+        min-width: 16rem;
+      }
+      .context-panel > div {
+        display: grid;
+      }
+      .context-panel > div strong {
+        font-size: 1.8rem;
+      }
+      .context-panel span {
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      .inventory-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
+        gap: var(--space-lg);
+        align-items: start;
+      }
+      .section-heading {
+        margin-bottom: var(--space-md);
+      }
+      .search {
+        max-width: 17rem;
+      }
+      .stock-list {
+        display: grid;
+        gap: var(--space-sm);
+        max-height: 40rem;
+        overflow: auto;
+      }
+      .stock-card {
+        border: 1px solid var(--line);
+        background: var(--surface, #fff);
+        border-radius: 1rem;
+        padding: var(--space-md);
+        display: flex;
+        text-align: left;
+        justify-content: space-between;
+        gap: var(--space-md);
+        color: var(--ink);
+        width: 100%;
+      }
+      .stock-card > div {
+        display: grid;
+        gap: var(--space-2xs);
+        min-width: 0;
+      }
+      .stock-card span {
+        font-size: 0.74rem;
+        color: var(--muted);
+      }
+      .stock-card.selected {
+        border-color: var(--accent);
+        box-shadow: inset 3px 0 var(--accent);
+      }
+      .stock-card:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .stock-numbers {
+        text-align: right;
+      }
+      .stock-numbers strong {
+        font-variant-numeric: tabular-nums;
+      }
+      .operation-panel {
+        background: var(--ink);
+        color: #f9faef;
+      }
+      .operation-panel p {
+        color: #d3dccb;
+      }
+      .operation-panel .eyebrow {
+        color: #c0dc7c;
+      }
+      .operation-panel input,
+      .operation-panel select,
+      .operation-panel textarea {
+        background: #fff;
+        color: #24392b;
+      }
+      .operation-panel .pill-btn {
+        background: #f4f7eb;
+        color: #24392b;
+      }
+      form,
+      fieldset {
+        display: grid;
+        gap: var(--space-xs);
+      }
+      fieldset {
+        border: 0;
+        min-width: 0;
+      }
+      label {
+        display: grid;
+        gap: var(--space-2xs);
+        font-size: 0.8rem;
+        font-weight: 650;
+      }
+      input,
+      select,
+      textarea {
+        min-width: 0;
+        width: 100%;
+        border: 1px solid var(--line);
+        background: var(--surface, #fff);
+        padding: var(--space-xs);
+        border-radius: 0.8rem;
+        font-weight: 400;
+      }
+      textarea {
+        min-height: 5rem;
+        resize: vertical;
+      }
+      .two-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-sm);
+      }
+      .hint,
+      .empty {
+        font-size: 0.8rem;
+        line-height: 1.6;
+      }
+      .notice {
+        padding: var(--space-md);
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        background: #fff8e7;
+        margin-bottom: var(--space-md);
+      }
+      .ok {
+        color: #2f6b3a;
+        background: #f0f7ee;
+        border: 1px solid #c0dc7c;
+        padding: var(--space-xs) var(--space-md);
+        border-radius: 0.8rem;
+        font-weight: 600;
+        margin-bottom: var(--space-md);
+      }
+      .error {
+        color: #a04731;
+        background: #fdeeea;
+        border: 1px solid #d48a7f;
+        padding: var(--space-xs) var(--space-md);
+        border-radius: 0.8rem;
+        font-weight: 600;
+        margin-bottom: var(--space-md);
+      }
+      .info {
+        color: #1d4e89;
+        background: #eef4fb;
+        border: 1px solid #a9c9e8;
+        padding: var(--space-xs) var(--space-md);
+        border-radius: 0.8rem;
+        font-weight: 600;
+        margin-bottom: var(--space-md);
+      }
+      .movements {
+        margin-top: var(--space-lg);
+      }
+      .table-scroll {
+        overflow: auto;
+        overscroll-behavior: contain;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 700px;
+        font-size: 0.8rem;
+      }
+      th {
+        text-align: left;
+        color: var(--muted);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      td,
+      th {
+        padding: var(--space-sm) var(--space-2xs);
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      td:nth-child(3),
+      td:nth-child(4),
+      td:nth-child(5) {
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .negative {
+        color: #a04731;
+      }
+      @media (max-width: 599px) {
+        .page-heading,
+        .section-heading {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: var(--space-xs);
+        }
+        .inventory-shell {
+          padding: var(--space-xs);
+        }
+        .panel {
+          padding: var(--space-md);
+        }
+      }
+      @media (max-width: 850px) {
+        .inventory-layout {
+          grid-template-columns: 1fr;
+        }
+        .context-panel {
+          gap: 1rem;
+        }
+        .context-panel label {
+          min-width: 0;
+          width: 100%;
+        }
+        .stock-card {
+          padding: 0.8rem;
+        }
+        .stock-numbers {
+          max-width: 50%;
+        }
+      }
+      @media (max-width: 420px) {
+        .inventory-shell {
+          padding: 0.8rem;
+        }
+        .panel {
+          padding: 1rem;
+        }
+        .two-fields {
+          grid-template-columns: 1fr;
+        }
+        .stock-card strong {
+          overflow-wrap: anywhere;
+        }
+        .form-actions > * {
+          width: 100%;
+        }
+      }
+    `,
+  ],
+})
+export class InventoryComponent implements OnInit, OnDestroy {
+  @ViewChild("stockList") stockList?: ElementRef<HTMLElement>;
+  @ViewChild("tableScroll") tableScroll?: ElementRef<HTMLElement>;
+  readonly session = inject(SessionStore);
+  readonly context = inject(OperationalContextService);
+  readonly scanner = inject(BarcodeScannerService);
+  readonly adminApi = inject(AdminApiService);
+  private readonly http = inject(HttpClient);
+  readonly Number = Number;
+  rows: any[] = [];
+  movements: any[] = [];
+  locationId = "";
+  productId = "";
+  query = "";
+  feedback = "";
+  loading = false;
+  busy = false;
+  attempted = false;
+  hasMore = false;
+  scanFeedback = "";
+  scanFeedbackKind: "ok" | "error" | "info" = "ok";
+  private page = 1;
+  private generation = 0;
+  private snapshot: any = null;
+  private key = crypto.randomUUID();
+  @ViewChild("movementQuantity")
+  private movementQuantity?: ElementRef<HTMLInputElement>;
+  private readonly changeDetector = inject(ChangeDetectorRef);
+  private destroyed = false;
+  private scannerDetach: (() => void) | null = null;
+  form = {
+    kind: "opening",
+    quantity: "",
+    unitCost: "",
+    costMode: "net",
+    purchaseVatRate: "",
+    toLocationId: "",
+    returnOfId: "",
+    reason: "",
+  };
+  get filteredRows() {
+    const q = this.query.trim().toLowerCase();
+    return this.rows.filter(
+      (row) => !q || `${row.name} ${row.sku ?? ""}`.toLowerCase().includes(q),
+    );
+  }
+  get selectedProduct() {
+    return this.rows.find((row) => row.id === this.productId);
+  }
+  get initializedCount() {
+    return this.rows.filter((row) => row.initialized).length;
+  }
+  get destinations() {
+    return this.context
+      .locations()
+      .filter((loc) => loc.isActive && loc.id !== this.locationId);
+  }
+  get returnable() {
+    return this.movements.filter(
+      (row) =>
+        Number(row.returnableQuantity) > 0 && row.kind !== "transfer_out",
+    );
+  }
+  number(value: unknown, digits: number) {
+    return Number(value).toLocaleString("it-IT", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  }
+  label(kind: string) {
+    return (
+      (
+        {
+          opening: "Inventario iniziale",
+          receipt: "Carico acquisto",
+          issue: "Scarico interno",
+          adjust_in: "Rettifica in aumento",
+          adjust_out: "Rettifica in diminuzione",
+          transfer_in: "Trasferimento in entrata",
+          transfer_out: "Trasferimento in uscita",
+          return: "Reso",
+          sale: "Vendita",
+          consumption: "Consumo servizio",
+          order_adjust_in: "Rettifica conto",
+          order_adjust_out: "Rettifica conto",
+        } as Record<string, string>
+      )[kind] || kind
+    );
+  }
+  async ngOnInit() {
+    if (!this.session.can("inventory.read")) return;
+    this.attachScanner();
+    try {
+      await this.context.load();
+      this.locationId =
+        this.context.selected.locationId ||
+        (this.context.locations().length === 1
+          ? this.context.locations()[0].id
+          : "");
+      if (this.locationId) await this.changeLocation();
+    } catch (error: any) {
+      this.feedback = error?.error?.message || "Caricamento non riuscito";
+    }
+  }
+  ngOnDestroy() {
+    this.destroyed = true;
+    if (this.scannerDetach) this.scannerDetach();
+    this.scannerDetach = null;
+  }
+  async changeLocation() {
+    this.saveInventoryScroll();
+    this.context.select(this.locationId, "", false);
+    this.productId = "";
+    this.rows = [];
+    this.movements = [];
+    this.newOperation();
+    await this.load();
+  }
+  async selectProduct(id: string) {
+    this.saveInventoryScroll();
+    this.productId = id;
+    this.movements = [];
+    this.page = 1;
+    this.newOperation();
+    this.form.kind = this.selectedProduct?.initialized ? "receipt" : "opening";
+    await this.loadMovements();
+  }
+
+  private attachScanner(): void {
+    this.scanner.setOptions({
+      scanThresholdMs: 120,
+      terminatorKey: "Enter",
+      soundEnabled: false,
+      vibrationEnabled: false,
+    });
+    this.scannerDetach = this.scanner.attach((event) =>
+      this.handleScannedBarcode(event.barcode),
+    );
+  }
+
+  private async handleScannedBarcode(barcode: string): Promise<void> {
+    if (this.destroyed || this.busy || this.attempted || this.loading) return;
+    this.scanFeedback = "";
+    if (!this.locationId) {
+      this.showScanFeedback("error", "Seleziona una sede prima di scansionare");
+      return;
+    }
+    const locationId = this.locationId;
+    try {
+      const product = await firstValueFrom(
+        this.adminApi.findProductByBarcode(barcode),
+      );
+      if (
+        this.destroyed ||
+        this.busy ||
+        this.attempted ||
+        locationId !== this.locationId
+      )
+        return;
+      if (!product?.id) {
+        this.showScanFeedback(
+          "info",
+          "Prodotto non trovato per questo barcode",
+        );
+        return;
+      }
+      if (!this.rows.some((row) => row.id === product.id)) {
+        this.showScanFeedback(
+          "info",
+          "Prodotto non disponibile nel magazzino della sede selezionata",
+        );
+        return;
+      }
+      await this.selectProduct(product.id);
+      if (
+        this.destroyed ||
+        locationId !== this.locationId ||
+        this.productId !== product.id
+      )
+        return;
+      this.showScanFeedback("ok", `Selezionato: ${product.name}`);
+      this.changeDetector.detectChanges();
+      this.movementQuantity?.nativeElement.focus();
+    } catch (error: any) {
+      if (this.destroyed || locationId !== this.locationId) return;
+      this.showScanFeedback(
+        error?.status === 404 ? "info" : "error",
+        error?.status === 404
+          ? "Prodotto non trovato per questo barcode"
+          : error?.status === 0
+            ? "Rete assente. Riprova la scansione quando la connessione è disponibile."
+            : error?.error?.message || "Scansione non riuscita. Riprova.",
+      );
+    }
+  }
+
+  private showScanFeedback(
+    kind: "ok" | "error" | "info",
+    message: string,
+  ): void {
+    this.scanFeedback = message;
+    this.scanFeedbackKind = kind;
+  }
+  async load() {
+    const token = ++this.generation;
+    if (!this.locationId) return;
+    this.loading = true;
+    try {
+      const rows = await firstValueFrom(
+        this.http.get<any[]>(`${ADMIN_API_URL}/inventory/balances`, {
+          params: { locationId: this.locationId },
+        }),
+      );
+      if (token !== this.generation) return;
+      this.rows = rows;
+      if (!this.rows.some((row) => row.id === this.productId))
+        this.productId = "";
+      if (this.productId) await this.loadMovements();
+      setTimeout(() => this.restoreInventoryScroll(), 0);
+    } catch (error: any) {
+      if (token === this.generation)
+        this.feedback = error?.error?.message || "Giacenze non disponibili";
+    } finally {
+      if (token === this.generation) this.loading = false;
+    }
+  }
+  async loadMovements(append = false) {
+    const token = this.generation,
+      id = this.productId,
+      location = this.locationId;
+    if (!id) return;
+    try {
+      const result: any = await firstValueFrom(
+        this.http.get(`${ADMIN_API_URL}/inventory/movements`, {
+          params: {
+            locationId: location,
+            productId: id,
+            page: String(this.page),
+          },
+        }),
+      );
+      if (
+        token !== this.generation ||
+        id !== this.productId ||
+        location !== this.locationId
+      )
+        return;
+      this.movements = append
+        ? [...this.movements, ...result.items]
+        : result.items;
+      this.hasMore = result.hasMore;
+      if (!append) setTimeout(() => this.restoreInventoryScroll(), 0);
+    } catch (error: any) {
+      this.feedback = error?.error?.message || "Registro non disponibile";
+    }
+  }
+  async loadMore() {
+    this.page++;
+    await this.loadMovements(true);
+  }
+  newOperation() {
+    this.key = crypto.randomUUID();
+    this.attempted = false;
+    this.snapshot = null;
+    this.feedback = "";
+    this.form.reason = "";
+  }
+  async submit() {
+    if (this.busy || !this.selectedProduct) return;
+    this.busy = true;
+    this.feedback = "";
+    if (!this.snapshot)
+      this.snapshot = {
+        kind: this.form.kind,
+        locationId: this.locationId,
+        productId: this.productId,
+        quantity: String(this.form.quantity),
+        idempotencyKey: this.key,
+        reason: this.form.reason,
+        ...(["opening", "receipt", "adjust"].includes(this.form.kind) &&
+        this.form.unitCost !== ""
+          ? { unitCost: String(this.form.unitCost) }
+          : {}),
+        ...(this.form.kind === "receipt"
+          ? {
+              costMode: this.form.costMode,
+              purchaseVatRate: String(this.form.purchaseVatRate),
+            }
+          : {}),
+        ...(this.form.kind === "transfer"
+          ? { toLocationId: this.form.toLocationId }
+          : {}),
+        ...(this.form.kind === "return"
+          ? { returnOfId: this.form.returnOfId }
+          : {}),
+      };
+    this.attempted = true;
+    try {
+      await firstValueFrom(
+        this.http.post(`${ADMIN_API_URL}/inventory/operations`, this.snapshot),
+      );
+      this.newOperation();
+      this.feedback = "Movimento registrato e giacenza riconciliata";
+      this.page = 1;
+      await this.load();
+    } catch (error: any) {
+      this.feedback =
+        (error?.error?.message || "Esito non disponibile") +
+        ". Puoi ripetere la stessa operazione; per modificarla controlla il registro e scegli Nuova operazione.";
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private saveInventoryScroll(): void {
+    try {
+      const key = this.locationId ? `barber.inventory.scroll.${this.locationId}` : "barber.inventory.scroll";
+      const stock = this.stockList?.nativeElement;
+      const table = this.tableScroll?.nativeElement;
+      if (stock) sessionStorage.setItem(`${key}.stock`, String(stock.scrollTop));
+      if (table) sessionStorage.setItem(`${key}.table`, String(table.scrollTop));
+    } catch {
+      /* sessionStorage non disponibile: ignora */
+    }
+  }
+
+  private restoreInventoryScroll(): void {
+    try {
+      const key = this.locationId ? `barber.inventory.scroll.${this.locationId}` : "barber.inventory.scroll";
+      const stockRaw = sessionStorage.getItem(`${key}.stock`);
+      const tableRaw = sessionStorage.getItem(`${key}.table`);
+      const stock = this.stockList?.nativeElement;
+      const table = this.tableScroll?.nativeElement;
+      if (stockRaw && stock) stock.scrollTop = Number(stockRaw);
+      if (tableRaw && table) table.scrollTop = Number(tableRaw);
+    } catch {
+      /* scroll restore non disponibile: ignora */
+    }
+  }
+}

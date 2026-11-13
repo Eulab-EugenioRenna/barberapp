@@ -20,6 +20,14 @@
   --shell-gap: 1rem;
   --shell-pad: 1rem;
   --shell-radius: 2rem;
+  --space-2xs: 0.35rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.25rem;
+  --space-xl: 1.5rem;
+  --space-2xl: 2rem;
+  --space-3xl: 3rem;
 }
 
 * {
