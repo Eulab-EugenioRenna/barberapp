@@ -72,11 +72,13 @@ describe("barcode UI workflows", () => {
   };
   const state = jest.fn();
   const detector = { detectChanges: jest.fn() };
+  const http = { post: jest.fn(), get: jest.fn() };
   const scanOrder = (barcode = "12345") =>
     (modal as any).handleScannedBarcode(barcode) as Promise<void>;
   const scanInventory = () =>
     (inventory as any).handleScannedBarcode("12345") as Promise<void>;
   beforeEach(() => {
+    jest.useFakeTimers();
     jest.resetAllMocks();
     allowed = true;
     providers.set(AdminApiService, api);
@@ -92,7 +94,7 @@ describe("barcode UI workflows", () => {
       setOptions: jest.fn(),
       attach: jest.fn(() => jest.fn()),
     });
-    providers.set(HttpClient, {});
+    providers.set(HttpClient, http);
     providers.set(ChangeDetectorRef, detector);
     api.findProductByBarcode.mockReturnValue(of(product));
     modal = new QuickOrderModalComponent();
@@ -104,6 +106,76 @@ describe("barcode UI workflows", () => {
     jest.spyOn(inventory, "loadMovements").mockResolvedValue(undefined);
     dialog = new QuickCreateDialogComponent();
     dialog.kind = "product";
+  });
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+  it.each(["cash", "card", "bank", "other"])(
+    "preserves touch checkout with %s payment after a scan",
+    async (paymentMethod) => {
+      modal.customerId = "customer-1";
+      modal.paymentMethod = paymentMethod;
+      modal.paymentStatus = "unpaid";
+      modal.online = true;
+      modal.addService({ id: "service-1", name: "Taglio", basePrice: 20 });
+      modal.items[0].collaboratorId = "staff-1";
+      await scanOrder();
+      await scanOrder();
+      modal.items[1].discount = 1;
+      modal.orderDiscount = "2";
+      modal.quote = { total: 41 };
+      modal.submit();
+      expect(modal.submitOrder.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customerId: "customer-1",
+          locationId: "site-a",
+          orderStatus: "confirmed",
+          paymentMethod,
+          paymentStatus: "unpaid",
+          orderDiscount: "2",
+          items: expect.arrayContaining([
+            expect.objectContaining({
+              serviceId: "service-1",
+              collaboratorId: "staff-1",
+              quantity: 1,
+              unitPrice: "20",
+            }),
+            expect.objectContaining({
+              productId: product.id,
+              quantity: 2,
+              discount: "1",
+            }),
+          ]),
+        }),
+      );
+    },
+  );
+  it("retains the inventory command and idempotency key after an uncertain result", async () => {
+    await scanInventory();
+    inventory.form.quantity = "3";
+    inventory.form.reason = "Conteggio";
+    http.post.mockReturnValue(throwError(() => ({ status: 0 })));
+    await inventory.submit();
+    const original = { ...http.post.mock.calls[0][1] };
+    inventory.form.quantity = "99";
+    await inventory.submit();
+    expect(http.post.mock.calls[1][1]).toEqual(original);
+    expect(original).toEqual(
+      expect.objectContaining({
+        quantity: "3",
+        productId: product.id,
+        locationId: "site-a",
+        idempotencyKey: expect.any(String),
+      }),
+    );
+    expect(inventory.attempted).toBe(true);
+  });
+  it("preserves manual inventory selection and paginated movement loading", async () => {
+    await inventory.selectProduct(product.id);
+    expect(inventory.form.kind).toBe("receipt");
+    await inventory.loadMore();
+    expect(inventory.loadMovements).toHaveBeenLastCalledWith(true);
   });
   it("increments a scanned row and recalculates its quote", async () => {
     await scanOrder();
@@ -141,17 +213,28 @@ describe("barcode UI workflows", () => {
   });
   it("increments an existing cart product when its missing barcode is associated", async () => {
     modal.addProduct(product);
-    api.findProductByBarcode.mockReturnValue(throwError(() => ({ status: 404 })));
-    const pending = scanOrder("0012345"); await Promise.resolve();
-    modal.onQuickCreated({ kind: "product", entity: { ...product, barcode: "0012345" } });
+    api.findProductByBarcode.mockReturnValue(
+      throwError(() => ({ status: 404 })),
+    );
+    const pending = scanOrder("0012345");
+    await Promise.resolve();
+    modal.onQuickCreated({
+      kind: "product",
+      entity: { ...product, barcode: "0012345" },
+    });
     await pending;
-    expect(modal.items).toHaveLength(1); expect(modal.items[0].quantity).toBe(2);
+    expect(modal.items).toHaveLength(1);
+    expect(modal.items[0].quantity).toBe(2);
   });
   it("does not open unknown recovery when a write begins during lookup", async () => {
-    const lookup = new Subject<any>(); api.findProductByBarcode.mockReturnValue(lookup);
-    const pending = scanOrder(); state.mockReturnValue({ kind: "pending" });
-    lookup.error({ status: 404 }); await pending;
-    expect(modal.quickCreateKind).toBeNull(); expect(modal.items).toEqual([]);
+    const lookup = new Subject<any>();
+    api.findProductByBarcode.mockReturnValue(lookup);
+    const pending = scanOrder();
+    state.mockReturnValue({ kind: "pending" });
+    lookup.error({ status: 404 });
+    await pending;
+    expect(modal.quickCreateKind).toBeNull();
+    expect(modal.items).toEqual([]);
   });
   it("allows cancelling unknown recovery without changing the order", async () => {
     api.findProductByBarcode.mockReturnValue(of(null));
