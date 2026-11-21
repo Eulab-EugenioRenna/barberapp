@@ -1,0 +1,942 @@
+{
+  "checkedAt": "2026-11-11T11:55:16.348966+00:00",
+  "status": "technical-local-closure-real-device-acceptance-open",
+  "step13Closed": true,
+  "mainRuntimeUpdated": true,
+  "newStep13Migrations": false,
+  "scope": {
+    "realConnectAccountsModified": false,
+    "mainFinancialDataModified": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "identity": "synthetic users in disposable PostgreSQL",
+    "browser": "actual Angular with Chromium virtual viewports; physical devices not verified"
+  },
+  "http": {
+    "checkedAt": "2026-11-09T17:08:09.116Z",
+    "database": "step7_http_1794243314048",
+    "identity": "isolated-synthetic-http",
+    "mainDatabaseModified": false,
+    "realProviders": false,
+    "checks": [
+      "confirmed-unpaid-account-counts-as-sold-without-inferred-cash-or-appointment-fallback",
+      "partial-payment-refund-and-cross-period-cash-use-receivedAt-while-cohort-balance-stays-current",
+      "explicit-opening-is-not-new-period-cash-and-legacy-unknown-is-never-inferred-paid-or-zero",
+      "sector-sales-project-only-selected-lines-and-account-payments-remain-explicitly-unattributed",
+      "all-account-sector-memberships-are-required-and-other-tenant-or-missing-financial-function-is-denied",
+      "strict-query-dto-rejects-invalid-period-date-month-identifier-and-unrecognized-fields",
+      "tenant-local-day-range-covers-real-daylight-saving-transition",
+      "professional-filter-does-not-inherit-account-primary-or-invent-payment-attribution",
+      "report-reads-do-not-mutate-domain-ledger-or-events-and-money-is-decimal-text-with-safe-projections",
+      "report-professional-selector-includes-all-profiles-beyond-catalog-first-page-and-inactive-history-without-pagination-or-appointment-editor-state",
+      "product-breakdown-reconciles-confirmed-unpaid-partial-and-historical-account-lines-without-appointment-values",
+      "account-activity-has-stable-database-pagination-with-selected-line-values-and-sector-selector-uses-confirmed-sales",
+      "actual-service-execution-is-counted-once-with-VAT-in-personal-and-company-values-without-inferred-cash",
+      "legacy-planned-professional-is-not-reinterpreted-as-performed-service-and-unknown-attribution-remains-visible",
+      "open-and-cancelled-multi-service-account-is-not-sold-or-counted-twice-and-retained-deposit-refund-remains-real-period-cash",
+      "empty-historical-account-retains-original-total-as-unattributed-and-requires-full-location-scope-in-report-and-activity"
+    ]
+  },
+  "browser": {
+    "checkedAt": "2026-11-09T17:18:30.910Z",
+    "database": "step7_http_1794243314048",
+    "checks": [
+      "actual-angular-page-separates-sold-cash-refunds-and-current-cohort-balance-with-unknown-history",
+      "professional-dropdown-searches-all-profiles-beyond-catalog-first-page-including-history-and-line-view-explains-unattributed-payments",
+      "late-month-response-cannot-overwrite-newer-all-period-financial-report",
+      "desktop-landscape-tablet-portrait-tablet-and-phone-have-readable-financial-sections-and-usable-full-select-without-horizontal-overflow",
+      "privacy-toggle-masks-financial-metrics-and-account-reconciliation-on-mobile"
+    ],
+    "screenshots": [
+      "financial-desktop.png",
+      "financial-tablet-landscape.png",
+      "financial-tablet-portrait.png",
+      "financial-mobile.png"
+    ],
+    "realAccounts": false,
+    "realProviders": false
+  },
+  "calendar": {
+    "checkedAt": "2026-11-09T17:18:34.911Z",
+    "database": "step7_http_1794243314048",
+    "checks": [
+      "week-and-month-legends-remain-bounded-keyboard-scrollable-with-many-professionals-on-four-viewport-sizes",
+      "real-week-day-header-and-month-cell-clicks-remain-reachable-with-calendar-area-over-100-pixels-and-no-document-horizontal-overflow"
+    ],
+    "layouts": [
+      {
+        "name": "desktop",
+        "viewportWidth": 1440,
+        "viewportHeight": 1050,
+        "columns": 7,
+        "width": 1077,
+        "height": 340
+      },
+      {
+        "name": "tablet-landscape",
+        "viewportWidth": 1180,
+        "viewportHeight": 820,
+        "columns": 3,
+        "width": 817,
+        "height": 340
+      },
+      {
+        "name": "tablet-portrait",
+        "viewportWidth": 820,
+        "viewportHeight": 1180,
+        "columns": 3,
+        "width": 752,
+        "height": 340
+      },
+      {
+        "name": "mobile",
+        "viewportWidth": 390,
+        "viewportHeight": 844,
+        "columns": 1,
+        "width": 329,
+        "height": 808
+      }
+    ],
+    "fullTabletOperationalAcceptance": false,
+    "realAccounts": false,
+    "realProviders": false
+  },
+  "notificationFoundationRegression": {
+    "groups": 18,
+    "status": "passed",
+    "evidence": ".local/step13/regression-notification-outbox-http.log",
+    "checkedAt": "2026-11-09T16:47:11.952666+00:00"
+  },
+  "httpRegressions": {
+    "checkedAt": "2026-11-09T17:17:23.799992+00:00",
+    "checks": [
+      {
+        "name": "operational-order",
+        "status": "passed"
+      },
+      {
+        "name": "pricing-inventory",
+        "status": "passed"
+      },
+      {
+        "name": "payment-ledger",
+        "status": "passed"
+      },
+      {
+        "name": "booking-resources",
+        "status": "passed"
+      },
+      {
+        "name": "booking-command",
+        "status": "passed"
+      },
+      {
+        "name": "booking-availability",
+        "status": "passed"
+      },
+      {
+        "name": "booking-mutation",
+        "status": "passed"
+      },
+      {
+        "name": "cashier-fulfilment",
+        "status": "passed"
+      },
+      {
+        "name": "rescheduling",
+        "status": "passed"
+      },
+      {
+        "name": "calendar-configuration",
+        "status": "passed"
+      }
+    ]
+  },
+  "browserRegressions": {
+    "checkedAt": "2026-11-09T17:18:36.159929+00:00",
+    "checks": [
+      {
+        "name": "locations",
+        "status": "passed"
+      },
+      {
+        "name": "operational-order",
+        "status": "passed"
+      },
+      {
+        "name": "pricing-inventory",
+        "status": "passed"
+      },
+      {
+        "name": "payment-ledger",
+        "status": "passed"
+      },
+      {
+        "name": "booking-resources",
+        "status": "passed"
+      },
+      {
+        "name": "create-recovery",
+        "status": "passed"
+      },
+      {
+        "name": "booking-sequence",
+        "status": "passed"
+      },
+      {
+        "name": "booking-mutation",
+        "status": "passed"
+      },
+      {
+        "name": "cashier-fulfilment",
+        "status": "passed"
+      },
+      {
+        "name": "rescheduling",
+        "status": "passed"
+      }
+    ]
+  },
+  "validation": {
+    "jest": {
+      "passed": true,
+      "suites": 60,
+      "tests": 363,
+      "snapshots": 1,
+      "evidence": ".local/step13/unit.log"
+    },
+    "lint": true,
+    "hostApiBuild": true,
+    "hostAdminBuild": true,
+    "hostPublicBuild": true,
+    "gitDiffCheck": true,
+    "dockerCandidateBuilt": true,
+    "candidateArtifactsExactMatch": true,
+    "candidateFullAppModuleStartupIsolated": true
+  },
+  "mainRuntime": {
+    "checkedAt": "2026-11-11T11:52:54.961822+00:00",
+    "status": "passed",
+    "environment": "local Docker only",
+    "mainRuntimeUpdated": true,
+    "candidateImages": {
+      "api": {
+        "name": "api",
+        "tag": "alora-step12-events-candidate-api:20261111",
+        "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+        "files": 344,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      "admin": {
+        "name": "admin",
+        "tag": "alora-step12-events-candidate-admin:20261111",
+        "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+        "files": 20,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      "booking": {
+        "name": "booking",
+        "tag": "alora-step12-events-candidate-booking:20261111",
+        "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+        "files": 17,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      }
+    },
+    "migrationCount": 9,
+    "originalTablesPreserved": 54,
+    "originalColumnsPreserved": 632,
+    "exactDataTablesUnchanged": 53,
+    "technicalStoreRenewal": {
+      "checkedAt": "2026-11-11T11:52:54.636Z",
+      "table": "connect_sdk_records",
+      "recordKind": "configuration",
+      "recordCountUnchanged": true,
+      "plaintextConfigurationUnchanged": true,
+      "changedTopLevelFields": [],
+      "cipherUnchanged": false,
+      "expiresAtUnchanged": false,
+      "namespaceUnchanged": true,
+      "configurationHash": "8e8c244071ba8dda1d2d027db6a6f58d7fe4e063bd90f42dd72015a2c69ce7db",
+      "credentialsExposed": false
+    },
+    "accountsAndSessionsPreserved": true,
+    "contactConsentsInferred": 0,
+    "automationPlansInferred": 0,
+    "domainEventsInferred": 0,
+    "notificationQueueEmptyBeforeRollout": true,
+    "applicationWritersStoppedForBackup": true,
+    "coordinatedDatabaseUploadBackup": true,
+    "databaseBackupReadable": true,
+    "databaseBackupSha256": "51ca3b8dd647f6d0d9bfc8d6541c71af5cb69f4498efc4f207a064dc4db56e0f",
+    "uploadArchiveSha256": "0a729b5b83fbfe824bb5e70fb1a4440e71bdf6fc66351da6319fc50ebf5f5d13",
+    "uploadArchiveUnchanged": true,
+    "configurationUnchanged": true,
+    "environmentVariablesUnchanged": true,
+    "sharedServicesAndConnectContainersUnchanged": true,
+    "staticAssetChecks": [
+      "admin",
+      "booking"
+    ],
+    "anonymousGuardsChecked": 3,
+    "health": {
+      "status": "ok",
+      "timestamp": "2026-11-11T11:52:39.977Z"
+    },
+    "rollbackImages": {
+      "api": "alora-workflow-before-events-api:20261111t115220z",
+      "admin": "alora-workflow-before-events-admin:20261111t115220z",
+      "booking": "alora-workflow-before-events-booking:20261111t115220z"
+    },
+    "realAccountSessionsUsed": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "realProviderAcceptance": false,
+    "evidence": ".local/step12/local-events-rollout-20261111T115220Z/result.json"
+  },
+  "qaCleanup": {
+    "currentOwnedContainersRemaining": 0,
+    "currentOwnedDatabasesRemaining": 0,
+    "sharedServicesPreserved": true,
+    "backupsAndRollbackImagesRetained": true
+  },
+  "testedHostArtifacts": {
+    "api": {
+      "files": 290,
+      "digest": "79473eee369a3a5e711eb080292a524f6e5a8a64561cd337d462e164957aba4b"
+    },
+    "admin": {
+      "files": 21,
+      "digest": "730c2d25342bd2d311ddc13ee4161cf892e53b1923befdcaba28b341b3559621"
+    },
+    "booking": {
+      "files": 18,
+      "digest": "6b28197a4ed67e704e6a6f5d5df783703d494be91de6debeaa3e3269be2016f2"
+    }
+  },
+  "sourceChecksums": {
+    "apps/api/src/modules/dashboard/financial-report.dto.ts": "49e1cd03c917981c45bdc60cc3bf3f09295f771a529c5df427ce06f58adace34",
+    "apps/api/src/modules/dashboard/financial-report.service.ts": "dc0efdb41ea61904d929f34b89a2a8bb9af55296e6e0e0615ee151050b24e6a5",
+    "apps/api/src/modules/dashboard/dashboard.controller.ts": "a9a8e4e0f63be56dfbb8b71b6d2ae30319de7e3402b5331a96ea5a38e44835fe",
+    "apps/api/src/modules/dashboard/dashboard.module.ts": "c77665e1fee248fe4d4f776bb4cc485a7cb7757017bcaa54ffbe330f4600c31b",
+    "apps/api/src/modules/dashboard/personal-dashboard.controller.ts": "178c4c90d1d7ee3357f4dc1a842eae8d37d218e4d641c21bd6ce9d26b1017d60",
+    "apps/api/src/modules/dashboard/personal-dashboard.controller.spec.ts": "f9227026f73fbdb80c1256e5f2f48d900816fd4b7567eb6a45d0f67a9e32391f",
+    "apps/api/src/common/personal-appointment.ts": "8723295c579f9b89639901a98d7cc56545ca2ebaba088b6edc19483fa177f18e",
+    "apps/api/src/modules/locations/locations.controller.ts": "a87885c7dfa8ca8a3e6d1541b2f687d79c7d36042683e9ddbb2b428c3ae8151a",
+    "apps/api/src/modules/locations/locations.module.ts": "f4a7705d9329015a898571d057d8d0c53cf89a4b476d6f859e4fe4ee7c9ef46b",
+    "apps/web-admin/src/app/core/admin.facade.ts": "d7ca124396a16512cf5758fec930c0ef826505091fbae024b8eaa3b0eb757ddc",
+    "apps/web-admin/src/app/admin-app.component.ts": "827b0726bc8b3af20b1b1501bb40d26071e30b675d28d2de7ae6bf564ecef99e",
+    "apps/web-admin/src/app/pages/admin-dashboard-page.component.ts": "596967cf80fe1f34b67ece4fdd164896f4c12f29b33b0c6e08eeefdc327dcfb5",
+    "apps/web-admin/src/app/pages/personal-agenda.component.ts": "06a897b3e1fab2433019af4090ad59a1b4d815df7afc08fbba6a199a1efb6922",
+    "apps/web-admin/src/app/shared/admin-metrics-grid.component.ts": "d4b57878383b258be3c0cd49163caaa7200fad2cc0ab4e656cc205440ff8deb4",
+    "apps/web-admin/src/app/shared/operational-selector.component.ts": "93543d735a340d194480b2e8f39589fcba042bc35a3ff81d3656e7117e46dd48",
+    "apps/web-admin/src/app/appointments/admin-appointments-calendar.component.ts": "93b91fbb25c9781e3186f7918548cbe125c6a5c693bd43c1da35cf97bc919dc1",
+    "apps/web-admin/src/app/appointments/admin-appointments-feature-page.component.ts": "d61beb8d77a23847fa76a8054fe2ca70b9f3b690beba391c73b16a0ee623d61a",
+    "apps/api/src/modules/dashboard/financial-valuation.sql.ts": "9734e06169d97580cfee78d9d84704e6dc9ef406c8d45f6bc43a00ad16293b92",
+    "apps/web-admin/src/app/shared/financial-values-panel.component.ts": "b440cfb5e8bacc61cfe0eddb32c134c1a53400530a4e5053f251774c93dd9176",
+    "apps/web-admin/src/app/core/admin-api.service.ts": "0586d6441f5df382b6334af0e3081ab5385938c81e474b34de6ea5077bc7b3b1",
+    "apps/api/src/modules/collaborators/collaborators.controller.ts": "7d2b80dfaa63876c5da5b0f236d9fd5ba7b87b0e8dd3dcfd6739e825ee778055",
+    "apps/api/src/common/operation-catalog.ts": "26d128a7d353147f0d23acec33082d241b7f1a037a0b247be7506b176bab38b6",
+    "apps/web-admin/src/app/quick-order/quick-order-modal.component.html": "947a3f655e99f25d94872e3120d6e4a5fd2b329dfd80860d95e0900be1dce70e",
+    "apps/web-admin/src/app/quick-order/quick-order-modal.component.css": "d3f58c54b9ef6bf768c41268a92df21152a00d78f1e9c8849d5caac9832d4190"
+  },
+  "verificationScriptChecksums": {
+    "scripts/verify-financial-report-http.mjs": "6ce4d92d8498329d04b8e790eee8f85af40bea3bf3ddf9fccfb906dcc732cc7d",
+    "scripts/verify-financial-report-browser.cjs": "0196a0a7b28cbc9cb921f094aeca9e110e045b3af279e4665f19e94be5bf172b",
+    "scripts/verify-calendar-viewport-browser.cjs": "d040e58c4733832cfdba87aa8cdcbc81ce489b25e0ee2bbbb81ad4ee236036af",
+    "scripts/locations-qa-server.cjs": "671059e41abe6ddee0df8a3de893d8736c304cafce85860fa7699116e2e09eef",
+    "scripts/verify-locations-http.mjs": "9b9e4ba4f25e118ff357d7796cedb4f89c2b893c5b6aee492657c4814bb0720f",
+    "scripts/payment-ledger-qa-fixtures.mjs": "b040d3949f371f5769d497f80aa1453a360624880679f4bdb68d20d0e20e526f",
+    "scripts/verify-financial-valuation-http.mjs": "ead823b593e5938e27f56841b10264adb4181683c516fe7b597ffaf294f778f6",
+    "scripts/verify-financial-valuation-browser.cjs": "fb060fdbeb2e4eefba9996e2480ec2e86ce9602f19c72bbc7d87d6bb5b8af97d",
+    "scripts/qa-viewport.cjs": "994716e41d1a52b947855e268ff8bc7948b54238c15e9850a4c14a02bec66302",
+    "scripts/verify-operational-options-http.mjs": "7c638a992635e106ec535e5d527616ee09f4fe57615adc3e4c973f5d14ed75da",
+    "scripts/verify-direct-cashier-options-browser.cjs": "da9dc0dfb28e08deba1e846c1824c463a3807042ff16fa9bd5f790c25b206962",
+    "scripts/verify-booking-sequence-browser.cjs": "5592ea554b6c54cd97d543ccb4a88817836e072488b238e04356ec3628644516",
+    "scripts/verify-booking-mutation-browser.cjs": "bedbed214f0d0685877f50b7af70bbfb85229b1dc25b0d8359980778a347784b",
+    "scripts/verify-cashier-fulfilment-browser.cjs": "4848ea3a6fd05aa5ae7c8829cbc94365a38e76d7643fe7f2d4a165fb249f3976",
+    "scripts/verify-payment-ledger-browser.cjs": "f160ee1b8cee659f3b17b920e74d3ee685487837bf49bafdac956748e342522e",
+    "scripts/verify-step13-docker-runtime.mjs": "33a4ebba26b6b6806e8b1deb11c2dfe0d7d6ac21b4d7c963ad92d4eefba02218"
+  },
+  "remaining": [
+    "Controlled public HTTPS webhook origin and real provider/device acceptance remain unverified",
+    "Physical devices, commercial acceptance and production remain separate",
+    "Account work remains deferred by user instruction"
+  ],
+  "valuation": {
+    "http": {
+      "checkedAt": "2026-11-09T17:08:10.331Z",
+      "database": "step7_http_1794243314048",
+      "checks": [
+        "explicit-sales-VAT-and-distributed-cent-discount-reconcile-while-material-cost-uses-recorded-weighted-average-and-purchase-VAT-is-independent",
+        "partial-physical-return-preserves-original-cost-without-money-or-VAT-reversal-and-later-catalog-cost-or-price-does-not-revalue-history",
+        "cost-and-warehouse-values-require-explicit-inventory-read-and-warehouse-aggregation-also-requires-full-location-scope-without-line-filters",
+        "legacy-VAT-is-not-inferred-as-zero-or-a-rate-and-unknown-material-history-never-produces-a-zero-cost-or-complete-margin",
+        "declared-service-consumption-is-valued-from-frozen-material-requirements-and-internal-transfers-do-not-create-purchases-or-company-cost",
+        "explicit-zero-VAT-and-an-empty-frozen-material-list-are-known-values-distinct-from-legacy-unknown-costs",
+        "current-unknown-stock-is-excluded-with-explicit-coverage-and-current-valuation-is-distinct-from-empty-period-flows-with-read-only-reports",
+        "posted-marker-with-required-materials-but-no-original-issue-is-incomplete-evidence-and-never-a-zero-cost",
+        "receipt-without-documented-purchase-VAT-keeps-known-net-value-and-partial-tax-but-withholds-complete-gross-and-customer-filters-withhold-warehouse-totals",
+        "documented-negative-material-margin-remains-negative-and-last-issue-clears-inventory-value-without-rounding-or-profit-floor"
+      ],
+      "realProviders": false,
+      "mainDatabaseModified": false
+    },
+    "browser": {
+      "checkedAt": "2026-11-09T17:18:32.471Z",
+      "database": "step7_http_1794243314048",
+      "checks": [
+        "actual-page-separates-known-sales-VAT-unknown-history-and-documented-material-cost-without-invented-margin-or-redundant-statistical-requests",
+        "sales-VAT-materials-and-warehouse-sections-remain-reachable-on-four-viewports-without-horizontal-overflow",
+        "privacy-toggle-masks-every-known-VAT-cost-and-current-stock-amount",
+        "known-zero-rate-and-complete-tracked-material-margin-are-visible-to-authorized-user-and-cost-sections-are-absent-without-inventory-grant"
+      ],
+      "screenshots": [
+        "valuation-desktop.png",
+        "valuation-tablet-landscape.png",
+        "valuation-tablet-portrait.png",
+        "valuation-mobile.png"
+      ],
+      "realAccounts": false,
+      "realProviders": false
+    },
+    "salesVatBasis": "stored-explicit-net-gross-lines-and-rates-after-discounts",
+    "materialCostBasis": "current-original-issues-and-reintegrations-for-the-period-account-cohort",
+    "completeMaterialMarginRequiresAllLinesKnown": true,
+    "missingPhysicalIssueIsNotZeroCost": true,
+    "laborOrOverheadsIncluded": false,
+    "warehouseRequiresInventoryReadAndWholeLocationScope": true,
+    "unknownAmountsRetained": true,
+    "currentStockAndPeriodFlowsSeparate": true
+  },
+  "professionalSelector": {
+    "profilesVerified": 205,
+    "catalogFirstPageLimitVerified": 200,
+    "completeProjectionIndependentOfCatalogPage": true
+  },
+  "operationalProfessionalOptions": {
+    "checkedAt": "2026-11-09T16:55:27.814Z",
+    "database": "step7_http_1794243314048",
+    "checks": [
+      "operational-target-is-outside-the-first-200-catalog-entries",
+      "complete-active-professional-projection-is-unique-and-contains-only-names-IDs-and-permitted-sector-IDs",
+      "explicit-function-tenant-and-current-operational-membership-are-enforced-without-cached-revoked-options",
+      "inactive-professionals-are-excluded-from-new-operational-choices-and-explicit-reactivation-is-reflected"
+    ],
+    "paddingProfiles": 205,
+    "firstPageProfiles": 200,
+    "targetBeyondFirstPage": true,
+    "realConnectAccountsModified": false
+  },
+  "tabletWorkflows": {
+    "matrix": {
+      "checkedAt": "2026-11-09T17:03:59.711030+00:00",
+      "checks": [
+        {
+          "viewport": "tablet-landscape",
+          "name": "direct-cashier-options",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-landscape",
+          "name": "booking-sequence",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-landscape",
+          "name": "booking-mutation",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-landscape",
+          "name": "cashier-fulfilment",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-landscape",
+          "name": "payment-ledger",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-portrait",
+          "name": "direct-cashier-options",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-portrait",
+          "name": "booking-sequence",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-portrait",
+          "name": "booking-mutation",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-portrait",
+          "name": "cashier-fulfilment",
+          "status": "passed"
+        },
+        {
+          "viewport": "tablet-portrait",
+          "name": "payment-ledger",
+          "status": "passed"
+        }
+      ],
+      "identity": "disposable SQL and synthetic sessions",
+      "realAccounts": false,
+      "realProviders": false
+    },
+    "workflows": {
+      "tablet-landscape": {
+        "viewport": {
+          "width": 1180,
+          "height": 820
+        },
+        "groups": 24,
+        "results": [
+          {
+            "viewportScenario": "tablet-landscape",
+            "checkedAt": "2026-11-09T17:03:30.283Z",
+            "identity": "isolated-synthetic-browser",
+            "database": "step7_http_1794243314048",
+            "providerCalls": false,
+            "checks": [
+              "internal-editor-creates-two-services-with-no-preference-and-server-validated-sequence-on-one-account",
+              "public-cross-sector-sequence-shows-all-services-server-validated-times-and-gross-total",
+              "two-services-no-preference-reserve-real-resources-and-one-account-with-45-minute-exact-continuation",
+              "lost-response-after-commit-and-tablet-landscape-reload-recover-the-identical-multiple-service-command-and-summary"
+            ],
+            "screenshots": [
+              "booking-sequence-desktop.png",
+              "booking-sequence-recovered-mobile.png",
+              "booking-sequence-internal.png"
+            ]
+          },
+          {
+            "viewportScenario": "tablet-landscape",
+            "database": "step7_http_1794243314048",
+            "checkedAt": "2026-11-09T17:03:34.827Z",
+            "identity": "isolated-synthetic-browser",
+            "providerCalls": false,
+            "checks": [
+              "whole-booking-editor-validates-and-appends-service-with-existing-deposit-and-no-actual-performer-inference",
+              "lost-revision-response-after-commit-reloads-from-another-service-and-recovers-identical-anchor-command-and-row-ids",
+              "tablet-landscape-cancellation-recovers-after-lost-response-releases-resources-and-preserves-all-service-rows-and-deposit",
+              "cancelled-account-is-read-only-and-offers-an-explicit-linked-refund-without-new-receipts-or-reopening",
+              "unchanged-booking-edit-keeps-non-grid-seconds-and-milliseconds-without-silently-shifting-the-original-instant",
+              "scheduling-grant-without-sales-read-can-preview-resources-without-receiving-or-rendering-financial-summary"
+            ],
+            "screenshots": [
+              "booking-mutation-desktop.png",
+              "booking-cancelled-account-mobile.png"
+            ]
+          },
+          {
+            "viewportScenario": "tablet-landscape",
+            "checkedAt": "2026-11-09T17:21:18.470Z",
+            "database": "step7_http_1794243314048",
+            "checks": [
+              "actual-editor-check-in-updates-only-the-scheduled-state-without-execution-stock-or-money",
+              "open-counter-explicitly-retains-unknown-performers-added-service-and-retail-with-no-execution-or-stock",
+              "actual-booked-account-deposit-before-completion-keeps-one-open-account-without-material-execution",
+              "completion-preserves-explicit-deposit-without-inventing-a-cash-settlement",
+              "checkout-requires-explicit-actual-performer-and-nonperformance-fee-declaration",
+              "lost-update-response-freezes-inputs-and-recovers-exact-persisted-command-after-tablet-landscape-reload-from-another-service-of-the-same-account",
+              "actual-booked-account-mixed-cash-card-settlement-and-original-deposit-refund-preserve-order-lines-performers-and-material-movements",
+              "completed-counter-displays-actual-distinct-from-planned-actor-and-preserves-cancelled-row-tablet-landscape-without-overflow"
+            ]
+          },
+          {
+            "viewportScenario": "tablet-landscape",
+            "checkedAt": "2026-11-09T17:03:43.208Z",
+            "identity": "isolated-synthetic-browser",
+            "database": "step7_http_1794243314048",
+            "providerCalls": false,
+            "checks": [
+              "explicit-legacy-opening-and-saved-account-balance",
+              "lost-http-response-after-commit-reload-recovers-original-operation-once",
+              "deposit-and-mixed-payment-in-same-account",
+              "manual-refund-original-reference-and-residual",
+              "tablet-landscape-and-tablet-landscape-no-horizontal-overflow"
+            ],
+            "screenshots": [
+              "payments-desktop.png",
+              "payments-mobile.png"
+            ]
+          },
+          {
+            "checkedAt": "2026-11-09T17:03:25.511Z",
+            "database": "step7_http_1794243314048",
+            "viewportScenario": "tablet-landscape",
+            "checks": [
+              "fresh-sales-route-selects-authorized-performer-beyond-first-catalog-page-without-an-agenda-visit-or-horizontal-overflow"
+            ],
+            "realAccounts": false,
+            "realProviders": false
+          }
+        ]
+      },
+      "tablet-portrait": {
+        "viewport": {
+          "width": 820,
+          "height": 1180
+        },
+        "groups": 24,
+        "results": [
+          {
+            "viewportScenario": "tablet-portrait",
+            "checkedAt": "2026-11-09T17:03:47.846Z",
+            "identity": "isolated-synthetic-browser",
+            "database": "step7_http_1794243314048",
+            "providerCalls": false,
+            "checks": [
+              "internal-editor-creates-two-services-with-no-preference-and-server-validated-sequence-on-one-account",
+              "public-cross-sector-sequence-shows-all-services-server-validated-times-and-gross-total",
+              "two-services-no-preference-reserve-real-resources-and-one-account-with-45-minute-exact-continuation",
+              "lost-response-after-commit-and-tablet-portrait-reload-recover-the-identical-multiple-service-command-and-summary"
+            ],
+            "screenshots": [
+              "booking-sequence-desktop.png",
+              "booking-sequence-recovered-mobile.png",
+              "booking-sequence-internal.png"
+            ]
+          },
+          {
+            "viewportScenario": "tablet-portrait",
+            "database": "step7_http_1794243314048",
+            "checkedAt": "2026-11-09T17:03:52.018Z",
+            "identity": "isolated-synthetic-browser",
+            "providerCalls": false,
+            "checks": [
+              "whole-booking-editor-validates-and-appends-service-with-existing-deposit-and-no-actual-performer-inference",
+              "lost-revision-response-after-commit-reloads-from-another-service-and-recovers-identical-anchor-command-and-row-ids",
+              "tablet-portrait-cancellation-recovers-after-lost-response-releases-resources-and-preserves-all-service-rows-and-deposit",
+              "cancelled-account-is-read-only-and-offers-an-explicit-linked-refund-without-new-receipts-or-reopening",
+              "unchanged-booking-edit-keeps-non-grid-seconds-and-milliseconds-without-silently-shifting-the-original-instant",
+              "scheduling-grant-without-sales-read-can-preview-resources-without-receiving-or-rendering-financial-summary"
+            ],
+            "screenshots": [
+              "booking-mutation-desktop.png",
+              "booking-cancelled-account-mobile.png"
+            ]
+          },
+          {
+            "viewportScenario": "tablet-portrait",
+            "checkedAt": "2026-11-09T17:21:24.618Z",
+            "database": "step7_http_1794243314048",
+            "checks": [
+              "actual-editor-check-in-updates-only-the-scheduled-state-without-execution-stock-or-money",
+              "open-counter-explicitly-retains-unknown-performers-added-service-and-retail-with-no-execution-or-stock",
+              "actual-booked-account-deposit-before-completion-keeps-one-open-account-without-material-execution",
+              "completion-preserves-explicit-deposit-without-inventing-a-cash-settlement",
+              "checkout-requires-explicit-actual-performer-and-nonperformance-fee-declaration",
+              "lost-update-response-freezes-inputs-and-recovers-exact-persisted-command-after-tablet-portrait-reload-from-another-service-of-the-same-account",
+              "actual-booked-account-mixed-cash-card-settlement-and-original-deposit-refund-preserve-order-lines-performers-and-material-movements",
+              "completed-counter-displays-actual-distinct-from-planned-actor-and-preserves-cancelled-row-tablet-portrait-without-overflow"
+            ]
+          },
+          {
+            "viewportScenario": "tablet-portrait",
+            "checkedAt": "2026-11-09T17:03:59.678Z",
+            "identity": "isolated-synthetic-browser",
+            "database": "step7_http_1794243314048",
+            "providerCalls": false,
+            "checks": [
+              "explicit-legacy-opening-and-saved-account-balance",
+              "lost-http-response-after-commit-reload-recovers-original-operation-once",
+              "deposit-and-mixed-payment-in-same-account",
+              "manual-refund-original-reference-and-residual",
+              "tablet-portrait-and-tablet-portrait-no-horizontal-overflow"
+            ],
+            "screenshots": [
+              "payments-desktop.png",
+              "payments-mobile.png"
+            ]
+          },
+          {
+            "checkedAt": "2026-11-09T17:03:44.329Z",
+            "database": "step7_http_1794243314048",
+            "viewportScenario": "tablet-portrait",
+            "checks": [
+              "fresh-sales-route-selects-authorized-performer-beyond-first-catalog-page-without-an-agenda-visit-or-horizontal-overflow"
+            ],
+            "realAccounts": false,
+            "realProviders": false
+          }
+        ]
+      }
+    },
+    "fullOperationalFlowsVerifiedInVirtualViewports": true,
+    "physicalDevicesVerified": false,
+    "finalCashierRetest": {
+      "checkedAt": "2026-11-09T17:21:24.661021+00:00",
+      "checks": [
+        {
+          "scenario": "desktop-and-mobile",
+          "status": "passed"
+        },
+        {
+          "scenario": "tablet-landscape",
+          "status": "passed"
+        },
+        {
+          "scenario": "tablet-portrait",
+          "status": "passed"
+        }
+      ],
+      "renderedBalancesVerified": true
+    }
+  },
+  "dockerCandidate": {
+    "builds": {
+      "checkedAt": "2026-11-09T17:09:42.065201+00:00",
+      "checks": [
+        {
+          "name": "api",
+          "target": "api-runtime",
+          "tag": "alora-step13-candidate-api:20261109",
+          "status": "passed"
+        },
+        {
+          "name": "admin",
+          "target": "admin-runtime",
+          "tag": "alora-step13-candidate-admin:20261109",
+          "status": "passed"
+        },
+        {
+          "name": "booking",
+          "target": "booking-runtime",
+          "tag": "alora-step13-candidate-booking:20261109",
+          "status": "passed"
+        }
+      ],
+      "mainRuntimeUpdated": false
+    },
+    "artifacts": {
+      "checkedAt": "2026-11-09T17:16:55.178524+00:00",
+      "checks": [
+        {
+          "name": "api",
+          "tag": "alora-step13-candidate-api:20261109",
+          "imageId": "sha256:a7530d61819fd89959e4819e4c9de89017bdc030d2fa2fd43b541135626a8795",
+          "files": 290,
+          "exactHostMatch": true,
+          "difference": {
+            "missing": [],
+            "extra": [],
+            "changed": []
+          }
+        },
+        {
+          "name": "admin",
+          "tag": "alora-step13-candidate-admin:20261109",
+          "imageId": "sha256:fcae7f487b46a1f208b9a07cb39f48fd2161aeffb9a14bf0be51038a16045cd3",
+          "files": 20,
+          "exactHostMatch": true,
+          "difference": {
+            "missing": [],
+            "extra": [],
+            "changed": []
+          }
+        },
+        {
+          "name": "booking",
+          "tag": "alora-step13-candidate-booking:20261109",
+          "imageId": "sha256:368c3138dddd27e745bb377cfcf7be96e6105bee8e7aa3393b37f06ead217c88",
+          "files": 17,
+          "exactHostMatch": true,
+          "difference": {
+            "missing": [],
+            "extra": [],
+            "changed": []
+          }
+        }
+      ],
+      "mainRuntimeUpdated": false,
+      "publicStylesRefreshReason": "shared Tailwind scan: removed obsolete lg:grid-cols-7 utility after container-width calendar layout; current host rebuild matches candidate exactly"
+    },
+    "runtime": {
+      "checkedAt": "2026-11-09T17:13:39.727Z",
+      "checks": [
+        "full-candidate-AppModule-starts-with-isolated-Redis-and-empty-PostgreSQL-migrations",
+        "entrypoint-applies-the-two-pending-notification-migrations-and-does-not-seed-accounts-tenants-or-sales",
+        "actual-global-guards-deny-anonymous-operational-options-without-an-account-or-Connect-login",
+        "generated-Linux-Prisma-client-and-native-bcrypt-work-and-QA-server-scripts-are-excluded",
+        "both-candidate-Nginx-images-serve-real-HTML-and-JavaScript-assets-on-the-private-network"
+      ],
+      "identity": "empty disposable database; no auth session created",
+      "networkInternal": true,
+      "hostPortsPublished": false,
+      "realAccounts": false,
+      "realProviders": false,
+      "mainDatabaseModified": false,
+      "mainRuntimeUpdated": false,
+      "evidence": ".local/step13/docker/runtime-1794244409842/result.json"
+    },
+    "runtimeCleanup": {
+      "checkedAt": "2026-11-09T17:13:40.661Z",
+      "allOwnedContainersRemoved": true,
+      "networkRemoved": true
+    },
+    "mainRuntimeUpdated": false,
+    "connectSessionsOrAccountsCreated": false
+  },
+  "migrationRehearsal": {
+    "checkedAt": "2026-11-09T17:17:12.967Z",
+    "sourceDatabaseModified": false,
+    "backupReadable": true,
+    "restoredAndReapplied": true,
+    "originalTablesUnchanged": 45,
+    "originalColumnsUnchanged": 504,
+    "noInferredEventsOrDeliveries": true,
+    "legacyDeliveryStatusesUnchanged": true,
+    "assertions": [
+      "PASS:immutable-and-tenant-consistent-domain-events",
+      "PASS:stable-delivery-identity-immutable-payload-and-cross-tenant-rejection",
+      "PASS:claimed-dispatch-requires-token-and-lease-no-unsafe-retry-and-closed-event-cannot-reopen",
+      "PASS:tenant-cascade-is-coherent-with-preserved-event-history"
+    ],
+    "evidence": ".local/step12/migration-1794244615208/result.json"
+  },
+  "subsequentTemplateCheckpoint": {
+    "checkedAt": "2026-11-09T17:46:37.088596+00:00",
+    "report": "docs/verification/notification-templates-step-12.json",
+    "note": "Step 13 evidence above is its tested snapshot; subsequent template editor is in separate new candidate images.",
+    "mainRuntimeUpdated": false
+  },
+  "subsequentPolicyCheckpoint": {
+    "checkedAt": "2026-11-09T20:35:57.155719+00:00",
+    "report": "docs/verification/appointment-policy-step-12.json",
+    "note": "Earlier artifact evidence remains its own tested snapshot; the new policy is in separate candidate images.",
+    "mainRuntimeUpdated": false
+  },
+  "restoreRehearsal": {
+    "checkedAt": "2026-11-09T20:49:30.931Z",
+    "report": "docs/verification/release-restore-step-14.json",
+    "currentDataCopyPreserved": true,
+    "binaryAndColdRollbackVerified": true,
+    "mainRuntimeUpdated": false
+  },
+  "currentVerification": "docs/verification/appointment-automations-workflow-step-12.json",
+  "currentSourceChecksums": {
+    "apps/api/src/common/appointment-automation-policy.ts": "2fa3780e85a81823187b4c798a09893f5e12eef13b754f7206f35ccb09d3fb82",
+    "apps/api/src/modules/notifications/appointment-automation-dispatch.service.ts": "32d2cbe373e0669131c4a9a97fcf4164531ede8f552d081d056bb7e795e6a7c5",
+    "apps/api/src/modules/notifications/appointment-automation-messages.ts": "8b1c36bb38d96042bc5789cdf7b80958649574edeac1cdd0c5a564d362a6bbca",
+    "apps/api/src/modules/notifications/appointment-automation-monitor.controller.ts": "586822411c73241695499cbdd15dcb03b9d3818b7df5a74d05927d076499f9c1",
+    "apps/api/src/modules/notifications/appointment-automation-planner.service.ts": "537822e715e43be923b7eb1b9c79a1a695fe677d9f841a85a0a3780367949714",
+    "apps/api/src/modules/notifications/appointment-automation-policy.controller.ts": "872ed5d46b13dc9d2fe04edffa34cfdee09a2fa55879f8d51700a28ae394142e",
+    "apps/api/src/modules/notifications/appointment-automation-policy.service.ts": "83712d808c0ad090eb3f39dd13055fb0a4cb2e8efa40bfba3cc5968acfe48788",
+    "apps/api/src/modules/notifications/appointment-automation-recovery.service.ts": "5425b809bd44444eebe03f3c6bc6725a37a683c7fa45c8f4be51b9d1795c5664",
+    "apps/api/src/modules/notifications/appointment-automation-staff.service.ts": "db1516098270ae2b4f3f28f80aef5654276a2ff80fa7ef16280155428a96d23d",
+    "apps/api/src/modules/notifications/appointment-automation-state.ts": "e86dd8e324ca0b30ef57cfa9f6c719b3750b8a5eb65e72c37a3a829301f0b5a4",
+    "apps/api/src/modules/notifications/appointment-automations.module.ts": "02e752c2445f7409849df488440bd367b1b5754074caee8511f849b1a5b7221a",
+    "apps/api/src/modules/notifications/appointment-contact.controller.ts": "e0907fcadcfd22e5a38ef6f239bcb88270b76788ebdbbd8102218935c455c851",
+    "apps/api/src/modules/notifications/appointment-contact.service.ts": "74de8e94c9994295e6f8fc6b5d93d8a769afa89cd983cf6cfc30f3a17b6d9bcc",
+    "apps/api/src/modules/notifications/appointment-customer-actions.service.ts": "d71a3aa1c3b8a175134e11fd6bd381567bfb6639a99a5e4e08073b2063500d58",
+    "apps/api/src/modules/notifications/appointment-customer-contract.spec.ts": "635e221ad925cbb1b8d2567cde3ebfc32d47e50fe32bb921aca1e9a6f5c6f14d",
+    "apps/api/src/modules/notifications/appointment-events.ts": "c7a96bcd655314ac34e2c86e1e253987cea92d4d573d2c0484dddc6ca9b4595b",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.spec.ts": "b5392bf72b142dac65652de5f83c511e7604c7134cdc532a5e96af767f5f1540",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.ts": "ae0db3355a5b3baebad505782e995380e5575090f250e2d9786d02dac75594d2",
+    "apps/web-admin/src/app/core/appointment-automation-access-api.service.ts": "7bf3ac15abdadd1f5f1bd7a40a43ebdbac810246c76a987f0982d035e3d2e9f7",
+    "apps/web-admin/src/app/core/appointment-automation-policy-api.service.ts": "f28da7936a49af971495b13cd1f7d1532ebace62beb2b88fa120a69a96480c0c",
+    "apps/web-admin/src/app/shared/appointment-automation-access.component.ts": "e885ade9b2beff33f1ca5e496eb30ca8a4f58cb0c7a4d46b3400e52854ec6178",
+    "apps/web-admin/src/app/shared/appointment-automation-monitor.component.ts": "c50125c1de2b51236dc82b187cc259ad27e9e961de4132806d48483bcb6844cb",
+    "apps/web-admin/src/app/shared/appointment-automation-policy.component.ts": "d0db852edbd1835ae0f97189ceff9d57f06dfbb8df87389d214d95aad4142f0d",
+    "apps/web-admin/src/app/shared/appointment-contact.component.ts": "987829e28a08c9094d0bc347e63b1f42caed50a25489243e77c4b57d26a3b9be",
+    "prisma/migrations/20261110100000_notification_automation_grants/migration.sql": "c7c0dd6afee498ed17d20de6d76eb98d2add9a84712034adbc1fd40f571f5138",
+    "prisma/migrations/20261110101000_notification_automation_webhooks/migration.sql": "461021e5b791323331cc7fec4839835e4a9dfa08ecd02a867b616b5c60d54b69",
+    "prisma/migrations/20261110160000_notification_automation_commands/migration.sql": "2abb5d26e49e7ded368748e02d3296800ee65ce0ab7618922d0a2ed8c4cbc237",
+    "prisma/migrations/20261110200000_automation_queued_state/migration.sql": "1c9c0b5fb4854dcd65897d4ab764ef5b517469110134bf98be0e6eefc32fabd5",
+    "prisma/migrations/20261110201000_appointment_automation_workflow/migration.sql": "6b1829d265990ea0524a97313ae4a52c2d8cac105935428052ebec873b2e70bc",
+    "prisma/migrations/20261111200000_appointment_event_notices/migration.sql": "8fc8a585d22e1d74f60cbf33ab77fa105cf9e2aa1459142e848722888d233924",
+    "prisma/schema.prisma": "23b63a44a20bdba52df5c3c2099b6285d88eca02fe641c6f88e5b327977baa4e"
+  },
+  "previousStatusCheckpoint": {
+    "checkedAt": "2026-11-09T17:29:46.638228+00:00",
+    "status": "implementation-and-complete-tablet-workflows-verified-isolated-candidate-built-main-rollout-pending",
+    "step13Closed": false,
+    "mainRuntimeUpdated": false,
+    "remaining": [
+      "local rollout of Steps 11-13 remains pending Step 12 authorization contract and remaining automation/configuration/response implementation and gates",
+      "Connect-owned background delegation API/SDK contract: scope expansion requested with a reviewable contract; no implicit repository changes authorized",
+      "Step 14 commercial production and physical-device/provider acceptance, with Connect account operations excluded"
+    ],
+    "mainRuntime": {
+      "phase": "Step 10",
+      "services": {
+        "barber-api-1": {
+          "image": "sha256:6226d88312684c1c3248a1e60b2667da63332f0230a624aa2802b6baa24f70e7",
+          "status": "healthy"
+        },
+        "barber-web-admin-1": {
+          "image": "sha256:655d551f712bee0ca37a9ef071b3ea16e02ffe24fd0ebbbc24c1306ceddbdfc6",
+          "status": "healthy"
+        },
+        "barber-web-public-booking-1": {
+          "image": "sha256:a4389b9dd8bf199c096f579ec59c32ff663d598864ebcf53770a2098b7d8dfd3",
+          "status": "healthy"
+        }
+      },
+      "notificationDomainEventAbsent": true,
+      "migration20261109Count": 0
+    }
+  },
+  "evidenceTimeScope": "Detailed preceding test/build/checksum fields retain their original checkpoint dates; current verification is linked separately.",
+  "technicalImplementationComplete": true,
+  "subsequentConnectRuntimeVerification": "docs/verification/connect-runtime-015-local.json",
+  "localConnectRuntimeUpdated": true,
+  "latestRuntimePackagingVerification": "docs/verification/runtime-only-images.json",
+  "currentMainImages": {
+    "barber-api-1": {
+      "imageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-admin-1": {
+      "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-public-booking-1": {
+      "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-api-1": {
+      "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-runner-1": {
+      "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-web-1": {
+      "imageId": "sha256:73df58837c66c998dda4745ff2d4c856c4e824b3507ca1719ffefccbf83d9338",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    }
+  }
+}

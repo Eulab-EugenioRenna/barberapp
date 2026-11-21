@@ -1,3 +1,5 @@
+import { RouterLink } from "@angular/router";
+import { SectorPickerComponent } from "../shared/sector-picker.component";
 import { AdminTeamPageComponent } from "./admin-team-page.component";
 import { SessionStore } from "../core/session.store";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
@@ -12,6 +14,8 @@ import { UiIconComponent } from "../shared/ui-icon.component";
   selector: "barber-admin-collaborators-page",
   standalone: true,
   imports: [
+    RouterLink,
+    SectorPickerComponent,
     AdminTeamPageComponent,
     FunctionAccessDirective,
     CommonModule,
@@ -21,7 +25,12 @@ import { UiIconComponent } from "../shared/ui-icon.component";
     UiIconComponent,
   ],
   template: `
-    <alora-admin-team-page *ngIf="canManageAccounts" [professionals]="collaborators" (editProfessional)="openEdit($event)" (newProfessional)="openNew()"></alora-admin-team-page>
+    <alora-admin-team-page
+      *ngIf="canManageAccounts"
+      [professionals]="collaborators"
+      (editProfessional)="openEdit($event)"
+      (newProfessional)="openNew()"
+    ></alora-admin-team-page>
     <section *ngIf="!canManageAccounts" class="grid gap-4">
       <article class="panel rounded-[2rem] p-4 sm:p-5">
         <div class="page-head">
@@ -137,6 +146,16 @@ import { UiIconComponent } from "../shared/ui-icon.component";
 
         <form class="mt-4 grid gap-4 lg:grid-cols-2" (ngSubmit)="submit()">
           <div class="grid content-start gap-4">
+            <alora-sector-picker
+              *ngIf="!collaboratorForm.id"
+              [(value)]="collaboratorForm.sectorId"
+            ></alora-sector-picker>
+            <a
+              *ngIf="collaboratorForm.id"
+              routerLink="/locations"
+              class="secondary-btn"
+              >Appartenenze a sedi e settori</a
+            >
             <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
               <label class="field">
                 <span
@@ -392,7 +411,9 @@ import { UiIconComponent } from "../shared/ui-icon.component";
 })
 export class AdminCollaboratorsPageComponent {
   private readonly session = inject(SessionStore);
-  get canManageAccounts(): boolean { return this.session.can("users.manage"); }
+  get canManageAccounts(): boolean {
+    return this.session.can("users.manage");
+  }
   @Input() collaborators: any[] = [];
   @Input() collaboratorForm: any = {};
   @Input() defaultCollaboratorId = "";

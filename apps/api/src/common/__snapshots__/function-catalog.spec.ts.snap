@@ -5,6 +5,16 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
   "appId": "alora-test",
   "functions": [
     {
+      "description": "Consultare le sedi e i settori operativi abilitati.",
+      "key": "locations.read",
+      "name": "Consultazione sedi e settori",
+    },
+    {
+      "description": "Configurare sedi, settori, orari, risorse e appartenenze operative senza concedere funzioni Connect.",
+      "key": "locations.manage",
+      "name": "Gestione sedi e settori",
+    },
+    {
       "description": "Consultare gli appuntamenti aziendali.",
       "key": "appointments.read.all",
       "name": "Agenda aziendale",
@@ -48,6 +58,16 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
       "description": "Modificare servizi e associazioni ai prodotti.",
       "key": "services.manage",
       "name": "Gestione listino",
+    },
+    {
+      "description": "Consultare giacenze e movimenti delle sedi autorizzate.",
+      "key": "inventory.read",
+      "name": "Consultazione magazzino",
+    },
+    {
+      "description": "Registrare aperture, carichi, rettifiche, resi e trasferimenti nelle sedi autorizzate.",
+      "key": "inventory.manage",
+      "name": "Gestione magazzino",
     },
     {
       "description": "Consultare il catalogo prodotti.",
@@ -110,6 +130,21 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
       "name": "Recupero accessi dei collaboratori",
     },
     {
+      "description": "Consultare connessioni, conversazioni e stato degli invii dell’intera attività.",
+      "key": "whatsapp.read",
+      "name": "Conversazioni WhatsApp",
+    },
+    {
+      "description": "Inviare messaggi espliciti attraverso il numero autorizzato in Connect.",
+      "key": "whatsapp.send",
+      "name": "Invio WhatsApp",
+    },
+    {
+      "description": "Collegare il numero con QR e gestirne connessione e disconnessione.",
+      "key": "whatsapp.manage",
+      "name": "Amministrazione WhatsApp",
+    },
+    {
       "description": "Consultare le operazioni registrate per la propria azienda.",
       "key": "audit.read",
       "name": "Consultazione audit",
@@ -131,6 +166,6 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
     },
   ],
   "schemaVersion": 1,
-  "version": 4,
+  "version": 7,
 }
 `;

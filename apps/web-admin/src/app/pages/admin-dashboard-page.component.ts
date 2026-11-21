@@ -1,3 +1,4 @@
+import { FinancialValuesPanelComponent } from "../shared/financial-values-panel.component";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
@@ -17,6 +18,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
   selector: "barber-admin-dashboard-page",
   standalone: true,
   imports: [
+    FinancialValuesPanelComponent,
     FunctionAccessDirective,
     CommonModule,
     AdminMetricsGridComponent,
@@ -31,7 +33,9 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         <div class="page-head">
           <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Andamento del salone</p>
-            <h3 class="mt-1 font-display text-2xl sm:text-3xl">Incassi</h3>
+            <h3 class="mt-1 font-display text-2xl sm:text-3xl">
+              Venduto e incassi
+            </h3>
           </div>
           <button
             type="button"
@@ -102,17 +106,54 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         </div>
       </article>
 
+      <p
+        class="px-1 text-sm text-[var(--muted)]"
+        *ngIf="revenueReport?.basis?.lineFiltered"
+      >
+        Il venduto comprende le righe selezionate. Incassi e residui sono
+        registrati sul conto: per consultarli rimuovi i filtri settore e
+        professionista.
+      </p>
+      <p
+        class="px-1 text-sm text-[var(--muted)]"
+        *ngIf="revenueReport && !revenueReport.basis?.lineFiltered"
+      >
+        Il venduto segue la data registrata del conto confermato. Incassi e
+        rimborsi seguono la data del movimento, anche quando riguardano conti di
+        un altro periodo. Sono inclusi solo conti interamente accessibili.
+      </p>
+      <p
+        class="px-1 text-sm text-[var(--muted)]"
+        *ngIf="
+          revenueReport?.sold?.unattributedGross !== '0.00' &&
+          revenueReport?.sold
+        "
+      >
+        Differenza storica fra totale conti e righe:
+        {{ money(revenueReport.sold.unattributedGross) }}. Questo importo non è
+        attribuito a un settore o a un esecutore.
+      </p>
+
       <barber-admin-metrics-grid
         [metrics]="revenueMetrics"
         [masked]="balanceHidden"
       ></barber-admin-metrics-grid>
 
+      <alora-financial-values-panel
+        *ngIf="revenueReport"
+        [tax]="revenueReport.salesTax"
+        [materials]="revenueReport.materials"
+        [inventory]="revenueReport.inventory"
+        [currency]="revenueReport.currency"
+        [masked]="balanceHidden"
+      ></alora-financial-values-panel>
+
       <div class="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <article class="panel rounded-[2rem] p-4 sm:p-5">
           <div class="min-w-0">
-            <p class="eyebrow text-[var(--accent)]">Movimenti</p>
+            <p class="eyebrow text-[var(--accent)]">Attività</p>
             <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h3 class="font-display text-2xl">Vendite e appuntamenti</h3>
+              <h3 class="font-display text-2xl">Conti del periodo</h3>
               <span class="status-pill status-pill-neutral">{{
                 activity.length
               }}</span>
@@ -155,6 +196,13 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               </div>
               <div class="shrink-0 text-right">
                 <strong>{{ money(entry.amount) }}</strong>
+                <p class="text-xs text-[var(--muted)]">
+                  {{
+                    entry.amountBasis === "planned-account-value"
+                      ? "Valore previsto"
+                      : "Valore del conto"
+                  }}
+                </p>
                 <p class="text-sm text-[var(--muted)]">
                   {{ formatActivityStatus(entry.status) }}
                 </p>
@@ -164,7 +212,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               *ngIf="!activity.length && !activityLoading"
               class="rounded-2xl border border-dashed border-[var(--line)] p-4 text-sm text-[var(--muted)]"
             >
-              Nessuna vendita o appuntamento nel periodo selezionato.
+              Nessun conto nel periodo selezionato.
             </p>
             <p
               *ngIf="activityLoading"
@@ -185,7 +233,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <article class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Clienti</p>
             <h3 class="font-display text-xl sm:text-2xl">
-              Incassi per cliente
+              Venduto per cliente
             </h3>
             <div class="mt-3 grid max-h-[18rem] gap-2 overflow-y-auto pr-1">
               <div
@@ -199,14 +247,14 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                 *ngIf="!revenueReport?.byCustomer?.length"
                 class="text-sm text-[var(--muted)]"
               >
-                Nessun incasso nel periodo selezionato.
+                Nessun conto confermato nel periodo selezionato.
               </p>
             </div>
           </article>
           <article class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Squadra</p>
             <h3 class="font-display text-xl sm:text-2xl">
-              Incassi per professionista
+              Servizi per esecutore dichiarato
             </h3>
             <div class="mt-3 grid max-h-[18rem] gap-2 overflow-y-auto pr-1">
               <div
@@ -220,11 +268,40 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
                 *ngIf="!revenueReport?.byCollaborator?.length"
                 class="text-sm text-[var(--muted)]"
               >
-                Nessun incasso associato alla squadra.
+                Nessuna riga di servizio nel periodo selezionato.
               </p>
             </div>
           </article>
         </div>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-2">
+        <article
+          *ngFor="
+            let group of [
+              { title: 'Venduto per sede', rows: revenueReport?.byLocation },
+              { title: 'Venduto per settore', rows: revenueReport?.bySector },
+            ]
+          "
+          class="panel min-w-0 rounded-[2rem] p-4 sm:p-5"
+        >
+          <h3 class="font-display text-xl">{{ group.title }}</h3>
+          <dl class="mt-3 grid gap-2">
+            <div
+              *ngFor="let row of group.rows"
+              class="flex min-w-0 flex-wrap justify-between gap-2 border-b border-[var(--line)] py-2"
+            >
+              <dt class="min-w-0 break-words">{{ row.label }}</dt>
+              <dd>{{ money(row.revenue) }}</dd>
+            </div>
+          </dl>
+          <p
+            *ngIf="!group.rows?.length"
+            class="mt-3 text-sm text-[var(--muted)]"
+          >
+            Nessuna vendita nel periodo.
+          </p>
+        </article>
       </div>
 
       <div class="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -277,26 +354,53 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           </div>
         </article>
 
-        <article class="dark-panel rounded-[2rem] p-4 text-white sm:p-5">
-          <p class="eyebrow text-white/40">Andamento della squadra</p>
-          <div class="mt-4 grid gap-2.5 sm:gap-3">
-            <div
-              *ngFor="let collaborator of collaboratorStats"
-              class="rounded-[1.4rem] bg-white/8 p-4"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <strong>{{ collaborator.collaboratorName }}</strong>
-                <span class="status-pill status-pill-inverse"
-                  >{{ collaborator.completed }} completate</span
-                >
-              </div>
-              <p class="mt-2 text-sm text-white/65">
-                Ricavi: {{ money(collaborator.revenue) }} · Vendite:
-                {{ collaborator.orderCount || 0 }} · Prossimi appuntamenti:
-                {{ collaborator.upcoming }}
-              </p>
+        <article
+          class="dark-panel rounded-[2rem] p-4 text-white sm:p-5"
+          data-testid="account-reconciliation"
+        >
+          <p class="eyebrow text-white/50">Situazione attuale</p>
+          <h3 class="mt-1 font-display text-2xl">Conti del periodo</h3>
+          <p class="mt-2 text-sm text-white/65">
+            Conti aperti e confermati con data nel periodo, aggiornati ai
+            movimenti registrati oggi.
+          </p>
+          <dl
+            *ngIf="
+              revenueReport?.accounts as balances;
+              else noAccountAttribution
+            "
+            class="mt-4 grid gap-3"
+          >
+            <div class="flex flex-wrap justify-between gap-2">
+              <dt>Totale conti riconciliati</dt>
+              <dd>{{ money(balances.total) }}</dd>
             </div>
-          </div>
+            <div class="flex flex-wrap justify-between gap-2">
+              <dt>Saldi iniziali dichiarati</dt>
+              <dd>{{ money(balances.opening) }}</dd>
+            </div>
+            <div class="flex flex-wrap justify-between gap-2">
+              <dt>Ricevuto netto attuale</dt>
+              <dd>{{ money(balances.netReceived) }}</dd>
+            </div>
+            <div
+              class="flex flex-wrap justify-between gap-2 border-t border-white/20 pt-3 font-semibold"
+            >
+              <dt>Residuo attuale</dt>
+              <dd>{{ money(balances.remaining) }}</dd>
+            </div>
+            <p class="text-sm text-white/65" *ngIf="balances.unknownCount">
+              {{ balances.unknownCount }} conti storici, per
+              {{ money(balances.unknownTotal) }}, hanno un incasso da
+              riconciliare e sono esclusi dal residuo.
+            </p>
+          </dl>
+          <ng-template #noAccountAttribution
+            ><p class="mt-4 text-sm text-white/65">
+              I pagamenti non sono ripartiti per riga. Consulta i conti completi
+              rimuovendo i filtri settore e professionista.
+            </p></ng-template
+          >
         </article>
       </div>
     </section>
@@ -318,7 +422,6 @@ export class AdminDashboardPageComponent {
     collaboratorId: "",
   };
   @Input() customerOptions: Array<{ value: string; label: string }> = [];
-  @Input() collaboratorOptions: Array<{ value: string; label: string }> = [];
   @Input() loading = false;
   @Output() editAppointment = new EventEmitter<any>();
   @Output() applyRevenueFilters = new EventEmitter<void>();
@@ -345,6 +448,8 @@ export class AdminDashboardPageComponent {
       return "**,**";
     }
 
+    if (typeof value === "string" && /^-?\d+\.\d{2}$/.test(value))
+      return `€${value}`;
     const amount = Number(value ?? 0);
     return `€${(Number.isFinite(amount) ? amount : 0).toFixed(2)}`;
   }
@@ -376,7 +481,7 @@ export class AdminDashboardPageComponent {
   get collaboratorFilterOptions(): Array<{ value: string; label: string }> {
     return [
       { value: "", label: "Tutta la squadra" },
-      ...this.collaboratorOptions,
+      ...(this.revenueReport?.collaboratorOptions || []),
     ];
   }
 

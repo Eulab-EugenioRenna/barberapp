@@ -1,4 +1,8 @@
+import { WhatsAppComponent } from "./pages/whatsapp.component";
+import { InventoryComponent } from "./pages/inventory.component";
+import { LocationsComponent } from "./pages/locations.component";
 import { AccessUnavailableComponent } from "./pages/access-unavailable.component";
+import { PersonalAccountComponent } from "./pages/personal-account.component";
 import { PersonalAgendaComponent } from "./pages/personal-agenda.component";
 import { Routes } from "@angular/router";
 import { authGuard } from "./core/auth.guard";
@@ -16,6 +20,7 @@ export const adminRoutes: Routes = [
   { path: "", pathMatch: "full", redirectTo: "login" },
   { path: "login", component: AdminAuthPageComponent },
   { path: "signup", component: AdminAuthPageComponent },
+  { path: "account", component: PersonalAccountComponent, canActivate: [authGuard] },
   {
     path: "my-agenda",
     component: PersonalAgendaComponent,
@@ -26,6 +31,9 @@ export const adminRoutes: Routes = [
     component: AccessUnavailableComponent,
     canActivate: [authGuard],
   },
+  { path:"inventory",component:InventoryComponent,canActivate:[authGuard]},
+  { path: "whatsapp", component: WhatsAppComponent, canActivate: [authGuard] },
+  { path: "locations", component: LocationsComponent, canActivate: [authGuard] },
   shellRoute("dashboard", "dashboard"),
   shellRoute("appointments", "appointments"),
   shellRoute("confirmations", "confirmations"),

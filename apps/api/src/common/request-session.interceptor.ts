@@ -1,3 +1,4 @@
+import { runOperationalCacheScope } from "../modules/locations/operational-scope";
 import {
   CallHandler,
   ExecutionContext,
@@ -18,16 +19,17 @@ export class RequestSessionInterceptor implements NestInterceptor {
     // Each event-stream tick must continue to recheck revocations and current permissions.
     if (Reflect.getMetadata(SSE_METADATA, context.getHandler()))
       return next.handle();
-    const request = context
-      .switchToHttp()
-      .getRequest<{
-        headers: { authorization?: string };
-        localSession?: RequestSession;
-      }>();
+    const request = context.switchToHttp().getRequest<{
+      headers: { authorization?: string };
+      localSession?: RequestSession;
+    }>();
     return new Observable((subscriber) =>
       runRequestSessionScope(
         () => {
-          const subscription = next.handle().subscribe(subscriber);
+          const subscription = runOperationalCacheScope(
+            request.localSession?.operationalScope?.cacheKey,
+            () => next.handle().subscribe(subscriber),
+          );
           return () => subscription.unsubscribe();
         },
         request.localSession

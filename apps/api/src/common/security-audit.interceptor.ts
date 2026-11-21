@@ -13,7 +13,11 @@ export class SecurityAuditInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler) {
     const request = context.switchToHttp().getRequest();
     const session = request.localSession;
-    if (!session || ["GET", "HEAD", "OPTIONS"].includes(request.method))
+    if (
+      !session ||
+      Reflect.getMetadata("alora.readOnly", context.getHandler()) === true ||
+      ["GET", "HEAD", "OPTIONS"].includes(request.method)
+    )
       return next.handle();
     return next.handle().pipe(
       concatMap(async (result) => {

@@ -1,0 +1,375 @@
+{
+  "checkedAt": "2026-11-11T11:55:16.348966+00:00",
+  "status": "implemented-and-installed-locally-real-provider-acceptance-open",
+  "step11Closed": false,
+  "mainRuntimeUpdated": true,
+  "scope": {
+    "realConnectAccountsModified": false,
+    "realProviderMessages": false,
+    "realPairing": false,
+    "productionDeployment": false,
+    "identity": "synthetic-users-and-companies-in-disposable-PostgreSQL",
+    "provider": "synthetic-loopback-Connect-and-OIDC",
+    "sdk": "installed-0.12.0-rc.2-real-SDK-and-compiled-domain-services-with-synthetic-provider",
+    "previousSdkCheckpoint": "installed-0.11.0-real-services-and-encrypted-store"
+  },
+  "catalog": {
+    "version": 7,
+    "functions": 32,
+    "keys": [
+      "whatsapp.read",
+      "whatsapp.send",
+      "whatsapp.manage"
+    ],
+    "realAssignmentsChanged": false
+  },
+  "http": {
+    "checkedAt": "2026-11-09T11:34:32.744Z",
+    "database": "step11_qa_1794224060340",
+    "realSdk": true,
+    "connectProvider": "synthetic-loopback",
+    "realAccounts": false,
+    "realProviderMessages": false,
+    "checks": [
+      "real-sdk-session-authentication-and-installation-scope-safe-qr-archives-conversations-and-50-message-pagination",
+      "explicit-independent-grants-whole-company-sector-access-origin-and-strict-payload-boundaries",
+      "stable-actor-bound-provider-idempotency-original-acknowledgement-no-inferred-delivery-and-conflicting-payload-rejected",
+      "real-sdk-request-deadline-bounds-hung-provider-after-commit-and-same-key-recovery-does-not-requeue",
+      "lost-provider-response-after-queue-commit-explicit-same-command-recovery-no-duplicate-and-provider-uncertain-state-retained",
+      "current-central-revocation-and-transient-or-malformed-provider-failures-deny-request-without-destroying-valid-sdk-session",
+      "explicit-connect-disconnect-and-reconnect-use-existing-provider-state-machine-and-preserve-archive",
+      "mutations-audited-without-message-content-phone-token-or-command-key",
+      "definitive-connect-access-revocation-invalidates-sdk-session-and-does-not-silently-restore-it"
+    ]
+  },
+  "browser": {
+    "checkedAt": "2026-11-09T11:35:48.273Z",
+    "database": "step11_qa_1794224060340",
+    "realSdk": true,
+    "connectProvider": "synthetic-loopback",
+    "realAccounts": false,
+    "realProviderMessages": false,
+    "checks": [
+      "actual-sdk-bff-page-qr-for-admin-conversations-safe-plain-text-and-older-message-pagination",
+      "read-only-tablet-profile-does-not-fetch-or-render-qr-connection-actions-or-send-controls-and-has-no-horizontal-overflow",
+      "explicit-disconnection-confirmation-and-reconnection-use-server-state-and-preserve-conversations",
+      "lost-http-response-after-real-bff-queue-commit-freezes-message-and-recovers-identical-actor-bound-command-after-mobile-reload-once",
+      "provider-uncertain-status-remains-visible-with-no-automatic-resend-and-central-revocation-clears-conversation-data"
+    ],
+    "screenshots": [
+      "whatsapp-desktop.png",
+      "whatsapp-reader-tablet.png",
+      "whatsapp-recovery-mobile.png",
+      "whatsapp-header-mobile.png"
+    ]
+  },
+  "validation": {
+    "jest": {
+      "passed": true,
+      "suites": 59,
+      "tests": 356,
+      "snapshots": 1,
+      "evidence": ".local/step11/unit.log"
+    },
+    "lint": true,
+    "hostApiBuild": true,
+    "hostAdminBuild": true,
+    "hostPublicBuild": true,
+    "composeConfigurationValid": true,
+    "gitDiffCheck": true,
+    "dockerCandidateRequiresBuild": true
+  },
+  "testedHostArtifacts": {
+    "api": {
+      "files": 278,
+      "digest": "d1147a2a70b10959a9f07f8a1882fa00508fb0dcefa901ab469d163d6fd6d823"
+    },
+    "admin": {
+      "files": 20,
+      "digest": "7325acb6a491f2162bdd1b89d7c2d186c2ad149c9893eb711186a17b35d0eed6"
+    },
+    "booking": {
+      "files": 17,
+      "digest": "c9dd9e4b2e427bc7fb813cb298f94fb6a18264763aeaac94b477ccdb302c9a0f"
+    }
+  },
+  "sourceChecksums": {
+    "apps/api/src/common/whatsapp-contract.ts": "87daa2791351e7cb41bec10576531f82aee6d22178cdf10aa2238a627801e303",
+    "apps/api/src/common/function-catalog.ts": "83d61c85dd406b02f7c33486a549ac395a34d17ecfc53a05c9b370b88f297f15",
+    "apps/api/src/common/function-catalog.spec.ts": "0529d3c6a7857e4efc038e30db2e6669b87c9e0dcc677ce749c6ea43e96dd838",
+    "apps/api/src/common/__snapshots__/function-catalog.spec.ts.snap": "2e9f091651c43dc4c8bb93a80c3bdf682e8ea82a7e0cde7498d3a199cf82b6e5",
+    "apps/api/src/common/operation-catalog.ts": "bb9785d86554d0b1da166542381ebae79169d71fcf76663c091e7b6a33e97664",
+    "apps/api/src/app.module.ts": "4bd97182102255945e840f9289cd3799fb1678c35a7b3d459c9977bc19f760a9",
+    "apps/web-admin/src/app/admin.routes.ts": "319932105931afb2f37a41c12a392349ee6131655fc050047a8958ea432fdd24",
+    "apps/web-admin/src/app/admin-app.component.ts": "6cc65dee67c4aeadb3c10aebfd8bcf50856ac38625363902c8eb64122db074d6",
+    "apps/web-admin/src/app/core/whatsapp-api.service.ts": "a0813f4e4318e9486aa2eed77b30e80ed9939c3f6118e89fd149ce2e2abcc237",
+    "apps/api/src/modules/locations/operational-scope.spec.ts": "6bc93d90c959179deb98124198372702d101643d1451a166523f4833c470560b",
+    "tsconfig.base.json": "f3f46e906195018a9b37cadacdfd055fdcde2c84a90ddd68d0bd044b49889c3a",
+    "docker-compose.yml": "44e9133f65805f05d9ad2254f17350ae311da67573a31bd3117da6acc192a560",
+    "apps/api/src/modules/whatsapp/whatsapp.controller.ts": "b83f626d40f5300f04ce4c588073d69149e25af7a4a8c2d9bc46fc8263219c93",
+    "apps/api/src/modules/whatsapp/whatsapp.dto.ts": "de9630fdf076a99ec19ee5a50c678e8807166765895b3434be4b36650d53eece",
+    "apps/api/src/modules/whatsapp/whatsapp.module.ts": "91204a4091944e8c5c410eec1f2f37ae892f5a9069ade7b10202b2cef88150fd",
+    "apps/api/src/modules/whatsapp/whatsapp.service.ts": "824a936ef373778c5ab50a3b578d7c8127e791c305cd43fda9cfe13fe27157db",
+    "apps/web-admin/src/app/pages/whatsapp.component.css": "9042a6e222d30baff90d086b81402ccded771efec16cfe2195235bfd56c5cbbc",
+    "apps/web-admin/src/app/pages/whatsapp.component.html": "bf57409c1f89ec62b07b79c314660237644e4767b7134b0ace0724b14c0aa0eb",
+    "apps/web-admin/src/app/pages/whatsapp.component.ts": "278b9c96652bafb64d97cdd4684baf3b3c1a5d4d09569a8721adbcf1a1c4276c"
+  },
+  "verificationScriptChecksums": {
+    "scripts/whatsapp-qa-server.cjs": "864137a40ae6a8c6c65c45f76f6baaeeb78c7635b822469a51084b54f52acda9",
+    "scripts/verify-whatsapp-http.mjs": "1438a2c036f90299ef447910141aae6b1f7ece9f177d318eb9e7041ca934e7ab",
+    "scripts/verify-whatsapp-browser.cjs": "a5432df8ed33544a24f0ee2cb53c538bd84a0308b2e747795ae5f75e91a7bfa5"
+  },
+  "remaining": [
+    "Controlled public HTTPS webhook origin and real provider/device acceptance remain unverified",
+    "Physical devices, commercial acceptance and production remain separate",
+    "Account work remains deferred by user instruction"
+  ],
+  "mainRuntime": {
+    "checkedAt": "2026-11-11T11:52:54.961822+00:00",
+    "status": "passed",
+    "environment": "local Docker only",
+    "mainRuntimeUpdated": true,
+    "candidateImages": {
+      "api": {
+        "name": "api",
+        "tag": "alora-step12-events-candidate-api:20261111",
+        "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+        "files": 344,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      "admin": {
+        "name": "admin",
+        "tag": "alora-step12-events-candidate-admin:20261111",
+        "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+        "files": 20,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      "booking": {
+        "name": "booking",
+        "tag": "alora-step12-events-candidate-booking:20261111",
+        "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+        "files": 17,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      }
+    },
+    "migrationCount": 9,
+    "originalTablesPreserved": 54,
+    "originalColumnsPreserved": 632,
+    "exactDataTablesUnchanged": 53,
+    "technicalStoreRenewal": {
+      "checkedAt": "2026-11-11T11:52:54.636Z",
+      "table": "connect_sdk_records",
+      "recordKind": "configuration",
+      "recordCountUnchanged": true,
+      "plaintextConfigurationUnchanged": true,
+      "changedTopLevelFields": [],
+      "cipherUnchanged": false,
+      "expiresAtUnchanged": false,
+      "namespaceUnchanged": true,
+      "configurationHash": "8e8c244071ba8dda1d2d027db6a6f58d7fe4e063bd90f42dd72015a2c69ce7db",
+      "credentialsExposed": false
+    },
+    "accountsAndSessionsPreserved": true,
+    "contactConsentsInferred": 0,
+    "automationPlansInferred": 0,
+    "domainEventsInferred": 0,
+    "notificationQueueEmptyBeforeRollout": true,
+    "applicationWritersStoppedForBackup": true,
+    "coordinatedDatabaseUploadBackup": true,
+    "databaseBackupReadable": true,
+    "databaseBackupSha256": "51ca3b8dd647f6d0d9bfc8d6541c71af5cb69f4498efc4f207a064dc4db56e0f",
+    "uploadArchiveSha256": "0a729b5b83fbfe824bb5e70fb1a4440e71bdf6fc66351da6319fc50ebf5f5d13",
+    "uploadArchiveUnchanged": true,
+    "configurationUnchanged": true,
+    "environmentVariablesUnchanged": true,
+    "sharedServicesAndConnectContainersUnchanged": true,
+    "staticAssetChecks": [
+      "admin",
+      "booking"
+    ],
+    "anonymousGuardsChecked": 3,
+    "health": {
+      "status": "ok",
+      "timestamp": "2026-11-11T11:52:39.977Z"
+    },
+    "rollbackImages": {
+      "api": "alora-workflow-before-events-api:20261111t115220z",
+      "admin": "alora-workflow-before-events-admin:20261111t115220z",
+      "booking": "alora-workflow-before-events-booking:20261111t115220z"
+    },
+    "realAccountSessionsUsed": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "realProviderAcceptance": false,
+    "evidence": ".local/step12/local-events-rollout-20261111T115220Z/result.json"
+  },
+  "localRecovery": {
+    "reason": "PostgreSQL Redis and Mailhog had exited 255 and API was waiting for database",
+    "existingContainersRestarted": true,
+    "volumesPreserved": true,
+    "dependencyRestartPolicy": "unless-stopped",
+    "scope": "local only; no proof of disk-disaster recovery"
+  },
+  "qaCleanup": {
+    "currentOwnedContainersRemaining": 0,
+    "currentOwnedDatabasesRemaining": 0,
+    "sharedServicesPreserved": true,
+    "backupsAndRollbackImagesRetained": true
+  },
+  "sdk012Compatibility": {
+    "report": "docs/verification/connect-automation-consumer-step-12.json",
+    "http": {
+      "checkedAt": "2026-11-10T04:59:52.799Z",
+      "database": "step11_qa_1794286772765",
+      "realSdk": true,
+      "sdkVersion": "0.12.0-rc.1",
+      "connectProvider": "synthetic-loopback",
+      "realAccounts": false,
+      "realProviderMessages": false,
+      "checks": [
+        "real-sdk-session-authentication-and-installation-scope-safe-qr-archives-conversations-and-50-message-pagination",
+        "explicit-independent-grants-whole-company-sector-access-origin-and-strict-payload-boundaries",
+        "stable-actor-bound-provider-idempotency-original-acknowledgement-no-inferred-delivery-and-conflicting-payload-rejected",
+        "real-sdk-request-deadline-bounds-hung-provider-after-commit-and-same-key-recovery-does-not-requeue",
+        "lost-provider-response-after-queue-commit-explicit-same-command-recovery-no-duplicate-and-provider-uncertain-state-retained",
+        "current-central-revocation-and-transient-or-malformed-provider-failures-deny-request-without-destroying-valid-sdk-session",
+        "explicit-connect-disconnect-and-reconnect-use-existing-provider-state-machine-and-preserve-archive",
+        "mutations-audited-without-message-content-phone-token-or-command-key",
+        "definitive-connect-access-revocation-invalidates-sdk-session-and-does-not-silently-restore-it"
+      ]
+    },
+    "browser": {
+      "checkedAt": "2026-11-10T04:57:11.511Z",
+      "database": "step11_qa_1794286549747",
+      "realSdk": true,
+      "connectProvider": "synthetic-loopback",
+      "realAccounts": false,
+      "realProviderMessages": false,
+      "checks": [
+        "actual-sdk-bff-page-qr-for-admin-conversations-safe-plain-text-and-older-message-pagination",
+        "read-only-tablet-profile-does-not-fetch-or-render-qr-connection-actions-or-send-controls-and-has-no-horizontal-overflow",
+        "explicit-disconnection-confirmation-and-reconnection-use-server-state-and-preserve-conversations",
+        "lost-http-response-after-real-bff-queue-commit-freezes-message-and-recovers-identical-actor-bound-command-after-mobile-reload-once",
+        "provider-uncertain-status-remains-visible-with-no-automatic-resend-and-central-revocation-clears-conversation-data"
+      ],
+      "screenshots": [
+        "whatsapp-desktop.png",
+        "whatsapp-reader-tablet.png",
+        "whatsapp-recovery-mobile.png",
+        "whatsapp-header-mobile.png"
+      ]
+    },
+    "mainRuntimeUpdated": false
+  },
+  "currentVerification": "docs/verification/appointment-automations-workflow-step-12.json",
+  "currentSourceChecksums": {
+    "apps/api/src/common/appointment-automation-policy.ts": "2fa3780e85a81823187b4c798a09893f5e12eef13b754f7206f35ccb09d3fb82",
+    "apps/api/src/modules/notifications/appointment-automation-dispatch.service.ts": "32d2cbe373e0669131c4a9a97fcf4164531ede8f552d081d056bb7e795e6a7c5",
+    "apps/api/src/modules/notifications/appointment-automation-messages.ts": "8b1c36bb38d96042bc5789cdf7b80958649574edeac1cdd0c5a564d362a6bbca",
+    "apps/api/src/modules/notifications/appointment-automation-monitor.controller.ts": "586822411c73241695499cbdd15dcb03b9d3818b7df5a74d05927d076499f9c1",
+    "apps/api/src/modules/notifications/appointment-automation-planner.service.ts": "537822e715e43be923b7eb1b9c79a1a695fe677d9f841a85a0a3780367949714",
+    "apps/api/src/modules/notifications/appointment-automation-policy.controller.ts": "872ed5d46b13dc9d2fe04edffa34cfdee09a2fa55879f8d51700a28ae394142e",
+    "apps/api/src/modules/notifications/appointment-automation-policy.service.ts": "83712d808c0ad090eb3f39dd13055fb0a4cb2e8efa40bfba3cc5968acfe48788",
+    "apps/api/src/modules/notifications/appointment-automation-recovery.service.ts": "5425b809bd44444eebe03f3c6bc6725a37a683c7fa45c8f4be51b9d1795c5664",
+    "apps/api/src/modules/notifications/appointment-automation-staff.service.ts": "db1516098270ae2b4f3f28f80aef5654276a2ff80fa7ef16280155428a96d23d",
+    "apps/api/src/modules/notifications/appointment-automation-state.ts": "e86dd8e324ca0b30ef57cfa9f6c719b3750b8a5eb65e72c37a3a829301f0b5a4",
+    "apps/api/src/modules/notifications/appointment-automations.module.ts": "02e752c2445f7409849df488440bd367b1b5754074caee8511f849b1a5b7221a",
+    "apps/api/src/modules/notifications/appointment-contact.controller.ts": "e0907fcadcfd22e5a38ef6f239bcb88270b76788ebdbbd8102218935c455c851",
+    "apps/api/src/modules/notifications/appointment-contact.service.ts": "74de8e94c9994295e6f8fc6b5d93d8a769afa89cd983cf6cfc30f3a17b6d9bcc",
+    "apps/api/src/modules/notifications/appointment-customer-actions.service.ts": "d71a3aa1c3b8a175134e11fd6bd381567bfb6639a99a5e4e08073b2063500d58",
+    "apps/api/src/modules/notifications/appointment-customer-contract.spec.ts": "635e221ad925cbb1b8d2567cde3ebfc32d47e50fe32bb921aca1e9a6f5c6f14d",
+    "apps/api/src/modules/notifications/appointment-events.ts": "c7a96bcd655314ac34e2c86e1e253987cea92d4d573d2c0484dddc6ca9b4595b",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.spec.ts": "b5392bf72b142dac65652de5f83c511e7604c7134cdc532a5e96af767f5f1540",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.ts": "ae0db3355a5b3baebad505782e995380e5575090f250e2d9786d02dac75594d2",
+    "apps/web-admin/src/app/core/appointment-automation-access-api.service.ts": "7bf3ac15abdadd1f5f1bd7a40a43ebdbac810246c76a987f0982d035e3d2e9f7",
+    "apps/web-admin/src/app/core/appointment-automation-policy-api.service.ts": "f28da7936a49af971495b13cd1f7d1532ebace62beb2b88fa120a69a96480c0c",
+    "apps/web-admin/src/app/shared/appointment-automation-access.component.ts": "e885ade9b2beff33f1ca5e496eb30ca8a4f58cb0c7a4d46b3400e52854ec6178",
+    "apps/web-admin/src/app/shared/appointment-automation-monitor.component.ts": "c50125c1de2b51236dc82b187cc259ad27e9e961de4132806d48483bcb6844cb",
+    "apps/web-admin/src/app/shared/appointment-automation-policy.component.ts": "d0db852edbd1835ae0f97189ceff9d57f06dfbb8df87389d214d95aad4142f0d",
+    "apps/web-admin/src/app/shared/appointment-contact.component.ts": "987829e28a08c9094d0bc347e63b1f42caed50a25489243e77c4b57d26a3b9be",
+    "prisma/migrations/20261110100000_notification_automation_grants/migration.sql": "c7c0dd6afee498ed17d20de6d76eb98d2add9a84712034adbc1fd40f571f5138",
+    "prisma/migrations/20261110101000_notification_automation_webhooks/migration.sql": "461021e5b791323331cc7fec4839835e4a9dfa08ecd02a867b616b5c60d54b69",
+    "prisma/migrations/20261110160000_notification_automation_commands/migration.sql": "2abb5d26e49e7ded368748e02d3296800ee65ce0ab7618922d0a2ed8c4cbc237",
+    "prisma/migrations/20261110200000_automation_queued_state/migration.sql": "1c9c0b5fb4854dcd65897d4ab764ef5b517469110134bf98be0e6eefc32fabd5",
+    "prisma/migrations/20261110201000_appointment_automation_workflow/migration.sql": "6b1829d265990ea0524a97313ae4a52c2d8cac105935428052ebec873b2e70bc",
+    "prisma/migrations/20261111200000_appointment_event_notices/migration.sql": "8fc8a585d22e1d74f60cbf33ab77fa105cf9e2aa1459142e848722888d233924",
+    "prisma/schema.prisma": "23b63a44a20bdba52df5c3c2099b6285d88eca02fe641c6f88e5b327977baa4e"
+  },
+  "previousStatusCheckpoint": {
+    "checkedAt": "2026-11-09T11:36:18.230Z",
+    "status": "in-progress-console-verified-isolated",
+    "step11Closed": false,
+    "mainRuntimeUpdated": false,
+    "remaining": [
+      "operational notification configuration templates and appointment responses through durable Step 12 events",
+      "Connect API/SDK contract for explicit revocable scheduled-message delegation beyond UI token lifetime",
+      "relevant regression and candidate artifact checks and local rollout",
+      "real provider pairing delivery receipt interaction and revocation acceptance",
+      "Steps 12-14 and production/commercial acceptance; Connect account work remains excluded"
+    ],
+    "mainRuntime": {
+      "phase": "Step 10",
+      "healthyApplications": 3,
+      "healthEndpoint": 200,
+      "step11Applied": false
+    }
+  },
+  "evidenceTimeScope": "Detailed preceding test/build/checksum fields retain their original checkpoint dates; current verification is linked separately.",
+  "technicalImplementationComplete": true,
+  "subsequentConnectRuntimeVerification": "docs/verification/connect-runtime-015-local.json",
+  "localConnectRuntimeUpdated": true,
+  "latestRuntimePackagingVerification": "docs/verification/runtime-only-images.json",
+  "currentMainImages": {
+    "barber-api-1": {
+      "imageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-admin-1": {
+      "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-public-booking-1": {
+      "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-api-1": {
+      "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-runner-1": {
+      "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-web-1": {
+      "imageId": "sha256:73df58837c66c998dda4745ff2d4c856c4e824b3507ca1719ffefccbf83d9338",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    }
+  }
+}

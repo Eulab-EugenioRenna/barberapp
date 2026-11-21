@@ -1,4 +1,10 @@
 import {
+  resolveOperationalScope,
+  sectorFilter,
+  collaboratorFilter,
+  saleFilter,
+} from "../modules/locations/operational-scope";
+import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -11,7 +17,10 @@ import {
   requireTenantId,
 } from "./request-session";
 
-import { canUseLocalFunction, requiresOwnAppointmentScope } from "./function-catalog";
+import {
+  canUseLocalFunction,
+  requiresOwnAppointmentScope,
+} from "./function-catalog";
 import { operationDefinition } from "./operation-catalog";
 
 // Unknown handlers are denied even for owners and platform administrators.
@@ -47,7 +56,12 @@ export function authorizeLocalOperation(
   if (definition.kind === "function") {
     const key = user.role === "collaborator" ? definition.own : definition.key;
     if (key && canUseLocalFunction(user, key)) return;
-    if (user.role !== "collaborator" && definition.own && canUseLocalFunction(user, definition.own)) return;
+    if (
+      user.role !== "collaborator" &&
+      definition.own &&
+      canUseLocalFunction(user, definition.own)
+    )
+      return;
   }
   throw new ForbiddenException("Permesso esplicito richiesto");
 }
@@ -67,16 +81,107 @@ export class LocalPolicyGuard implements CanActivate {
     );
     authorizeLocalOperation(session, controller, operation);
     request.localSession = session;
+    const scopedControllers = [
+      "AppointmentsController",
+      "AvailabilityController",
+      "ServicesController",
+      "CollaboratorsController",
+      "SalesController",
+      "DashboardController",
+      "PersonalDashboardController",
+      "LocationsController",
+    ];
+    if (
+      scopedControllers.includes(controller) ||
+      (controller === "CustomersController" && operation === "history") ||
+      (controller === "TenantController" && operation === "getSettings")
+    ) {
+      const scope = await resolveOperationalScope(
+        this.prisma,
+        session,
+        request.headers,
+      );
+      const id = request.params?.id;
+      if (
+        id &&
+        [
+          "AppointmentsController",
+          "ServicesController",
+          "CollaboratorsController",
+          "SalesController",
+        ].includes(controller)
+      ) {
+        const allowed =
+          controller === "AppointmentsController"
+            ? await this.prisma.appointment.count({
+                where: { id, tenantId: scope.tenantId, ...sectorFilter(scope) },
+              })
+            : controller === "ServicesController"
+              ? await this.prisma.service.count({
+                  where: {
+                    id,
+                    tenantId: scope.tenantId,
+                    ...sectorFilter(scope),
+                  },
+                })
+              : controller === "CollaboratorsController"
+                ? await this.prisma.collaborator.count({
+                    where: {
+                      id,
+                      tenantId: scope.tenantId,
+                      ...collaboratorFilter(scope),
+                    },
+                  })
+                : await this.prisma.sale.count({
+                    where: {
+                      id,
+                      tenantId: scope.tenantId,
+                      ...saleFilter(scope),
+                    },
+                  });
+        if (
+          controller === "CollaboratorsController" &&
+          ["update", "remove"].includes(operation) &&
+          (await this.prisma.collaboratorSector.count({
+            where: {
+              collaboratorId: id,
+              sectorId: { notIn: scope.allowedSectorIds },
+            },
+          }))
+        )
+          throw new ForbiddenException(
+            "Il profilo e condiviso con altre sedi: serve accesso a tutte le appartenenze",
+          );
+        if (!allowed)
+          throw new ForbiddenException(
+            "Operazione fuori sede o settore autorizzati",
+          );
+      }
+    }
+
     if (controller === "AppointmentsController" && request.params.id) {
       const definition = operationDefinition(controller, operation)!;
-      const personal = definition.kind === "function" && !!definition.own && requiresOwnAppointmentScope(session.user, definition.key);
-      if (personal && !session.user?.collaboratorId) throw new ForbiddenException("Professionista non associato");
+      const personal =
+        definition.kind === "function" &&
+        !!definition.own &&
+        requiresOwnAppointmentScope(session.user, definition.key);
+      if (personal && !session.user?.collaboratorId)
+        throw new ForbiddenException("Professionista non associato");
       const tenantId = requireTenantId(session);
       const appointment = await this.prisma.appointment.findFirst({
         where: {
           id: request.params.id,
           tenantId,
-          ...(personal ? { collaboratorId: session.user!.collaboratorId!, collaborator: { tenantId, userId: session.user!.id, isActive: true } } : {}),
+          ...(personal
+            ? {
+                collaboratorId: session.user!.collaboratorId!,
+                collaborator: {
+                  tenantId,
+                  userId: session.user!.id,
+                  isActive: true,
+                },
+              }
+            : {}),
         },
         select: { id: true },
       });

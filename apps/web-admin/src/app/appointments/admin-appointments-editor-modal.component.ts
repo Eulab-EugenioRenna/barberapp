@@ -1,3 +1,4 @@
+import { BookingOrderEditorComponent } from "./booking-order-editor.component";
 import {
   Component,
   EventEmitter,
@@ -19,6 +20,7 @@ import { AppointmentsFacade } from "./appointments.facade";
   standalone: true,
   imports: [
     CommonModule,
+    BookingOrderEditorComponent,
     AdminAppointmentsPageComponent,
     QuickCreateDialogComponent,
   ],
@@ -53,6 +55,11 @@ import { AppointmentsFacade } from "./appointments.facade";
         min-height: 0;
         width: 100%;
       }
+      .editor-body > .editor-mode-button {
+        flex: 0 0 auto;
+        width: calc(100% - 2rem);
+        margin: 1rem;
+      }
 
       /*
        * Dentro il modale il form e l'unica card: togliamo il bordo/ombra
@@ -65,10 +72,7 @@ import { AppointmentsFacade } from "./appointments.facade";
         box-shadow: none;
       }
 
-      :host
-        ::ng-deep
-        barber-admin-appointments-page
-        .appointments-list-layout {
+      :host ::ng-deep barber-admin-appointments-page .appointments-list-layout {
         gap: 0;
       }
 
@@ -143,46 +147,147 @@ import { AppointmentsFacade } from "./appointments.facade";
           ×
         </button>
         <div class="editor-body">
-          <barber-admin-appointments-page
-            [formOnly]="true"
-            [appointmentForm]="appointmentsFacade.appointmentForm()"
-            [appointmentCustomerOptions]="
-              appointmentsFacade.appointmentCustomerOptions()
+          <article
+            *ngIf="appointmentsFacade.appointmentUpdateState().kind !== 'empty'"
+            class="editor-mode-button rounded-2xl bg-amber-50 p-4"
+            role="status"
+          >
+            <p>
+              La modifica precedente è ancora da verificare. Recupera lo stesso
+              invio prima di cambiare la prenotazione.
+            </p>
+            <button
+              type="button"
+              class="primary-btn mt-2"
+              [disabled]="
+                appointmentsFacade.loading() ||
+                appointmentsFacade.appointmentUpdateState().kind !== 'pending'
+              "
+              (click)="retryUpdate()"
+            >
+              Verifica spostamento precedente
+            </button>
+          </article>
+          <alora-booking-order-editor
+            *ngIf="
+              wholeBooking &&
+              appointment?.id &&
+              appointmentsFacade.appointmentUpdateState().kind === 'empty'
             "
-            [serviceSelectOptions]="appointmentsFacade.serviceSelectOptions()"
-            [appointmentCollaboratorOptions]="
-              appointmentsFacade.appointmentCollaboratorOptions()
+            [appointmentId]="appointment.id"
+            (back)="openSingleService()"
+            (saved)="onWholeBookingSaved()"
+            (openAccount)="createOrder.emit(appointment); close.emit()"
+          />
+          <button
+            *ngIf="!wholeBooking && appointment?.id"
+            type="button"
+            class="secondary-btn editor-mode-button"
+            [disabled]="
+              appointmentsFacade.appointmentUpdateState().kind !== 'empty'
             "
-            [appointmentSelectedDate]="
-              appointmentsFacade.appointmentSelectedDate()
+            (click)="wholeBooking = true"
+          >
+            Gestisci tutta la prenotazione
+          </button>
+
+          <p
+            *ngIf="appointmentsFacade.feedback()"
+            role="status"
+            class="rounded-2xl bg-amber-50 p-4 mb-4 text-sm text-amber-950"
+          >
+            {{ appointmentsFacade.feedback() }}
+          </p>
+          <div
+            *ngIf="
+              !appointmentsFacade.appointmentForm().id &&
+              appointmentsFacade.creations.state('appointment').kind !== 'empty'
             "
-            [appointmentSlots]="appointmentsFacade.appointmentSlots()"
-            [appointmentSlotOptions]="
-              appointmentsFacade.appointmentSlotOptions()
+            role="status"
+            class="rounded-2xl bg-amber-50 p-4 mb-4 text-sm text-amber-950"
+          >
+            <p>
+              L’invio precedente è ancora da verificare. Recuperane l’esito
+              prima di iniziare una nuova prenotazione.
+            </p>
+            <button
+              type="button"
+              class="primary-btn mt-3"
+              [disabled]="
+                appointmentsFacade.loading() ||
+                appointmentsFacade.creations.state('appointment').kind !==
+                  'pending'
+              "
+              (click)="retryCreation()"
+            >
+              Verifica prenotazione precedente
+            </button>
+          </div>
+          <fieldset
+            *ngIf="!wholeBooking"
+            style="border:0;padding:0;margin:0;min-width:0"
+            [disabled]="
+              appointmentsFacade.appointmentUpdateState().kind !== 'empty' ||
+              (!appointmentsFacade.appointmentForm().id &&
+                appointmentsFacade.creations.state('appointment').kind !==
+                  'empty')
             "
-            [appointmentStatusOptions]="
-              appointmentsFacade.appointmentStatusOptions()
-            "
-            [loading]="appointmentsFacade.loading()"
-            (appointmentValueChange)="
-              appointmentsFacade.setAppointmentValue($event.key, $event.value)
-            "
-            (appointmentCustomerSelect)="
-              appointmentsFacade.selectAppointmentCustomer($event)
-            "
-            (appointmentSelectedDateChange)="
-              appointmentsFacade.setAppointmentSelectedDate($event)
-            "
-            (updateAppointmentSlots)="
-              appointmentsFacade.updateAppointmentSlots()
-            "
-            (quickCreate)="quickCreateKind = $event"
-            (save)="saveAppointment()"
-            (confirmOrder)="confirmOrderFromEditor()"
-            (remove)="removeAppointment()"
-            (cancel)="cancelAppointment()"
-            (reset)="appointmentsFacade.prepareNewAppointment()"
-          ></barber-admin-appointments-page>
+          >
+            <barber-admin-appointments-page
+              [formOnly]="true"
+              [multipleServices]="true"
+              [availabilityLoading]="appointmentsFacade.availabilityLoading()"
+              [additionalServices]="appointmentsFacade.additionalServiceRows()"
+              [additionalServiceOptions]="
+                appointmentsFacade.additionalServiceOptions()
+              "
+              (addService)="appointmentsFacade.addService($event)"
+              (removeService)="appointmentsFacade.removeService($event)"
+              (serviceCollaborator)="
+                appointmentsFacade.setServiceCollaborator(
+                  $event.index,
+                  $event.collaboratorId
+                )
+              "
+              [appointmentForm]="appointmentsFacade.appointmentForm()"
+              [appointmentCustomerOptions]="
+                appointmentsFacade.appointmentCustomerOptions()
+              "
+              [serviceSelectOptions]="appointmentsFacade.serviceSelectOptions()"
+              [appointmentCollaboratorOptions]="
+                appointmentsFacade.appointmentCollaboratorOptions()
+              "
+              [appointmentSelectedDate]="
+                appointmentsFacade.appointmentSelectedDate()
+              "
+              [appointmentSlots]="appointmentsFacade.appointmentSlots()"
+              [appointmentSlotOptions]="
+                appointmentsFacade.appointmentSlotOptions()
+              "
+              [appointmentStatusOptions]="
+                appointmentsFacade.appointmentStatusOptions()
+              "
+              [loading]="appointmentsFacade.loading()"
+              (appointmentValueChange)="
+                appointmentsFacade.setAppointmentValue($event.key, $event.value)
+              "
+              (appointmentCustomerSelect)="
+                appointmentsFacade.selectAppointmentCustomer($event)
+              "
+              (appointmentSelectedDateChange)="
+                appointmentsFacade.setAppointmentSelectedDate($event)
+              "
+              (updateAppointmentSlots)="
+                appointmentsFacade.updateAppointmentSlots()
+              "
+              (quickCreate)="quickCreateKind = $event"
+              (save)="saveAppointment()"
+              (confirmOrder)="confirmOrderFromEditor()"
+              (remove)="removeAppointment()"
+              (cancel)="cancelAppointment()"
+              (reset)="appointmentsFacade.prepareNewAppointment()"
+            ></barber-admin-appointments-page>
+          </fieldset>
         </div>
       </article>
 
@@ -204,6 +309,12 @@ export class AdminAppointmentsEditorModalComponent implements OnInit {
   @Output() createOrder = new EventEmitter<any>();
 
   quickCreateKind: QuickCreateKind | null = null;
+  wholeBooking = false;
+  async onWholeBookingSaved(): Promise<void> {
+    await this.appointmentsFacade.loadViewData();
+    this.saved.emit();
+    this.close.emit();
+  }
 
   async ngOnInit(): Promise<void> {
     if (!this.appointmentsFacade.services().length) {
@@ -215,7 +326,12 @@ export class AdminAppointmentsEditorModalComponent implements OnInit {
     }
 
     if (this.appointment) {
-      this.appointmentsFacade.editAppointment(this.appointment);
+      this.wholeBooking =
+        !!this.appointment.orderItemId && !this.appointment.orderIssue;
+      this.appointmentsFacade.editAppointment(
+        this.appointment,
+        !this.wholeBooking,
+      );
     } else {
       this.appointmentsFacade.prepareNewAppointment();
     }
@@ -225,7 +341,28 @@ export class AdminAppointmentsEditorModalComponent implements OnInit {
     this.appointmentsFacade.selectQuickCreatedEntity(kind, entity);
     this.quickCreateKind = null;
   }
+  openSingleService(): void {
+    this.wholeBooking = false;
+    this.appointmentsFacade.updateAppointmentSlots();
+  }
 
+  async retryCreation(): Promise<void> {
+    try {
+      await this.appointmentsFacade.retryAppointmentCreation();
+      await this.appointmentsFacade.loadViewData();
+      this.saved.emit();
+      this.close.emit();
+    } catch {
+      return;
+    }
+  }
+  async retryUpdate(): Promise<void> {
+    await this.appointmentsFacade.retryAppointmentUpdate();
+    if (this.appointmentsFacade.appointmentUpdateState().kind === "empty") {
+      this.saved.emit();
+      this.close.emit();
+    }
+  }
   async saveAppointment(): Promise<void> {
     const status = this.appointmentsFacade.appointmentForm().status;
     const formId = this.appointmentsFacade.appointmentForm().id;
@@ -273,9 +410,7 @@ export class AdminAppointmentsEditorModalComponent implements OnInit {
       return saved || null;
     }
     return (
-      this.appointmentsFacade
-        .appointments()
-        .find((item) => item.id === id) ||
+      this.appointmentsFacade.appointments().find((item) => item.id === id) ||
       saved ||
       null
     );

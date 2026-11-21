@@ -41,6 +41,7 @@ export interface NotificationEventPayload {
 }
 
 export interface NotificationDispatchTarget {
+  payload?: NotificationEventPayload;
   channel: NotificationChannel;
   providerKey: string;
   recipientType: NotificationRecipientTypeValue;
@@ -62,6 +63,8 @@ export interface NotificationProviderResult {
   ok: boolean;
   providerMessageId?: string;
   error?: string;
+  outcome?: "not_started" | "uncertain";
+  retrySafe?: boolean;
 }
 
 export interface NotificationProvider {

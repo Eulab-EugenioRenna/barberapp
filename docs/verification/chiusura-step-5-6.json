@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-06T18:14:09.366Z",
+  "baseCommit": "637283896e98d66bd50ac992e02973288a0c757a",
+  "delivery": "technical-closure",
+  "steps": {
+    "5": "technically-closed-account-checks-deferred",
+    "6": "technically-closed-account-checks-deferred",
+    "7": "planned-not-implemented"
+  },
+  "userInstruction": "procedi con la chiusura degli step lascia perdere gli account",
+  "checks": [
+    {
+      "command": "npm test -- --runInBand",
+      "exitCode": 0,
+      "suites": 44,
+      "tests": 275,
+      "snapshots": 1
+    },
+    {
+      "command": "npm run lint",
+      "exitCode": 0,
+      "scope": "apps/libs"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "targets": [
+        "api",
+        "admin",
+        "public"
+      ]
+    },
+    {
+      "command": "test -f dist/apps/api/main.js",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "runtime": {
+    "api": "running/healthy",
+    "admin": "running/healthy",
+    "public": "running/healthy",
+    "adminHttpStatus": 200,
+    "publicHttpStatus": 200,
+    "catalogHttpStatus": 200,
+    "catalogVersion": 4,
+    "catalogFunctions": 25
+  },
+  "migrationsAppliedDuringClosure": 0,
+  "accountOperationsDuringClosure": 0,
+  "emailsSentDuringClosure": 0,
+  "liveAccountAcceptance": false,
+  "providerExtendedMfaAcceptance": false,
+  "productionDeployment": false,
+  "productionAcceptance": false,
+  "worktreeChangesCommitted": false,
+  "nextStep": "Sedi e settori",
+  "details": "docs/chiusura-step-5-6.md"
+}

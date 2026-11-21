@@ -1,3 +1,4 @@
+import { operationalCacheKey } from "../modules/locations/operational-scope";
 import { Inject, Injectable } from "@nestjs/common";
 import Redis from "ioredis";
 import { REDIS_CACHE_CLIENT } from "./cache.constants";
@@ -25,6 +26,7 @@ export class AppCacheService {
     ttlSeconds: number,
     loader: () => Promise<T>,
   ): Promise<T> {
+    key = operationalCacheKey(key);
     const cached = await this.get<T>(key);
 
     if (cached !== null) {

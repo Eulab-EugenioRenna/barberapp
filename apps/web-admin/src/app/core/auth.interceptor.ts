@@ -1,3 +1,4 @@
+import { selectedOperationalScope } from "./operational-context.service";
 import { HttpInterceptorFn } from "@angular/common/http";
 import { inject } from "@angular/core";
 import { catchError, switchMap, throwError } from "rxjs";
@@ -8,6 +9,22 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const store = inject(SessionStore);
   const refresh = inject(SessionRefreshService);
   store.syncFromStorage();
+  if (
+    request.url.startsWith(`${ADMIN_API_URL}/`) &&
+    /^\/(inventory|appointments|availability|services|collaborators|sales|dashboard|customers\/[^/]+\/history)(?:[/?]|$)/.test(
+      request.url.slice(ADMIN_API_URL.length),
+    )
+  ) {
+    const scope = selectedOperationalScope(store.currentUser()?.id || "");
+    request = request.clone({
+      setHeaders: {
+        "X-Alora-Location":
+          request.headers.get("X-Alora-Location") ?? scope.locationId,
+        "X-Alora-Sector":
+          request.headers.get("X-Alora-Sector") ?? scope.sectorId,
+      },
+    });
+  }
   if (
     !request.url.startsWith(`${ADMIN_API_URL}/`) ||
     request.headers.has("Authorization") ||

@@ -4,9 +4,25 @@ describe("AvailabilityService", () => {
   it("accounts for service buffers when evaluating conflicts", async () => {
     const service = new AvailabilityService(
       {
+        sector: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: "sector-1",
+            tenantId: "tenant-1",
+            weeklyHours: null,
+            closures: null,
+            location: { weeklyHours: null, closures: null },
+          }),
+        },
+        tenantHoliday: { count: jest.fn().mockResolvedValue(0) },
         service: {
+          aggregate: jest
+            .fn()
+            .mockResolvedValue({
+              _max: { bufferBeforeMinutes: 15, bufferAfterMinutes: 15 },
+            }),
           findFirst: jest.fn().mockResolvedValue({
             id: "service-1",
+            sectorId: "sector-1",
             tenantId: "tenant-1",
             durationMinutes: 30,
             bufferBeforeMinutes: 15,
@@ -46,9 +62,7 @@ describe("AvailabilityService", () => {
         },
         room: { count: jest.fn() },
         tenant: {
-          findUnique: jest
-            .fn()
-            .mockResolvedValue({ timezone: "UTC" }),
+          findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
       } as never,
       {

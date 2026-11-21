@@ -1,3 +1,6 @@
+import { WhatsAppModule } from "./modules/whatsapp/whatsapp.module";
+import { InventoryModule } from "./modules/inventory/inventory.module";
+import { LocationsModule } from "./modules/locations/locations.module";
 import { RequestSessionInterceptor } from "./common/request-session.interceptor";
 import { TeamModule } from "./modules/team/team.module";
 import { AuthAttemptGuard } from "./modules/auth/auth-attempt.guard";
@@ -39,6 +42,8 @@ import { UsersModule } from "./modules/users/users.module";
     TenantModule,
     UsersModule,
     TeamModule,
+    LocationsModule,
+    InventoryModule,
     CollaboratorsModule,
     ServicesModule,
     CustomersModule,
@@ -49,6 +54,7 @@ import { UsersModule } from "./modules/users/users.module";
     DashboardModule,
     AuditModule,
     NotificationsModule,
+    WhatsAppModule,
     PaymentsModule,
     PlatformAdminModule,
     PublicBookingModule,

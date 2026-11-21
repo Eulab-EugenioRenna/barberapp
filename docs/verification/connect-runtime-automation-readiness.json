@@ -1,0 +1,111 @@
+{
+  "checkedAt": "2026-11-11T12:22:52.384826+00:00",
+  "readOnly": true,
+  "status": "local-provider-runtime-compatible-public-webhook-and-device-acceptance-open",
+  "runtimeContractInstalled": true,
+  "publicWebhookOriginConfigured": false,
+  "goalComplete": false,
+  "goalTurnClassification": "progress: explicitly authorized Connect rollout completed and read-only readiness refreshed",
+  "alora": {
+    "installedSdkVersion": "0.12.0-rc.2",
+    "runtimeHealthy": true,
+    "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+    "workflowSourceChecksumDrift": [],
+    "webhookOrigins": {
+      "ALORA_CONNECT_WEBHOOK_ORIGIN": {
+        "configured": false
+      },
+      "PUBLIC_APP_URL": {
+        "configured": true,
+        "https": false,
+        "loopback": true,
+        "defaultHttpsPort": false
+      }
+    }
+  },
+  "connect": {
+    "apiImageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+    "runnerImageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+    "apiStartedAt": "2026-11-11T12:20:37.853982166Z",
+    "runnerStartedAt": "2026-11-11T12:20:37.854554458Z",
+    "openApi": {
+      "healthStatus": 200,
+      "service": "eulab-connect",
+      "capacityVerified": false,
+      "openapiStatus": 200,
+      "pathCount": 127,
+      "automationPaths": [
+        "/v1/installations/{installationId}/automations/delegations",
+        "/v1/installations/{installationId}/automations/delegations/by-key/{key}",
+        "/v1/installations/{installationId}/automations/delegations/{id}",
+        "/v1/installations/{installationId}/automations/delegations/{id}/verify",
+        "/v1/installations/{installationId}/automations/delegations/{id}/messages",
+        "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}",
+        "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}/withdraw",
+        "/v1/installations/{installationId}/automations/webhooks",
+        "/v1/installations/{installationId}/automations/webhooks/by-key/{key}"
+      ],
+      "manualMessagesRoutePresent": true
+    },
+    "apiBundle": {
+      "sha256": "a52607ed573c1b1ec6de68817a274ad57789a7315751554b04d48e8793e7609f",
+      "bytes": 373709,
+      "markers": {
+        "v1/installations/:installationId/automations": true,
+        "messages/by-key/:key/withdraw": true,
+        "automation_delegations": true,
+        "AutomationController": true
+      }
+    },
+    "runnerBundle": {
+      "sha256": "aa46f2b71904df6520f6b047e6060b0b507398b5e90e08c1ace3738e8003f657",
+      "bytes": 87310,
+      "markers": {
+        "automation_delegations": true,
+        "delegation_id": true,
+        "effect_started": true
+      }
+    },
+    "schema015DelegationsTableExists": true,
+    "inspectedDatabaseMatchesApiDatabase": true,
+    "containersUnchangedDuringReadOnlyAudit": true
+  },
+  "requiredNextExternalState": [
+    "A controlled HTTPS application origin is provided and the signed webhook is registered through the existing SDK flow",
+    "A controlled business WhatsApp number, licensed capabilities and explicitly authorized test recipient are supplied for device acceptance"
+  ],
+  "excluded": [
+    "No account creation, login, password reset, role change or modification",
+    "No Connect deployment, migration or code edit by this audit",
+    "No webhook registration, QR pairing or real provider message",
+    "No public tunnel, DNS/TLS change or production deployment"
+  ],
+  "acceptance": [
+    "Current API OpenAPI must expose the automation delegation, message status, withdrawal and webhook recovery paths",
+    "Schema 015 and runner must be the compatible release; an SDK tarball alone is insufficient runtime evidence",
+    "Real device must demonstrate one original send, callback correlation, action state transition and receipt without duplicate send",
+    "Revocation and pending withdrawal require real provider outcome evidence; acquired effects cannot be reported cancelled"
+  ],
+  "evidenceSources": [
+    "evolve.md sections 8, 13 and 14",
+    "docs/connect-sdk-integration-contract.md",
+    "/Users/eugeniorenna/eulab connect/packages/sdk/AUTOMATIONS.md",
+    "docs/verification/appointment-automations-workflow-step-12.json"
+  ],
+  "installationOriginLookup": {
+    "checkedAt": "2026-11-11T12:28:23.195043+00:00",
+    "source": "enabled Connect installations scoped to ALORA configured app ID",
+    "readOnly": true,
+    "origins": [
+      {
+        "scheme": "http",
+        "hostname": "127.0.0.1",
+        "port": 53020,
+        "basePath": "",
+        "loopback": true
+      }
+    ],
+    "publicHttpsOrigins": 0,
+    "accountOperations": false
+  }
+}

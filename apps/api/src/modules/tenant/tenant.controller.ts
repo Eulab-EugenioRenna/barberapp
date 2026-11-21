@@ -1,4 +1,8 @@
 import {
+  resolveOperationalScope,
+  collaboratorFilter,
+} from "../locations/operational-scope";
+import {
   BadRequestException,
   Body,
   Controller,
@@ -82,6 +86,11 @@ export class TenantController {
     );
 
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
 
     return this.cacheService.getOrSet(
       cacheKeys.tenantSettings(tenantId),
@@ -91,7 +100,7 @@ export class TenantController {
           where: { id: tenantId },
           include: {
             collaborators: {
-              where: { isActive: true },
+              where: { isActive: true, ...collaboratorFilter(scope) },
               orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
               select: {
                 id: true,

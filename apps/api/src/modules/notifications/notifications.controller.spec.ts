@@ -5,6 +5,7 @@ import { NotificationsController } from "./notifications.controller";
 jest.mock("../../common/request-session", () => ({
   resolveRequestSession: jest.fn().mockResolvedValue({
     tenantId: "tenant-1",
+    operationalScope: { tenantId: "tenant-1", sectorIds: ["sector-1"], allowedSectorIds: ["sector-1"], locationIds: ["location-1"], cacheKey: "fixture" },
     user: {
       id: "user-1",
       tenantId: "tenant-1",
@@ -51,12 +52,12 @@ describe("NotificationsController", () => {
     });
     expect(
       notificationsService.listAppointmentsAwaitingOrder,
-    ).toHaveBeenCalledWith("tenant-1", expect.any(Date));
+    ).toHaveBeenCalledWith("tenant-1", expect.any(Date), ["sector-1"]);
   });
 
   it("delegates unread count to the service", async () => {
     const controller = new NotificationsController(
-      {} as never,
+      { sector: { count: jest.fn().mockResolvedValue(1) } } as never,
       {
         unreadCount: jest.fn().mockResolvedValue({ unreadCount: 4 }),
       } as never,

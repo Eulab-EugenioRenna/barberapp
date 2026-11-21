@@ -1,3 +1,7 @@
+import {
+  resolveOperationalScope,
+  requireServiceScope,
+} from "../locations/operational-scope";
 import { Controller, Get, Query, Req } from "@nestjs/common";
 import {
   requireTenantId,
@@ -26,6 +30,12 @@ export class AvailabilityController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    await requireServiceScope(this.prisma, scope, serviceId);
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { timezone: true },

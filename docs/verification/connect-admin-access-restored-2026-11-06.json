@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-06T17:45:59.843Z",
+  "authorizedEmailRestoredAsConnectAdmin": true,
+  "centralRole": "eulab-admin",
+  "providerSubjectPreserved": true,
+  "currentPasswordCredentialUnchanged": true,
+  "temporaryCollaboratorRemovedFromAlora": true,
+  "temporaryApplicationMappingsAndMembershipRemoved": true,
+  "temporaryRoleRemoved": true,
+  "identityRetainedPermanentlyAsAdmin": true,
+  "previousSessionsRevokedByProvider": true,
+  "originalBootstrapAdminRetained": true,
+  "noResetEmailSent": true,
+  "userLoginStillToConfirm": true,
+  "preExistingProviderIdentityTablesReconciled": 6,
+  "preExistingProviderIdentityDataMatchesBaseline": true,
+  "evidenceScope": "historical-restoration-attempt-only",
+  "currentAccountAcceptance": false,
+  "followup": {
+    "lastObservedAt": "2026-11-06T18:06:56.578Z",
+    "adminRoleNotObserved": true,
+    "investigationDeferredByUser": true,
+    "noAdditionalAccountMutationDuringTechnicalClosure": true
+  }
+}

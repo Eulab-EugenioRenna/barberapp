@@ -1,0 +1,314 @@
+{
+  "checkedAt": "2026-11-10T15:13:47.363237+00:00",
+  "status": "rc2-withdrawal-and-durable-original-command-recovery-verified-reminder-workflow-incomplete",
+  "step12Closed": false,
+  "goalComplete": false,
+  "mainRuntimeUpdated": false,
+  "sdk": {
+    "version": "0.12.0-rc.2",
+    "archive": "vendor/eulab-connect-0.12.0-rc.2.tgz",
+    "sha256": "a76152931bf69b41d77aef679de1a623a607679cc0441b2d1e2016bf94acc44d",
+    "installedOffline": true,
+    "published": false,
+    "previousCandidateRetained": true
+  },
+  "withdrawalHttp": {
+    "checkedAt": "2026-11-10T15:11:54.721Z",
+    "sdkVersion": "0.12.0-rc.2",
+    "database": "step11_qa_1794323409040",
+    "realSdk": true,
+    "realPostgresql": true,
+    "connectTransport": "synthetic-loopback",
+    "providerLockEngineVerifiedByConsumer": false,
+    "freshRecoveryProcess": true,
+    "realAccounts": false,
+    "realMessages": false,
+    "checks": [
+      "queued-command-withdrawn-with-original-key-id-and-encrypted-payload-durable-receipt-and-no-send-on-replay",
+      "concurrent-preventive-withdrawals-create-one-original-command-and-outbox-tombstone-canonical-input-replay-and-different-payload-or-grant-conflicts",
+      "all-acquired-and-terminal-states-return-typed-current-outcome-without-falsely-declaring-cancellation",
+      "revoked-expired-and-currently-denied-grant-still-allows-withdrawal-and-receipt-ownership-without-authorizing-new-send",
+      "lost-withdrawal-ack-retains-durable-pending-request-and-fresh-session-free-process-recovers-same-command-without-any-send",
+      "consumer-concurrency-before-provider-commit-and-late-queued-ack-keeps-cancelled-receipt-with-original-identity",
+      "malformed-positive-withdrawal-pair-never-completes-local-request-and-is-reconciled-from-persisted-original",
+      "SQL-fences-freeze-command-and-terminal-receipt-retain-activity-owned-history-and-allow-only-complete-tenant-cascade-no-payload-in-audit"
+    ]
+  },
+  "grantRegression": {
+    "checkedAt": "2026-11-10T15:03:07.902Z",
+    "database": "step11_qa_1794322855172",
+    "sdkVersion": "0.12.0-rc.2",
+    "realSdk": true,
+    "provider": "synthetic-loopback",
+    "realAccounts": false,
+    "realProviderMessages": false,
+    "checks": [
+      "two-concurrent-create-commands-and-replays-share-one-remote-grant-with-encrypted-server-credential-and-safe-public-projection",
+      "strict-payload-current-function-origin-whole-company-author-and-tenant-boundaries-and-SQL-immutable-identity",
+      "lost-grant-ack-recovers-original-frozen-request-and-credential-and-malformed-actor-cannot-be-persisted-as-authorized",
+      "session-free-worker-keeps-same-domain-key-across-timeout-retry-and-replacement-grant-and-recovers-uncertain-receipt-without-requeue",
+      "current-central-denial-expiry-malformed-positive-local-user-suspension-and-sector-revocation-fail-closed-before-send",
+      "email-and-application-notification-use-distinct-function-scoped-grants-and-cannot-authorize-a-WhatsApp-send",
+      "lost-revoke-response-stops-local-sends-immediately-and-reconciles-repeatably-while-original-receipts-remain-readable",
+      "revoke-during-unknown-create-stays-pending-until-late-provider-commit-is-found-persisted-and-revoked",
+      "expired-and-invalidated-UI-session-does-not-power-worker-SDK-calls-and-no-credential-or-message-content-is-in-public-output-or-audit"
+    ]
+  },
+  "webhookRegression": {
+    "checkedAt": "2026-11-10T15:03:05.625Z",
+    "database": "step11_qa_1794322855172",
+    "sdkVersion": "0.12.0-rc.2",
+    "realSdk": true,
+    "realDatabase": true,
+    "provider": "synthetic-loopback",
+    "publicWebhookDelivery": false,
+    "realAccounts": false,
+    "realMessages": false,
+    "customerActionsApplied": false,
+    "checks": [
+      "whole-company-personal-author-origin-strict-input-concurrent-registration-and-encrypted-stable-recovery",
+      "lost-provider-ack-keeps-preparing-receipt-and-recovers-same-endpoint-without-rotating-secret",
+      "signature-over-original-bytes-no-browser-ingress-expiry-json-and-installation-validation-before-durable-storage",
+      "durable-encrypted-minimal-interactive-receipt-concurrent-dedup-conflict-detection-sql-immutability-no-booking-or-money-effect",
+      "outgoing-ambiguous-addressing-connect-timestamps-and-noninteractive-events-ignored-without-payload-normal-api-size-limit-and-uncompressed-signature-boundary",
+      "central-disabled-endpoint-recovery-never-reenables-and-subsequent-events-close-with-visible-reason"
+    ]
+  },
+  "manualCompatibilityHttp": {
+    "checkedAt": "2026-11-10T15:10:27.099Z",
+    "database": "step11_qa_1794323409040",
+    "realSdk": true,
+    "sdkVersion": "0.12.0-rc.2",
+    "connectProvider": "synthetic-loopback",
+    "realAccounts": false,
+    "realProviderMessages": false,
+    "checks": [
+      "real-sdk-session-authentication-and-installation-scope-safe-qr-archives-conversations-and-50-message-pagination",
+      "explicit-independent-grants-whole-company-sector-access-origin-and-strict-payload-boundaries",
+      "stable-actor-bound-provider-idempotency-original-acknowledgement-no-inferred-delivery-and-conflicting-payload-rejected",
+      "real-sdk-request-deadline-bounds-hung-provider-after-commit-and-same-key-recovery-does-not-requeue",
+      "lost-provider-response-after-queue-commit-explicit-same-command-recovery-no-duplicate-and-provider-uncertain-state-retained",
+      "current-central-revocation-and-transient-or-malformed-provider-failures-deny-request-without-destroying-valid-sdk-session",
+      "explicit-connect-disconnect-and-reconnect-use-existing-provider-state-machine-and-preserve-archive",
+      "mutations-audited-without-message-content-phone-token-or-command-key",
+      "definitive-connect-access-revocation-invalidates-sdk-session-and-does-not-silently-restore-it"
+    ]
+  },
+  "validation": {
+    "suites": 61,
+    "tests": 381,
+    "snapshots": 1,
+    "lintPassed": true,
+    "hostBuilds": [
+      "api",
+      "admin",
+      "public"
+    ],
+    "logsRoot": ".local/step12/sdk-012-rc2/",
+    "browserRerun": false,
+    "browserScope": "No UI changes. Fresh host admin/public bundles match prior verified image artifacts byte for byte."
+  },
+  "migration": {
+    "checkedAt": "2026-11-10T15:07:09.211Z",
+    "sourceDatabaseModified": false,
+    "backupReadable": true,
+    "restoredAndReapplied": true,
+    "originalTablesUnchanged": 45,
+    "originalColumnsUnchanged": 504,
+    "noInferredEventsOrDeliveries": true,
+    "draftPoliciesCreated": 0,
+    "automationGrantsCreated": 0,
+    "automationWebhooksCreated": 0,
+    "automationWebhookEventsCreated": 0,
+    "automationCommandsCreated": 0,
+    "policyMigrationApplied": true,
+    "legacyDeliveryStatusesUnchanged": true,
+    "assertions": [
+      "PASS:immutable-and-tenant-consistent-domain-events",
+      "PASS:stable-delivery-identity-immutable-payload-and-cross-tenant-rejection",
+      "PASS:claimed-dispatch-requires-token-and-lease-no-unsafe-retry-and-closed-event-cannot-reopen",
+      "PASS:tenant-cascade-is-coherent-with-preserved-event-history",
+      "PASS:original-automation-command-is-frozen-retained-and-bound-to-grant-tenant",
+      "PASS:webhook-receipt-tenant-boundary-immutability-retention-closed-state-and-complete-tenant-cascade"
+    ],
+    "evidence": ".local/step12/migration-1794323208757/result.json"
+  },
+  "dockerArtifacts": {
+    "checkedAt": "2026-11-10T15:07:13.623100+00:00",
+    "checks": [
+      {
+        "name": "api",
+        "tag": "alora-step12-withdrawal-candidate-api:20261110",
+        "imageId": "sha256:ef8d5ce3dc0c3d8dfc58739329b94f8c96d7ee25c40027c5e155cc31cf7f2a83",
+        "files": 318,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      {
+        "name": "admin",
+        "tag": "alora-step12-withdrawal-candidate-admin:20261110",
+        "imageId": "sha256:44376be59ae4a683d347b3c1742f0b5293af215fa8629d920f6141d53988d4c7",
+        "files": 20,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      {
+        "name": "booking",
+        "tag": "alora-step12-withdrawal-candidate-booking:20261110",
+        "imageId": "sha256:0b06dbef1f5e7caa7f708145d57e334583ad5b11ca4e92fcfd9d5ccd9bb5ea4c",
+        "files": 17,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      }
+    ],
+    "sdkVersion": "0.12.0-rc.2",
+    "mainRuntimeUpdated": false,
+    "builder": "desktop-linux with cache; identical static images reused after fresh bundle comparison",
+    "noCacheBuild": false
+  },
+  "dockerRuntime": {
+    "checkedAt": "2026-11-10T15:07:23.262Z",
+    "imagePrefix": "alora-step12-withdrawal-candidate-",
+    "checks": [
+      "full-candidate-AppModule-starts-with-isolated-Redis-and-empty-PostgreSQL-migrations",
+      "entrypoint-applies-pending-notification-migrations-and-does-not-seed-accounts-tenants-or-sales",
+      "actual-global-guards-deny-anonymous-operational-options-without-an-account-or-Connect-login",
+      "actual-global-guards-deny-anonymous-template-read-preview-and-save-without-seeding-identities",
+      "draft-policy-migration-does-not-create-configuration-or-work-and-real-guards-deny-anonymous-policy-read-save-and-preview",
+      "SDK-012-rc2-three-empty-automation-migrations-current-guards-public-raw-webhook-route-and-ordinary-body-limit",
+      "durable-command-journal-and-withdrawal-recovery-module-start-empty-without-provider-effects",
+      "generated-Linux-Prisma-client-and-native-bcrypt-work-and-QA-server-scripts-are-excluded",
+      "both-candidate-Nginx-images-serve-real-HTML-and-JavaScript-assets-on-the-private-network"
+    ],
+    "identity": "empty disposable database; no auth session created",
+    "networkInternal": true,
+    "hostPortsPublished": false,
+    "realAccounts": false,
+    "realProviders": false,
+    "mainDatabaseModified": false,
+    "mainRuntimeUpdated": false,
+    "evidence": ".local/step12/withdrawal-docker/runtime-1794323232882/result.json"
+  },
+  "restore": {
+    "checkedAt": "2026-11-10T15:07:59.192Z",
+    "checks": [
+      "fresh-database-and-upload-archives-read-without-stopping-or-changing-main-services",
+      "database-restores-before-migration-and-upload-archive-restores-byte-identical-paths-types-modes-and-symlinks",
+      "candidate-normal-entrypoint-applies-six-migrations-with-SDK-012-rc2-and-boots-on-restored-current-data-with-all-original-columns-and-media-preserved",
+      "actual-Step-10-image-boots-on-additively-upgraded-copy-and-serves-restored-media-without-changing-original-data",
+      "cold-restore-from-retained-database-and-media-archives-boots-the-original-Step-10-image-with-unchanged-data",
+      "main-image-identities-health-schema-and-source-uploads-remain-unchanged-and-no-source-write-was-issued"
+    ],
+    "candidateImageId": "sha256:ef8d5ce3dc0c3d8dfc58739329b94f8c96d7ee25c40027c5e155cc31cf7f2a83",
+    "candidateTag": "alora-step12-withdrawal-candidate-api:20261110",
+    "candidateMigrationCount": 6,
+    "rollbackImageId": "sha256:6226d88312684c1c3248a1e60b2667da63332f0230a624aa2802b6baa24f70e7",
+    "originalTablesUnchanged": 45,
+    "originalColumnsUnchanged": 504,
+    "sourceUploadFiles": 0,
+    "syntheticUploadFixtures": 3,
+    "syntheticSymlinkFixtures": 1,
+    "originalMediaArchiveSha256": "0a729b5b83fbfe824bb5e70fb1a4440e71bdf6fc66351da6319fc50ebf5f5d13",
+    "sourceOperationsReadOnly": true,
+    "mainRuntimeUpdated": false,
+    "sourceConfigurationChanged": false,
+    "realAccountSessionsCreated": false,
+    "copiedAccountRowsUnchanged": true,
+    "realProviderMessages": false,
+    "networkInternal": true,
+    "hostPortsPublished": false,
+    "productionDeployment": false,
+    "commercialAcceptance": false,
+    "limits": [
+      "Live source was not quiesced; concurrent database/media point-in-time consistency is not certified",
+      "Source uploads were empty; non-empty media recovery used synthetic files only in isolated volumes",
+      "Binary rollback is verified before any post-upgrade user writes or provider effects",
+      "Redis queues, external Connect configuration/keys, DNS/TLS and production infrastructure recovery are not covered",
+      "No real login, provider delivery or customer acceptance was attempted"
+    ],
+    "evidence": ".local/step14/restore-1794323241746/result.json"
+  },
+  "qaCleanup": [
+    {
+      "checkedAt": "2026-11-10T15:04:24.389Z",
+      "status": "passed",
+      "containerRemoved": true,
+      "databaseRemoved": true
+    },
+    {
+      "checkedAt": "2026-11-10T15:13:46.846Z",
+      "status": "passed",
+      "containerRemoved": true,
+      "databaseRemoved": true
+    }
+  ],
+  "runtimeCleanup": {
+    "checkedAt": "2026-11-10T15:07:24.171Z",
+    "allOwnedContainersRemoved": true,
+    "networkRemoved": true
+  },
+  "restoreCleanup": {
+    "checkedAt": "2026-11-10T15:07:59.760Z",
+    "ownedContainersRemoved": true,
+    "ownedVolumesRemoved": true,
+    "networkRemoved": true
+  },
+  "providerDelivery": {
+    "originalContractDelivered": true,
+    "queuedCancellationContractPending": false,
+    "consumerWithdrawalIntegrated": true,
+    "providerReportedTests": 187,
+    "providerReportedPostgresqlTests": 24,
+    "providerTestsRerunByConsumer": false
+  },
+  "scope": {
+    "realAccountsModified": false,
+    "realConfigurationChanged": false,
+    "connectRepositoryModifiedByConsumer": false,
+    "realMessagesSent": false,
+    "newConsumerMigrationAppliedOnMain": false,
+    "customerActionsApplied": false,
+    "policyActivationAvailable": false,
+    "publicWebhookAccepted": false,
+    "deviceAccepted": false,
+    "realProviderLockEngineVerifiedByConsumer": false
+  },
+  "remaining": [
+    "appointment reminder intent lifecycle and invalidation against authoritative current plan/policy",
+    "explicit per-booking recipient authorization and separate channel delegation gates",
+    "WhatsApp templates and correlated one-use customer confirmation/change-request/cancellation commands",
+    "no-response handling and operational monitoring",
+    "complete local rollout with preserved data",
+    "separate provider/device/public-webhook and ALORA acceptance"
+  ],
+  "sourceChecksums": {
+    "package.json": "c7e04a986df8781e17c43cc052909699d3bdef4720644677f84defcbd345e516",
+    "package-lock.json": "4aa5f81b402c551fc506edbd51ed5ec72917f532607baa0c13e481a7dfd599de",
+    "docker/app.Dockerfile": "c5d3130fb5b4a1bbcc45e59661f4885d69a029a1a6e3555a22b88dbfcb6a41dc",
+    "prisma/schema.prisma": "3fefe22105ab34a8cd2003d027f2ae59b5276cca44a9e501baa7176d0ca0a414",
+    "prisma/migrations/20261110160000_notification_automation_commands/migration.sql": "2abb5d26e49e7ded368748e02d3296800ee65ce0ab7618922d0a2ed8c4cbc237",
+    "apps/api/src/modules/notifications/notification-automation-command-store.service.ts": "b18b95c396e288ddcdf25f6d0c2fcd4a83d3696d91c7151913d543e0b36590ce",
+    "apps/api/src/modules/notifications/notification-automation-grants.service.ts": "1832c5676e100a3ce6c67f600d3306d6eb593390889d21294607262cb8367d88",
+    "apps/api/src/modules/notifications/notification-automation-grants.module.ts": "6168dd6237989197226f960065262f5d51cabb0e706a597560d6d0ef8447766e",
+    "apps/api/src/modules/notifications/notification-automation-withdrawal-recovery.service.ts": "d3cc7d88f61120741119b18b0565402538620b994d050d04ba2ded2052fe1480",
+    "scripts/automation-provider-qa.cjs": "e035ced49c274cd5160662b003f30719de2f4ee3d820f3355d4effaa8bd7f2a5",
+    "scripts/automation-worker-qa.cjs": "a69f8f67c769c6b8456fc17b3c217bdbd2ce3b48cbaf7fa8c433b62eac3a0a58",
+    "scripts/verify-automation-withdrawals-http.mjs": "2a094d5d1ae972f8cf77e9d533f71024b47aaead933afa2b2c3ae87ba8918b16",
+    "scripts/verify-step13-docker-runtime.mjs": "7841c6e9a482d0cbbc29546f9c8abb859cac787a285d20fa1fc5714ff28a1775",
+    "scripts/verify-release-restore.mjs": "03f0aece9fb32dffb7df7989984b22311a43c01be74d873836731cc8c4f346ff",
+    "scripts/verify-notification-outbox-migration.mjs": "fdb91c9dd53190946bf854dd4d9a1227693900e754b9e99fcfc2d51276c638ad",
+    "scripts/verify-notification-outbox-fixtures.sql": "90c5711ae8e43caa7a77be011efbdacd177c911bd250d0401d470befce841884"
+  }
+}

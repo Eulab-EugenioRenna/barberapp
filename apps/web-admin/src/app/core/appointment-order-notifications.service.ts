@@ -1,3 +1,4 @@
+import { selectedOperationalScope } from "./operational-context.service";
 import { firstValueFrom } from "rxjs";
 import { SessionStore } from "./session.store";
 import { SessionRefreshService } from "./session-refresh.service";
@@ -62,9 +63,12 @@ export class AppointmentOrderNotificationsService {
       if (controller.signal.aborted) return;
       token = this.store.token();
       this.activeToken = token;
+      const scope = selectedOperationalScope(this.store.currentUser()?.id || "");
       const response = await fetch(`${ADMIN_API_URL}/notifications/stream`, {
         headers: {
           Accept: "text/event-stream",
+          "X-Alora-Location": scope.locationId,
+          "X-Alora-Sector": scope.sectorId,
           Authorization: `Bearer ${token}`,
         },
         signal: controller.signal,

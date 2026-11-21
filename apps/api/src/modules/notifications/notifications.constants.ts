@@ -18,6 +18,10 @@ export const NOTIFICATION_EVENT_TYPES = {
   appointmentAssigned: "appointment.assigned",
   appointmentReassigned: "appointment.reassigned",
   appointmentCancelled: "appointment.cancelled",
+  appointmentRescheduled: "appointment.rescheduled",
+  appointmentCompleted: "appointment.completed",
+  appointmentNoShow: "appointment.no_show",
+  appointmentCheckedIn: "appointment.checked_in",
 } as const;
 
 export type NotificationEventType =

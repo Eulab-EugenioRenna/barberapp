@@ -1,0 +1,217 @@
+{
+  "checkedAt": "2026-11-09T17:46:37.088596+00:00",
+  "status": "template-editor-verified-isolated-and-candidate-built-main-rollout-pending",
+  "step12Closed": false,
+  "mainRuntimeUpdated": false,
+  "mainRuntime": "Step 10",
+  "scope": {
+    "realAccountsModified": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "templateApis": "actual controllers and disposable PostgreSQL",
+    "whatsappReadsInTemplateBrowser": "synthetic empty responses; no WhatsApp provider acceptance"
+  },
+  "http": {
+    "checkedAt": "2026-11-09T17:43:02.898Z",
+    "database": "step7_http_1794246171205",
+    "realAccounts": false,
+    "realProviderMessages": false,
+    "checks": [
+      "all-eleven-domain-events-have-editable-valid-defaults-and-new-event-preferences-stay-disabled",
+      "preview-uses-operational-example-values-and-shared-renderer-without-event-history-or-delivery",
+      "unknown-placeholders-prototype-paths-malformed-or-unbounded-text-client-context-and-unversioned-writes-are-rejected",
+      "function-grants-whole-activity-membership-and-tenant-isolation-apply-to-read-preview-and-save",
+      "two-concurrent-writers-cannot-overwrite-one-another-and-stale-version-remains-rejected",
+      "saved-template-is-rendered-identically-by-real-booking-outbox-without-dispatch-and-global-editor-ignores-narrower-view-filter-for-fully-authorized-owner"
+    ]
+  },
+  "browser": {
+    "checkedAt": "2026-11-09T17:43:36.084Z",
+    "database": "step7_http_1794246171205",
+    "templateApis": "actual",
+    "whatsappReads": "synthetic-empty",
+    "realAccounts": false,
+    "realProviderMessages": false,
+    "checks": [
+      "real-ui-preview-then-versioned-save-renders-literal-text-without-html-execution-or-message-send",
+      "concurrent-browser-save-conflict-retains-draft-until-explicit-reload-of-current-text",
+      "four-viewport-layouts-and-editing-invalidate-preview-with-visible-server-validation",
+      "function-denied-editor-is-hidden-and-partial-membership-cannot-load-shared-template-text"
+    ],
+    "screenshots": [
+      ".local/step12/templates-screenshots/desktop.png",
+      ".local/step12/templates-screenshots/landscape.png",
+      ".local/step12/templates-screenshots/portrait.png",
+      ".local/step12/templates-screenshots/phone.png"
+    ]
+  },
+  "foundationRegression": {
+    "checkedAt": "2026-11-09T17:44:27.393Z",
+    "database": "step7_http_1794246241598",
+    "identity": "isolated-synthetic-http",
+    "providerCalls": "synthetic-only",
+    "mainDatabaseModified": false,
+    "checks": [
+      "two-service-command-persists-one-account-creation-event-and-complete-safe-snapshot-without-replay-duplicates",
+      "failure-after-acknowledgement-and-event-insert-rolls-back-account-bookings-command-and-event-and-same-key-recovers-once",
+      "single-rescheduling-snapshots-are-immutable-and-notes-only-or-financial-revision-do-not-create-calendar-events",
+      "status-transition-and-whole-account-cancellation-are-transactional-grouped-and-do-not-repeat-unchanged-status",
+      "public-multiple-booking-persists-customer-safe-creation-and-status-events-in-same-transaction-without-exposing-private-account-id",
+      "cashier-execution-is-not-a-new-future-booking-and-deposit-does-not-produce-calendar-events",
+      "redis-outage-does-not-lose-prepared-deliveries-and-restored-queue-rebuilds-with-original-snapshots-and-no-duplicate-history",
+      "failure-after-history-inbox-insert-rolls-back-materialization-and-two-concurrent-transactions-claim-one-event-delivery-set",
+      "two-concurrent-delivery-workers-and-repeated-job-have-one-committed-claim-and-one-provider-call",
+      "ambiguous-provider-result-remains-uncertain-through-recovery-and-repeated-job-without-another-provider-call",
+      "real-killed-dispatch-process-leaves-durable-attempt-and-expired-lease-becomes-uncertain-without-replay",
+      "current-plan-check-rejects-superseded-schedule-before-effect-but-financial-revision-does-not-invalidate-unchanged-calendar",
+      "only-definitive-no-effect-failure-can-retry-after-deadline-using-same-delivery-identity",
+      "changed-recipient-address-or-disabled-provider-cancels-pending-effect-and-never-retargets-original-delivery",
+      "multi-sector-notice-requires-all-account-memberships-and-revocation-hides-history-inbox-and-blocks-pending-email-without-contact-payload-leaks",
+      "generic-notification-endpoint-cannot-forge-an-appointment-confirmation-without-domain-transition",
+      "legacy-external-pending-status-is-not-reinterpreted-as-a-safe-new-send",
+      "shared-webhook-setting-requires-whole-company-operational-scope"
+    ],
+    "fixture": {
+      "serviceId": "675ba89c-ba4a-489e-a64c-726d17374d62",
+      "locationId": "6cdf0a67-93fb-4101-b8b2-2fa43089824d",
+      "sectorId": "7f8f67ad-0556-4f2f-a8ec-716e05112a09",
+      "orderId": "dcbea422-f470-4f44-92a2-37e625a301d2"
+    }
+  },
+  "validation": {
+    "jest": {
+      "suites": 60,
+      "tests": 363,
+      "snapshots": 1,
+      "passed": true,
+      "evidence": ".local/step12/templates-unit.log"
+    },
+    "lint": true,
+    "hostApiBuild": true,
+    "hostAdminBuild": true,
+    "hostPublicBuild": true,
+    "gitDiffCheck": true
+  },
+  "dockerArtifacts": {
+    "checkedAt": "2026-11-09T17:43:54.021307+00:00",
+    "checks": [
+      {
+        "name": "api",
+        "tag": "alora-step12-templates-candidate-api:20261109",
+        "imageId": "sha256:bf3b4736ccbbe40c8ba5873e6e9c26ce8cc9ddcd2d4ef1d4390bea7442697790",
+        "files": 292,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      {
+        "name": "admin",
+        "tag": "alora-step12-templates-candidate-admin:20261109",
+        "imageId": "sha256:ee3e121033252130eeb138a3f28c73a9cd0d10331d300de12c8e90c5e767491f",
+        "files": 20,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      {
+        "name": "booking",
+        "tag": "alora-step12-templates-candidate-booking:20261109",
+        "imageId": "sha256:cde938bff0f74d9f65ff5ad715e54cddb2c37226662224d5954b14f46b15f5ac",
+        "files": 17,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      }
+    ],
+    "mainRuntimeUpdated": false,
+    "builder": "desktop-linux with cache",
+    "noCacheBuild": false
+  },
+  "dockerRuntime": {
+    "checkedAt": "2026-11-09T17:44:07.874Z",
+    "imagePrefix": "alora-step12-templates-candidate-",
+    "checks": [
+      "full-candidate-AppModule-starts-with-isolated-Redis-and-empty-PostgreSQL-migrations",
+      "entrypoint-applies-the-two-pending-notification-migrations-and-does-not-seed-accounts-tenants-or-sales",
+      "actual-global-guards-deny-anonymous-operational-options-without-an-account-or-Connect-login",
+      "actual-global-guards-deny-anonymous-template-read-preview-and-save-without-seeding-identities",
+      "generated-Linux-Prisma-client-and-native-bcrypt-work-and-QA-server-scripts-are-excluded",
+      "both-candidate-Nginx-images-serve-real-HTML-and-JavaScript-assets-on-the-private-network"
+    ],
+    "identity": "empty disposable database; no auth session created",
+    "networkInternal": true,
+    "hostPortsPublished": false,
+    "realAccounts": false,
+    "realProviders": false,
+    "mainDatabaseModified": false,
+    "mainRuntimeUpdated": false,
+    "evidence": ".local/step12/templates-docker/runtime-1794246233610/result.json"
+  },
+  "runtimeCleanup": {
+    "checkedAt": "2026-11-09T17:44:09.362Z",
+    "allOwnedContainersRemoved": true,
+    "networkRemoved": true
+  },
+  "qaCleanup": {
+    "checkedAt": "2026-11-09T17:46:37.088596+00:00",
+    "ownedContainersAbsent": true,
+    "step7HttpAndStep12DatabasesAbsent": true
+  },
+  "mainDatabase": {
+    "notificationDomainEventAbsent": true,
+    "migration20261109Count": 0
+  },
+  "behavior": {
+    "events": 11,
+    "newEventDefaultsDisabled": [
+      "appointment.rescheduled",
+      "appointment.completed",
+      "appointment.no_show",
+      "appointment.checked_in"
+    ],
+    "templateChangesDoNotEnableDelivery": true,
+    "materializedMessagesUnchangedByEdits": true,
+    "atomicMonotonicVersionCheck": true,
+    "contextIsSyntheticAndNotClientSupplied": true
+  },
+  "remaining": [
+    "Connect background delegation contract and integration",
+    "durable reminder policies and scheduling",
+    "signed and correlated customer responses",
+    "automation configuration and WhatsApp templates",
+    "data-preserving main local rollout",
+    "Step 14 commercial and provider/device acceptance"
+  ],
+  "sourceChecksums": {
+    "apps/api/src/modules/notifications/notification-template-editor.ts": "401217ecea28887b671ff4c0b2bd1d934e090cd7c4e1a14722b74253d83f14ea",
+    "apps/api/src/modules/notifications/notifications.templates.ts": "bacaeb8815d8084a573e03fdc22e3eaf50c1c7460722333dcb938ecef02a829d",
+    "apps/api/src/modules/notifications/notifications.constants.ts": "11c400634080c04bac0b36cfab9eb7546280276bef6981f1d34be068b02c3796",
+    "apps/api/src/modules/notifications/notifications.utils.ts": "202b88188c490ad9cb93632fd3a22c3bc56d337397ff6580364f0eef53561683",
+    "apps/api/src/modules/notifications/notifications.service.ts": "68f42fc0f2b67a956d52a03e674dc246378510f0a0b44c3ee0f37357892d280a",
+    "apps/api/src/modules/notifications/notifications.controller.ts": "46979b524547c7df2c66247bf3c8871682e1217773c82e82a8b79af4c106d096",
+    "apps/api/src/common/operation-catalog.ts": "db4c6af732832c2454e0b46df95efb2b349e0b68dc312e1626ade57d768d28d2",
+    "apps/web-admin/src/app/core/notification-templates-api.service.ts": "62a9e086e74a89cd7e7db50ec8d4f13fe4362d98f8d700d4835a71e006318e50",
+    "apps/web-admin/src/app/shared/notification-template-editor.component.ts": "b410b9f609a172bf30c26ffe23d34039870bb1950c552e8973941ef29120c08b",
+    "apps/web-admin/src/app/pages/whatsapp.component.ts": "aa05c8ff897eced1e453729dac81c9d4e14ea03daa80ac07f5112895139f4179",
+    "apps/web-admin/src/app/pages/whatsapp.component.html": "169e2c423b6389fbe72d10a6ca4346477ff2bd2e356aff2498501b42f0fa7aec",
+    "scripts/verify-notification-templates-http.mjs": "5877620b3e44e119d46e3f3cd317196d88403b196f80fe6deca199dcc2741510",
+    "scripts/verify-notification-templates-browser.cjs": "325cc09f7c43be3c49dd8bbebbbed6308ef7f0adedb389e26f38433afbf2abfa",
+    "scripts/verify-step13-docker-runtime.mjs": "cb39d00fe9b74d580f3d6ee8b6374e386f8b00105ba39c188ee0de61aa86f637",
+    "scripts/locations-qa-server.cjs": "66f088f7b47f944f2dfd39704ca2e76f5b5fabcc2ff804f5e64a88a132ecf578"
+  },
+  "subsequentPolicyCheckpoint": {
+    "checkedAt": "2026-11-09T20:35:57.155719+00:00",
+    "report": "docs/verification/appointment-policy-step-12.json",
+    "note": "Earlier artifact evidence remains its own tested snapshot; the new policy is in separate candidate images.",
+    "mainRuntimeUpdated": false
+  }
+}

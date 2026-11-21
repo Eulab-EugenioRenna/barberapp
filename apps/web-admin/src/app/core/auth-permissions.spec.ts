@@ -59,6 +59,20 @@ describe("function-based route access", () => {
     expect(await visit("collaborator",["dashboard.revenue.read"],"/dashboard")).toBe("/my-agenda");
     expect(await visit("manager",[],"/my-agenda")).toBe("/access-unavailable");
   });
+  it("admits personal security without operational grants and preserves platform separation", async () => {
+    expect(await visit("collaborator", [], "/account")).toBe(true);
+    expect(await visit("manager", [], "/account")).toBe(true);
+    expect(await visit("reception", [], "/account")).toBe(true);
+    expect(await visit("owner", [], "/account")).toBe(true);
+    expect(await visit("platform_admin", [], "/account")).toBe("/platform");
+  });
+  it("never admits a technical impersonation session to personal security", async () => {
+    const user = { role: "owner", technicalAccess: true };
+    providers.set(SessionStore, { isAuthenticated:()=>true, setCurrentUser:jest.fn(), clear:jest.fn() });
+    providers.set(AuthApiService, { me:()=>of(user) });
+    providers.set(Router, { createUrlTree:(paths:string[])=>paths[0] });
+    expect(await authGuard({} as ActivatedRouteSnapshot, { url:"/account" } as RouterStateSnapshot)).toBe("/access-unavailable");
+  });
   it("keeps the session on a temporary provider failure and offers a retry without a redirect loop", async()=>{
     const clear=jest.fn(),remember=jest.fn(),me=jest.fn(()=>throwError(()=>({status:503})));
     providers.set(SessionStore,{isAuthenticated:()=>true,clear,rememberRequestedUrl:remember});

@@ -1,0 +1,242 @@
+{
+  "checkedAt": "2026-11-09T20:35:57.155719+00:00",
+  "status": "draft-policy-and-timing-preview-verified-isolated-candidate-built-main-rollout-pending",
+  "step12Closed": false,
+  "mainRuntimeUpdated": false,
+  "mainRuntime": "Step 10",
+  "scope": {
+    "realAccountsModified": false,
+    "realProviderMessages": false,
+    "policyApi": "actual controllers and PostgreSQL",
+    "whatsappReadsInBrowser": "synthetic empty responses; not provider acceptance",
+    "policyActivationImplemented": false,
+    "durableReminderLifecycleImplemented": false,
+    "customerResponsesImplemented": false
+  },
+  "http": {
+    "checkedAt": "2026-11-09T18:01:17.497Z",
+    "database": "step7_http_1794247248685",
+    "realAccounts": false,
+    "realProviderMessages": false,
+    "checks": [
+      "migration-and-policy-read-create-no-policy-historical-event-booking-delivery-or-account",
+      "concurrent-first-save-and-stale-updates-have-one-atomic-version-winner-and-no-activation-field",
+      "current-function-membership-and-tenant-checks-cover-policy-read-write-preview-and-database-rejects-cross-tenant-authorship-or-skipped-revision",
+      "preview-reuses-live-location-and-sector-openings-closures-and-tenant-timezone-without-persisting-a-schedule",
+      "invalid-nonexistent-or-ambiguous-local-times-and-unavailable-sectors-are-rejected-without-guessing-a-clock-offset",
+      "saving-and-previewing-policy-leave-notification-domain-history-bookings-sales-and-accounts-unchanged"
+    ]
+  },
+  "browser": {
+    "checkedAt": "2026-11-09T20:30:18.594Z",
+    "database": "step7_http_1794247248685",
+    "policyApis": "actual",
+    "whatsappReads": "synthetic-empty",
+    "realAccounts": false,
+    "realProviderMessages": false,
+    "checks": [
+      "real-policy-ui-saves-and-restores-draft-across-reload-without-activation-or-outbound-message",
+      "second-browser-conflict-retains-draft-and-only-explicit-reload-replaces-it-with-current-version",
+      "live-calendar-preview-is-usable-in-four-viewports-and-editing-invalidates-it-with-response-controls-matching-the-policy",
+      "current-function-and-whole-activity-membership-restrict-policy-UI-and-no-provider-account-or-booking-mutations-occur"
+    ],
+    "screenshots": [
+      ".local/step12/policy-screenshots/desktop.png",
+      ".local/step12/policy-screenshots/landscape.png",
+      ".local/step12/policy-screenshots/portrait.png",
+      ".local/step12/policy-screenshots/phone.png"
+    ]
+  },
+  "foundationRegression": {
+    "checkedAt": "2026-11-09T20:33:04.338Z",
+    "database": "step7_http_1794256348734",
+    "identity": "isolated-synthetic-http",
+    "providerCalls": "synthetic-only",
+    "mainDatabaseModified": false,
+    "checks": [
+      "two-service-command-persists-one-account-creation-event-and-complete-safe-snapshot-without-replay-duplicates",
+      "failure-after-acknowledgement-and-event-insert-rolls-back-account-bookings-command-and-event-and-same-key-recovers-once",
+      "single-rescheduling-snapshots-are-immutable-and-notes-only-or-financial-revision-do-not-create-calendar-events",
+      "status-transition-and-whole-account-cancellation-are-transactional-grouped-and-do-not-repeat-unchanged-status",
+      "public-multiple-booking-persists-customer-safe-creation-and-status-events-in-same-transaction-without-exposing-private-account-id",
+      "cashier-execution-is-not-a-new-future-booking-and-deposit-does-not-produce-calendar-events",
+      "redis-outage-does-not-lose-prepared-deliveries-and-restored-queue-rebuilds-with-original-snapshots-and-no-duplicate-history",
+      "failure-after-history-inbox-insert-rolls-back-materialization-and-two-concurrent-transactions-claim-one-event-delivery-set",
+      "two-concurrent-delivery-workers-and-repeated-job-have-one-committed-claim-and-one-provider-call",
+      "ambiguous-provider-result-remains-uncertain-through-recovery-and-repeated-job-without-another-provider-call",
+      "real-killed-dispatch-process-leaves-durable-attempt-and-expired-lease-becomes-uncertain-without-replay",
+      "current-plan-check-rejects-superseded-schedule-before-effect-but-financial-revision-does-not-invalidate-unchanged-calendar",
+      "only-definitive-no-effect-failure-can-retry-after-deadline-using-same-delivery-identity",
+      "changed-recipient-address-or-disabled-provider-cancels-pending-effect-and-never-retargets-original-delivery",
+      "multi-sector-notice-requires-all-account-memberships-and-revocation-hides-history-inbox-and-blocks-pending-email-without-contact-payload-leaks",
+      "generic-notification-endpoint-cannot-forge-an-appointment-confirmation-without-domain-transition",
+      "legacy-external-pending-status-is-not-reinterpreted-as-a-safe-new-send",
+      "shared-webhook-setting-requires-whole-company-operational-scope"
+    ],
+    "fixture": {
+      "serviceId": "66195597-b2db-4b05-948c-1bf02fb51667",
+      "locationId": "9b4af275-a1af-461c-b563-bda1c1277980",
+      "sectorId": "08d35796-3c81-47b7-a6d5-68ebf04178a9",
+      "orderId": "af1501e4-7128-4ec2-bcf3-614cf233cbf7"
+    }
+  },
+  "migration": {
+    "checkedAt": "2026-11-09T18:01:39.014Z",
+    "sourceDatabaseModified": false,
+    "backupReadable": true,
+    "restoredAndReapplied": true,
+    "originalTablesUnchanged": 45,
+    "originalColumnsUnchanged": 504,
+    "noInferredEventsOrDeliveries": true,
+    "draftPoliciesCreated": 0,
+    "policyMigrationApplied": true,
+    "legacyDeliveryStatusesUnchanged": true,
+    "assertions": [
+      "PASS:immutable-and-tenant-consistent-domain-events",
+      "PASS:stable-delivery-identity-immutable-payload-and-cross-tenant-rejection",
+      "PASS:claimed-dispatch-requires-token-and-lease-no-unsafe-retry-and-closed-event-cannot-reopen",
+      "PASS:tenant-cascade-is-coherent-with-preserved-event-history"
+    ],
+    "evidence": ".local/step12/migration-1794247277550/result.json"
+  },
+  "validation": {
+    "jest": {
+      "passed": true,
+      "suites": 61,
+      "tests": 381,
+      "snapshots": 1,
+      "evidence": ".local/step12/policy-unit.log"
+    },
+    "timingAndSettingsTests": 18,
+    "lint": true,
+    "hostApiBuild": true,
+    "hostAdminBuild": true,
+    "hostPublicBuild": true,
+    "gitDiffCheck": true
+  },
+  "dockerArtifacts": {
+    "checkedAt": "2026-11-09T20:33:44.170203+00:00",
+    "checks": [
+      {
+        "name": "api",
+        "tag": "alora-step12-policy-candidate-api:20261109",
+        "imageId": "sha256:3488cb78726090c86d75d3b9bef4742230fc52a3a2643199902a4ef4800f6dad",
+        "files": 300,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      {
+        "name": "admin",
+        "tag": "alora-step12-policy-candidate-admin:20261109",
+        "imageId": "sha256:c2543271eea1317c47b1f9c349610b9f7dd076740b492e19bcda5c3836c7b2fc",
+        "files": 20,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      {
+        "name": "booking",
+        "tag": "alora-step12-policy-candidate-booking:20261109",
+        "imageId": "sha256:4c06bf96dd6582c713deffb02fe506a947662ddc0b1a0099ef1a0be691620c7a",
+        "files": 17,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      }
+    ],
+    "mainRuntimeUpdated": false,
+    "builder": "desktop-linux with cache",
+    "noCacheBuild": false
+  },
+  "dockerRuntime": {
+    "checkedAt": "2026-11-09T20:33:31.862Z",
+    "imagePrefix": "alora-step12-policy-candidate-",
+    "checks": [
+      "full-candidate-AppModule-starts-with-isolated-Redis-and-empty-PostgreSQL-migrations",
+      "entrypoint-applies-pending-notification-migrations-and-does-not-seed-accounts-tenants-or-sales",
+      "actual-global-guards-deny-anonymous-operational-options-without-an-account-or-Connect-login",
+      "actual-global-guards-deny-anonymous-template-read-preview-and-save-without-seeding-identities",
+      "draft-policy-migration-does-not-create-configuration-or-work-and-real-guards-deny-anonymous-policy-read-save-and-preview",
+      "generated-Linux-Prisma-client-and-native-bcrypt-work-and-QA-server-scripts-are-excluded",
+      "both-candidate-Nginx-images-serve-real-HTML-and-JavaScript-assets-on-the-private-network"
+    ],
+    "identity": "empty disposable database; no auth session created",
+    "networkInternal": true,
+    "hostPortsPublished": false,
+    "realAccounts": false,
+    "realProviders": false,
+    "mainDatabaseModified": false,
+    "mainRuntimeUpdated": false,
+    "evidence": ".local/step12/policy-docker/runtime-1794256401724/result.json"
+  },
+  "runtimeCleanup": {
+    "checkedAt": "2026-11-09T20:33:32.793Z",
+    "allOwnedContainersRemoved": true,
+    "networkRemoved": true
+  },
+  "qaCleanup": {
+    "checkedAt": "2026-11-09T20:35:57.155719+00:00",
+    "ownedContainersAbsent": true,
+    "step7HttpAndStep12DatabasesAbsent": true
+  },
+  "mainDatabase": {
+    "policyAbsent": true,
+    "notificationDomainEventAbsent": true,
+    "migration20261109Count": 0
+  },
+  "policy": {
+    "status": "draft",
+    "activationAvailable": false,
+    "atomicRevisionCheck": true,
+    "actorBoundToTenant": true,
+    "noProviderOrExistingPreferenceChanges": true,
+    "previewPersistsNoEventOrBooking": true,
+    "configurationReadCreatesNoRow": true
+  },
+  "remaining": [
+    "Connect-owned background delegation API/SDK integration with current grants and license checks",
+    "policy activation and durable reminder intents bound to authoritative booking plans",
+    "supersession and cancellation of pending intents on plan/policy/contact changes",
+    "WhatsApp delivery and outcome reconciliation",
+    "signed deduplicated customer responses and no-response actions",
+    "local rollout and Step 14 acceptance"
+  ],
+  "sourceChecksums": {
+    "apps/api/src/common/appointment-automation-policy.ts": "6f8ebd1c7e64c015d1ca224cf659dfabae6857a6d6c9a7a3a4b3828401da92a3",
+    "apps/api/src/modules/notifications/appointment-automation-policy.controller.ts": "98b7f5cc292ef7e65936dc36c3ce9ce166108abd2036578def7c0e2f459964da",
+    "apps/api/src/modules/notifications/appointment-automation-policy.service.ts": "e6e68bacf5afa4cace9206d16a92f163cfb324ce1b6b651468e95b8ea2512070",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.ts": "ae0db3355a5b3baebad505782e995380e5575090f250e2d9786d02dac75594d2",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.spec.ts": "b5392bf72b142dac65652de5f83c511e7604c7134cdc532a5e96af767f5f1540",
+    "apps/api/src/modules/notifications/notifications.module.ts": "31aacbc435be14c9dfc79a422ed67b41ba1d8719672e9565e9092a70a970ead5",
+    "apps/api/src/common/operation-catalog.ts": "2f20b252dc7e5a108e8e12619f1c03d15c1e6744764fbc20bcd347ecd56828a2",
+    "apps/web-admin/src/app/core/appointment-automation-policy-api.service.ts": "f9f1fd3d745f180dc19c713d0846f10d90da982b4edd509bcdf9a44638af2cfc",
+    "apps/web-admin/src/app/shared/appointment-automation-policy.component.ts": "80820b3f8f7d734bda80ea35b8cb0aaeeead45d039f5fc864ea13eea2e019740",
+    "apps/web-admin/src/app/pages/whatsapp.component.ts": "44c4e48962c95c6f4b2b8f5a97dfc02184a142eb1321b084baffdb19d59866bf",
+    "apps/web-admin/src/app/pages/whatsapp.component.html": "7b82fe9bc5f84250766ef8aafdb0f319efec27598186565aa6b16f649a55d66d",
+    "tsconfig.base.json": "571ee63ff5d358d5ebbbb28ea615360a5f6408e589ce25deea33d770078c30df",
+    "prisma/schema.prisma": "25c476df7166b109c53b3e02f7b73e9ac913599e264572a1945d952a952ac072",
+    "prisma/migrations/20261109180000_appointment_automation_policy/migration.sql": "0a65e991cc1cfbab445912f198d909c6113c8b9f7acf024549dd2e8606088505",
+    "scripts/verify-automation-policy-http.mjs": "36f093da1f315a0afd2387c6f4c945549fbf15a58b534ca137fe7499929a7b2f",
+    "scripts/verify-automation-policy-browser.cjs": "b39cb7bb2f4d5294f81e19694ee01d772f91e2fb215c18f028468db2fb8e0125",
+    "scripts/verify-notification-outbox-migration.mjs": "2a5e76bd99fc1462600e18406f9312d89018b2c5adaee369ac046482f4de8744",
+    "scripts/verify-step13-docker-runtime.mjs": "2bb91c5cc948bb246e9fc0f3c2d3cea2e117afc3f5d08a99525ed043f6b248e3",
+    "scripts/locations-qa-server.cjs": "293b441c37f649472516d029d261a39f93f3e5b8f38fa9256ece5192e3a30ccf"
+  },
+  "restoreRehearsal": {
+    "checkedAt": "2026-11-09T20:49:30.931Z",
+    "report": "docs/verification/release-restore-step-14.json",
+    "currentDataCopyPreserved": true,
+    "binaryAndColdRollbackVerified": true,
+    "mainRuntimeUpdated": false
+  }
+}

@@ -2,9 +2,11 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NotificationChannel } from "@prisma/client";
 import { createTransport } from "nodemailer";
+import { isEmail } from "class-validator";
 import {
   NotificationEventPayload,
   NotificationProvider,
+  NotificationProviderResult,
 } from "./notifications.types";
 import { NOTIFICATION_PROVIDER_KEYS } from "./notifications.constants";
 
@@ -33,15 +35,22 @@ export class EmailNotificationProvider implements NotificationProvider {
   async send(input: {
     historyId: string;
     target: { recipientEmail?: string; subject?: string; message: string };
-  }): Promise<{ ok: boolean; providerMessageId?: string; error?: string }> {
-    if (!input.target.recipientEmail) {
-      return { ok: false, error: "Recipient email is missing" };
+  }): Promise<NotificationProviderResult> {
+    if (!input.target.recipientEmail || !isEmail(input.target.recipientEmail)) {
+      return {
+        ok: false,
+        outcome: "not_started",
+        error: "Recipient email is missing",
+      };
     }
 
     const transporter = createTransport({
       host: this.configService.get<string>("SMTP_HOST"),
       port: Number(this.configService.get<string>("SMTP_PORT") ?? 1025),
       secure: false,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
       auth: this.configService.get<string>("SMTP_USER")
         ? {
             user: this.configService.get<string>("SMTP_USER"),
@@ -50,21 +59,39 @@ export class EmailNotificationProvider implements NotificationProvider {
         : undefined,
     });
 
-    const info = await transporter.sendMail({
-      from: `${this.configService.get<string>("SMTP_FROM_NAME") ?? "ALORA by EULAB"} <${this.configService.get<string>("SMTP_FROM_EMAIL") ?? "no-reply@barber.test"}>`,
-      to: input.target.recipientEmail,
-      subject: input.target.subject ?? "Notifica ALORA by EULAB",
-      text: input.target.message,
-      html: `<p>${input.target.message}</p>`,
-      headers: {
-        "x-notification-history-id": input.historyId,
-      },
-    });
+    try {
+      const info = await transporter.sendMail({
+        from: `${this.configService.get<string>("SMTP_FROM_NAME") ?? "ALORA by EULAB"} <${this.configService.get<string>("SMTP_FROM_EMAIL") ?? "no-reply@barber.test"}>`,
+        to: input.target.recipientEmail,
+        subject: input.target.subject ?? "Notifica ALORA by EULAB",
+        text: input.target.message,
+        headers: {
+          "x-notification-history-id": input.historyId,
+        },
+      });
 
-    return {
-      ok: true,
-      providerMessageId: info.messageId,
-    };
+      if (!info.accepted.length)
+        return {
+          ok: false,
+          outcome: "not_started",
+          error: "Recipient was not accepted",
+        };
+      return { ok: true, providerMessageId: info.messageId };
+    } catch (error) {
+      const failure = error as { code?: string; syscall?: string };
+      const notStarted =
+        failure.syscall === "connect" ||
+        ["EAUTH", "EENVELOPE", "EDNS"].includes(failure.code || "");
+      return {
+        ok: false,
+        outcome: notStarted ? "not_started" : "uncertain",
+        retrySafe:
+          notStarted &&
+          failure.code !== "EAUTH" &&
+          failure.code !== "EENVELOPE",
+        error: "SMTP outcome requires verification",
+      };
+    }
   }
 }
 
@@ -80,9 +107,13 @@ export class WebhookNotificationProvider implements NotificationProvider {
     historyId: string;
     target: { recipientWebhookUrl?: string };
     payload: NotificationEventPayload;
-  }): Promise<{ ok: boolean; providerMessageId?: string; error?: string }> {
+  }): Promise<NotificationProviderResult> {
     if (!input.target.recipientWebhookUrl) {
-      return { ok: false, error: "Webhook URL is missing" };
+      return {
+        ok: false,
+        outcome: "not_started",
+        error: "Webhook URL is missing",
+      };
     }
 
     const controller = new AbortController();
@@ -108,6 +139,7 @@ export class WebhookNotificationProvider implements NotificationProvider {
       if (!response.ok) {
         return {
           ok: false,
+          outcome: "uncertain",
           error: `Webhook returned ${response.status}`,
         };
       }
@@ -116,11 +148,11 @@ export class WebhookNotificationProvider implements NotificationProvider {
         ok: true,
         providerMessageId: response.headers.get("x-request-id") ?? undefined,
       };
-    } catch (error) {
+    } catch {
       return {
         ok: false,
-        error:
-          error instanceof Error ? error.message : "Webhook request failed",
+        outcome: "uncertain",
+        error: "Webhook outcome requires verification",
       };
     } finally {
       clearTimeout(timeout);

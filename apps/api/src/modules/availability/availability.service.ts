@@ -1,3 +1,18 @@
+import type { Prisma } from "@prisma/client";
+export type AvailabilityCalendar = Pick<
+  Prisma.TransactionClient,
+  | "service"
+  | "room"
+  | "tenant"
+  | "sector"
+  | "tenantHoliday"
+  | "appointment"
+  | "collaborator"
+  | "collaboratorWeeklySchedule"
+  | "collaboratorDayOverride"
+>;
+import { roomFits } from "../orders/resource-allocation";
+import { sectorWorkingWindow } from "../locations/operational-hours";
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { CACHE_TTL_SECONDS, cacheKeys } from "../../cache/cache.constants";
 import { normalizeCacheToken } from "../../cache/cache.helpers";
@@ -12,6 +27,7 @@ export type AvailabilitySlot = {
   collaboratorId: string | null;
   collaboratorName: string;
   isWorkingSlot?: boolean;
+  roomId?: string;
 };
 
 @Injectable()
@@ -55,7 +71,7 @@ export class AvailabilityService {
         dateToken,
         collaboratorToken,
       ) +
-        `:${options?.publicOnly ? "public" : "internal"}:${options?.requireExplicitCollaborator ? "explicit" : "auto"}`,
+        `:scope7:${options?.publicOnly ? "public" : "internal"}:${options?.requireExplicitCollaborator ? "explicit" : "auto"}`,
       CACHE_TTL_SECONDS.publicAvailability,
       () =>
         this.buildAvailability(
@@ -76,25 +92,48 @@ export class AvailabilityService {
     options?: {
       requireExplicitCollaborator?: boolean;
       publicOnly?: boolean;
+      excludeAppointmentIds?: string[];
+      durationMilliseconds?: number;
     },
+    client: AvailabilityCalendar = this.prisma,
   ): Promise<AvailabilitySlot[]> {
-    const service = await this.prisma.service.findFirst({
-      where: { id: serviceId, tenantId, isActive: true },
+    const service = await client.service.findFirst({
+      where: {
+        id: serviceId,
+        tenantId,
+        isActive: true,
+        ...(options?.publicOnly
+          ? { isPublic: true, isBookableOnline: true }
+          : {}),
+        sector: {
+          isActive: true,
+          location: {
+            isActive: true,
+            ...(options?.publicOnly ? { isPublic: true } : {}),
+          },
+          ...(options?.publicOnly ? { isPublic: true } : {}),
+        },
+      },
     });
 
     if (!service) {
       throw new BadRequestException("Il servizio scelto non è disponibile");
     }
+    const duration =
+      options?.durationMilliseconds ?? service.durationMinutes * 60000;
+    if (!Number.isInteger(duration) || duration < 1000 || duration > 86400000)
+      throw new BadRequestException("Durata della prenotazione non valida");
 
     if (options?.requireExplicitCollaborator && service.requiresCollaborator) {
       if (!collaboratorId) {
         return [];
       }
 
-      const collaboratorExists = await this.prisma.collaborator.count({
+      const collaboratorExists = await client.collaborator.count({
         where: {
           tenantId,
           id: collaboratorId,
+          sectors: { some: { sectorId: service.sectorId } },
           isActive: true,
           ...(options?.publicOnly ? { isPublic: true } : {}),
         },
@@ -106,20 +145,37 @@ export class AvailabilityService {
       }
     }
 
-    const roomCount = service.requiresRoom
-      ? await this.prisma.room.count({ where: { tenantId, isActive: true } })
-      : 0;
+    const rooms = service.requiresRoom
+      ? await client.room.findMany({
+          where: {
+            tenantId,
+            sectorId: service.sectorId,
+            isActive: true,
+            ...(options?.publicOnly ? { isPublic: true } : {}),
+          },
+          orderBy: { id: "asc" },
+          select: { id: true, capacity: true },
+        })
+      : [];
+    const roomCount = rooms.reduce((sum, room) => sum + room.capacity, 0);
 
     if (service.requiresRoom && roomCount === 0) {
       return [];
     }
 
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await client.tenant.findUnique({
       where: { id: tenantId },
       select: { timezone: true },
     });
     const timezone = tenant?.timezone || "Europe/Rome";
     const dateKey = resolveZonedDateKey(dateInput, timezone);
+    const businessWindow = await sectorWorkingWindow(
+      client,
+      service.sectorId,
+      dateKey,
+      options?.publicOnly,
+    );
+    if (!businessWindow) return [];
     const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
     if (!dateMatch) {
       throw new BadRequestException("La data scelta non è valida");
@@ -142,14 +198,32 @@ export class AvailabilityService {
       timezone,
     );
     const endOfDay = new Date(nextDayStart.getTime() - 1);
-    const appointments = await this.prisma.appointment.findMany({
+    const buffers = await client.service.aggregate({
+      where: { tenantId },
+      _max: { bufferBeforeMinutes: true, bufferAfterMinutes: true },
+    });
+    const conflictStart = new Date(
+      dayStart.getTime() -
+        (service.bufferBeforeMinutes + (buffers._max.bufferAfterMinutes || 0)) *
+          60000,
+    );
+    const conflictEnd = new Date(
+      endOfDay.getTime() +
+        (service.bufferAfterMinutes + (buffers._max.bufferBeforeMinutes || 0)) *
+          60000,
+    );
+    const appointments = await client.appointment.findMany({
       where: {
         tenantId,
-        startsAt: { lte: endOfDay },
-        endsAt: { gte: dayStart },
+        startsAt: { lte: conflictEnd },
+        endsAt: { gte: conflictStart },
         status: { notIn: ["cancelled", "no_show"] },
+        ...(options?.excludeAppointmentIds?.length
+          ? { id: { notIn: options.excludeAppointmentIds } }
+          : {}),
       },
       select: {
+        sectorId: true,
         collaboratorId: true,
         roomId: true,
         startsAt: true,
@@ -165,9 +239,10 @@ export class AvailabilityService {
     });
 
     const availableCollaborators = service.requiresCollaborator
-      ? await this.prisma.collaborator.findMany({
+      ? await client.collaborator.findMany({
           where: {
             tenantId,
+            sectors: { some: { sectorId: service.sectorId } },
             isActive: true,
             ...(options?.publicOnly ? { isPublic: true } : {}),
             ...(collaboratorId ? { id: collaboratorId } : {}),
@@ -205,16 +280,24 @@ export class AvailabilityService {
           tenantId,
           collaborator.id,
           localDay,
+          client,
         ),
       );
     }
 
-    for (let hour = 9; hour < 19; hour += 1) {
+    for (
+      let hour = Math.floor(businessWindow.startMinutes / 60);
+      hour <= Math.floor(businessWindow.endMinutes / 60);
+      hour += 1
+    ) {
       for (const minute of [0, 30]) {
         const slotStartMinutes = hour * 60 + minute;
-        const slotEndMinutes = slotStartMinutes + service.durationMinutes;
+        const slotEndMinutes = slotStartMinutes + duration / 60000;
 
-        if (slotEndMinutes > 19 * 60) {
+        if (
+          slotStartMinutes < businessWindow.startMinutes ||
+          slotEndMinutes > businessWindow.endMinutes
+        ) {
           continue;
         }
 
@@ -222,9 +305,7 @@ export class AvailabilityService {
           { year, month, day: dayOfMonth, hour, minute },
           timezone,
         );
-        const endsAt = new Date(
-          startsAt.getTime() + service.durationMinutes * 60000,
-        );
+        const endsAt = new Date(startsAt.getTime() + duration);
 
         const slotBlockedStart = new Date(
           startsAt.getTime() - service.bufferBeforeMinutes * 60000,
@@ -296,17 +377,45 @@ export class AvailabilityService {
             );
           });
 
-          const roomConflicts = overlappingAppointments.filter(
-            (appointment) =>
-              appointment.roomId || appointment.service.requiresRoom,
-          ).length;
-
-          if (service.requiresRoom && roomConflicts >= roomCount) {
+          // An unassigned historical room cannot be silently treated as free.
+          if (
+            service.requiresRoom &&
+            overlappingAppointments.some(
+              (appointment) =>
+                appointment.sectorId === service.sectorId &&
+                appointment.service.requiresRoom &&
+                !appointment.roomId,
+            )
+          )
             continue;
-          }
+          const roomReservations = overlappingAppointments.map(
+            (appointment) => ({
+              start:
+                appointment.startsAt.getTime() -
+                appointment.service.bufferBeforeMinutes * 60000,
+              end:
+                appointment.endsAt.getTime() +
+                appointment.service.bufferAfterMinutes * 60000,
+              collaboratorId: appointment.collaboratorId,
+              roomId: appointment.roomId,
+            }),
+          );
+          const room = rooms.find((room) =>
+            roomFits(
+              {
+                start: slotBlockedStart.getTime(),
+                end: slotBlockedEnd.getTime(),
+              },
+              room.id,
+              room.capacity,
+              roomReservations,
+            ),
+          );
+          if (service.requiresRoom && !room) continue;
 
           slots.push({
             startsAt: startsAt.toISOString(),
+            ...(room ? { roomId: room.id } : {}),
             label: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
             collaboratorId: service.requiresCollaborator
               ? collaborator.id

@@ -167,6 +167,13 @@ export class AdminFacade {
     this.loadedPages.customers = 1;
   }
 
+  async refreshRevenueReport(filters: Record<string, string>): Promise<void> {
+    const requestId = ++this.statsRequestId;
+    this.setRevenueReport(null);
+    const report = await firstValueFrom(this.adminApi.loadRevenueReport({ ...filters }));
+    if (requestId === this.statsRequestId) this.setRevenueReport(report);
+  }
+
   async refreshStatsData(
     revenueFilters: Record<string, string> = {},
   ): Promise<void> {
@@ -184,8 +191,8 @@ export class AdminFacade {
     this.revenueMetrics.set(statsResponse.revenue?.metrics || []);
     this.appointmentStats.set(statsResponse.appointmentStats);
     this.dashboardAppointments.set(statsResponse.upcomingAppointments || []);
-    this.collaboratorStats.set(statsResponse.collaboratorStats || []);
-    this.serviceStats.set(statsResponse.serviceStats || []);
+    this.collaboratorStats.set((statsResponse.revenue?.byCollaborator || []).map((row: any) => ({ collaboratorName: row.label, revenue: row.revenue })));
+    this.serviceStats.set((statsResponse.revenue?.byService || []).map((row: any) => ({ serviceName: row.label, revenue: row.revenue, quantity: row.quantity })));
 
     const sales = unwrapPage(statsResponse.sales);
     this.sales.set(sales.items);
@@ -210,6 +217,14 @@ export class AdminFacade {
     this.customers.set(response?.items || []);
     this.customersHasMore.set(Boolean(response?.hasMore));
     this.loadedPages.customers = 1;
+  }
+
+  async reloadProducts(): Promise<void> {
+    const response = await firstValueFrom(this.adminApi.loadProductsPage(1));
+    const products = unwrapPage(response);
+    this.products.set(products.items);
+    this.productsHasMore.set(products.hasMore);
+    this.loadedPages.products = 1;
   }
 
   async loadMoreCustomers(): Promise<void> {

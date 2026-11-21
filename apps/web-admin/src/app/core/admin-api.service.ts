@@ -1,3 +1,5 @@
+import { CreateRecoveryService } from "./create-recovery.service";
+import { defer } from "rxjs";
 import type { PersonalDashboard } from "@barber/shared/personal";
 import { SessionStore } from "./session.store";
 import { HttpClient } from "@angular/common/http";
@@ -8,7 +10,18 @@ import { ADMIN_API_URL } from "./api-config";
 @Injectable({ providedIn: "root" })
 export class AdminApiService {
   private readonly http = inject(HttpClient);
+  private readonly creations = inject(CreateRecoveryService);
   private readonly session = inject(SessionStore);
+
+  bookingAvailability(payload: {
+    date: string;
+    lines: Array<{ serviceId: string; collaboratorId?: string }>;
+  }): Observable<any> {
+    return this.http.post(
+      `${ADMIN_API_URL}/appointments/availability`,
+      payload,
+    );
+  }
 
   private allowed<T>(
     key: string,
@@ -79,16 +92,34 @@ export class AdminApiService {
     });
   }
 
-  loadPersonalDashboard(period: "day" | "week" | "month", date = "", page = 1, collaboratorId = ""): Observable<PersonalDashboard> {
-    if (!(collaboratorId ? this.session.can("appointments.read.all") : this.session.can("appointments.read.own"))) return throwError(() => new Error("Agenda personale non abilitata"));
+  loadPersonalDashboard(
+    period: "day" | "week" | "month",
+    date = "",
+    page = 1,
+    collaboratorId = "",
+  ): Observable<PersonalDashboard> {
+    if (
+      !(collaboratorId
+        ? this.session.can("appointments.read.all")
+        : this.session.can("appointments.read.own"))
+    )
+      return throwError(() => new Error("Agenda personale non abilitata"));
     const query = new URLSearchParams({ period, page: String(page) });
     if (date) query.set("date", date);
     if (collaboratorId) query.set("collaboratorId", collaboratorId);
-    return this.http.get<PersonalDashboard>(`${ADMIN_API_URL}/dashboard/personal?${query}`);
+    return this.http.get<PersonalDashboard>(
+      `${ADMIN_API_URL}/dashboard/personal?${query}`,
+    );
   }
 
-  updatePersonalAppointmentStatus(id: string, status: string): Observable<unknown> {
-    return this.http.post(`${ADMIN_API_URL}/appointments/${encodeURIComponent(id)}/status`, { status });
+  updatePersonalAppointmentStatus(
+    id: string,
+    status: string,
+  ): Observable<unknown> {
+    return this.http.post(
+      `${ADMIN_API_URL}/appointments/${encodeURIComponent(id)}/status`,
+      { status },
+    );
   }
 
   loadAppointments(): Observable<any[]> {
@@ -166,6 +197,12 @@ export class AdminApiService {
     );
   }
 
+  findProductByBarcode(barcode: string): Observable<any> {
+    return this.http.get(`${ADMIN_API_URL}/products/by-barcode`, {
+      params: { barcode },
+    });
+  }
+
   loadCollaboratorsPage(
     page: number,
   ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
@@ -177,6 +214,14 @@ export class AdminApiService {
         ),
       { items: [], total: 0, hasMore: false },
     );
+  }
+
+  loadCollaboratorOptions(): Observable<Array<{
+    id: string; firstName: string; lastName: string; sectors: Array<{ sectorId: string }>;
+  }>> {
+    return this.allowed("collaborators.read", () => this.http.get<Array<{
+      id: string; firstName: string; lastName: string; sectors: Array<{ sectorId: string }>;
+    }>>(`${ADMIN_API_URL}/collaborators/options`), []);
   }
 
   loadShellData(): Observable<Record<string, unknown>> {
@@ -215,16 +260,6 @@ export class AdminApiService {
         () => this.http.get(`${ADMIN_API_URL}/dashboard/appointments`),
         null,
       ),
-      collaboratorStats: this.allowed<any>(
-        "dashboard.revenue.read",
-        () => this.http.get(`${ADMIN_API_URL}/dashboard/collaborators`),
-        null,
-      ),
-      serviceStats: this.allowed<any>(
-        "dashboard.revenue.read",
-        () => this.http.get(`${ADMIN_API_URL}/dashboard/services`),
-        null,
-      ),
       sales: this.loadSalesPage(1),
       products: this.loadProductsPage(1),
     });
@@ -257,14 +292,26 @@ export class AdminApiService {
   }
 
   createAppointment(payload: Record<string, unknown>): Observable<any> {
-    return this.http.post(`${ADMIN_API_URL}/appointments`, payload);
+    return defer(() => this.creations.create("appointment", payload));
   }
 
   updateAppointment(
     id: string,
     payload: Record<string, unknown>,
   ): Observable<any> {
-    return this.http.patch(`${ADMIN_API_URL}/appointments/${id}`, payload);
+    return defer(() => this.creations.updateAppointment(id, payload));
+  }
+  retryAppointmentUpdate(): Observable<any> {
+    return defer(() => this.creations.retry("appointment-update"));
+  }
+  reschedulingAvailability(
+    id: string,
+    payload: Record<string, unknown>,
+  ): Observable<any> {
+    return this.http.post(
+      `${ADMIN_API_URL}/appointments/${encodeURIComponent(id)}/availability`,
+      payload,
+    );
   }
 
   cancelAppointment(
@@ -379,12 +426,26 @@ export class AdminApiService {
     );
   }
 
-  createSale(payload: Record<string, unknown>): Observable<any> {
-    return this.http.post(`${ADMIN_API_URL}/sales`, payload);
+  orderForAppointment(id: string): Observable<any> {
+    return this.http.get(`${ADMIN_API_URL}/sales/for-appointment/${id}`);
   }
 
+  createSale(payload: Record<string, unknown>): Observable<any> {
+    return defer(() => this.creations.create("sale", payload));
+  }
+
+  retrySaleCreation(): Observable<any> {
+    return defer(() => this.creations.retry("sale"));
+  }
+  retryAppointmentCreation(): Observable<any> {
+    return defer(() => this.creations.retry("appointment"));
+  }
   updateSale(id: string, payload: Record<string, unknown>): Observable<any> {
-    return this.http.patch(`${ADMIN_API_URL}/sales/${id}`, payload);
+    return defer(() => this.creations.updateSale(id, payload));
+  }
+
+  retrySaleUpdate(id: string): Observable<any> {
+    return defer(() => this.creations.retry("sale-update", id));
   }
 
   deleteSale(id: string): Observable<any> {

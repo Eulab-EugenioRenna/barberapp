@@ -1,6 +1,13 @@
 import { SessionStore } from "../core/session.store";
 import { CommonModule, DOCUMENT } from "@angular/common";
-import { Component, EventEmitter, HostListener, OnInit, Output, inject } from "@angular/core";
+import {
+  Component,
+  EventEmitter,
+  HostListener,
+  OnInit,
+  Output,
+  inject,
+} from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import { AdminAppointmentsDrawerComponent } from "./admin-appointments-drawer.component";
 import { AdminAppointmentsQuickRescheduleModalComponent } from "./admin-appointments-quick-reschedule-modal.component";
@@ -26,6 +33,27 @@ import {
     QuickCreateDialogComponent,
   ],
   template: `
+    <article
+      *ngIf="appointmentsFacade.appointmentUpdateState().kind !== 'empty'"
+      class="panel rounded-2xl border border-amber-200 bg-amber-50 p-4 mb-3"
+      role="status"
+    >
+      <p>
+        Uno spostamento precedente è ancora da verificare. Recupera lo stesso
+        invio prima di effettuare altre modifiche.
+      </p>
+      <button
+        type="button"
+        class="primary-btn mt-2"
+        [disabled]="
+          appointmentsFacade.loading() ||
+          appointmentsFacade.appointmentUpdateState().kind !== 'pending'
+        "
+        (click)="appointmentsFacade.retryAppointmentUpdate()"
+      >
+        Verifica spostamento precedente
+      </button>
+    </article>
     <section class="appointments-shell">
       <div class="appointments-header panel rounded-[2rem] p-4 md:p-5">
         <div class="appointments-toolbar">
@@ -144,6 +172,18 @@ import {
       <barber-admin-appointments-quick-reschedule-modal
         *ngIf="appointmentsFacade.quickRescheduleState()"
         [appointment]="appointmentsFacade.quickRescheduleAppointment()"
+        [busy]="
+          appointmentsFacade.loading() ||
+          appointmentsFacade.appointmentUpdateState().kind !== 'empty'
+        "
+        [saving]="appointmentsFacade.loading()"
+        [loadingSlots]="appointmentsFacade.quickRescheduleLoading()"
+        [feedback]="appointmentsFacade.feedback()"
+        [pending]="appointmentsFacade.appointmentUpdateState().kind !== 'empty'"
+        [canRecover]="
+          appointmentsFacade.appointmentUpdateState().kind === 'pending'
+        "
+        (retry)="appointmentsFacade.retryAppointmentUpdate()"
         [state]="appointmentsFacade.quickRescheduleState()"
         [collaboratorOptions]="
           appointmentsFacade.quickRescheduleCollaboratorOptions()
@@ -237,7 +277,7 @@ import {
        * Mobile: niente altezze fisse annidate. Il calendario cresce in modo
        * naturale e a scorrere e il contenitore della pagina.
        */
-      @media (max-width: 63.99rem) {
+      @media (max-width: 79.99rem) {
         :host {
           height: auto;
         }
@@ -286,8 +326,11 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
   @HostListener("document:visibilitychange")
   @HostListener("window:online")
   async refreshOnResume(): Promise<void> {
-    if (this.document.hidden || !this.document.defaultView?.navigator.onLine ||
-        this.appointmentsFacade.loading()) {
+    if (
+      this.document.hidden ||
+      !this.document.defaultView?.navigator.onLine ||
+      this.appointmentsFacade.loading()
+    ) {
       return;
     }
     try {
@@ -376,6 +419,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
     appointmentId: string;
     collaboratorId: string;
     startsAt: string;
+    revision?: number;
   }): Promise<void> {
     try {
       await this.appointmentsFacade.moveAppointment(event);
@@ -387,6 +431,12 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
   }
 
   editAppointmentById(appointmentId: string): void {
+    if (this.appointmentsFacade.appointmentUpdateState().kind !== "empty") {
+      this.appointmentsFacade.feedback.set(
+        "Recupera prima lo spostamento precedente",
+      );
+      return;
+    }
     if (!this.session.can("appointments.update.all")) {
       this.openDetails(appointmentId);
       return;
@@ -427,6 +477,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
     targetDate: string;
     suggestedStartsAt: string;
     suggestedCollaboratorId: string;
+    revision?: number;
     sourceView: "week" | "month";
   }): void {
     this.appointmentsFacade.closeDrawer();
@@ -435,6 +486,7 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
       targetDate: event.targetDate,
       startsAt: event.suggestedStartsAt,
       collaboratorId: event.suggestedCollaboratorId,
+      revision: event.revision,
       sourceView: event.sourceView,
     });
   }

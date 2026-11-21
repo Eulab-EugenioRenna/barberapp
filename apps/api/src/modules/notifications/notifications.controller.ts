@@ -1,6 +1,9 @@
+import { resolveOperationalScope } from "../locations/operational-scope";
 import { authorizeLocalOperation } from "../../common/local-policy.guard";
 import {
   Body,
+  BadRequestException,
+  ForbiddenException,
   Controller,
   Get,
   MessageEvent,
@@ -30,6 +33,42 @@ export class NotificationsController {
     private readonly notificationsEventsService: NotificationsEventsService,
   ) {}
 
+  private async readScope(
+    session: import("../../common/request-session").RequestSession,
+    request: { headers: { authorization?: string } },
+  ) {
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const total = await this.prisma.sector.count({
+      where: { tenantId: requireTenantId(session) },
+    });
+    return {
+      sectorIds: scope.sectorIds,
+      fullAccess: scope.sectorIds.length === total,
+    };
+  }
+
+  private async requireTemplateScope(
+    session: import("../../common/request-session").RequestSession,
+    request: { headers: { authorization?: string } },
+  ) {
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const total = await this.prisma.sector.count({
+      where: { tenantId: requireTenantId(session) },
+    });
+    if (scope.allowedSectorIds.length !== total)
+      throw new ForbiddenException(
+        "I template sono condivisi dall’attività: occorre accesso a tutti i settori",
+      );
+  }
+
   @Sse("stream")
   stream(
     @Req() request: { headers: { authorization?: string } },
@@ -42,11 +81,17 @@ export class NotificationsController {
         );
         authorizeLocalOperation(session, "NotificationsController", "stream");
         const tenantId = requireTenantId(session);
+        const scope = await resolveOperationalScope(
+          this.prisma,
+          session,
+          request.headers,
+        );
         const now = new Date();
         const appointments =
           await this.notificationsService.listAppointmentsAwaitingOrder(
             tenantId,
             now,
+            scope.sectorIds,
           );
         return { appointments, now };
       }),
@@ -131,6 +176,13 @@ export class NotificationsController {
       this.prisma,
       request.headers.authorization,
     );
+    if (
+      channel === NotificationChannel.webhook &&
+      !(await this.readScope(session, request)).fullAccess
+    )
+      throw new ForbiddenException(
+        "Il webhook è condiviso dall’attività: occorre accesso a tutti i settori",
+      );
 
     return this.notificationsService.upsertProvider(
       requireTenantId(session),
@@ -169,7 +221,23 @@ export class NotificationsController {
       request.headers.authorization,
     );
 
+    await this.requireTemplateScope(session, request);
     return this.notificationsService.listTemplates(requireTenantId(session));
+  }
+
+  @Post("templates/:eventType/:channel/preview")
+  async previewTemplate(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("eventType") eventType: string,
+    @Param("channel") channel: NotificationChannel,
+    @Body() body: Record<string, unknown>,
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    await this.requireTemplateScope(session, request);
+    return this.notificationsService.previewTemplate(eventType, channel, body);
   }
 
   @Patch("templates/:eventType/:channel")
@@ -184,6 +252,7 @@ export class NotificationsController {
       request.headers.authorization,
     );
 
+    await this.requireTemplateScope(session, request);
     return this.notificationsService.updateTemplate(
       requireTenantId(session),
       eventType,
@@ -203,7 +272,11 @@ export class NotificationsController {
     const tenantId = requireTenantId(session);
     const user = requireUser(session);
 
-    return this.notificationsService.listInbox(tenantId, user.id);
+    return this.notificationsService.listInbox(
+      tenantId,
+      user.id,
+      await this.readScope(session, request),
+    );
   }
 
   @Get("inbox/unread-count")
@@ -217,7 +290,11 @@ export class NotificationsController {
     const tenantId = requireTenantId(session);
     const user = requireUser(session);
 
-    return this.notificationsService.unreadCount(tenantId, user.id);
+    return this.notificationsService.unreadCount(
+      tenantId,
+      user.id,
+      await this.readScope(session, request),
+    );
   }
 
   @Patch("inbox/:id/read")
@@ -258,7 +335,10 @@ export class NotificationsController {
       request.headers.authorization,
     );
 
-    return this.notificationsService.listHistory(requireTenantId(session));
+    return this.notificationsService.listHistory(
+      requireTenantId(session),
+      await this.readScope(session, request),
+    );
   }
 
   @Post("events")
@@ -266,12 +346,39 @@ export class NotificationsController {
     @Req() request: { headers: { authorization?: string } },
     @Body() body: Record<string, unknown>,
   ): Promise<unknown> {
+    if (
+      typeof body["eventType"] === "string" &&
+      body["eventType"].startsWith("appointment.")
+    )
+      throw new BadRequestException(
+        "Le notifiche di appuntamento si generano dall’operazione in agenda",
+      );
     const session = await resolveRequestSession(
       this.prisma,
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
     const user = requireUser(session);
+
+    const scope = await this.readScope(session, request);
+    if (
+      body["entityType"] === "appointment" &&
+      typeof body["entityId"] === "string"
+    ) {
+      if (
+        !(await this.prisma.appointment.count({
+          where: {
+            id: body["entityId"],
+            tenantId,
+            sectorId: { in: scope.sectorIds },
+          },
+        }))
+      )
+        throw new ForbiddenException("Evento fuori sede o settore autorizzati");
+    } else if (!scope.fullAccess)
+      throw new ForbiddenException(
+        "Evento aziendale: occorre accesso a tutti i settori",
+      );
 
     return this.notificationsEventsService.emit({
       eventType: String(body["eventType"] ?? ""),

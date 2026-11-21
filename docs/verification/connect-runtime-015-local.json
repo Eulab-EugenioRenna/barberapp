@@ -1,0 +1,323 @@
+{
+  "checkedAt": "2026-11-11T12:23:39.801730+00:00",
+  "status": "connect-local-runtime-015-installed-provider-device-and-public-webhook-acceptance-open",
+  "authorization": "User explicitly instructed this agent to work directly in ../eulab connect after the read-only readiness finding",
+  "localRuntimeUpdated": true,
+  "unitTests": {
+    "total": 192,
+    "passed": 187,
+    "failed": 0,
+    "reservedForPostgres": 5,
+    "evidence": "backups/automation-runtime-20261111/unit-tests-final.log"
+  },
+  "postgresIsolated": {
+    "passed": 24,
+    "failed": 0,
+    "realMigratorAppliedTwice": true,
+    "evidence": "dist/verification/automations/isolated-run.json"
+  },
+  "packagingRegression": {
+    "beforeFix": "runner image included src/license.ts due to license-name exemption",
+    "reproducedRedTest": true,
+    "fixed": "TypeScript and source map extensions cannot claim the legal-document exemption",
+    "greenTestAndRuntimeChecks": true,
+    "legalDocumentsRetained": true,
+    "filesChanged": [
+      "scripts/prune-runtime-deps.mjs",
+      "tests/runtime-packaging.test.mjs"
+    ]
+  },
+  "sdkVersion": "0.12.0-rc.2",
+  "sdkPackageSha256": "a76152931bf69b41d77aef679de1a623a607679cc0441b2d1e2016bf94acc44d",
+  "aloraUsesIdenticalVendoredPackage": true,
+  "rehearsal": {
+    "checkedAt": "2026-11-11T12:19:14.950488+00:00",
+    "status": "passed",
+    "checks": [
+      "actual-source-backup-restores-on-isolated-tmpfs-PostgreSQL-without-source-writes",
+      "candidate-migrator-applied-twice-preserves-every-original-public-field",
+      "candidate-API-and-runner-boot-health-heartbeat-no-inferred-automations-and-unchanged-business-fields-and-profiles",
+      "previous-API-and-runner-boot-health-heartbeat-no-inferred-automations-and-unchanged-business-fields-and-profiles",
+      "cold-restored-backup-recovers-original-schema-and-every-original-field"
+    ],
+    "sourceBackupReadable": true,
+    "originalTablesPreserved": 45,
+    "originalColumnsPreserved": 337,
+    "newSchemaVersion": "015",
+    "expectedStartupTechnicalFields": [
+      "runners.heartbeat_at",
+      "applications.catalog_checked_at",
+      "applications.catalog_sync_error",
+      "applications.catalog_synced_at"
+    ],
+    "allOriginalFieldsExactBeforeStartup": true,
+    "accountsSessionsAndOutboxPreserved": true,
+    "profileDataAndModesPreserved": true,
+    "emptyProfileRootMtimeMayChangeOnDockerMount": true,
+    "sourceProfileFiles": 0,
+    "realAccountLogin": false,
+    "realProviderMessages": false,
+    "internalNetwork": true,
+    "hostPorts": false,
+    "sourceWrites": false,
+    "binaryRollbackBeforeNewWritesOnly": true,
+    "candidateImages": {
+      "api": {
+        "target": "api",
+        "tag": "connect-automations-candidate-api:20261111",
+        "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+        "artifactSha256": "a52607ed573c1b1ec6de68817a274ad57789a7315751554b04d48e8793e7609f",
+        "exactHostMatch": true,
+        "runtimePackagingAndDependencies": "passed",
+        "chromiumBlankPageVerified": false
+      },
+      "runner": {
+        "target": "runner",
+        "tag": "connect-automations-candidate-runner:20261111",
+        "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+        "artifactSha256": "aa46f2b71904df6520f6b047e6060b0b507398b5e90e08c1ace3738e8003f657",
+        "exactHostMatch": true,
+        "runtimePackagingAndDependencies": "passed",
+        "chromiumBlankPageVerified": true
+      },
+      "migrate": {
+        "target": "migrate",
+        "tag": "connect-automations-candidate-migrate:20261111",
+        "imageId": "sha256:6a0cd43a60905437e8806f8336b5f6a6c1c33e3ceca3cdeb7e004e6660fc4a85",
+        "artifactSha256": "ae654b1d1e8aa053f7907fc26c034bd8a1e98bdaa404b4da7ecc94eb9110bc2e",
+        "exactHostMatch": true,
+        "runtimePackagingAndDependencies": "passed",
+        "chromiumBlankPageVerified": false
+      }
+    }
+  },
+  "cleanup": {
+    "ownedContainersRemoved": true,
+    "ownedVolumeRemoved": true,
+    "ownedNetworkRemoved": true
+  },
+  "rollout": {
+    "checkedAt": "2026-11-11T12:20:52.583435+00:00",
+    "status": "passed",
+    "localRuntimeUpdated": true,
+    "schemaVersion": "015",
+    "migrations": 15,
+    "candidateImages": {
+      "api": {
+        "target": "api",
+        "tag": "connect-automations-candidate-api:20261111",
+        "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+        "artifactSha256": "a52607ed573c1b1ec6de68817a274ad57789a7315751554b04d48e8793e7609f",
+        "exactHostMatch": true,
+        "runtimePackagingAndDependencies": "passed",
+        "chromiumBlankPageVerified": false
+      },
+      "runner": {
+        "target": "runner",
+        "tag": "connect-automations-candidate-runner:20261111",
+        "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+        "artifactSha256": "aa46f2b71904df6520f6b047e6060b0b507398b5e90e08c1ace3738e8003f657",
+        "exactHostMatch": true,
+        "runtimePackagingAndDependencies": "passed",
+        "chromiumBlankPageVerified": true
+      },
+      "migrate": {
+        "target": "migrate",
+        "tag": "connect-automations-candidate-migrate:20261111",
+        "imageId": "sha256:6a0cd43a60905437e8806f8336b5f6a6c1c33e3ceca3cdeb7e004e6660fc4a85",
+        "artifactSha256": "ae654b1d1e8aa053f7907fc26c034bd8a1e98bdaa404b4da7ecc94eb9110bc2e",
+        "exactHostMatch": true,
+        "runtimePackagingAndDependencies": "passed",
+        "chromiumBlankPageVerified": false
+      }
+    },
+    "originalPublicTables": 45,
+    "originalPublicColumnsRetained": 337,
+    "allOriginalPublicValuesUnchangedAfterMigrationBeforeStartup": true,
+    "startupTechnicalTablesChanged": [
+      "runners"
+    ],
+    "startupTechnicalFieldsPermitted": {
+      "runners": [
+        "heartbeat_at"
+      ],
+      "applications": [
+        "catalog_checked_at",
+        "catalog_sync_error",
+        "catalog_synced_at"
+      ]
+    },
+    "allOtherPublicValuesUnchanged": true,
+    "keycloakAccountTablesVerifiedUnchanged": [
+      "user_entity",
+      "credential",
+      "user_role_mapping",
+      "keycloak_role",
+      "realm",
+      "client",
+      "user_group_membership",
+      "user_attribute",
+      "federated_identity"
+    ],
+    "accountRolesPasswordsAndSessionsNotModified": true,
+    "databaseBackupReadable": true,
+    "databaseBackupSha256": "5971d65364aa9847279f09d4d3d5fed85939ba9d57fd6da71d5bb93b55ba1e03",
+    "coordinatedBackupWithApiAndRunnerStopped": true,
+    "profilesPreserved": true,
+    "sourceProfileFiles": 0,
+    "emptyRootMtimeMayChangeOnDockerMount": true,
+    "applicationConfigurationUnchanged": true,
+    "runtimeEnvironmentUnchanged": true,
+    "sharedServicesAndAloraContainersUnchanged": true,
+    "migratorExecutedTwice": true,
+    "newAutomationDelegations": 0,
+    "pendingEffectsBeforeAndAfter": 0,
+    "existingSentAndUncertainOutboxPreserved": true,
+    "runnerHeartbeatVerified": true,
+    "publicProxyHealth": {
+      "status": "ok",
+      "service": "eulab-connect",
+      "capacityVerified": false
+    },
+    "automationPaths": [
+      "/v1/installations/{installationId}/automations/delegations",
+      "/v1/installations/{installationId}/automations/delegations/by-key/{key}",
+      "/v1/installations/{installationId}/automations/delegations/{id}",
+      "/v1/installations/{installationId}/automations/delegations/{id}/verify",
+      "/v1/installations/{installationId}/automations/delegations/{id}/messages",
+      "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}",
+      "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}/withdraw",
+      "/v1/installations/{installationId}/automations/webhooks",
+      "/v1/installations/{installationId}/automations/webhooks/by-key/{key}"
+    ],
+    "anonymousGrantReadDenied": true,
+    "rollbackImages": {
+      "api": "connect-before-automations-api:20261111t122016z",
+      "runner": "connect-before-automations-runner:20261111t122016z",
+      "migrate": "connect-before-automations-migrate:20261111t122016z"
+    },
+    "evidence": "backups/automation-runtime-20261111/rollout-20261111T122016Z",
+    "realAccountLogin": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "deviceAcceptance": false
+  },
+  "currentReadOnlyReadiness": {
+    "checkedAt": "2026-11-11T12:22:52.384826+00:00",
+    "readOnly": true,
+    "status": "local-provider-runtime-compatible-public-webhook-and-device-acceptance-open",
+    "runtimeContractInstalled": true,
+    "publicWebhookOriginConfigured": false,
+    "goalComplete": false,
+    "goalTurnClassification": "progress: explicitly authorized Connect rollout completed and read-only readiness refreshed",
+    "alora": {
+      "installedSdkVersion": "0.12.0-rc.2",
+      "runtimeHealthy": true,
+      "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+      "workflowSourceChecksumDrift": [],
+      "webhookOrigins": {
+        "ALORA_CONNECT_WEBHOOK_ORIGIN": {
+          "configured": false
+        },
+        "PUBLIC_APP_URL": {
+          "configured": true,
+          "https": false,
+          "loopback": true,
+          "defaultHttpsPort": false
+        }
+      }
+    },
+    "connect": {
+      "apiImageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+      "runnerImageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+      "apiStartedAt": "2026-11-11T12:20:37.853982166Z",
+      "runnerStartedAt": "2026-11-11T12:20:37.854554458Z",
+      "openApi": {
+        "healthStatus": 200,
+        "service": "eulab-connect",
+        "capacityVerified": false,
+        "openapiStatus": 200,
+        "pathCount": 127,
+        "automationPaths": [
+          "/v1/installations/{installationId}/automations/delegations",
+          "/v1/installations/{installationId}/automations/delegations/by-key/{key}",
+          "/v1/installations/{installationId}/automations/delegations/{id}",
+          "/v1/installations/{installationId}/automations/delegations/{id}/verify",
+          "/v1/installations/{installationId}/automations/delegations/{id}/messages",
+          "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}",
+          "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}/withdraw",
+          "/v1/installations/{installationId}/automations/webhooks",
+          "/v1/installations/{installationId}/automations/webhooks/by-key/{key}"
+        ],
+        "manualMessagesRoutePresent": true
+      },
+      "apiBundle": {
+        "sha256": "a52607ed573c1b1ec6de68817a274ad57789a7315751554b04d48e8793e7609f",
+        "bytes": 373709,
+        "markers": {
+          "v1/installations/:installationId/automations": true,
+          "messages/by-key/:key/withdraw": true,
+          "automation_delegations": true,
+          "AutomationController": true
+        }
+      },
+      "runnerBundle": {
+        "sha256": "aa46f2b71904df6520f6b047e6060b0b507398b5e90e08c1ace3738e8003f657",
+        "bytes": 87310,
+        "markers": {
+          "automation_delegations": true,
+          "delegation_id": true,
+          "effect_started": true
+        }
+      },
+      "schema015DelegationsTableExists": true,
+      "inspectedDatabaseMatchesApiDatabase": true,
+      "containersUnchangedDuringReadOnlyAudit": true
+    },
+    "requiredNextExternalState": [
+      "A controlled HTTPS application origin is provided and the signed webhook is registered through the existing SDK flow",
+      "A controlled business WhatsApp number, licensed capabilities and explicitly authorized test recipient are supplied for device acceptance"
+    ],
+    "excluded": [
+      "No account creation, login, password reset, role change or modification",
+      "No Connect deployment, migration or code edit by this audit",
+      "No webhook registration, QR pairing or real provider message",
+      "No public tunnel, DNS/TLS change or production deployment"
+    ],
+    "acceptance": [
+      "Current API OpenAPI must expose the automation delegation, message status, withdrawal and webhook recovery paths",
+      "Schema 015 and runner must be the compatible release; an SDK tarball alone is insufficient runtime evidence",
+      "Real device must demonstrate one original send, callback correlation, action state transition and receipt without duplicate send",
+      "Revocation and pending withdrawal require real provider outcome evidence; acquired effects cannot be reported cancelled"
+    ],
+    "evidenceSources": [
+      "evolve.md sections 8, 13 and 14",
+      "docs/connect-sdk-integration-contract.md",
+      "/Users/eugeniorenna/eulab connect/packages/sdk/AUTOMATIONS.md",
+      "docs/verification/appointment-automations-workflow-step-12.json"
+    ]
+  },
+  "realAccountsUsedOrModified": false,
+  "realProviderMessages": false,
+  "npmPublication": false,
+  "productionDeployment": false,
+  "goalComplete": false,
+  "limits": [
+    "Runtime API/schema/routes/runner are verified; no real personal delegation or device send was exercised",
+    "Public HTTPS webhook origin is still absent in ALORA; the Connect runner rejects private destination addresses and non-HTTPS URLs",
+    "A controlled business number and explicitly authorized recipient are still needed for device tests",
+    "Source profile volume was empty; data preservation checks do not prove recovery of an existing paired authentication profile",
+    "Binary rollback was proven only before any new application writes or external effects",
+    "All preexisting worktree modifications were preserved; only the runtime-pruning fix and its regression were added"
+  ],
+  "sourceChecksums": {
+    "scripts/prune-runtime-deps.mjs": "1b13a19d14ca6e7b9a6ae47b685f467ea9882b097957cf05b7ed74efa0ef98f7",
+    "tests/runtime-packaging.test.mjs": "6468ff1e55da5f8202bff51c0f2a9bd5f7b52ad7f801963069bf535bac980092",
+    "apps/api/src/automation.service.ts": "5a8f1d6d35a103a8467d9c9bf9dc2e0b6e4ce8d09201da5fdd31794ee0dcb016",
+    "apps/api/src/automation.controller.ts": "7e964845f828b1d00a50fd368698bb78ccee5115bae4834b980f3a8bd2dcaa3f",
+    "apps/runner/src/outbox.ts": "9ef835d6913a7fa13993d651d374255b55eb595f0b05c20bc246fbc6237cb6c8",
+    "apps/runner/src/main.ts": "1fb9991fe3a7a17d440c995d85901f1c295d1f30f2919ecc576d56cb6064669d",
+    "apps/runner/src/webhooks.ts": "0eab178583cf45b1d6eac97b26a1511a4968b480982957855a0f53e0e1fd603a",
+    "infra/postgres/015-automation-delegations.sql": "32505c5c033314f04a7d4922f18a55919cadff6a6a4221a2e7ad112b61cbb039"
+  }
+}

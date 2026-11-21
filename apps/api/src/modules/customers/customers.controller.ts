@@ -1,3 +1,8 @@
+import {
+  resolveOperationalScope,
+  sectorFilter,
+  saleFilter,
+} from "../locations/operational-scope";
 import { LegacyWriteDto } from "../../common/legacy-write.dto";
 import {
   Body,
@@ -21,6 +26,12 @@ import {
 import { buildPaginatedResult, parsePagination } from "../../common/pagination";
 import { resolveSaleItemLabels } from "../sales/sales.logic";
 import { CustomersAlignmentService } from "./customers-alignment.service";
+import { lockOperationalTenant } from "../../common/operational-lock";
+import {
+  appointmentPhone,
+  stopAutomationRuns,
+  stopAutomationNotices,
+} from "../notifications/appointment-automation-state";
 
 @Controller("customers")
 export class CustomersController {
@@ -170,22 +181,56 @@ export class CustomersController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
-    const updated = await this.prisma.customer.update({
-      where: { id, tenantId },
-      data: {
-        firstName:
-          typeof body["firstName"] === "string" ? body["firstName"] : undefined,
-        lastName:
-          typeof body["lastName"] === "string" ? body["lastName"] : undefined,
-        email: typeof body["email"] === "string" ? body["email"] : undefined,
-        phone: typeof body["phone"] === "string" ? body["phone"] : undefined,
-        notes: typeof body["notes"] === "string" ? body["notes"] : undefined,
-        tags: Array.isArray(body["tags"])
-          ? body["tags"].map(String)
-          : undefined,
-        isActive:
-          typeof body["isActive"] === "boolean" ? body["isActive"] : undefined,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await lockOperationalTenant(tx, tenantId);
+      const previous = await tx.customer.findUniqueOrThrow({
+        where: { id, tenantId },
+        select: { phone: true, isActive: true },
+      });
+      const result = await tx.customer.update({
+        where: { id, tenantId },
+        data: {
+          firstName:
+            typeof body["firstName"] === "string"
+              ? body["firstName"]
+              : undefined,
+          lastName:
+            typeof body["lastName"] === "string" ? body["lastName"] : undefined,
+          email: typeof body["email"] === "string" ? body["email"] : undefined,
+          phone: typeof body["phone"] === "string" ? body["phone"] : undefined,
+          notes: typeof body["notes"] === "string" ? body["notes"] : undefined,
+          tags: Array.isArray(body["tags"])
+            ? body["tags"].map(String)
+            : undefined,
+          isActive:
+            typeof body["isActive"] === "boolean"
+              ? body["isActive"]
+              : undefined,
+        },
+      });
+      if (
+        appointmentPhone(previous.phone) !== appointmentPhone(result.phone) ||
+        (previous.isActive && !result.isActive)
+      ) {
+        const runs = await tx.appointmentAutomationRun.findMany({
+          where: { tenantId, customerId: id, status: "waiting" },
+          select: { id: true },
+        });
+        await stopAutomationRuns(
+          tx,
+          tenantId,
+          runs.map((run) => run.id),
+          "superseded",
+          "Recapito cliente cambiato o cliente disabilitato",
+        );
+        await stopAutomationNotices(
+          tx,
+          tenantId,
+          "Recapito cliente cambiato o cliente disabilitato",
+          id,
+        );
+      }
+      return result;
     });
     await this.cacheInvalidationService.invalidateDashboard(tenantId);
 
@@ -209,6 +254,11 @@ export class CustomersController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
 
     return this.cacheService.getOrSet(
       cacheKeys.customerHistory(tenantId, id),
@@ -216,7 +266,7 @@ export class CustomersController {
       async () => {
         const [appointments, salesRaw] = await Promise.all([
           this.prisma.appointment.findMany({
-            where: { customerId: id, tenantId },
+            where: { customerId: id, tenantId, ...sectorFilter(scope) },
             orderBy: { startsAt: "desc" },
             include: {
               service: true,
@@ -224,7 +274,7 @@ export class CustomersController {
             },
           }),
           this.prisma.sale.findMany({
-            where: { customerId: id, tenantId },
+            where: { customerId: id, tenantId, ...saleFilter(scope) },
             orderBy: { soldAt: "desc" },
             include: {
               items: {

@@ -1,0 +1,160 @@
+{
+  "step": 8,
+  "title": "Conto operativo unico",
+  "status": "implemented-and-technically-verified-local",
+  "checkedAt": "2026-11-07T15:37:50.483Z",
+  "scope": {
+    "environment": "local Docker",
+    "realAccountAcceptance": "excluded-by-user",
+    "connectAccountsModified": false,
+    "realProviderCalls": false,
+    "productionDeployment": false
+  },
+  "automated": {
+    "jest": {
+      "passed": true,
+      "suites": 51,
+      "tests": 296,
+      "snapshots": 1,
+      "evidence": ".local/step8/jest-result.json"
+    },
+    "lint": {
+      "passed": true,
+      "command": "npm run lint"
+    },
+    "build": {
+      "passed": true,
+      "host": "npm run build",
+      "docker": "docker compose -f docker-compose.yml -f docker-compose.connect-local.yml build api web-admin web-public-booking"
+    }
+  },
+  "migration": {
+    "checkedAt": "2026-11-07T15:35:16.536Z",
+    "sourceDatabaseModified": false,
+    "restoreVerified": true,
+    "reapplied": true,
+    "originalTablesCompared": 14,
+    "originalFieldsPreserved": true,
+    "historicalRevenueBefore": "675.99",
+    "historicalRevenueAfter": "675.99",
+    "assertions": [
+      "PASS:unbilled-unpaid-deterministic-order-and-unique-existing-link",
+      "PASS:duplicate-and-ambiguous-history-preserved-with-explicit-issues",
+      "PASS:standalone-sales-and-historical-totals-preserved",
+      "PASS:deferred-customer-and-booked-line-fences-reject-incompatible-writes",
+      "PASS:explicit-mapping-is-atomic-repeatable-and-preserves-all-original-fields"
+    ],
+    "issues": [
+      {
+        "orderIssue": "ambiguous-or-missing-service-line",
+        "count": 2
+      }
+    ],
+    "backup": ".local/step8/migration-1794065709812/before.dump",
+    "evidence": ".local/step8/migration-1794065709812/result.json",
+    "issuesAreSyntheticFixtureScenarios": true
+  },
+  "http": {
+    "checkedAt": "2026-11-07T15:35:25.005Z",
+    "identity": "synthetic-local-test-sessions",
+    "database": "isolated-test-database",
+    "providerCalls": false,
+    "checks": [
+      "failed-order-attachment-rolls-back-the-booking",
+      "booking-atomically-opens-unpaid-order-without-claiming-performer-or-sale",
+      "agenda-edits-update-the-existing-canonical-row",
+      "open-order-save-preserves-ids-and-rejects-stale-revisions",
+      "canonical-order-read-is-tenant-and-sector-scoped",
+      "checkout-confirms-the-same-order-once-without-recreating-booked-rows",
+      "confirmed-price-projection-and-booked-account-history-protection"
+    ],
+    "evidence": ".local/step8/http-result.json"
+  },
+  "browser": {
+    "checkedAt": "2026-11-07T15:36:03.534Z",
+    "identity": "synthetic-local-test-sessions",
+    "providerCalls": false,
+    "checks": [
+      "open-canonical-order-from-agenda",
+      "save-open-order-without-changing-order-or-row-id",
+      "reopen-and-register-same-order-without-duplicating-lines",
+      "desktop-and-mobile-checkout"
+    ],
+    "screenshots": [
+      "checkout-desktop.png",
+      "checkout-mobile.png"
+    ],
+    "evidence": ".local/step8/browser-result.json"
+  },
+  "step7Regression": {
+    "httpEvidence": ".local/step7/http-1794065699646/result.json",
+    "httpChecks": 7,
+    "browserEvidence": ".local/step7/browser-result.json",
+    "browserChecks": 9
+  },
+  "runtime": {
+    "checkedAt": "2026-11-07T15:37:17.710Z",
+    "endpoints": {
+      "/api/health": 200,
+      "/admin/": 200,
+      "/booking/": 200,
+      "/.well-known/eulab-connect.json": 200
+    },
+    "syntheticTokenRejected": true,
+    "migrationChecksumMatches": true,
+    "orders": {
+      "appointments": 11,
+      "linked": 11,
+      "issues": 0
+    },
+    "containers": [
+      {
+        "name": "barber-api-1",
+        "image": "sha256:7d36b569ca58cf9ee21a6c34e4f07a66f7b425d61ee880cefd15f9477db6d0ce",
+        "health": "healthy"
+      },
+      {
+        "name": "barber-web-admin-1",
+        "image": "sha256:e4669d3026d2070a06365da36e21a6a48c332560fdfd3e604b11478a5a351cb6",
+        "health": "healthy"
+      },
+      {
+        "name": "barber-web-public-booking-1",
+        "image": "sha256:e4a3765149a3958c8338957773fdbdb860f7378db127761489be180581856a8b",
+        "health": "healthy"
+      }
+    ],
+    "originalFieldsPreserved": true,
+    "tablesCompared": 14,
+    "historicalRevenueUnchanged": true,
+    "sharedServicesAndVolumesPreserved": true,
+    "evidence": ".local/step8/runtime-result.json"
+  },
+  "rollback": {
+    "backup": ".local/step8/before-runtime-deploy.dump",
+    "backupReadable": true,
+    "restoreTestedOnCopies": true,
+    "images": [
+      {
+        "tag": "alora-step8-before-api:20261107",
+        "method": "private-rootfs-export-import-without-application-environment"
+      },
+      {
+        "tag": "alora-step8-before-admin:20261107",
+        "method": "private-rootfs-export-import-without-application-environment"
+      },
+      {
+        "tag": "alora-step8-before-booking:20261107",
+        "method": "private-rootfs-export-import-without-application-environment"
+      }
+    ],
+    "mainDatabaseRestored": false,
+    "boundary": "Forward fix or planned restore required after new operations; legacy writers do not coordinate the new order linkage."
+  },
+  "remaining": [
+    "Pricing, VAT, price history and location stock: Step 9.",
+    "Multi-service scheduling, actual payment records, deposits, settlement and refunds: Step 10.",
+    "Complete reporting and tablet acceptance: Step 13.",
+    "Real accounts and external providers excluded; production release not performed."
+  ]
+}

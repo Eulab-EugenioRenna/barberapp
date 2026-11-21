@@ -1,7 +1,25 @@
+import { HttpErrorResponse } from "@angular/common/http";
+import {
+  beginPendingCommand,
+  clearPendingCommand,
+  readPendingCommand,
+  type PendingCommand,
+  type PendingCommandState,
+} from "@barber/shared/utils";
 import { Injectable, computed, inject, signal } from "@angular/core";
 import { Title } from "@angular/platform-browser";
 import { toLocalDateKey } from "@barber/shared/utils";
-import { Subject, catchError, firstValueFrom, of, switchMap } from "rxjs";
+import {
+  Subject,
+  catchError,
+  firstValueFrom,
+  of,
+  switchMap,
+  from as rxFrom,
+  mergeMap,
+  toArray,
+  map,
+} from "rxjs";
 import { PublicBookingApiService } from "./public-booking-api.service";
 
 @Injectable({ providedIn: "root" })
@@ -16,8 +34,52 @@ export class PublicBookingFacade {
   readonly feedback = signal("");
   readonly settings = signal<any>(null);
   readonly services = signal<any[]>([]);
+  readonly selectedLocationId = signal("");
+  readonly selectedSectorId = signal("");
+  readonly visibleServices = computed(() =>
+    this.services().filter(
+      (service) =>
+        (!this.selectedLocationId() ||
+          service.sector?.locationId === this.selectedLocationId()) &&
+        (!this.selectedSectorId() ||
+          service.sectorId === this.selectedSectorId()),
+    ),
+  );
+  readonly selectedLocation = computed(() =>
+    (this.settings()?.locations || []).find(
+      (location: any) => location.id === this.selectedLocationId(),
+    ),
+  );
   readonly selectedService = signal<any>(null);
   readonly selectedCollaboratorId = signal("");
+  readonly additionalServices = signal<
+    Array<{ service: any; collaboratorId: string }>
+  >([]);
+  readonly availabilityLoading = signal(false);
+  readonly bookingLines = computed(() =>
+    this.selectedService()
+      ? [
+          {
+            serviceId: this.selectedService().id,
+            collaboratorId: this.selectedCollaboratorId() || undefined,
+          },
+          ...this.additionalServices().map((row) => ({
+            serviceId: row.service.id,
+            collaboratorId: row.collaboratorId || undefined,
+          })),
+        ]
+      : [],
+  );
+  readonly additionalServiceOptions = computed(() =>
+    this.services()
+      .filter(
+        (service) => service.sector?.locationId === this.selectedLocationId(),
+      )
+      .map((service) => ({
+        value: service.id,
+        label: `${service.name} · ${service.durationMinutes} min`,
+      })),
+  );
   readonly selectedSlot = signal("");
   readonly slots = signal<any[]>([]);
   readonly bookingResult = signal<any>(null);
@@ -28,24 +90,40 @@ export class PublicBookingFacade {
     email: "",
     phone: "",
     customerNotes: "",
+    appointmentWhatsAppConsent: false,
   });
 
+  private readonly pendingVersion = signal(0);
+  private lastSlotDate = "";
+  private pendingKey() {
+    return `alora.public.booking:${this.publicBasePath()}:${this.settings()?.id || this.tenantSlug()}`;
+  }
+  readonly pendingState = computed<PendingCommandState>(() => {
+    this.pendingVersion();
+    try {
+      return readPendingCommand(sessionStorage, this.pendingKey());
+    } catch {
+      return { kind: "unreadable" };
+    }
+  });
+  readonly displayedWhatsAppConsent = computed(() => {
+    const state = this.pendingState();
+    return state.kind === "pending"
+      ? state.command.body["appointmentWhatsAppConsent"] === true
+      : this.bookingForm().appointmentWhatsAppConsent;
+  });
   constructor() {
     this.availabilityRefresh
       .pipe(
         switchMap(() => {
-          const selectedService = this.selectedService();
-          const selectedCollaboratorId = this.selectedCollaboratorId();
-
-          if (!selectedService || !selectedCollaboratorId) {
+          if (!this.bookingLines().length) {
             return of({ slots: [] });
           }
 
           return this.api
-            .availability(this.publicBasePath(), {
-              serviceId: selectedService.id,
+            .sequenceAvailability(this.publicBasePath(), {
+              lines: this.bookingLines(),
               date: this.selectedDate(),
-              collaboratorId: selectedCollaboratorId,
             })
             .pipe(
               catchError((error: any) => {
@@ -60,30 +138,59 @@ export class PublicBookingFacade {
         }),
       )
       .subscribe((response: any) => {
-        const slots = response?.slots || [];
-        this.slots.set(slots);
-        this.selectedSlot.set(slots[0]?.startsAt || "");
+        this.availabilityLoading.set(false);
+        const slots: any[] = response?.slots || [];
+        const unique = [
+          ...new Map(slots.map((slot) => [slot.startsAt, slot])).values(),
+        ];
+        const selected = this.selectedSlot(),
+          date = this.selectedDate();
+        this.slots.set(unique);
+        this.selectedSlot.set(
+          unique.some((slot) => slot.startsAt === selected)
+            ? selected
+            : this.lastSlotDate === date && selected
+              ? ""
+              : unique[0]?.startsAt || "",
+        );
+        this.lastSlotDate = date;
       });
 
     this.rangeRefresh
       .pipe(
         switchMap(() => {
-          const selectedService = this.selectedService();
-          const selectedCollaboratorId = this.selectedCollaboratorId();
-
-          if (!selectedService || !selectedCollaboratorId) {
+          if (!this.bookingLines().length) {
             return of({ days: [] });
           }
 
           const { from, to } = this.resolveAvailabilityRange();
-          return this.api
-            .availabilityRange(this.publicBasePath(), {
-              serviceId: selectedService.id,
-              from,
-              to,
-              collaboratorId: selectedCollaboratorId,
-            })
-            .pipe(catchError(() => of({ days: [] })));
+          const chunks: Array<{ from: string; to: string }> = [];
+          const end = Date.parse(to + "T00:00:00Z");
+          for (
+            let cursor = Date.parse(from + "T00:00:00Z");
+            cursor <= end;
+            cursor += 7 * 86400000
+          )
+            chunks.push({
+              from: new Date(cursor).toISOString().slice(0, 10),
+              to: new Date(Math.min(end, cursor + 6 * 86400000))
+                .toISOString()
+                .slice(0, 10),
+            });
+          const lines = this.bookingLines(),
+            basePath = this.publicBasePath();
+          return rxFrom(chunks).pipe(
+            mergeMap(
+              (chunk) =>
+                this.api.sequenceAvailability(basePath, { lines, ...chunk }),
+              2,
+            ),
+            toArray(),
+            map((responses) => ({
+              days: responses.flatMap((response) => response.days || []),
+            })),
+            catchError(() => of({ days: [] })),
+          );
         }),
       )
       .subscribe((response: any) => {
@@ -146,12 +253,11 @@ export class PublicBookingFacade {
       .join(", ");
   });
   readonly collaboratorSelectOptions = computed(() => {
-    const defaultCollaboratorId = this.settings()?.defaultCollaboratorId;
-
-    return [...(this.selectedService()?.collaborators || [])]
+    return this.professionalOptions(this.selectedService());
+  });
+  professionalOptions(service: any): Array<{ value: string; label: string }> {
+    const options = [...(service?.collaborators || [])]
       .sort((left: any, right: any) => {
-        if (left.id === defaultCollaboratorId) return -1;
-        if (right.id === defaultCollaboratorId) return 1;
         return `${left.firstName} ${left.lastName}`.localeCompare(
           `${right.firstName} ${right.lastName}`,
           "it",
@@ -159,11 +265,10 @@ export class PublicBookingFacade {
       })
       .map((collaborator: any) => ({
         value: collaborator.id,
-        label: `${collaborator.firstName} ${collaborator.lastName}${
-          collaborator.id === defaultCollaboratorId ? " · consigliato" : ""
-        }`,
+        label: `${collaborator.firstName} ${collaborator.lastName}`,
       }));
-  });
+    return [{ value: "", label: "Nessuna preferenza" }, ...options];
+  }
   readonly slotSelectOptions = computed(() =>
     this.slots().map((slot) => ({
       value: slot.startsAt,
@@ -235,6 +340,8 @@ export class PublicBookingFacade {
   }
 
   setSelectedDate(value: string): void {
+    this.selectedSlot.set("");
+    this.slots.set([]);
     this.selectedDate.set(value);
     this.requestAvailability();
   }
@@ -254,6 +361,7 @@ export class PublicBookingFacade {
       email: string;
       phone: string;
       customerNotes: string;
+      appointmentWhatsAppConsent: boolean;
     }>,
   ): void {
     this.bookingForm.update((current) => ({ ...current, ...patch }));
@@ -277,19 +385,12 @@ export class PublicBookingFacade {
       );
       this.services.set(services as any[]);
 
-      const selectedService = (services as any[])[0] || null;
+      this.selectedLocationId.set(settings?.locations?.[0]?.id || "");
+      const selectedService = this.visibleServices()[0] || null;
       this.selectedService.set(selectedService);
+      this.additionalServices.set([]);
 
-      const defaultCollaboratorId = settings?.defaultCollaboratorId;
-      const availableCollaborators = selectedService?.collaborators || [];
-      this.selectedCollaboratorId.set(
-        availableCollaborators.some(
-          (collaborator: any) => collaborator.id === defaultCollaboratorId,
-        )
-          ? defaultCollaboratorId
-          : availableCollaborators[0]?.id || "",
-      );
-
+      this.selectedCollaboratorId.set("");
       this.requestAvailability();
     } catch (error: any) {
       this.feedback.set(
@@ -303,6 +404,9 @@ export class PublicBookingFacade {
   }
 
   requestAvailability(): void {
+    this.availabilityLoading.set(true);
+    this.slots.set([]);
+    this.availabilityByDate.set({});
     this.availabilityRefresh.next();
     this.rangeRefresh.next();
   }
@@ -329,42 +433,101 @@ export class PublicBookingFacade {
     return { from, to: toLocalDateKey(end) };
   }
 
+  selectLocation(id: string): void {
+    this.selectedLocationId.set(id);
+    this.selectedSectorId.set("");
+    this.selectService(this.visibleServices()[0] || null);
+  }
+  selectSector(id: string): void {
+    this.selectedSectorId.set(id);
+    this.selectService(this.visibleServices()[0] || null);
+  }
+
   selectService(service: any): void {
     this.selectedService.set(service);
-    const defaultCollaboratorId = this.settings()?.defaultCollaboratorId;
-    this.selectedCollaboratorId.set(
-      (service.collaborators || []).some(
-        (collaborator: any) => collaborator.id === defaultCollaboratorId,
-      )
-        ? defaultCollaboratorId
-        : service.collaborators?.[0]?.id || "",
-    );
+    this.additionalServices.set([]);
+    this.slots.set([]);
+    this.selectedSlot.set("");
+    this.bookingResult.set(null);
+    this.availabilityByDate.set({});
+    this.selectedCollaboratorId.set("");
     this.selectedSlot.set("");
     this.slots.set([]);
     this.requestAvailability();
   }
 
+  addService(id: string): void {
+    const service = this.services().find(
+      (row) =>
+        row.id === id && row.sector?.locationId === this.selectedLocationId(),
+    );
+    if (!service || !this.selectedService() || this.bookingLines().length >= 20)
+      return;
+    this.additionalServices.update((rows) => [
+      ...rows,
+      { service, collaboratorId: "" },
+    ]);
+    this.bookingResult.set(null);
+    this.requestAvailability();
+  }
+  removeService(index: number): void {
+    this.additionalServices.update((rows) =>
+      rows.filter((_row, i) => i !== index),
+    );
+    this.requestAvailability();
+  }
+  moveService(index: number, direction: -1 | 1): void {
+    this.additionalServices.update((rows) => {
+      const target = index + direction;
+      if (target < 0 || target >= rows.length) return rows;
+      const copy = [...rows];
+      [copy[index], copy[target]] = [copy[target], copy[index]];
+      return copy;
+    });
+    this.requestAvailability();
+  }
+  setServiceCollaborator(index: number, collaboratorId: string): void {
+    this.additionalServices.update((rows) =>
+      rows.map((row, i) => (i === index ? { ...row, collaboratorId } : row)),
+    );
+    this.requestAvailability();
+  }
+
   async submitBooking(): Promise<void> {
-    if (!this.selectedService() || !this.selectedSlot()) {
+    if (this.loading()) return;
+    const state = this.pendingState();
+    if (state.kind === "unreadable") {
+      this.feedback.set(
+        "Dati dell'invio precedente non leggibili: verifica la prenotazione prima di riprendere.",
+      );
       return;
     }
-
+    if (
+      state.kind === "empty" &&
+      (this.availabilityLoading() ||
+        !this.bookingLines().length ||
+        !this.selectedSlotRecord())
+    )
+      return;
     this.loading.set(true);
     this.feedback.set("");
-
+    const key = this.pendingKey();
+    let attempt: PendingCommand | null =
+      state.kind === "pending" ? state.command : null;
     try {
-      const result = await firstValueFrom(
-        this.api.createBooking(this.publicBasePath(), {
-          serviceId: this.selectedService().id,
-          collaboratorId:
-            this.selectedCollaboratorId() ||
-            this.selectedSlotRecord()?.collaboratorId ||
-            undefined,
+      if (!attempt) {
+        attempt = beginPendingCommand(sessionStorage, key, {
+          lines: this.bookingLines(),
           startsAt: this.selectedSlot(),
           ...this.bookingForm(),
-        }),
+        });
+        this.pendingVersion.update((value) => value + 1);
+      }
+      const result = await firstValueFrom(
+        this.api.createBooking(this.publicBasePath(), attempt.body),
       );
-
+      clearPendingCommand(sessionStorage, key, attempt.body.idempotencyKey);
+      this.pendingVersion.update((value) => value + 1);
       this.bookingResult.set(result);
       this.feedback.set(
         result?.status === "confirmed"
@@ -376,17 +539,36 @@ export class PublicBookingFacade {
         email: "",
         phone: "",
         customerNotes: "",
+        appointmentWhatsAppConsent: false,
       });
       this.requestAvailability();
     } catch (error: any) {
+      if (
+        attempt &&
+        error instanceof HttpErrorResponse &&
+        [400, 409].includes(error.status)
+      ) {
+        clearPendingCommand(sessionStorage, key, attempt.body.idempotencyKey);
+        this.pendingVersion.update((value) => value + 1);
+      }
       this.feedback.set(
-        error?.error?.message ||
-          error?.message ||
-          "Non siamo riusciti a inviare la richiesta. Controlla i dati e riprova.",
+        this.pendingState().kind === "pending"
+          ? "Esito da verificare. Recupera la prenotazione precedente con lo stesso invio."
+          : typeof error?.error?.message === "string"
+            ? error.error.message
+            : "Invio non riuscito. Controlla i dati e riprova.",
       );
     } finally {
       this.loading.set(false);
     }
+  }
+
+  startNewBooking(): void {
+    if (this.pendingState().kind !== "empty") return;
+    this.bookingResult.set(null);
+    this.feedback.set("");
+    this.selectedSlot.set("");
+    this.requestAvailability();
   }
 
   private hexToRgb(value: string): string {

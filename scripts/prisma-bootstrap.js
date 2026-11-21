@@ -7,7 +7,7 @@ const BASELINE_MIGRATIONS = [
 ];
 
 function prisma(args) {
-  execFileSync(process.platform === "win32" ? "npx.cmd" : "npx", ["prisma", ...args], {
+  execFileSync(process.execPath, [require.resolve("prisma"), ...args], {
     stdio: "inherit",
   });
 }
@@ -45,7 +45,9 @@ async function main() {
         );
       }
 
-      console.log("Database legacy rilevato: registro la baseline senza alterare dati.");
+      console.log(
+        "Database legacy rilevato: registro la baseline senza alterare dati.",
+      );
       for (const migration of BASELINE_MIGRATIONS) {
         prisma(["migrate", "resolve", "--applied", migration]);
       }

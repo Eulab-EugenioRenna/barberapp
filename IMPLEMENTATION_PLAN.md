@@ -1,5 +1,7 @@
 # Implementation Plan
 
+> Piano storico della fondazione MVP. Per lo stato corrente usare la [roadmap ALORA](docs/evolution-roadmap.md) la [chiusura tecnica degli step 5 e 6](docs/chiusura-step-5-6.md) e il [collegamento promemoria/azioni cliente](docs/appointment-automations-workflow-step-12.md). Le sezioni sotto non rappresentano l’elenco aggiornato delle funzionalità mancanti.
+
 ## MVP Scope
 
 The PRD describes a full SaaS. This implementation establishes the foundation needed to build it safely:

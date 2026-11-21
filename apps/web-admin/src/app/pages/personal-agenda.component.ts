@@ -1,3 +1,4 @@
+import { OperationalSelectorComponent } from "../shared/operational-selector.component";
 import { AloraBrandComponent } from "@barber/shared/brand";
 import { CommonModule } from "@angular/common";
 import { Component, inject, OnInit } from "@angular/core";
@@ -11,10 +12,10 @@ import { SessionRefreshService } from "../core/session-refresh.service";
 import { SessionStore } from "../core/session.store";
 @Component({
   standalone: true,
-  imports: [CommonModule, AloraBrandComponent, FormsModule, RouterLink],
+  imports: [OperationalSelectorComponent, CommonModule, AloraBrandComponent, FormsModule, RouterLink],
   template: `<main class="mx-auto grid max-w-6xl gap-5 p-4 pb-10 sm:p-7">
     <header class="panel rounded-[2rem] p-5 sm:p-7">
-      <div class="flex flex-wrap items-center justify-between gap-4"><alora-brand></alora-brand><div class="flex flex-wrap gap-2"><a *ngIf="canOpenCompany" class="secondary-btn" [routerLink]="companyRoute">Area aziendale</a><button class="secondary-btn" type="button" (click)="logout()">Esci</button></div></div>
+      <div class="flex flex-wrap items-center justify-between gap-4"><alora-brand></alora-brand><div class="flex flex-wrap gap-2"><a *ngIf="!storeUserIsTechnical" class="secondary-btn" routerLink="/account">Il mio account</a><a *ngIf="canOpenInventory" class="secondary-btn" routerLink="/inventory">Magazzino</a><a *ngIf="canOpenCompany" class="secondary-btn" [routerLink]="companyRoute">Area aziendale</a><button class="secondary-btn" type="button" (click)="logout()">Esci</button></div></div>
       <p class="eyebrow mt-6 text-[var(--accent)]">Il mio lavoro</p>
       <h1 class="mt-1 font-display text-3xl sm:text-4xl">{{ collaboratorId ? (data ? "Agenda di " + data.professional.firstName + " " + data.professional.lastName : "Agenda del profilo") : "La mia agenda" }}</h1>
       <p *ngIf="data" class="mt-2 text-sm opacity-75">{{ data.professional.firstName }} {{ data.professional.lastName }} · Orari {{ data.timezone }}</p>
@@ -28,6 +29,7 @@ import { SessionStore } from "../core/session.store";
       <p *ngIf="loading" class="mt-4 text-sm" role="status">Caricamento delle attività…</p>
       <p *ngIf="feedback" class="mt-4 text-sm" role="status" aria-live="polite">{{ feedback }}</p>
     </header>
+    <alora-operational-selector></alora-operational-selector>
     <ng-container *ngIf="data as dashboard">
       <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Attività nel periodo">
         <article class="panel rounded-3xl p-5"><p class="eyebrow">Appuntamenti</p><strong class="mt-2 block font-display text-3xl">{{ dashboard.activity.totalAppointments }}</strong></article>
@@ -35,7 +37,7 @@ import { SessionStore } from "../core/session.store";
         <article class="panel rounded-3xl p-5"><p class="eyebrow">Servizi attribuiti</p><strong class="mt-2 block font-display text-3xl">{{ dashboard.activity.attributedServices }}</strong><p class="mt-1 text-xs opacity-65">Nei conti registrati nel periodo</p></article>
         <article class="panel rounded-3xl p-5"><p class="eyebrow">Assenze / annullati</p><strong class="mt-2 block font-display text-3xl">{{ dashboard.activity.noShows }} / {{ dashboard.activity.cancelledAppointments }}</strong></article>
       </section>
-      <article *ngIf="dashboard.values as values" class="panel rounded-3xl p-5"><p class="eyebrow">Valore registrato dei servizi</p><strong class="mt-2 block font-display text-3xl">{{ values.registeredServiceLineTotal | currency: values.currency }}</strong><p class="mt-2 text-sm opacity-75">Somma delle righe servizio attribuite al profilo, prima di eventuali sconti sul conto. Sono esclusi i servizi senza un conto registrato. Non indica incassi o compensi.</p></article>
+      <article *ngIf="dashboard.values as values" class="panel rounded-3xl p-5"><p class="eyebrow">Valore registrato dei servizi</p><strong class="mt-2 block font-display text-3xl">{{ values.registeredServiceLineTotal | currency: values.currency }}</strong><p class="mt-2 text-sm opacity-75">Servizi completati con esecutore dichiarato e conto confermato. Valori finali delle righe, comprese imposte registrate e sconti applicati. Il periodo segue la data del conto. Non indica incassi o compensi.</p></article>
       <section class="panel rounded-[2rem] p-5 sm:p-6" aria-labelledby="personal-schedule-title">
         <h2 id="personal-schedule-title" class="font-display text-2xl">{{ collaboratorId ? "Orari del profilo" : "I miei orari" }}</h2>
         <p class="mt-2 text-sm opacity-75">Turni configurati dal salone, in {{ dashboard.timezone }}. Gli appuntamenti e le altre risorse determinano gli slot ancora prenotabili.</p>
@@ -54,6 +56,7 @@ import { SessionStore } from "../core/session.store";
         <p *ngIf="!dashboard.appointments.items.length" class="py-8 text-sm opacity-75">Nessun appuntamento assegnato in questo periodo.</p>
         <article *ngFor="let item of dashboard.appointments.items" class="mt-4 rounded-3xl border border-current/10 p-4 sm:p-5">
           <div class="flex flex-wrap justify-between gap-3"><div><p class="text-sm text-[var(--accent)]">{{ dateTime(item.startsAt) }} – {{ time(item.endsAt) }}</p><h3 class="mt-1 font-display text-xl">{{ item.service.name }}</h3><p class="mt-1 text-sm">{{ item.customer.firstName }} {{ item.customer.lastName }}</p><p *ngIf="item.customer.phone" class="mt-1 text-sm opacity-70">{{ item.customer.phone }}</p></div><span class="status-pill status-pill-neutral self-start">{{ statusLabel(item.status) }}</span></div>
+          <p *ngIf="item.location" class="text-xs opacity-70">{{ item.location.name }} · {{ item.sector?.name }}</p>
           <p *ngIf="item.customerNotes" class="mt-3 whitespace-pre-wrap text-sm opacity-75">{{ item.customerNotes }}</p>
           <p *ngIf="item.room" class="mt-2 text-xs opacity-65">{{ item.room.name }}</p>
           <div *ngIf="canUpdate" class="mt-3 flex flex-wrap gap-2"><button *ngFor="let next of transitions(item)" type="button" class="secondary-btn" [disabled]="!!updatingId || loading" (click)="pending = { id: item.id, status: next }">{{ actionLabel(next) }}</button></div>
@@ -71,6 +74,7 @@ export class PersonalAgendaComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   get collaboratorId(): string { return this.route.snapshot.queryParamMap.get("collaboratorId") || ""; }
+  get storeUserIsTechnical(): boolean { return !!this.store.currentUser()?.technicalAccess; }
   data: PersonalDashboard | null = null;
   period: "day" | "week" | "month" = "week";
   referenceDate = "";
@@ -80,6 +84,7 @@ export class PersonalAgendaComponent implements OnInit {
   pending: { id: string; status: string } | null = null;
   feedback = "";
   get companyRoute(): string { return this.store.can("users.manage") ? "/collaborators" : "/appointments"; }
+  get canOpenInventory(): boolean { return this.store.can("inventory.read"); }
   get canOpenCompany(): boolean { return this.store.can("appointments.read.all") || this.store.can("users.manage"); }
   get canUpdate(): boolean { return this.store.can("appointments.update.all") || ((!this.collaboratorId || this.collaboratorId === this.store.currentUser()?.collaboratorId) && this.store.can("appointments.update.own")); }
   ngOnInit(): void { void this.load(); }

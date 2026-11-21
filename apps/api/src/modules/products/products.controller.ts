@@ -1,9 +1,15 @@
+import { canUseLocalFunction } from "../../common/function-catalog";
+import { PricingService } from "../pricing/pricing.service";
 import { LegacyWriteDto } from "../../common/legacy-write.dto";
 import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Body,
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -14,15 +20,19 @@ import { CacheInvalidationService } from "../../cache/cache-invalidation.service
 import { CACHE_TTL_SECONDS, cacheKeys } from "../../cache/cache.constants";
 import { AppCacheService } from "../../cache/cache.service";
 import { PrismaService } from "../../prisma/prisma.service";
+import { Prisma } from "@prisma/client";
 import {
   requireTenantId,
   resolveRequestSession,
+  requireUser,
 } from "../../common/request-session";
 import { buildPaginatedResult, parsePagination } from "../../common/pagination";
+import { normalizeBarcode } from "../../common/barcode-validation";
 
 @Controller("products")
 export class ProductsController {
   constructor(
+    private readonly pricing: PricingService,
     private readonly prisma: PrismaService,
     private readonly cacheService: AppCacheService,
     private readonly cacheInvalidationService: CacheInvalidationService,
@@ -53,7 +63,6 @@ export class ProductsController {
             orderBy: [{ isActive: "desc" }, { name: "asc" }],
             skip,
             take,
-            include: { saleItems: true, serviceProducts: true },
           }),
           this.prisma.product.count({ where: { tenantId } }),
         ]);
@@ -61,6 +70,20 @@ export class ProductsController {
         return buildPaginatedResult(items, total, page, pageSize);
       },
     );
+  }
+
+  @Get(":id/prices")
+  async priceHistory(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Query("page") page = "1",
+  ) {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    return this.pricing.productHistory(tenantId, id, Number(page));
   }
 
   @Post()
@@ -73,33 +96,91 @@ export class ProductsController {
       request.headers.authorization,
     );
 
+    if (
+      body["stockTracked"] !== undefined &&
+      !canUseLocalFunction(requireUser(session), "inventory.manage")
+    )
+      throw new ForbiddenException(
+        "Serve la gestione magazzino per configurare il tracciamento",
+      );
     const tenantId = requireTenantId(session);
-    const created = await this.prisma.product.create({
-      data: {
+    let created;
+    try {
+      created = await this.pricing.write(
         tenantId,
-        name: String(body["name"] ?? ""),
-        description:
-          typeof body["description"] === "string"
-            ? body["description"]
-            : undefined,
-        imageUrl:
-          typeof body["imageUrl"] === "string" ? body["imageUrl"] : undefined,
-        sku: typeof body["sku"] === "string" ? body["sku"] : undefined,
-        category:
-          typeof body["category"] === "string" ? body["category"] : undefined,
-        price:
-          body["price"] === undefined || body["price"] === null
-            ? null
-            : Number(body["price"]),
-      },
-    });
+        requireUser(session).id,
+        body["priceChangeReason"],
+        (tx) =>
+          tx.product.create({
+            data: {
+              tenantId,
+              isActive:
+                typeof body["isActive"] === "boolean"
+                  ? body["isActive"]
+                  : undefined,
+              name: String(body["name"] ?? ""),
+              description:
+                typeof body["description"] === "string"
+                  ? body["description"]
+                  : undefined,
+              imageUrl:
+                typeof body["imageUrl"] === "string"
+                  ? body["imageUrl"]
+                  : undefined,
+              sku: typeof body["sku"] === "string" ? body["sku"] : undefined,
+              barcode: normalizeWriteBarcode(body["barcode"]),
+              category:
+                typeof body["category"] === "string"
+                  ? body["category"]
+                  : undefined,
+              price:
+                body["price"] === undefined || body["price"] === null
+                  ? null
+                  : Number(body["price"]),
+              ...this.pricing.data(body, undefined, false),
+            },
+          }),
+      );
+    } catch (error) {
+      if (isBarcodeDuplicate(error)) {
+        throw new ConflictException(
+          "Barcode già assegnato a un altro prodotto di questa attività",
+        );
+      }
+      throw error;
+    }
 
     await Promise.all([
       this.cacheInvalidationService.invalidateProducts(tenantId),
+      this.cacheInvalidationService.invalidatePublicServices(tenantId),
       this.cacheInvalidationService.invalidateDashboard(tenantId),
     ]);
 
     return created;
+  }
+
+  @Get("by-barcode")
+  async byBarcode(
+    @Req() request: { headers: { authorization?: string } },
+    @Query() query: { barcode?: string },
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const barcode = normalizeBarcode(query.barcode);
+    if (!barcode) throw new BadRequestException("Barcode mancante");
+
+    const product = await this.prisma.product.findFirst({
+      where: { tenantId, barcode },
+    });
+    if (!product)
+      throw new NotFoundException(
+        "Prodotto non trovato per questo barcode",
+      );
+
+    return product;
   }
 
   @Patch(":id")
@@ -113,33 +194,70 @@ export class ProductsController {
       request.headers.authorization,
     );
 
+    if (
+      body["stockTracked"] !== undefined &&
+      !canUseLocalFunction(requireUser(session), "inventory.manage")
+    )
+      throw new ForbiddenException(
+        "Serve la gestione magazzino per configurare il tracciamento",
+      );
     const tenantId = requireTenantId(session);
-    const updated = await this.prisma.product.update({
-      where: { id, tenantId },
-      data: {
-        name: typeof body["name"] === "string" ? body["name"] : undefined,
-        description:
-          typeof body["description"] === "string"
-            ? body["description"]
-            : undefined,
-        imageUrl:
-          typeof body["imageUrl"] === "string" ? body["imageUrl"] : undefined,
-        sku: typeof body["sku"] === "string" ? body["sku"] : undefined,
-        category:
-          typeof body["category"] === "string" ? body["category"] : undefined,
-        price:
-          body["price"] === undefined
-            ? undefined
-            : body["price"] === null
-              ? null
-              : Number(body["price"]),
-        isActive:
-          typeof body["isActive"] === "boolean" ? body["isActive"] : undefined,
-      },
-    });
+    let updated;
+    try {
+      updated = await this.pricing.write(
+        tenantId,
+        requireUser(session).id,
+        body["priceChangeReason"],
+        async (tx) => {
+          const previous = await tx.product.findFirst({
+            where: { id, tenantId },
+          });
+          if (!previous) throw new BadRequestException("Articolo non trovato");
+          return tx.product.update({
+            where: { id, tenantId },
+            data: {
+              name: typeof body["name"] === "string" ? body["name"] : undefined,
+              description:
+                typeof body["description"] === "string"
+                  ? body["description"]
+                  : undefined,
+              imageUrl:
+                typeof body["imageUrl"] === "string"
+                  ? body["imageUrl"]
+                  : undefined,
+              sku: typeof body["sku"] === "string" ? body["sku"] : undefined,
+              barcode: normalizeWriteBarcode(body["barcode"]),
+              category:
+                typeof body["category"] === "string"
+                  ? body["category"]
+                  : undefined,
+              price:
+                body["price"] === undefined
+                  ? undefined
+                  : body["price"] === null
+                    ? null
+                    : Number(body["price"]),
+              isActive:
+                typeof body["isActive"] === "boolean"
+                  ? body["isActive"]
+                  : undefined,
+              ...this.pricing.data(body, previous, false),
+            },
+          });
+        },
+      );
+    } catch (error) {
+      if (isBarcodeDuplicate(error)) {
+        throw new ConflictException(
+          "Barcode già assegnato a un altro prodotto di questa attività",
+        );
+      }
+      throw error;
+    }
 
     await Promise.all([
       this.cacheInvalidationService.invalidateProducts(tenantId),
+      this.cacheInvalidationService.invalidatePublicServices(tenantId),
       this.cacheInvalidationService.invalidateDashboard(tenantId),
     ]);
 
@@ -157,13 +275,32 @@ export class ProductsController {
     );
     const tenantId = requireTenantId(session);
 
-    await this.prisma.product.delete({ where: { id, tenantId } });
+    await this.prisma.product.update({
+      where: { id, tenantId },
+      data: { isActive: false },
+    });
 
     await Promise.all([
       this.cacheInvalidationService.invalidateProducts(tenantId),
+      this.cacheInvalidationService.invalidatePublicServices(tenantId),
       this.cacheInvalidationService.invalidateDashboard(tenantId),
     ]);
 
     return { id, removed: true };
   }
+}
+
+function isBarcodeDuplicate(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  return (
+    error.code === "P2002" &&
+    String((error.meta as { target?: unknown } | undefined)?.["target"] ?? "")
+      .includes("barcode")
+  );
+}
+
+function normalizeWriteBarcode(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return normalizeBarcode(value) || null;
 }

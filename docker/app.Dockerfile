@@ -1,16 +1,18 @@
 # syntax=docker/dockerfile:1
 
 # Shared by every build target. Source edits do not invalidate node_modules.
-FROM node:22-alpine AS deps
+FROM node:22.23.4-alpine3.24 AS deps
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
-COPY vendor/eulab-connect-0.11.0-team-security.tgz ./vendor/eulab-connect-0.11.0-team-security.tgz
+COPY vendor/eulab-connect-0.12.0-rc.2.tgz ./vendor/eulab-connect-0.12.0-rc.2.tgz
 RUN --mount=type=cache,id=barber-npm,target=/root/.npm,sharing=locked npm ci --no-audit --no-fund
 
 FROM deps AS source
 COPY tsconfig.base.json angular.json tailwind.config.js postcss.config.js ./
 COPY libs ./libs
+# Tailwind scans the workspace's apps in both host and container builds.
+COPY apps ./apps
 
 # Prisma generation is cached independently from API source changes.
 FROM deps AS api-deps
@@ -23,41 +25,47 @@ COPY libs ./libs
 COPY apps/api ./apps/api
 COPY prisma ./prisma
 COPY scripts ./scripts
-RUN npm run build:api
+RUN npm run build:api -- --path apps/api/tsconfig.runtime.json && test -f dist/apps/api/main.js
+
+# Development dependencies and sources exist only in these build stages.
+FROM api-build AS api-production-deps
+COPY docker/prepare-api-runtime.cjs ./docker/prepare-api-runtime.cjs
+RUN node docker/prepare-api-runtime.cjs \
+ && npm prune --omit=dev --ignore-scripts --no-audit --no-fund --offline \
+ && node docker/prepare-api-runtime.cjs --verify
+COPY --from=api-deps /app/node_modules/.prisma ./node_modules/.prisma
+RUN node scripts/prune-runtime-deps.mjs /app/node_modules
 
 FROM source AS admin-build
-# ALORA shares framework-free permission and agenda contracts with the API.
-COPY apps/api/src/common/function-catalog.ts apps/api/src/common/personal-appointment.ts ./apps/api/src/common/
-COPY apps/web-admin ./apps/web-admin
 RUN npm run build:admin
 
 FROM source AS booking-build
-COPY apps/web-public-booking ./apps/web-public-booking
-# angular.json reuses the ALORA brand assets for public booking.
-COPY apps/web-admin/public/icons ./apps/web-admin/public/icons
-COPY apps/web-admin/public/fonts ./apps/web-admin/public/fonts
 RUN npm run build:public
 
-FROM node:22-alpine AS api-runtime
+FROM alpine:3.24 AS api-runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN apk add --no-cache openssl netcat-openbsd
-COPY --from=api-deps /app/node_modules ./node_modules
-COPY --from=api-build /app/package.json /app/package-lock.json ./
+RUN apk add --no-cache libstdc++ openssl netcat-openbsd
+COPY --from=deps /usr/local/bin/node /usr/local/bin/node
+COPY --from=api-production-deps /app/node_modules ./node_modules
+COPY --from=api-production-deps /app/package.json ./package.json
 COPY --from=api-build /app/dist/apps/api ./dist/apps/api
-COPY --from=api-build /app/prisma ./prisma
+COPY --from=api-production-deps /app/dist/scripts/create-demo-account.js ./dist/scripts/create-demo-account.js
+COPY --from=api-build /app/prisma/schema.prisma ./prisma/schema.prisma
+COPY --from=api-build /app/prisma/migrations ./prisma/migrations
 COPY --from=api-build /app/scripts/prisma-bootstrap.js ./scripts/prisma-bootstrap.js
-COPY --from=api-build /app/scripts/create-demo-account.ts ./scripts/create-demo-account.ts
 COPY --chmod=755 docker/api-entrypoint.sh ./docker/api-entrypoint.sh
 EXPOSE 3000
 CMD ["./docker/api-entrypoint.sh"]
 
 FROM nginx:1.27-alpine AS admin-runtime
+RUN rm -f /usr/share/nginx/html/50x.html /usr/share/nginx/html/index.html
 COPY docker/static.conf /etc/nginx/conf.d/default.conf
 COPY --from=admin-build /app/dist/apps/web-admin/browser /usr/share/nginx/html
 EXPOSE 80
 
 FROM nginx:1.27-alpine AS booking-runtime
+RUN rm -f /usr/share/nginx/html/50x.html /usr/share/nginx/html/index.html
 COPY docker/static.conf /etc/nginx/conf.d/default.conf
 COPY --from=booking-build /app/dist/apps/web-public-booking/browser /usr/share/nginx/html
 EXPOSE 80

@@ -1,0 +1,200 @@
+{
+  "step": 7,
+  "title": "Sedi e settori",
+  "checkedAt": "2026-11-06T22:31:43.683Z",
+  "status": "implemented-and-technically-verified-local",
+  "scope": {
+    "environment": "local Docker only",
+    "connectAccountsModified": false,
+    "realAccountAcceptance": "deferred-by-user",
+    "realProviderCalls": false,
+    "productionDeployment": false
+  },
+  "automated": {
+    "jest": {
+      "passed": true,
+      "suites": 50,
+      "tests": 292,
+      "snapshots": 1,
+      "evidence": ".local/step7/jest-result.json"
+    },
+    "lint": {
+      "command": "npm run lint",
+      "passed": true
+    },
+    "build": {
+      "host": "npm run build (three applications); final API rebuilt after public DTO change",
+      "docker": "docker compose -f docker-compose.yml -f docker-compose.connect-local.yml build api web-admin web-public-booking",
+      "passed": true
+    }
+  },
+  "migration": {
+    "name": "20261106190000_locations_sectors",
+    "baselineReplay": {
+      "evidence": ".local/step7/rehearsal-20261106223111752/result.json",
+      "restoreVerified": true,
+      "operationalDataUnchanged": true,
+      "unattributed": 0,
+      "preflightCheck": "passed",
+      "assertions": [
+        "PASS:new-tenant-bootstrap-and-owned-scope-cascade",
+        "PASS:immutable-scope-parent-ownership",
+        "PASS:professional-membership-tenant-fence",
+        "PASS:catalog-tenant-fence-and-ambiguous-legacy-write-denied",
+        "PASS:appointment-attribution-cross-location-conflict-and-resource-fence",
+        "PASS:exact-decimal-sector-location-company-reconciliation",
+        "PASS:historical-sector-and-location-preserved-after-catalog-move",
+        "PASS:deactivation-blocks-new-bookings-preserves-history",
+        "PASS:preflight-rejects-incoherent-history-without-reassignment"
+      ]
+    },
+    "currentSchemaRestore": {
+      "evidence": ".local/step7/rehearsal-20261106223105572/result.json",
+      "sourceAlreadyMigrated": true,
+      "scopeMetadataRestorePreserved": true,
+      "preflightCheck": "not-run-source-already-migrated",
+      "assertions": [
+        "PASS:new-tenant-bootstrap-and-owned-scope-cascade",
+        "PASS:immutable-scope-parent-ownership",
+        "PASS:professional-membership-tenant-fence",
+        "PASS:catalog-tenant-fence-and-ambiguous-legacy-write-denied",
+        "PASS:appointment-attribution-cross-location-conflict-and-resource-fence",
+        "PASS:exact-decimal-sector-location-company-reconciliation",
+        "PASS:historical-sector-and-location-preserved-after-catalog-move",
+        "PASS:deactivation-blocks-new-bookings-preserves-history"
+      ]
+    },
+    "sourceDatabaseRestored": false
+  },
+  "runtime": {
+    "checkedAt": "2026-11-06T22:30:50.180Z",
+    "/api/health": {
+      "status": 200
+    },
+    "/admin/": {
+      "status": 200
+    },
+    "/booking/": {
+      "status": 200
+    },
+    "/.well-known/eulab-connect.json": {
+      "status": 200,
+      "version": 5,
+      "functions": 27
+    },
+    "syntheticTestTokenAgainstRealRuntime": {
+      "status": 401
+    },
+    "publicSettings": {
+      "status": 200,
+      "locations": 1,
+      "sectors": 1
+    },
+    "migrationChecksumMatches": true,
+    "containers": [
+      {
+        "name": "barber-api-1",
+        "image": "sha256:1cd7ba4d84b251d2d2ffd541ee19715f5a1f511c79f03d6baf8b3cc9632087a3",
+        "health": "healthy"
+      },
+      {
+        "name": "barber-web-admin-1",
+        "image": "sha256:172ea80b4fd183c61a10e7a3f869c187fd2977dd3d81e1dbe287440fdd86822e",
+        "health": "healthy"
+      },
+      {
+        "name": "barber-web-public-booking-1",
+        "image": "sha256:22151e1921230ae3797f3297a1d9b9efc26fa2da81884e2dace702df17cc0ae9",
+        "health": "healthy"
+      }
+    ],
+    "originalOperationalFieldsUnchanged": true,
+    "tablesCompared": 14,
+    "counts": {
+      "Tenant": 1,
+      "Collaborator": 4,
+      "CollaboratorWeeklySchedule": 28,
+      "CollaboratorDayOverride": 0,
+      "TenantHoliday": 0,
+      "Customer": 4,
+      "Service": 4,
+      "Room": 0,
+      "Appointment": 11,
+      "Product": 5,
+      "ServiceProduct": 6,
+      "Sale": 4,
+      "SaleItem": 8,
+      "AppointmentCancellation": 0
+    },
+    "sharedServicesAndDataVolumesPreserved": true,
+    "evidence": ".local/step7/runtime-http.json"
+  },
+  "http": {
+    "checkedAt": "2026-11-06T22:29:53.284Z",
+    "database": "isolated-empty-fixture-database",
+    "identity": "synthetic-local-test-sessions",
+    "providerCalls": false,
+    "checks": [
+      "location-sector-resource-professional-and-catalog-crud",
+      "tenant-and-operational-membership-isolation-including-cache-and-forged-headers",
+      "internal-and-public-booking-attribution-cross-location-conflict-and-concurrent-write-rejection",
+      "public-projections-exclude-existing-crm-and-internal-service-data",
+      "sector-resource-allocation-closure-intersection-controlled-reassignment-and-cross-day-buffers",
+      "quick-order-exact-decimal-reconciliation-and-historical-attribution-after-service-move",
+      "deactivation-removes-public-booking-and-preserves-authorized-history"
+    ],
+    "statuses": [
+      201,
+      409
+    ],
+    "evidence": ".local/step7/http-1794004191252/result.json",
+    "outboundProviders": "stubbed; no messages sent"
+  },
+  "browser": {
+    "checkedAt": "2026-11-06T22:30:08.274Z",
+    "identity": "synthetic-local-test-sessions",
+    "providerCalls": false,
+    "checks": [
+      "desktop-render",
+      "sector-creation",
+      "resource-creation-and-public-toggle",
+      "weekly-hours-and-closure-save",
+      "multi-sector-professional-assignment",
+      "explicit-manager-operational-visibility",
+      "mobile-390-no-horizontal-overflow",
+      "public-location-and-sector-selector",
+      "public-resource-only-booking-without-hidden-professional-assignment"
+    ],
+    "screenshots": [
+      ".local/step7/locations-desktop.png",
+      ".local/step7/locations-mobile.png",
+      ".local/step7/public-mobile.png"
+    ],
+    "evidence": ".local/step7/browser-result.json",
+    "context": "fresh automated browser with synthetic identities against isolated API/database"
+  },
+  "rollback": {
+    "backup": ".local/step7/before-runtime-deploy.dump",
+    "backupReadable": true,
+    "restoreVerifiedOnCopies": true,
+    "previousRootfsImages": [
+      "alora-step7-before-api:20261106",
+      "alora-step7-before-admin:20261106",
+      "alora-step7-before-booking:20261106"
+    ],
+    "previousClient": {
+      "oldClientHasSectorModel": false,
+      "appointments": 1,
+      "sales": 1,
+      "storedTotal": "1.00",
+      "legacyReadWriteCompatible": true
+    },
+    "boundary": "Previous-client read/write verified on an isolated single-location database. After multi-location activation, prefer forward fix or planned data restore; no automatic production rollback is asserted."
+  },
+  "limitations": [
+    "Connect account login, actual capability grants and real provider acceptance are deferred.",
+    "HTTP/browser identity is synthetic; application handlers, database migrations and operational guards are real.",
+    "Stock, full operational-account convergence and aggregate reporting remain Steps 8, 9 and 13.",
+    "No production release, commit or push performed."
+  ]
+}

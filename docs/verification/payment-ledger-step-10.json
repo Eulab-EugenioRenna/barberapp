@@ -1,0 +1,628 @@
+{
+  "checkedAt": "2026-11-08T15:01:03.172Z",
+  "status": "implemented-and-technically-verified-local",
+  "step10Closed": true,
+  "mainRuntimeUpdated": true,
+  "realAccountsExcluded": true,
+  "externalProviderOperations": false,
+  "migration": {
+    "name": "20261107200000_payment_ledger",
+    "originalTablesUnchanged": 42,
+    "originalColumnsUnchanged": 471,
+    "noInferredPayments": true,
+    "restoredAndReapplied": true,
+    "assertions": [
+      "PASS:legacy-paid-and-partial-do-not-infer-amounts",
+      "PASS:explicit-opening-keeps-unknown-date-and-no-receipt",
+      "PASS:opening-and-mixed-receipts-reconcile-exactly",
+      "PASS:total-status-and-basis-cannot-diverge-from-ledger",
+      "PASS:operations-entries-and-financial-account-preserved",
+      "PASS:operation-and-actor-company-fences",
+      "PASS:refund-cap-includes-all-prior-refunds",
+      "PASS:deposit-on-open-account-does-not-confirm-fulfillment"
+    ],
+    "names": [
+      "20261107200000_payment_ledger",
+      "20261107210000_booking_resources",
+      "20261107220000_order_commands",
+      "20261108100000_booking_mutations",
+      "20261108140000_cashier_fulfilment"
+    ],
+    "resourceAssertions": [
+      "PASS:peak-capacity-allows-long-plus-successive-bookings-and-rejects-third-simultaneous",
+      "PASS:capacity-reduction-requires-releasing-future-reservations",
+      "PASS:multi-row-insert-cannot-hide-earlier-reservations-in-same-statement",
+      "PASS:room-capacity-includes-service-buffers"
+    ],
+    "checkedAt": "2026-11-08T14:43:31.342Z",
+    "orderCommandAssertions": [
+      "PASS:command-acknowledgement-and-account-preserved",
+      "PASS:command-company-actor-and-source-fences",
+      "PASS:command-idempotency-key-unique-within-company"
+    ],
+    "bookingMutationAssertions": [
+      "PASS:ordinary-conflicts-stay-immediate-and-coordinated-resource-swap-preserves-row-ids",
+      "PASS:deferring-resource-constraint-never-bypasses-invalid-final-state",
+      "PASS:cancelled-bookings-lines-values-and-cancellation-records-cannot-be-reopened-or-deleted",
+      "PASS:cancellation-keeps-original-account-value-without-inferring-refund-or-stock-return"
+    ],
+    "cashierFulfilmentAssertions": [
+      "PASS:partial-cancellation-checkout-requires-explicit-charge-reason-or-zero-amount",
+      "PASS:nonperformance-charge-reason-is-explicit-and-preserved-in-row-history",
+      "PASS:nonperformed-services-reject-automatic-consumption-and-automatic-return-writes",
+      "PASS:update-sale-command-uses-existing-immutable-actor-and-account-fences"
+    ],
+    "totalSqlAssertions": 23,
+    "calendarConfigurationLockTables": [
+      "Collaborator",
+      "CollaboratorDayOverride",
+      "CollaboratorSector",
+      "CollaboratorWeeklySchedule",
+      "Location",
+      "Room",
+      "Sector",
+      "Service",
+      "Tenant",
+      "TenantHoliday"
+    ],
+    "evidence": ".local/step10/migration-1794148993117/result.json",
+    "appliedOnMain": true,
+    "mainBackup": ".local/step10/before-runtime-deploy.dump"
+  },
+  "http": {
+    "checkedAt": "2026-11-08T14:49:54.879Z",
+    "identity": "isolated-synthetic-sessions",
+    "providerCalls": false,
+    "checks": [
+      "explicit-historical-reconciliation-no-inferred-cash-and-idempotent-replay",
+      "deposit-and-atomic-mixed-balance-no-fulfillment-or-stock-side-effects",
+      "overpayment-stale-revision-and-grouped-overrefund-rejected-atomically",
+      "refund-keeps-original-reference-and-cumulative-refundable-cap",
+      "company-sector-authority-rechecked-before-replay-actor-bound-and-strict-dto",
+      "concurrent-distinct-keys-only-one-receipt-and-same-key-exact-replay",
+      "legacy-cashier-cannot-delete-financial-history-or-reduce-under-net-received",
+      "new-cashier-zero-known-receipts-explicit-full-receipt-and-ambiguous-declarations-rollback"
+    ],
+    "concurrentStatuses": [
+      201,
+      409
+    ]
+  },
+  "browser": {
+    "checkedAt": "2026-11-08T14:50:10.442Z",
+    "identity": "isolated-synthetic-browser",
+    "providerCalls": false,
+    "checks": [
+      "explicit-legacy-opening-and-saved-account-balance",
+      "lost-http-response-after-commit-reload-recovers-original-operation-once",
+      "deposit-and-mixed-payment-in-same-account",
+      "manual-refund-original-reference-and-residual",
+      "desktop-and-mobile-no-horizontal-overflow"
+    ],
+    "screenshots": [
+      "payments-desktop.png",
+      "payments-mobile.png"
+    ]
+  },
+  "tests": {
+    "suites": 59,
+    "tests": 355,
+    "snapshots": 1,
+    "evidence": ".local/step10/rescheduling-unit.log"
+  },
+  "regressions": {
+    "locationsHttp": true,
+    "ordersHttp": true,
+    "inventoryHttp": true,
+    "ordersBrowser": true,
+    "inventoryBrowser": true,
+    "locationsBrowser": true,
+    "checkedAt": "2026-11-08T15:01:03.172Z",
+    "httpVerifiers": [
+      {
+        "name": "cashier-fulfilment",
+        "status": "passed"
+      },
+      {
+        "name": "operational-order",
+        "status": "passed"
+      },
+      {
+        "name": "pricing-inventory",
+        "status": "passed"
+      },
+      {
+        "name": "payment-ledger",
+        "status": "passed"
+      },
+      {
+        "name": "booking-resources",
+        "status": "passed"
+      },
+      {
+        "name": "booking-command",
+        "status": "passed"
+      },
+      {
+        "name": "booking-availability",
+        "status": "passed"
+      },
+      {
+        "name": "booking-mutation",
+        "status": "passed"
+      }
+    ],
+    "browserVerifiers": [
+      {
+        "name": "locations",
+        "status": "passed"
+      },
+      {
+        "name": "operational-order",
+        "status": "passed"
+      },
+      {
+        "name": "pricing-inventory",
+        "status": "passed"
+      },
+      {
+        "name": "payment-ledger",
+        "status": "passed"
+      },
+      {
+        "name": "booking-resources",
+        "status": "passed"
+      },
+      {
+        "name": "create-recovery",
+        "status": "passed"
+      },
+      {
+        "name": "booking-sequence",
+        "status": "passed"
+      },
+      {
+        "name": "booking-mutation",
+        "status": "passed"
+      },
+      {
+        "name": "cashier-fulfilment",
+        "status": "passed"
+      },
+      {
+        "name": "rescheduling",
+        "status": "passed"
+      }
+    ],
+    "browserRetry": {
+      "verifier": "booking-mutation",
+      "initialFailure": "scheduler list did not expose freshly created fixture before timeout",
+      "rerunPassed": true,
+      "productionFixClaimed": false,
+      "diagnosticAdded": true
+    }
+  },
+  "validation": {
+    "lint": true,
+    "prismaValidate": true,
+    "hostApiBuild": true,
+    "hostAdminBuild": true,
+    "hostPublicBuild": true,
+    "dockerApiBuild": true,
+    "testedHostArtifactsMatchDockerCandidate": true,
+    "qaScriptsExcludedFromCandidate": true,
+    "previousPhaseDockerApiBuild": true,
+    "dockerCandidateRequiresRebuild": false,
+    "checkedAt": "2026-11-08T15:01:03.172Z",
+    "dockerAdminBuild": true,
+    "dockerPublicBuild": true
+  },
+  "sourceChecksums": {
+    "prisma/migrations/20261107200000_payment_ledger/migration.sql": "98b28adaffdad3288ed00b87b839de11a543e862983003082e01f81e821d610d",
+    "prisma/schema.prisma": "0f6df5db83583bf6a8b370c83be6bf0954c23735f22acf0d16577ba7b47fcb58",
+    "apps/api/src/modules/payments/payments.service.ts": "2715ba0e8584c613ff59f1396bc6035ee9f808718b2783fdcb559ca7ac6b2650",
+    "apps/api/src/modules/payments/payment-balance.ts": "2d242a1238cdd38fe3fa21a4bdc6b9dda0d09af7696148d7cc53b60c27fda946",
+    "apps/api/src/modules/payments/payment-ledger.controller.ts": "14788bf03f31dcffc0bd19c6a2dcda9333bf6e59b210cae37ee129031df4388f",
+    "apps/api/src/modules/payments/payment-command.dto.ts": "f8a9240b8b343f3c594ca880a919c62646956f0344e5e9d5990a18c3cdd642f1",
+    "apps/api/src/modules/sales/sales.controller.ts": "4a0075e2e50cc24d5deed162530cc3c5ec9b85c8899627b6d92eb6944ed19be5",
+    "apps/api/src/modules/orders/operational-order.service.ts": "43f9aa387ca8771da9049c13bb763e6d4a07b294c04cd36a6b630d83545b4c4a",
+    "apps/web-admin/src/app/shared/account-payments.component.ts": "9174c822517001db84713f800da88efce1a7022e7f942371e852870fc56c70cf",
+    "apps/web-admin/src/app/quick-order/quick-order-modal.component.ts": "73a9c72d736762a0a23e8522470a11c5728f7a6f1a8fe024e6a7d56ca35bdb1b",
+    "prisma/migrations/20261107210000_booking_resources/migration.sql": "508ee787a4a95fa3846feb4009c50d9f7d4e2bca3e11e0f880b7cadcaa6d2dea",
+    "apps/api/src/modules/orders/resource-allocation.ts": "ceee2ad2a4036bc11a5a983fa056ac6c05ae605159d6a6a207fa5772bb5cc01c",
+    "apps/api/src/modules/orders/booking-resources.service.ts": "c58a89a70bf3c89b03c3befcdb958e230e084da9728aa9c86675430df692b62f",
+    "apps/api/src/modules/availability/availability.service.ts": "7b1a532452c5c7eb5f2cb9a3f26e4b834eb0f6643cb85169f39cade977c9e707",
+    "apps/api/src/modules/availability/collaborator-schedule.service.ts": "9070ce98e3882dce06278c9316c9e75ea6cacf6ff494f45fd367e50a7eb0ffea",
+    "apps/api/src/modules/locations/operational-hours.ts": "d7f5c000f1b35a66d775d4fdf576b2488352017c3593783f06ba2268e6897621",
+    "apps/api/src/modules/locations/operational-scope.ts": "036d018d5f301967ecd0119c82e20965b8b78b66573845b03ddc49b895419da4",
+    "apps/api/src/modules/locations/locations.controller.ts": "33add7645739c947451faaa36baa5a0eb008ec14ea0b92bcdf7ab5151f992bb9",
+    "apps/web-admin/src/app/pages/locations.component.ts": "e128e7af22f67472dfae7124c8a8e8b6934c51883adb53fefa51337d2e907d82",
+    "apps/api/src/modules/orders/order-command.service.ts": "5b11ed756b5b62bea5f277d58b3c0cfb3e6804607440ad683cacda4cfb7c6ac6",
+    "apps/api/src/modules/orders/booking-command.service.ts": "934dfbc97f3c2f09d3ad3f897995ea8da69f1ca9b79d91bdb5cbb976b2ff8423",
+    "apps/api/src/modules/orders/booking-availability.service.ts": "afc260b748d983ffb78e2e8170e5bd4b499feca51fe38ca23bbbb5737ee0a48a",
+    "apps/api/src/modules/orders/booking-times.ts": "47648b4d95f91cdf413880ecd4a58b652d0b043ca1e15536fddc6139aa91005c",
+    "apps/api/src/modules/orders/orders.module.ts": "9f63a949cfae91108e8c75c0bc67e6db74701d1d6ecc490540d2c5acbd1f368b",
+    "apps/api/src/common/booking-write.dto.ts": "b7b571cf73126f682ac673b2c946b7a05a8693a555581e670a7db94198410b44",
+    "apps/api/src/common/booking-availability.dto.ts": "9f6bd93dd948c729b573cd3e2bd88ca2335c0c7e40da65dc352e3eb2145be9ed",
+    "apps/api/src/modules/appointments/appointments.controller.ts": "673bab547e5581861ff3ee1aa079ebffd8ab865e6ec306c5cbdd001ab70981f7",
+    "apps/api/src/modules/public-booking/public-booking.controller.ts": "fa2912e9ac77fb0112693dfc3d916d4388583335f8dca461a8b70cb0417b314e",
+    "apps/api/src/common/operation-catalog.ts": "1b2c77d13150b1d2747304372ccfe993d5dba9a7e674a01e0346ba0581d21f78",
+    "apps/api/src/modules/customers/customer-identity.ts": "aef25b29ac0dbf34f3e045b60c999ab849f02567b97093642b1d6c5fd701513f",
+    "apps/api/src/modules/customers/customers-alignment.service.ts": "e2940bf80b46740950e5dadd783e992088b3c6a6c83f49ddf3fd9b4afeaea89d",
+    "apps/api/src/modules/sales/sale-command-result.ts": "ce957da4b2513fb83ffcad702d4cf01d471374213acb8cb6c76ba331acfd8735",
+    "prisma/migrations/20261107220000_order_commands/migration.sql": "f71f35e1d2a5be9e2b30efa8a2b31c98ea55cb114675d5f21eb0a69e22db84ad",
+    "libs/shared/utils/src/pending-command.ts": "f73089da7aa121c04f9b788c51f82fdd2e0389aca7106174c00bd5232bfee403",
+    "apps/web-admin/src/app/core/create-recovery.service.ts": "9ee4c3580cbaf0c7145b5cf3142ee7c2d2dda282de26ffdde09f895c634fa9d7",
+    "apps/web-admin/src/app/appointments/appointments.facade.ts": "2595900d641f0ac3f5f0c5566618d397a20aee287a12916ed7e38f80e3726948",
+    "apps/web-admin/src/app/appointments/appointments.service.ts": "205d47ce9a51f135b1e755cf60b1b5be1a39c6be6e44c8b6ce3ab4044df2e612",
+    "apps/web-admin/src/app/appointments/admin-appointments-editor-modal.component.ts": "49cd990db84f79d7f7f28589d6b9caabde1422408aedb9b12cd29fb14b9b358f",
+    "apps/web-admin/src/app/pages/admin-appointments-page.component.ts": "ea4cb4411a2deafb2c02c78fa72b624902bbff5edc1d5032a40cd43d09065c07",
+    "apps/web-public-booking/src/app/core/public-booking.facade.ts": "c25eb44daa91bf86f65afe1bfe9614be7f8c88a5863467a1c07f007f11b11097",
+    "apps/web-public-booking/src/app/core/public-booking-api.service.ts": "11fb445cabb5ef318c5ad9044a6cfcfb13427c3733d51a132806a0b5f5532b32",
+    "apps/web-public-booking/src/app/public-booking-app.component.ts": "5d2a4975b23cece4d72238d309f73b955806f6bc6db3af2cafce7444f4ed9d94",
+    "apps/web-admin/src/app/admin-app.component.ts": "6866f878e3d4b74c3dd51ab96a5641fb42af800e5b05f17675e9fbc6e0cb732a",
+    "prisma/migrations/20261108100000_booking_mutations/migration.sql": "95bbf6f516d2875fda9623b96eedcc70cabfe56fa454601e1d115de3c1733300",
+    "apps/api/src/common/booking-mutation.dto.ts": "f4a466833167a8dfac473916855c39f8e75a739fb6fb60ea4f54ed3704b94e89",
+    "apps/api/src/common/legacy-write.dto.ts": "4c4216ff6e5085c9dd8bca275693fb5811acdcb9d8722021a514d7b31d637f43",
+    "apps/api/src/common/prisma-error.filter.ts": "c324e75281d538ae718cc69b4bda41a3a2cc9116197b93af468e07e1f4c7a047",
+    "apps/api/src/modules/orders/booking-mutation.service.ts": "d4b921d98aec92b53e2572933d12dbbfd0ad719db6ea3a5483b9b98f703169ba",
+    "apps/web-admin/src/app/appointments/booking-order-editor.component.ts": "b83c6a0e6ff74e80b14f0c2325495ca5cb4c595e615f23dbce07057958f5c2a7",
+    "apps/web-admin/src/app/appointments/booking-local-time.ts": "082c8b7a6ea5d8c439a59cfc7df99bff482d9ab98bf32e97fa6c473200f901b7",
+    "prisma/migrations/20261108140000_cashier_fulfilment/migration.sql": "bef88a615b2f1fec7415fab40f6d68e7edb00a1e2c58459a880013989b212345",
+    "apps/api/src/modules/sales/sale-fulfilment.service.ts": "ba1651d5b0961dac7b15733abe7c55d864efa13523b873b717d090479c5a368e",
+    "apps/api/src/modules/sales/sales.logic.ts": "c87e6de274befd7cbe345c48424c45e90a7c6b10f7780a401192f1c1dff989e2",
+    "apps/api/src/modules/sales/sales.module.ts": "ff381f6af5c39696be1c27e40f40144135f8502951356afed740c79d94d42813",
+    "apps/api/src/modules/inventory/inventory.service.ts": "ac991c20027e984323a33cbae7806495338dd1d8f16ccd6f626f8ab450769160",
+    "apps/web-admin/src/app/core/admin.facade.ts": "5df3b05b537f722401c25be794a272f6a24b79de962bd66130adaffeda3d247b",
+    "apps/web-admin/src/app/quick-order/quick-order-modal.component.html": "db3b9f02097815fec2e36af884b807637e752f016b7d6b8513a9573501346051",
+    "apps/web-admin/src/app/quick-order/quick-order-modal.component.css": "abc0a123d260a17a15be3194db9dd9fa65e7f1e476661c06bf72d716c70ef47f",
+    "apps/web-admin/src/app/core/admin-api.service.ts": "49b3b4a97f3eb1f27610cfa520150113cf3e7b343bb9b82c0705bdf55974c1b3",
+    "prisma/migrations/20261108180000_calendar_configuration_lock/migration.sql": "5fb61627d8cc0b2f29c1ac9ea57f46c04b0757a76878467be7d867b16dbe9575",
+    "docker/app.Dockerfile": "2c7fdfa0ed35581c65056bbb12fc39364b9ac1d6da7777090d890a72c13eab0e"
+  },
+  "remaining": [
+    "Step 11 WhatsApp Connect",
+    "Step 12 durable appointment automations",
+    "Step 13 reconciled reporting and responsive acceptance",
+    "Step 14 commercial validation; real provider and production acceptance separate; Connect accounts excluded"
+  ],
+  "resources": {
+    "aggregateBookingExposed": true,
+    "http": [
+      "peak-capacity-agrees-between-public-slots-planner-and-actual-appointment-insert",
+      "capacity-cannot-invalidate-future-work-and-can-reduce-after-explicit-release",
+      "whole-sequence-assignment-is-not-greedy-and-keeps-non-grid-fixed-times",
+      "planner-rechecks-authorized-sectors-and-business-closures-in-the-transaction"
+    ],
+    "browser": [
+      "capacity-input-creates-actual-two-place-resource",
+      "capacity-change-persists-through-existing-location-form",
+      "desktop-and-mobile-resource-configuration-no-horizontal-overflow"
+    ],
+    "screenshots": [
+      "resources-desktop.png",
+      "resources-mobile.png"
+    ],
+    "checkedAt": "2026-11-08T13:48:46.878Z"
+  },
+  "verificationScriptChecksums": {
+    "scripts/verify-payment-ledger-migration.mjs": "cafba9c144702d1173925265f5c9e49e73e118f3a2ed4ab463756f75bf4f6844",
+    "scripts/verify-payment-ledger-fixtures.sql": "72150879585b55110bda9162735e07a92d9b53b15f028cbf935fe49b0a5117e8",
+    "scripts/verify-booking-resource-fixtures.sql": "207e830e11827807babff97b191602f33ab15007c7ff36fd10817050899e70f9",
+    "scripts/verify-payment-ledger-http.mjs": "870f9c10e407fb12adb44963c380753f230749bd37402513047975db55d4bd63",
+    "scripts/verify-payment-ledger-browser.cjs": "9fbfff11043faa5cd72f942a08090b25a8215e40e4233139c0a4d91469b1033e",
+    "scripts/verify-booking-resources-http.mjs": "56c19251ed134341530b365ff741db66f700e73cd56bf1dd91922af1b7221263",
+    "scripts/booking-resources-qa.cjs": "e245594dab0a36951c3b047850e3e6791278127452e6fafdf5c3497a5156ee91",
+    "scripts/verify-booking-resources-browser.cjs": "3fb09610c7d2bf177f8a019036888c89ee41d7e56feaab1b328c174ddcbefbcc",
+    "scripts/verify-booking-command-http.mjs": "b9cf9e88a9f7dcfe91e3b054d62ebde6210956797021a9ee022c0d95eda93339",
+    "scripts/verify-booking-availability-http.mjs": "06b5e817d24d2e23132444bdb5b17a698ce2bdef0a12607aa7e36b4355736970",
+    "scripts/verify-create-recovery-browser.cjs": "1d846b21ad96347018a72345910d8c6e63f7e907c42306583fc64b6d1a37d5f6",
+    "scripts/verify-booking-sequence-browser.cjs": "f50a89f87ca844ec023aee635ee6a09e5a03139ec238774cfa195c02893e38c9",
+    "scripts/locations-qa-server.cjs": "63837f5c9eab85e6e4f32a953022246256c00421e55896d22653c32c07091408",
+    "scripts/verify-order-command-fixtures.sql": "0b1b26a6eb5c2ee807deb48b33b106bdf91598b3a156e062e694b3f9b86261ca",
+    "scripts/verify-booking-mutation-fixtures.sql": "87e65e122271f9bfb7657cf4d28c1c6da5c3250ab221197e698a206f9bcd6f4f",
+    "scripts/verify-booking-mutation-http.mjs": "8786c8ca043b70fc1ac1a7c40a3795e75ad0a1b3e0aa7b9ca5e55c8b1641158f",
+    "scripts/verify-booking-mutation-browser.cjs": "13197b89cf3afaac11bfc6091593c79ac8318ed8b821f39654b201d042792adc",
+    "scripts/verify-locations-browser.cjs": "337e9840e171b0666cdb955c054e222ba7318fffbeb97bf015613e2bedbbd969",
+    "scripts/verify-operational-order-browser.cjs": "1ceeeff7fe621c09d49753e0a96759b6168409da2130cc303db7783f73f94d99",
+    "scripts/verify-pricing-inventory-browser.cjs": "258fec5df4a245f7e57e513b849227b790a57ea3bd33e04f49f5f7b62b989c6a",
+    "apps/web-admin/src/app/appointments/booking-local-time.spec.ts": "fe62f8f88ff83b3855f9530e8852aba910013507bc9243ab5a3ec677f25e492f",
+    "apps/api/src/common/prisma-error.filter.spec.ts": "ab0e5eff3507e40f38883e805413d6a1437155bb246621b01d2d70e23a7b64f1",
+    "scripts/verify-cashier-fulfilment-http.mjs": "70fc519b4029c9ae1ec59a69cd1a20284fcb620a5155946568753ce15320e5aa",
+    "scripts/verify-cashier-fulfilment-browser.cjs": "9a853276f8177390c6e73e389fae3a850484eab9d07b253c61f43fecd9d51ea3",
+    "scripts/verify-cashier-fulfilment-fixtures.sql": "e0d76e410d21a476a67a2a0db18b343beba1f0d064255e176c269b41c2214cbd",
+    "scripts/verify-operational-order-http.mjs": "3779e7fb81ec3beb2f791bd410e27d2f7f93216b7748424fdf109e9879a8319a",
+    "scripts/verify-rescheduling-http.mjs": "d1844401a5515bc414c67b0e4f8bf1b16acbc967f37d62e5bbc60768d249e505",
+    "scripts/verify-rescheduling-browser.cjs": "133cbe1fc3e7966eb48276c5563f91552569d7949b7b4fcb7dc30e5f0faa2727",
+    "scripts/verify-calendar-configuration-http.mjs": "8de5071bc617a12e1bd772cd4804e82d47be9881278cac90bc9d063869340f58"
+  },
+  "bookingCommands": {
+    "checkedAt": "2026-11-08T14:49:58.718Z",
+    "identity": "isolated-synthetic-sessions",
+    "providerCalls": false,
+    "checks": [
+      "two-sectors-one-account-stable-line-links-and-real-automatic-resources-without-invented-performer-or-payment",
+      "original-acknowledgement-replayed-after-catalogue-change-without-replanning-or-duplicating-rows",
+      "actor-binding-and-current-whole-account-sector-authority-before-replay",
+      "distinct-command-race-reserves-the-whole-sequence-once-and-same-key-race-replays-exactly",
+      "fault-after-appointment-inserts-rolls-back-customer-account-lines-and-command-and-can-retry-same-key",
+      "anonymous-no-preference-reserves-real-staff-reuses-crm-privately-and-replays-past-rate-limit-without-exposing-contact-fields",
+      "public-visibility-is-rechecked-before-returning-a-stored-acknowledgement",
+      "deposit-products-and-checkout-keep-one-account-line-ids-and-planned-versus-actual-performers-separate",
+      "cashier-creation-replays-one-account-two-completed-service-rows-and-one-manual-receipt-even-after-catalogue-change",
+      "creation-key-is-mandatory-bound-to-command-kind-and-preserves-an-unpaid-acknowledged-account"
+    ],
+    "raceStatuses": [
+      201,
+      409
+    ]
+  },
+  "bookingAvailability": {
+    "checkedAt": "2026-11-08T14:49:59.621Z",
+    "identity": "isolated-synthetic-qa",
+    "providerCalls": false,
+    "checks": [
+      "repeatable-read-public-and-internal-preview-has-no-writes-and-keeps-45-minute-offset-prices-and-safe-projections",
+      "later-service-resource-conflict-removes-sequence-start-and-internal-edit-excludes-only-authorized-self",
+      "whole-sequence-hours-buffers-and-bounded-range-availability",
+      "public-forged-internal-fields-invalid-dates-inactive-visibility-and-tenant-location-sector-fences",
+      "public-reservation-rechecks-and-commits-the-previewed-whole-sequence-on-one-account"
+    ]
+  },
+  "creationRecovery": {
+    "checkedAt": "2026-11-08T14:50:15.251Z",
+    "identity": "isolated-synthetic-browser",
+    "providerCalls": false,
+    "checks": [
+      "cashier-lost-response-after-commit-freezes-form-and-reloads-one-account-and-one-receipt",
+      "internal-editor-lost-response-and-reload-recover-one-booking-and-its-original-account",
+      "public-no-preference-reserves-real-professional-and-room-without-a-client-imposed-assignment",
+      "public-lost-response-and-mobile-reload-recover-the-original-booking-with-the-original-key"
+    ],
+    "screenshots": [
+      "create-cashier-recovered.png",
+      "create-public-recovered-mobile.png"
+    ]
+  },
+  "multipleServiceBrowser": {
+    "checkedAt": "2026-11-08T14:50:18.102Z",
+    "identity": "isolated-synthetic-browser",
+    "providerCalls": false,
+    "checks": [
+      "internal-editor-creates-two-services-with-no-preference-and-server-validated-sequence-on-one-account",
+      "public-cross-sector-sequence-shows-all-services-server-validated-times-and-gross-total",
+      "two-services-no-preference-reserve-real-resources-and-one-account-with-45-minute-exact-continuation",
+      "lost-response-after-commit-and-mobile-reload-recover-the-identical-multiple-service-command-and-summary"
+    ],
+    "screenshots": [
+      "booking-sequence-desktop.png",
+      "booking-sequence-recovered-mobile.png",
+      "booking-sequence-internal.png"
+    ]
+  },
+  "bookingMutations": {
+    "checkedAt": "2026-11-08T14:50:01.489Z",
+    "identity": "isolated-synthetic-qa",
+    "providerCalls": false,
+    "checks": [
+      "read-only-preview-and-atomic-resource-swap-preserve-appointment-line-primary-and-price-identities",
+      "stale-partial-and-conflicting-plans-rollback-and-distinct-revision-race-has-one-winner-with-original-acknowledgement-replay",
+      "service-append-keeps-one-account-stable-original-rows-exact-sequence-and-deposit-without-inventing-actual-performer-or-stock",
+      "read-only-economic-preview-matches-save-and-known-deposit-residual-rejects-price-reduction-below-net-received-without-domain-writes",
+      "new-service-reuses-shared-price-engine-and-redistributes-existing-order-discount-exactly",
+      "planning-existing-unbooked-service-reuses-its-line-value-and-performer-without-duplicating-cashier-lines",
+      "failure-after-schedule-and-price-writes-rolls-back-every-row-history-and-revision-before-same-key-recovery",
+      "whole-account-sector-authority-and-company-scope-rechecked-for-read-write-preview-and-replay",
+      "replacing-primary-service-across-authorized-sectors-preserves-booking-line-and-account-ids-and-clears-old-actual-performer",
+      "single-and-whole-cancellation-preserve-completed-service-ledger-and-original-value-release-active-resources-and-allow-only-explicit-refund"
+    ]
+  },
+  "bookingMutationBrowser": {
+    "checkedAt": "2026-11-08T14:57:54.226Z",
+    "identity": "isolated-synthetic-browser",
+    "providerCalls": false,
+    "checks": [
+      "whole-booking-editor-validates-and-appends-service-with-existing-deposit-and-no-actual-performer-inference",
+      "lost-revision-response-after-commit-reloads-from-another-service-and-recovers-identical-anchor-command-and-row-ids",
+      "mobile-cancellation-recovers-after-lost-response-releases-resources-and-preserves-all-service-rows-and-deposit",
+      "cancelled-account-is-read-only-and-offers-an-explicit-linked-refund-without-new-receipts-or-reopening",
+      "unchanged-booking-edit-keeps-non-grid-seconds-and-milliseconds-without-silently-shifting-the-original-instant",
+      "scheduling-grant-without-sales-read-can-preview-resources-without-receiving-or-rendering-financial-summary"
+    ],
+    "screenshots": [
+      "booking-mutation-desktop.png",
+      "booking-cancelled-account-mobile.png"
+    ]
+  },
+  "bookingTimeInput": {
+    "checkedAt": "2026-11-08T12:17:40.816Z",
+    "zone": "Europe/Rome",
+    "checks": [
+      "spring-gap-rejected",
+      "both-autumn-fold-instants-preserved-when-unchanged",
+      "seconds-and-milliseconds-retained"
+    ]
+  },
+  "mainRuntimeEvidence": {
+    "checkedAt": "2026-11-08T15:00:05.103Z",
+    "endpoints": {
+      "/api/health": 200,
+      "/admin/": 200,
+      "/booking/": 200,
+      "/.well-known/eulab-connect.json": 200,
+      "/api/public/default/services": 200
+    },
+    "appContainers": [
+      {
+        "name": "/barber-api-1",
+        "image": "sha256:6226d88312684c1c3248a1e60b2667da63332f0230a624aa2802b6baa24f70e7",
+        "health": "healthy"
+      },
+      {
+        "name": "/barber-web-admin-1",
+        "image": "sha256:655d551f712bee0ca37a9ef071b3ea16e02ffe24fd0ebbbc24c1306ceddbdfc6",
+        "health": "healthy"
+      },
+      {
+        "name": "/barber-web-public-booking-1",
+        "image": "sha256:a4389b9dd8bf199c096f579ec59c32ff663d598864ebcf53770a2098b7d8dfd3",
+        "health": "healthy"
+      }
+    ],
+    "migrations": [
+      {
+        "name": "20261108140000_cashier_fulfilment",
+        "checksum": "bef88a615b2f1fec7415fab40f6d68e7edb00a1e2c58459a880013989b212345"
+      },
+      {
+        "name": "20261108180000_calendar_configuration_lock",
+        "checksum": "5fb61627d8cc0b2f29c1ac9ea57f46c04b0757a76878467be7d867b16dbe9575"
+      },
+      {
+        "name": "20261107200000_payment_ledger",
+        "checksum": "98b28adaffdad3288ed00b87b839de11a543e862983003082e01f81e821d610d"
+      },
+      {
+        "name": "20261107210000_booking_resources",
+        "checksum": "508ee787a4a95fa3846feb4009c50d9f7d4e2bca3e11e0f880b7cadcaa6d2dea"
+      },
+      {
+        "name": "20261107220000_order_commands",
+        "checksum": "f71f35e1d2a5be9e2b30efa8a2b31c98ea55cb114675d5f21eb0a69e22db84ad"
+      },
+      {
+        "name": "20261108100000_booking_mutations",
+        "checksum": "95bbf6f516d2875fda9623b96eedcc70cabfe56fa454601e1d115de3c1733300"
+      }
+    ],
+    "metadata": {
+      "payments": 0,
+      "paymentOperations": 0,
+      "orderOperations": 0,
+      "legacyUnknown": 13,
+      "sales": 13,
+      "enabledConfigurationTriggers": 10
+    },
+    "syntheticTokenRejected": true,
+    "originalTablesPreserved": 42,
+    "originalColumnsPreserved": 471,
+    "backupReadable": true,
+    "connectAccountOperations": false,
+    "realAccountLogin": false,
+    "productionDeployment": false
+  },
+  "cashierFulfilment": {
+    "checkedAt": "2026-11-08T14:49:52.284Z",
+    "database": "step7_http_1794148995140",
+    "checks": [
+      "standalone-each-service-has-own-completed-execution-and-explicit-performer-no-tenant-or-root-default",
+      "open-counter-keeps-unknown-actual-performers-and-added-services-without-execution-stock-or-inferred-receipt",
+      "partial-cancellation-checkout-explicit-fee-preserves-planned-actor-actual-execution-and-single-deposit-without-consuming-cancelled-service",
+      "post-write-failure-rolls-back-rows-executions-stock-price-history-and-ack-same-key-retry-and-replay-create-no-duplicates",
+      "retained-inactive-performer-and-catalog-items-stay-on-own-historical-rows-without-authorizing-new-performances-or-duplicate-inactive-articles",
+      "adding-service-to-confirmed-account-requires-explicit-actor-and-separate-row-creates-exactly-one-new-execution-stable-existing-ids-and-catalog-independent-replay",
+      "unchanged-historical-cancelled-charge-allows-unrelated-retail-edit-preserves-prior-consumption-and-does-not-reissue-explicitly-returned-stock",
+      "legacy-confirmed-unknown-performer-execution-stock-and-receipts-are-never-backfilled-by-unrelated-edit",
+      "legacy-confirmed-account-with-unresolved-booking-status-does-not-silently-declare-execution-on-retail-edit",
+      "concurrent-sale-update-same-key-replays-once-distinct-keys-with-same-revision-have-one-winner-and-ack-is-actor-bound",
+      "explicit-zero-price-waives-cancelled-service-without-a-fee-or-implicit-stock-movement",
+      "sale-update-requires-recovery-key-and-enforces-tenant-and-authenticated-write-isolation"
+    ]
+  },
+  "cashierFulfilmentBrowser": {
+    "checkedAt": "2026-11-08T14:58:17.883Z",
+    "database": "step7_http_1794148995140",
+    "checks": [
+      "open-counter-explicitly-retains-unknown-performers-added-service-and-retail-with-no-execution-or-stock",
+      "checkout-requires-explicit-actual-performer-and-nonperformance-fee-declaration",
+      "lost-update-response-freezes-inputs-and-recovers-exact-persisted-command-after-mobile-reload-from-another-service-of-the-same-account",
+      "completed-counter-displays-actual-distinct-from-planned-actor-and-preserves-cancelled-row-mobile-without-overflow"
+    ]
+  },
+  "economicPreview": {
+    "readOnly": true,
+    "sameCalculationAsSave": true,
+    "financialProjectionRequiresSalesRead": true,
+    "legacyBalanceRemainsUnknown": true,
+    "resourceAvailabilityRemainsSeparate": true,
+    "readWriteRevalidation": true
+  },
+  "qaCleanup": {
+    "checkedAt": "2026-11-08T15:01:03.172Z",
+    "temporaryContainerRemoved": true,
+    "temporaryDatabaseRemoved": true,
+    "mainVolumesPreserved": true
+  },
+  "closureScope": "technical-local; manual real-provider and production acceptance separate",
+  "singleRescheduling": {
+    "checkedAt": "2026-11-08T14:45:06.800Z",
+    "database": "step7_http_1794148995140",
+    "identity": "isolated-synthetic-http",
+    "providerCalls": false,
+    "checks": [
+      "read-only-server-availability-honors-location-hours-fixed-sibling-buffer-original-duration-and-non-grid-millisecond-start-after-catalog-change",
+      "legacy-update-rechecks-fixed-room-sibling-and-business-hours-in-transaction-and-rolls-back-every-invalid-plan",
+      "single-line-shift-preserves-account-row-primary-sibling-time-and-duration-post-ack-failure-rolls-back-before-same-key-retry-and-original-replay",
+      "same-key-concurrent-move-replays-once-distinct-keys-with-same-revision-have-one-winner-and-command-is-actor-bound",
+      "legacy-price-change-reuses-shared-discount-and-ledger-calculation-without-changing-times-fulfilling-services-or-consuming-stock",
+      "whole-account-sector-and-company-authority-is-required-for-single-line-preview-write-and-replay",
+      "missing-recovery-key-revision-stale-state-identity-fields-and-ambiguous-null-price-are-rejected-with-no-domain-write",
+      "completed-service-preserves-historical-plan-and-unknown-actual-performer-while-allowing-explicit-metadata-correction"
+    ]
+  },
+  "singleReschedulingBrowser": {
+    "checkedAt": "2026-11-08T14:58:20.500Z",
+    "database": "step7_http_1794148995140",
+    "identity": "isolated-synthetic-browser",
+    "providerCalls": false,
+    "checks": [
+      "actual-week-drag-uses-server-slots-preserves-milliseconds-and-duration-and-reserves-real-staff-for-no-preference-without-declaring-actual-execution",
+      "lost-single-move-response-after-commit-recovers-identical-command-and-scope-after-mobile-reload-without-duplicating-booking-account-rows-or-money",
+      "actual-day-drag-reassigns-only-target-planned-professional-and-keeps-room-account-line-duration-sibling-and-ledger",
+      "legacy-editor-uses-same-recovery-command-freezes-unknown-update-and-recovers-without-altering-calendar-or-common-customer",
+      "stale-quick-move-revision-is-rejected-without-overwriting-concurrent-correction-or-silently-refreshing-intent"
+    ],
+    "screenshots": [
+      "rescheduling-server-slots-desktop.png",
+      "rescheduling-recovery-mobile.png",
+      "rescheduling-stale-mobile.png"
+    ]
+  },
+  "calendarConfigurationConcurrency": {
+    "checkedAt": "2026-11-08T14:48:04.632Z",
+    "database": "step7_http_1794148995140",
+    "identity": "isolated-synthetic-http-and-postgresql-sessions",
+    "providerCalls": false,
+    "checks": [
+      "location-opening-update-waits-in-postgresql-until-real-booking-transaction-commits-and-later-booking-sees-new-configuration",
+      "direct-nested-weekly-schedule-update-waits-in-postgresql-until-real-booking-transaction-commits-and-later-booking-sees-new-configuration",
+      "tenant-configuration-update-waits-in-postgresql-until-real-booking-transaction-commits-and-later-booking-sees-new-configuration"
+    ]
+  },
+  "candidateArtifacts": {
+    "checkedAt": "2026-11-08T14:48:23.261Z",
+    "directory": ".local/step10/candidate-artifacts-1794149303261",
+    "images": {
+      "api": {
+        "tag": "alora-step10-api:candidate-20261108",
+        "id": "sha256:6226d88312684c1c3248a1e60b2667da63332f0230a624aa2802b6baa24f70e7",
+        "files": 268,
+        "hostArtifactsMatch": true,
+        "prismaMatchesSource": true,
+        "qaScriptsExcluded": true
+      },
+      "admin": {
+        "tag": "alora-step10-admin:candidate-20261108",
+        "id": "sha256:655d551f712bee0ca37a9ef071b3ea16e02ffe24fd0ebbbc24c1306ceddbdfc6",
+        "files": 20,
+        "hostArtifactsMatch": true
+      },
+      "booking": {
+        "tag": "alora-step10-booking:candidate-20261108",
+        "id": "sha256:a4389b9dd8bf199c096f579ec59c32ff663d598864ebcf53770a2098b7d8dfd3",
+        "files": 17,
+        "hostArtifactsMatch": true
+      }
+    }
+  }
+}

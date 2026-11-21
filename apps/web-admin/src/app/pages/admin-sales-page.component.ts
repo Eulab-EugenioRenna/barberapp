@@ -59,6 +59,7 @@ import {
             *ngFor="let sale of filteredSales; trackBy: trackById"
             type="button"
             class="list-card text-left"
+            [attr.data-sale-id]="sale.id"
             (click)="openSaleDetail(sale)"
           >
             <div>

@@ -146,6 +146,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
               *ngFor="let appointment of appointments"
               type="button"
               class="list-card text-left"
+              [attr.data-appointment-id]="appointment.id"
               (click)="editAppointment.emit(appointment)"
             >
               <div>
@@ -239,10 +240,55 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 "
                 [options]="appointmentCollaboratorOptions"
                 label="Professionista"
-                placeholder="Seleziona professionista"
+                placeholder="Nessuna preferenza"
               ></barber-custom-select>
             </label>
           </div>
+          <section
+            *ngIf="multipleServices && !appointmentForm.id"
+            class="grid gap-3 rounded-2xl border border-[var(--line)] p-4"
+            aria-label="Sequenza dei servizi"
+          >
+            <p class="text-sm text-[var(--muted)]">
+              Il servizio principale viene eseguito per primo. Aggiungi gli
+              altri nell'ordine desiderato.
+            </p>
+            <article
+              *ngFor="let row of additionalServices; let index = index"
+              class="grid gap-2 rounded-xl bg-slate-50 p-3"
+              [attr.aria-label]="'Servizio ' + (index + 2)"
+            >
+              <strong
+                >{{ index + 2 }}. {{ row.name }} ·
+                {{ row.durationMinutes }} min</strong
+              >
+              <barber-custom-select
+                *ngIf="row.requiresCollaborator"
+                [value]="row.collaboratorId"
+                [options]="row.options"
+                [label]="'Professionista per ' + row.name"
+                (valueChange)="
+                  serviceCollaborator.emit({ index, collaboratorId: $event })
+                "
+              ></barber-custom-select>
+              <button
+                type="button"
+                class="secondary-btn"
+                [attr.aria-label]="'Rimuovi ' + row.name"
+                (click)="removeService.emit(index)"
+              >
+                Rimuovi
+              </button>
+            </article>
+            <barber-custom-select
+              *ngIf="additionalServices.length < 19"
+              value=""
+              label="Aggiungi un servizio"
+              placeholder="Aggiungi un servizio della sede"
+              [options]="additionalServiceOptions"
+              (valueChange)="addService.emit($event)"
+            ></barber-custom-select>
+          </section>
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Data</span>
@@ -269,12 +315,12 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                     value: $event,
                   })
                 "
-                [disabled]="!appointmentSlots.length"
+                [disabled]="availabilityLoading || !appointmentSlots.length"
                 [options]="appointmentSlotOptions"
                 label="Orario"
                 [placeholder]="
-                  !appointmentForm.collaboratorId
-                    ? 'Prima seleziona il professionista'
+                  availabilityLoading
+                    ? 'Verifica degli orari...'
                     : appointmentSlots.length
                       ? 'Seleziona orario'
                       : 'Nessun orario disponibile'
@@ -310,6 +356,10 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
               placeholder="Dettagli cliente o richieste speciali"
             ></textarea>
           </label>
+          <label *ngIf="!appointmentForm.id" class="flex items-start gap-3 text-sm leading-6">
+            <input type="checkbox" name="appointmentWhatsAppConsent" [ngModel]="appointmentForm.appointmentWhatsAppConsent" (ngModelChange)="appointmentValueChange.emit({key:'appointmentWhatsAppConsent',value:$event})" />
+            <span>Il cliente autorizza promemoria e richieste di conferma WhatsApp per questa prenotazione. È richiesto il numero con prefisso internazionale.</span>
+          </label>
           <div class="appointments-form-actions">
             <div class="appointments-form-actions-group">
               <button
@@ -320,7 +370,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 "
                 type="submit"
                 class="primary-btn"
-                [disabled]="loading || !formValid"
+                [disabled]="loading || availabilityLoading || !formValid"
               >
                 <barber-ui-icon name="save"></barber-ui-icon>
                 {{
@@ -387,6 +437,17 @@ export class AdminAppointmentsPageComponent {
   @Input() appointmentStatusOptions: Array<{ value: string; label: string }> =
     [];
   @Input() loading = false;
+  @Input() multipleServices = false;
+  @Input() availabilityLoading = false;
+  @Input() additionalServices: any[] = [];
+  @Input() additionalServiceOptions: Array<{ value: string; label: string }> =
+    [];
+  @Output() addService = new EventEmitter<string>();
+  @Output() removeService = new EventEmitter<number>();
+  @Output() serviceCollaborator = new EventEmitter<{
+    index: number;
+    collaboratorId: string;
+  }>();
 
   @Output() editAppointment = new EventEmitter<any>();
   @Output() appointmentCustomerSelect = new EventEmitter<string>();
@@ -411,6 +472,7 @@ export class AdminAppointmentsPageComponent {
     );
 
     return Boolean(
+      !this.availabilityLoading &&
       customer &&
       this.appointmentForm.serviceId &&
       this.appointmentForm.startsAt,

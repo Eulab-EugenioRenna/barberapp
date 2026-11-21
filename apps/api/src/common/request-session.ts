@@ -16,6 +16,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { bearerToken, tokenHash, sessionUserSelect } from "./local-sessions";
 
 export interface RequestSession {
+  operationalScope?: import("../modules/locations/operational-scope").OperationalScope;
   connectSessionId?: string | null;
   user: {
     id: string;

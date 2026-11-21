@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: barber
       POSTGRES_USER: barber
@@ -101,11 +102,13 @@ services:
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
     networks:
       - app
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     networks:
       - app

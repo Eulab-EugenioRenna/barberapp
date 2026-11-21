@@ -2,6 +2,7 @@ import { HttpClient } from "@angular/common/http";
 import { Injectable, inject } from "@angular/core";
 import { Observable } from "rxjs";
 import { ADMIN_API_URL } from "./api-config";
+import type { PersonalAccount, PersonalNotices, PersonalSecurity, PersonalSessionList } from "@barber/shared/account";
 
 @Injectable({ providedIn: "root" })
 export class AuthApiService {
@@ -56,4 +57,12 @@ export class AuthApiService {
   me(): Observable<any> {
     return this.http.get(`${ADMIN_API_URL}/auth/me`);
   }
+
+  personalAccount() { return this.http.get<PersonalAccount>(`${ADMIN_API_URL}/account`); }
+  personalSecurity() { return this.http.get<PersonalSecurity>(`${ADMIN_API_URL}/account/security`); }
+  personalSessions() { return this.http.get<PersonalSessionList>(`${ADMIN_API_URL}/account/sessions`); }
+  personalNotices() { return this.http.get<PersonalNotices>(`${ADMIN_API_URL}/account/notifications`); }
+  logoutPersonalSession(id: string) { return this.http.post<{ loggedOut: boolean; current: boolean }>(`${ADMIN_API_URL}/account/sessions/${encodeURIComponent(id)}/logout`, {}); }
+  logoutAllPersonalSessions() { return this.http.post<{ loggedOut: boolean }>(`${ADMIN_API_URL}/account/sessions/logout-all`, {}); }
+  revokePersonalDevice(id: string) { return this.http.delete<{ revoked: boolean; sessionsLoggedOut: boolean }>(`${ADMIN_API_URL}/account/devices/${encodeURIComponent(id)}`); }
 }

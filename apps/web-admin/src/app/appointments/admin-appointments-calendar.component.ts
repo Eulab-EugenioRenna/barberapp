@@ -1,3 +1,4 @@
+import { localBookingTime } from "./booking-local-time";
 import { SessionStore } from "../core/session.store";
 import { CommonModule } from "@angular/common";
 import {
@@ -29,6 +30,7 @@ import { buildDayListingEvent } from "./calendar-date";
       }
 
       .calendar-shell {
+        container-type: inline-size;
         display: flex;
         flex-direction: column;
         height: 100%;
@@ -299,6 +301,14 @@ import { buildDayListingEvent } from "./calendar-date";
         padding: 0.5rem 0.65rem;
       }
 
+      .calendar-week-legend,
+      .calendar-month-legend {
+        min-height: 0;
+        max-height: min(6rem, 20dvh);
+        overflow: auto;
+        overscroll-behavior: contain;
+      }
+
       .calendar-week-legend-chip {
         padding: 0.34rem 0.65rem;
         font-size: 0.78rem;
@@ -361,11 +371,32 @@ import { buildDayListingEvent } from "./calendar-date";
       }
 
       /*
+       * Tablet and phone keep natural page scrolling. Columns follow the
+       * actual calendar width, including the space left by navigation.
+       */
+      @container (min-width: 34rem) {
+        .calendar-week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @container (min-width: 44rem) {
+        .calendar-week-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      }
+      @container (min-width: 60rem) {
+        .calendar-week-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+      }
+      @container (min-width: 40rem) {
+        .calendar-month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+      }
+      @container (max-width: 39.99rem) {
+        .calendar-month-weekdays { display: none; }
+        .calendar-month-cell { min-height: auto; }
+      }
+
+      /*
        * Mobile: il calendario smette di essere una "app dentro la app".
        * L'altezza diventa naturale e lasciamo scorrere il contenitore della
        * pagina: cosi giorno, settimana e mese restano sempre visibili.
        */
-      @media (max-width: 63.99rem) {
+      @media (max-width: 79.99rem) {
         :host {
           height: auto;
         }
@@ -427,13 +458,6 @@ import { buildDayListingEvent } from "./calendar-date";
           overflow: visible;
         }
 
-        .calendar-month-weekdays {
-          display: none;
-        }
-
-        .calendar-month-cell {
-          min-height: auto;
-        }
       }
     `,
   ],
@@ -609,6 +633,7 @@ import { buildDayListingEvent } from "./calendar-date";
                     class="calendar-day-track relative min-h-[55rem] rounded-[1.2rem] bg-white/80"
                     (dragover)="handleDayDragOver($event, column)"
                     (dragleave)="handleDayDragLeave($event, column.id)"
+                    [attr.data-collaborator-id]="column.id"
                     (drop)="handleDrop($event, column.id)"
                   >
                     <div
@@ -669,6 +694,7 @@ import { buildDayListingEvent } from "./calendar-date";
                       [style.top.rem]="appointment.top"
                       [style.min-height.rem]="appointment.height"
                       [style.background]="appointment.color"
+                      [attr.data-appointment-id]="appointment.id"
                       [draggable]="session.can('appointments.update.all')"
                       (dragstart)="handleDragStart($event, appointment.id)"
                       (dragend)="handleDragEnd()"
@@ -699,6 +725,9 @@ import { buildDayListingEvent } from "./calendar-date";
           <div class="calendar-week-shell">
             <div
               class="calendar-week-legend flex flex-wrap gap-2 rounded-[1.4rem] border border-[var(--line)]/70 bg-white/72"
+              role="region"
+              aria-label="Professionisti nel calendario settimanale"
+              tabindex="0"
             >
               <div
                 *ngFor="let option of weekDays[0]?.collaboratorLegend || []"
@@ -712,7 +741,7 @@ import { buildDayListingEvent } from "./calendar-date";
               </div>
             </div>
 
-            <div class="calendar-week-grid lg:grid-cols-7">
+            <div class="calendar-week-grid">
               <article
                 *ngFor="let day of weekDays; trackBy: trackByKey"
                 class="calendar-week-day calendar-week-day-card rounded-[1.5rem] border border-[var(--line)]/70 bg-white/80 p-3"
@@ -726,6 +755,7 @@ import { buildDayListingEvent } from "./calendar-date";
                 (dblclick)="openDayView(day.date)"
                 (dragenter)="dragOverKey = 'week:' + day.key"
                 (dragover)="handleDragOver($event, 'week:' + day.key)"
+                [attr.data-date]="day.date | date: 'yyyy-MM-dd'"
                 (drop)="handleWeekDrop($event, day)"
               >
                 <header
@@ -748,6 +778,7 @@ import { buildDayListingEvent } from "./calendar-date";
                       type="button"
                       class="rounded-[1rem] px-3 py-2 text-left text-white"
                       [style.background]="appointment.color"
+                      [attr.data-appointment-id]="appointment.id"
                       [draggable]="session.can('appointments.update.all')"
                       (dragstart)="handleDragStart($event, appointment.id)"
                       (click)="appointmentClick.emit(appointment.id)"
@@ -788,6 +819,9 @@ import { buildDayListingEvent } from "./calendar-date";
           <div class="calendar-month-shell">
             <div
               class="calendar-month-legend flex flex-wrap gap-2 rounded-[1.4rem] border border-[var(--line)]/70 bg-white/72"
+              role="region"
+              aria-label="Professionisti nel calendario mensile"
+              tabindex="0"
             >
               <div
                 *ngFor="let option of weekDays[0]?.collaboratorLegend || []"
@@ -810,7 +844,7 @@ import { buildDayListingEvent } from "./calendar-date";
               </div>
             </div>
 
-            <div class="calendar-month-grid md:grid-cols-7">
+            <div class="calendar-month-grid">
               <article
                 *ngFor="let cell of monthCells; trackBy: trackByKey"
                 class="calendar-month-cell min-h-[9rem] rounded-[1.4rem] border border-[var(--line)]/70 p-3"
@@ -842,6 +876,7 @@ import { buildDayListingEvent } from "./calendar-date";
                     type="button"
                     class="w-full min-w-0 truncate rounded-[0.9rem] px-2 py-1 text-left text-xs text-white"
                     [style.background]="appointment.color"
+                    [attr.data-appointment-id]="appointment.id"
                     [draggable]="session.can('appointments.update.all')"
                     (dragstart)="handleDragStart($event, appointment.id)"
                     (click)="appointmentClick.emit(appointment.id)"
@@ -915,12 +950,14 @@ export class AdminAppointmentsCalendarComponent
     appointmentId: string;
     collaboratorId: string;
     startsAt: string;
+    revision?: number;
   }>();
   @Output() appointmentRescheduleRequest = new EventEmitter<{
     appointmentId: string;
     targetDate: string;
     suggestedStartsAt: string;
     suggestedCollaboratorId: string;
+    revision?: number;
     sourceView: "week" | "month";
   }>();
   @Output() showDayAppointments = new EventEmitter<{
@@ -1103,6 +1140,7 @@ export class AdminAppointmentsCalendarComponent
           appointmentId,
           originalStartsAt: appointment.startsAt,
           originalCollaboratorId: appointment.collaboratorId,
+          originalRevision: appointment.source?.orderItem?.sale?.revision,
         }),
       );
     }
@@ -1226,6 +1264,7 @@ export class AdminAppointmentsCalendarComponent
       appointmentId: payload.appointmentId,
       collaboratorId: nextCollaboratorId,
       startsAt,
+      revision: payload.originalRevision,
     });
   }
 
@@ -1248,12 +1287,18 @@ export class AdminAppointmentsCalendarComponent
 
     const original = new Date(payload.originalStartsAt);
     const target = new Date(day.date);
-    target.setHours(original.getHours(), original.getMinutes(), 0, 0);
+    target.setHours(
+      original.getHours(),
+      original.getMinutes(),
+      original.getSeconds(),
+      original.getMilliseconds(),
+    );
     this.appointmentRescheduleRequest.emit({
       appointmentId: payload.appointmentId,
       targetDate: toLocalDateKey(target),
       suggestedStartsAt: this.toLocalDateTimeValue(target),
       suggestedCollaboratorId: payload.originalCollaboratorId,
+      revision: payload.originalRevision,
       sourceView: "week",
     });
   }
@@ -1272,12 +1317,18 @@ export class AdminAppointmentsCalendarComponent
 
     const original = new Date(payload.originalStartsAt);
     const target = new Date(date);
-    target.setHours(original.getHours(), original.getMinutes(), 0, 0);
+    target.setHours(
+      original.getHours(),
+      original.getMinutes(),
+      original.getSeconds(),
+      original.getMilliseconds(),
+    );
     this.appointmentRescheduleRequest.emit({
       appointmentId: payload.appointmentId,
       targetDate: toLocalDateKey(target),
       suggestedStartsAt: this.toLocalDateTimeValue(target),
       suggestedCollaboratorId: payload.originalCollaboratorId,
+      revision: payload.originalRevision,
       sourceView: "month",
     });
   }
@@ -1318,6 +1369,7 @@ export class AdminAppointmentsCalendarComponent
     appointmentId: string;
     originalStartsAt: string;
     originalCollaboratorId: string;
+    originalRevision?: number;
   } | null {
     const raw = event.dataTransfer?.getData("application/json");
     if (raw) {
@@ -1339,6 +1391,7 @@ export class AdminAppointmentsCalendarComponent
       appointmentId,
       originalStartsAt: appointment.startsAt,
       originalCollaboratorId: appointment.collaboratorId,
+      originalRevision: appointment.source?.orderItem?.sale?.revision,
     };
   }
 
@@ -1371,11 +1424,6 @@ export class AdminAppointmentsCalendarComponent
   }
 
   private toLocalDateTimeValue(value: Date): string {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-    const hours = String(value.getHours()).padStart(2, "0");
-    const minutes = String(value.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    return localBookingTime(value);
   }
 }

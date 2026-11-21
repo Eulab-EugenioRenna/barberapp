@@ -22,6 +22,9 @@
       "DOM"
     ],
     "paths": {
+      "@barber/shared/automations": ["apps/api/src/common/appointment-automation-policy.ts"],
+      "@barber/shared/whatsapp": ["apps/api/src/common/whatsapp-contract.ts"],
+      "@barber/shared/account": ["apps/api/src/common/personal-account.ts"],
       "@barber/shared/types": [
         "libs/shared/types/src/index.ts"
       ],

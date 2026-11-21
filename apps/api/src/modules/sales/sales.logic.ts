@@ -1,27 +1,45 @@
+import { Prisma } from "@prisma/client";
+import {
+  priceLine,
+  applyOrderDiscount,
+  type PriceMode,
+  type PricedLine,
+} from "../pricing/money";
 export type OrderItemInput = Record<string, unknown>;
 
 export type ProductCatalogEntry = {
   id: string;
   name: string;
   price: unknown;
+  priceMode?: string;
+  vatRate?: unknown;
 };
 
 export type ServiceCatalogEntry = {
   id: string;
   name: string;
   basePrice: unknown;
+  priceMode?: string;
+  vatRate?: unknown;
 };
 
 export type NormalizedOrderItem = {
   productId?: string;
   serviceId?: string;
   collaboratorId?: string;
+  nonPerformanceChargeReason?: string | null;
   label: string;
   quantity: number;
-  unitPrice: number;
-  discount: number;
-  taxTotal: number;
-  lineTotal: number;
+  unitPrice: string;
+  discount: string;
+  taxTotal: string;
+  lineTotal: string;
+  priceMode: PriceMode;
+  vatRate: string | null;
+  lineSubtotal: string;
+  discountNet: string;
+  orderDiscountShare: string;
+  priceOverrideReason?: string;
 };
 
 export type LabelResolvableItem = {
@@ -53,7 +71,10 @@ export function resolveSaleLabels<T extends { items?: LabelResolvableItem[] }>(
     return entity;
   }
 
-  return { ...entity, items: resolveSaleItemLabels(entity.items) as T["items"] };
+  return {
+    ...entity,
+    items: resolveSaleItemLabels(entity.items) as T["items"],
+  };
 }
 
 export function calculateRetroactiveAppointment(input: {
@@ -66,10 +87,12 @@ export function calculateRetroactiveAppointment(input: {
     const service = input.services.find((entry) => entry.id === item.serviceId);
     return sum + Number(service?.durationMinutes ?? 0) * item.quantity;
   }, 0);
-  const serviceTotal = serviceItems.reduce(
-    (sum, item) => sum + item.lineTotal + item.taxTotal,
-    0,
-  );
+  const serviceTotal = serviceItems
+    .reduce(
+      (sum, item) => sum.plus(item.lineTotal).plus(item.taxTotal),
+      new Prisma.Decimal(0),
+    )
+    .toFixed(2);
 
   return {
     serviceItems,
@@ -81,71 +104,174 @@ export function calculateRetroactiveAppointment(input: {
   };
 }
 
-function money(value: unknown, fallback = 0): number {
-  const parsed = value === "" || value === null ? Number.NaN : Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
+type ExistingItem = {
+  collaboratorId?: string | null;
+  nonPerformanceChargeReason?: string | null;
+  id: string;
+  productId: string | null;
+  serviceId: string | null;
+  label: string;
+  unitPrice: unknown;
+  discount: unknown;
+  taxTotal: unknown;
+  priceMode: string;
+  vatRate: unknown;
+  priceOverrideReason: string | null;
+};
 export function normalizeOrderItems(input: {
   items: OrderItemInput[];
   products: ProductCatalogEntry[];
   services: ServiceCatalogEntry[];
+  existing?: ExistingItem[];
+  orderDiscount?: unknown;
 }): NormalizedOrderItem[] {
-  return input.items.map((item, index) => {
+  if (
+    !input.items.length ||
+    input.items.length > 200 ||
+    input.items.some(
+      (row) => !row || typeof row !== "object" || Array.isArray(row),
+    )
+  )
+    throw Error("Aggiungi da una a 200 righe valide");
+  const used = new Set<string>();
+  const priced: PricedLine[] = [];
+  const rows = input.items.map((item, index) => {
     const productId =
       typeof item["productId"] === "string" ? item["productId"] : "";
     const serviceId =
       typeof item["serviceId"] === "string" ? item["serviceId"] : "";
     const kind =
       item["kind"] === "service" || serviceId ? "service" : "product";
-    const product = input.products.find((entry) => entry.id === productId);
-    const service = input.services.find((entry) => entry.id === serviceId);
-
-    if ((kind === "product" && !product) || (kind === "service" && !service)) {
-      throw new Error(`Riga ${index + 1}: articolo non valido`);
+    let old = input.existing?.find((row) => row.id === item["id"]);
+    if (!item["id"]) {
+      const matches =
+        input.existing?.filter(
+          (row) =>
+            !used.has(row.id) &&
+            (row.productId || "") === productId &&
+            (row.serviceId || "") === serviceId,
+        ) || [];
+      if (matches.length === 1) old = matches[0];
     }
-
+    if (
+      old &&
+      ((old.productId || "") !== productId ||
+        (old.serviceId || "") !== serviceId)
+    )
+      old = undefined;
+    if (old) used.add(old.id);
+    const product = input.products.find((row) => row.id === productId),
+      service = input.services.find((row) => row.id === serviceId);
+    const catalog = kind === "service" ? service : product;
+    if (!catalog && !old) throw Error(`Riga ${index + 1}: articolo non valido`);
     const catalogPrice =
       kind === "service" ? service?.basePrice : product?.price;
-    const hasExplicitPrice =
+    const hasExplicit =
       item["unitPrice"] !== undefined && item["unitPrice"] !== "";
-
+    const unitPrice = hasExplicit
+      ? item["unitPrice"]
+      : (old?.unitPrice ?? catalogPrice);
+    if (unitPrice === null || unitPrice === undefined)
+      throw Error(`Riga ${index + 1}: inserisci il prezzo`);
+    const quantity = Number(item["quantity"] ?? 1);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000000)
+      throw Error(`Riga ${index + 1}: quantità non valida`);
+    const mode = String(
+      item["priceMode"] ?? old?.priceMode ?? catalog?.priceMode ?? "legacy",
+    ) as PriceMode;
+    const vatRate =
+      item["vatRate"] === undefined
+        ? (old?.vatRate ?? catalog?.vatRate)
+        : item["vatRate"];
+    const reason =
+      typeof item["priceOverrideReason"] === "string"
+        ? item["priceOverrideReason"].trim()
+        : old?.priceOverrideReason || undefined;
+    const baseRate = old?.vatRate ?? catalog?.vatRate;
+    const changedRate =
+      item["vatRate"] !== undefined &&
+      !(item["vatRate"] == null && baseRate == null) &&
+      (item["vatRate"] == null ||
+        baseRate == null ||
+        !new Prisma.Decimal(String(item["vatRate"])).equals(String(baseRate)));
+    const baselinePrice = old?.unitPrice ?? catalogPrice;
+    const changedPrice =
+      baselinePrice !== null &&
+      baselinePrice !== undefined &&
+      new Prisma.Decimal(String(unitPrice)).comparedTo(
+        String(baselinePrice),
+      ) !== 0;
+    const changedMode =
+      mode !== (old?.priceMode ?? catalog?.priceMode ?? "legacy");
     if (
-      !hasExplicitPrice &&
-      (catalogPrice === null || catalogPrice === undefined)
-    ) {
-      throw new Error(`Riga ${index + 1}: inserisci il prezzo`);
-    }
-
-    const quantity = Math.max(1, Math.trunc(money(item["quantity"], 1)));
-    const unitPrice = money(
-      hasExplicitPrice ? item["unitPrice"] : catalogPrice,
-      -1,
-    );
-    const discount = Math.max(0, money(item["discount"]));
-    const taxTotal = Math.max(0, money(item["taxTotal"]));
-
-    if (unitPrice < 0) {
-      throw new Error(`Riga ${index + 1}: prezzo non valido`);
-    }
-    if (discount > quantity * unitPrice) {
-      throw new Error(
-        `Riga ${index + 1}: lo sconto supera il valore della riga`,
+      (changedRate || changedMode || (mode !== "legacy" && changedPrice)) &&
+      (!reason || reason.length < 3)
+    )
+      throw Error(
+        `Riga ${index + 1}: indica il motivo della modifica a prezzo o IVA`,
       );
-    }
-    return {
-      productId: product?.id,
-      serviceId: service?.id,
-      collaboratorId:
-        kind === "service" && typeof item["collaboratorId"] === "string"
-          ? item["collaboratorId"]
-          : undefined,
-      label: (service ?? product)?.name ?? "Articolo",
-      quantity,
+    if (reason && reason.length > 500)
+      throw Error(`Riga ${index + 1}: motivazione troppo lunga`);
+    const chargeReason = item["nonPerformanceChargeReason"];
+    if (
+      chargeReason !== undefined &&
+      chargeReason !== null &&
+      (typeof chargeReason !== "string" ||
+        (chargeReason.trim() &&
+          (chargeReason.trim().length < 3 ||
+            chargeReason.trim().length > 500)) ||
+        kind !== "service")
+    )
+      throw Error(
+        `Riga ${index + 1}: motivo della quota per servizio non eseguito non valido`,
+      );
+    const line = priceLine({
       unitPrice,
-      discount,
-      taxTotal,
-      lineTotal: quantity * unitPrice - discount,
+      quantity,
+      priceMode: mode,
+      vatRate,
+      discount: item["discount"] ?? old?.discount ?? 0,
+      legacyTaxTotal: item["taxTotal"] ?? old?.taxTotal ?? 0,
+    });
+    priced.push(line);
+    return {
+      productId: product?.id ?? old?.productId ?? undefined,
+      serviceId: service?.id ?? old?.serviceId ?? undefined,
+      collaboratorId:
+        kind !== "service"
+          ? undefined
+          : item["collaboratorId"] === undefined
+            ? old?.collaboratorId || undefined
+            : typeof item["collaboratorId"] === "string"
+              ? item["collaboratorId"] || undefined
+              : undefined,
+      nonPerformanceChargeReason:
+        item["nonPerformanceChargeReason"] === undefined
+          ? old?.nonPerformanceChargeReason || null
+          : typeof item["nonPerformanceChargeReason"] === "string"
+            ? item["nonPerformanceChargeReason"].trim() || null
+            : null,
+      label: catalog?.name ?? old?.label ?? "Articolo",
+      quantity,
+      priceOverrideReason: reason,
+    };
+  });
+  const final = applyOrderDiscount(priced, input.orderDiscount ?? 0);
+  return rows.map((row, index) => {
+    const line = final[index];
+    return {
+      ...row,
+      unitPrice: line.unitPrice,
+      discount: line.discount,
+      taxTotal: line.taxTotal,
+      lineTotal: line.lineTotal,
+      priceMode: line.priceMode,
+      vatRate: line.vatRate,
+      lineSubtotal: line.lineSubtotal,
+      discountNet: line.discountNet,
+      orderDiscountShare: new Prisma.Decimal(priced[index].grossTotal)
+        .minus(line.grossTotal)
+        .toFixed(2),
     };
   });
 }

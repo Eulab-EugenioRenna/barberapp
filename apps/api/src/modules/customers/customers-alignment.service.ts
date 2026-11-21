@@ -1,3 +1,5 @@
+import { resolveCustomerIdentity } from "./customer-identity";
+import { lockOperationalTenant } from "../../common/operational-lock";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Injectable } from "@nestjs/common";
 import { Customer } from "@prisma/client";
@@ -63,40 +65,9 @@ export class CustomersAlignmentService {
   }
 
   async findOrCreateCustomer(input: CustomerIdentityInput): Promise<Customer> {
-    const normalized = this.normalizeIdentity(input);
-
-    const candidates = await this.prisma.customer.findMany({
-      where: {
-        tenantId: input.tenantId,
-        firstName: normalized.firstName,
-        lastName: normalized.lastName,
-      },
-      orderBy: { createdAt: "asc" },
-    });
-
-    const matched = candidates.find((candidate) =>
-      this.matchesIdentity(candidate, normalized),
-    );
-
-    if (matched) {
-      return this.prisma.customer.update({
-        where: { id: matched.id },
-        data: {
-          email: matched.email || normalized.email || undefined,
-          phone: matched.phone || normalized.phone || undefined,
-        },
-      });
-    }
-
-    return this.prisma.customer.create({
-      data: {
-        tenantId: input.tenantId,
-        firstName: normalized.firstName,
-        lastName: normalized.lastName,
-        email: normalized.email || undefined,
-        phone: normalized.phone || undefined,
-        privacyConsent: true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await lockOperationalTenant(tx, input.tenantId);
+      return resolveCustomerIdentity(tx, input);
     });
   }
 
@@ -184,40 +155,6 @@ export class CustomersAlignmentService {
     }
 
     await this.alignTenant(tenantId);
-  }
-
-  private normalizeIdentity(input: CustomerIdentityInput) {
-    return {
-      firstName: input.firstName.trim().toLowerCase(),
-      lastName: input.lastName.trim().toLowerCase(),
-      email: input.email?.trim().toLowerCase() || null,
-      phone: input.phone?.replace(/\s+/g, "") || null,
-    };
-  }
-
-  private matchesIdentity(
-    customer: Customer,
-    identity: ReturnType<typeof this.normalizeIdentity>,
-  ): boolean {
-    const customerEmail = customer.email?.trim().toLowerCase() || null;
-    const customerPhone = customer.phone?.replace(/\s+/g, "") || null;
-
-    if (identity.email && customerEmail && identity.email !== customerEmail) {
-      return false;
-    }
-
-    if (identity.phone && customerPhone && identity.phone !== customerPhone) {
-      return false;
-    }
-
-    if (!identity.email && !identity.phone) {
-      return !customerEmail && !customerPhone;
-    }
-
-    return Boolean(
-      (identity.email && customerEmail && identity.email === customerEmail) ||
-      (identity.phone && customerPhone && identity.phone === customerPhone),
-    );
   }
 
   private collectDuplicateGroups(

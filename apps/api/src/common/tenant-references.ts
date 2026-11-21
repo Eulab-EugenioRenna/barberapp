@@ -9,6 +9,7 @@ export async function assertTenantReferences(
     roomId?: string | null;
     serviceId?: string | null;
     productId?: string | null;
+    sectorIds?: string[];
   },
 ): Promise<void> {
   const checks = [
@@ -24,7 +25,13 @@ export async function assertTenantReferences(
       ? prisma.room.count({ where: { id: refs.roomId, tenantId } })
       : 1,
     refs.serviceId !== undefined
-      ? prisma.service.count({ where: { id: refs.serviceId ?? "", tenantId } })
+      ? prisma.service.count({
+          where: {
+            id: refs.serviceId ?? "",
+            tenantId,
+            ...(refs.sectorIds ? { sectorId: { in: refs.sectorIds } } : {}),
+          },
+        })
       : 1,
     refs.productId !== undefined
       ? prisma.product.count({ where: { id: refs.productId ?? "", tenantId } })

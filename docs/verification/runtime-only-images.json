@@ -1,0 +1,269 @@
+{
+  "checkedAt": "2026-11-11T17:15:36.829921+00:00",
+  "status": "runtime-only-images-installed-and-verified-for-alora-and-connect",
+  "userRequirement": "Docker final images contain builds, executables and necessary runtime assets; no full project source or development toolchain",
+  "aloraApi": {
+    "newImageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+    "typescriptFiles": 0,
+    "sourceMapFiles": 0,
+    "developmentToolsPresent": false,
+    "npmNpxYarnPresent": false,
+    "frontendDependenciesPresent": false,
+    "compiledApiJavaScriptFiles": 172,
+    "applicationJavaScriptUnchangedApartFromSourceMapComment": true,
+    "compiledExplicitDemoCommand": "node dist/scripts/create-demo-account.js",
+    "demoHelpCheckedWithoutDatabaseOrAccountOperation": true,
+    "oldImageBytes": 214259943,
+    "newImageBytes": 97239210,
+    "runtimeDependencyVersionsUnchanged": true,
+    "runtimePrismaCliRetained": true,
+    "migrationSqlAndSchemaRetained": true
+  },
+  "connectBackendChecks": [
+    {
+      "target": "api",
+      "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+      "runtimeOnlyCheck": "passed"
+    },
+    {
+      "target": "runner",
+      "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+      "runtimeOnlyCheck": "passed"
+    },
+    {
+      "target": "bootstrap",
+      "imageId": "sha256:5a8ef84d40ae36aedc4b1fc2c433838544a2830e77bf83548055a0439f824431",
+      "runtimeOnlyCheck": "passed"
+    },
+    {
+      "target": "migrate",
+      "imageId": "sha256:6a0cd43a60905437e8806f8336b5f6a6c1c33e3ceca3cdeb7e004e6660fc4a85",
+      "runtimeOnlyCheck": "passed"
+    }
+  ],
+  "frontendChecks": [
+    {
+      "container": "barber-web-admin-1",
+      "files": 20,
+      "typescript": 0,
+      "sourceMaps": 0
+    },
+    {
+      "container": "barber-web-public-booking-1",
+      "files": 17,
+      "typescript": 0,
+      "sourceMaps": 0
+    },
+    {
+      "container": "eulab-connect-web-1",
+      "files": 11,
+      "typescript": 0,
+      "sourceMaps": 0
+    }
+  ],
+  "currentContainers": {
+    "barber-api-1": {
+      "imageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-admin-1": {
+      "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-public-booking-1": {
+      "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-api-1": {
+      "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-runner-1": {
+      "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-web-1": {
+      "imageId": "sha256:73df58837c66c998dda4745ff2d4c856c4e824b3507ca1719ffefccbf83d9338",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    }
+  },
+  "validation": {
+    "unitSuites": 62,
+    "unitTests": 391,
+    "snapshots": 1,
+    "lint": "passed",
+    "isolatedFullApp": {
+      "checkedAt": "2026-11-11T17:06:08.616Z",
+      "imagePrefix": "alora-runtime-only-",
+      "checks": [
+        "full-candidate-AppModule-starts-with-isolated-Redis-and-empty-PostgreSQL-migrations",
+        "entrypoint-applies-pending-notification-migrations-and-does-not-seed-accounts-tenants-or-sales",
+        "actual-global-guards-deny-anonymous-operational-options-without-an-account-or-Connect-login",
+        "actual-global-guards-deny-anonymous-template-read-preview-and-save-without-seeding-identities",
+        "draft-policy-migration-does-not-create-configuration-or-work-and-real-guards-deny-anonymous-policy-read-save-and-preview",
+        "SDK-012-rc2-five-empty-automation-migrations-current-guards-public-raw-webhook-route-and-ordinary-body-limit",
+        "durable-command-journal-and-withdrawal-recovery-module-start-empty-without-provider-effects",
+        "generated-Linux-Prisma-client-and-native-bcrypt-work-and-QA-server-scripts-are-excluded",
+        "actual-full-app-wires-workflow-and-customer-commands-with-empty-plans-and-guards-all-new-operations",
+        "event-notice-migration-and-nullable-run-client-start-without-inferred-deliveries",
+        "both-candidate-Nginx-images-serve-real-HTML-and-JavaScript-assets-on-the-private-network"
+      ],
+      "identity": "empty disposable database; no auth session created",
+      "networkInternal": true,
+      "hostPortsPublished": false,
+      "realAccounts": false,
+      "realProviders": false,
+      "mainDatabaseModified": false,
+      "mainRuntimeUpdated": false,
+      "evidence": ".local/runtime-only-20261111/runtime-1794416759990/result.json"
+    },
+    "currentDatabaseRestore": {
+      "checkedAt": "2026-11-11T17:06:37.579Z",
+      "checks": [
+        "fresh-database-and-upload-archives-read-without-stopping-or-changing-main-services",
+        "database-restores-before-migration-and-upload-archive-restores-byte-identical-paths-types-modes-and-symlinks",
+        "candidate-normal-entrypoint-applies-nine-automation-migrations-and-preserves-existing-workflow-data-and-media",
+        "previous-workflow-image-boots-on-event-notice-schema-before-new-writes-with-original-data-and-media",
+        "cold-restore-boots-retained-workflow-image-and-restores-original-data-and-media",
+        "main-image-identities-health-schema-and-source-uploads-remain-unchanged-and-no-source-write-was-issued"
+      ],
+      "candidateImageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+      "candidateTag": "alora-runtime-only-api:20261111",
+      "candidateMigrationCount": 9,
+      "rollbackImageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+      "originalTablesUnchanged": 54,
+      "originalColumnsUnchanged": 633,
+      "sourceUploadFiles": 0,
+      "syntheticUploadFixtures": 3,
+      "syntheticSymlinkFixtures": 1,
+      "originalMediaArchiveSha256": "0a729b5b83fbfe824bb5e70fb1a4440e71bdf6fc66351da6319fc50ebf5f5d13",
+      "sourceOperationsReadOnly": true,
+      "mainRuntimeUpdated": false,
+      "sourceConfigurationChanged": false,
+      "realAccountSessionsCreated": false,
+      "copiedAccountRowsUnchanged": true,
+      "realProviderMessages": false,
+      "networkInternal": true,
+      "hostPortsPublished": false,
+      "productionDeployment": false,
+      "commercialAcceptance": false,
+      "limits": [
+        "Live source was not quiesced; concurrent database/media point-in-time consistency is not certified",
+        "Source uploads were empty; non-empty media recovery used synthetic files only in isolated volumes",
+        "Binary rollback is verified before any post-upgrade user writes or provider effects",
+        "Redis queues, external Connect configuration/keys, DNS/TLS and production infrastructure recovery are not covered",
+        "No real login, provider delivery or customer acceptance was attempted"
+      ],
+      "evidence": ".local/step14/restore-1794416759985/result.json"
+    },
+    "installedImages": {
+      "checkedAt": "2026-11-11T17:13:31.957Z",
+      "apiImageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+      "api": {
+        "files": 6444,
+        "typescript": 0,
+        "sourceMaps": 0,
+        "runtimeDependencies": "passed"
+      },
+      "frontends": [
+        {
+          "container": "barber-web-admin-1",
+          "files": 20,
+          "typescript": 0,
+          "sourceMaps": 0
+        },
+        {
+          "container": "barber-web-public-booking-1",
+          "files": 17,
+          "typescript": 0,
+          "sourceMaps": 0
+        }
+      ],
+      "sourceCodeMounts": 0,
+      "readOnly": true
+    },
+    "connectRuntimeImagesVerifier": "node scripts/verify-runtime-images.mjs eulab-connect passed in Connect checkout",
+    "runtimeCompatibleQa": {
+      "whatsappHttpGroups": 9,
+      "locationsHttpGroups": 7,
+      "provider": "synthetic loopback",
+      "npmInstallationInRuntimeRequired": false,
+      "sdkExecutableFilesComparedWithPinnedArchive": true,
+      "mainApiContainerUsedForQaSourceCopies": false,
+      "ownedQaContainersAndDatabasesRemoved": true
+    }
+  },
+  "rollout": {
+    "checkedAt": "2026-11-11T17:11:22.527184+00:00",
+    "status": "passed",
+    "apiImageUpdated": true,
+    "candidateImage": {
+      "name": "api",
+      "tag": "alora-runtime-only-api:20261111",
+      "imageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+      "sameApplicationJavaScriptAfterRemovingSourceMapComment": true,
+      "compiledJavaScriptFiles": 172,
+      "runtimeSourceMaps": 0
+    },
+    "rollbackImage": "alora-before-runtime-only-api:20261111t171055z",
+    "originalTablesRetained": 54,
+    "originalColumnsRetained": 633,
+    "exactDataTablesUnchanged": 54,
+    "technicalSdkConfigurationContentPreserved": true,
+    "accountsAndSessionsPreserved": true,
+    "migrationHistoryUnchanged": true,
+    "coordinatedDatabaseAndUploadsBackup": true,
+    "backupReadable": true,
+    "databaseBackupSha256": "5b9161b11aa6a4d3a8d7435d901b0a78bead6be3f2da7b31cda88b5e9634e69e",
+    "uploadsUnchanged": true,
+    "applicationEnvironmentAndMountsUnchanged": true,
+    "frontendsAndAllConnectContainersUnchanged": true,
+    "health": {
+      "status": "ok",
+      "timestamp": "2026-11-11T17:11:12.864Z"
+    },
+    "realAccountSessionsUsed": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "evidence": ".local/runtime-only-20261111/rollout-20261111T171055Z"
+  },
+  "qaCleanup": {
+    "ownedVerificationContainersAndNetworksRemoved": true
+  },
+  "sourceChecksums": {
+    "docker/app.Dockerfile": "3341ff1e36e3c79f6766cd219b9df99b2568db21db495992eb0bcbf88cbd03a4",
+    "docker/prepare-api-runtime.cjs": "3a63fc76b11c30747bd869555a3312241200d0ee95b468c334e472e75ed87c8a",
+    "docker/check-api-runtime.cjs": "e7d2438c72fe56b9ad9a2b7e156b9d5e42428a71c0413a6c06a88562ffe64ea8",
+    "apps/api/tsconfig.runtime.json": "804ce2d38acd07185d849c593f8323fd03a74b6aff79ab10aa572746c4a2b9e2",
+    "scripts/prune-runtime-deps.mjs": "174dccb354da44a42f99235b69f59446ad1c6c3d6842224599bd5d60a897b79d",
+    "scripts/prisma-bootstrap.js": "d56887166a61b0dc035f4719a7229783b53f5f9d0180559c0ddb04e68ad337c5",
+    "scripts/verify-runtime-images.mjs": "1eceb01dbfb2c2155f2434959146c82e9d2b4ca981c970e60c5bfaac365325e3",
+    "scripts/verify-step13-docker-runtime.mjs": "71aff398031be14bf8c8747d8986d6f0dd9d3c6b4f7f9c8ca3601168e6f99b4b",
+    "scripts/verify-release-restore.mjs": "42933027b9a19b426fdca9b9514c0c7c893dcba00e68e182289525d800338b2e",
+    "scripts/check-qa-runtime-sdk.cjs": "03c0cdfafe6439d8bad225544c7d4f9e3a47365bbf93a0e77cfb24fab91c7ff5",
+    "scripts/verify-whatsapp-http.mjs": "8c03eccbfee52b93389ef706b40a4ecbcc4b8f0866935261301453876641bb47",
+    "scripts/verify-locations-http.mjs": "b42b6b38521865de95fee08b776aa8eb3d179c34869c0a353619e0c25b75daff"
+  },
+  "limits": [
+    "Build stages and local build cache may contain sources and compilers; final runtime images exclude them",
+    "JavaScript executables, native libraries, Prisma generated metadata/migrations, legal notices, certificates and runtime configuration are required runtime artifacts",
+    "Connect already satisfied this requirement; its running containers were audited and preserved",
+    "Runtime packaging verification does not certify real WhatsApp delivery, public webhook or commercial acceptance",
+    "Backup and retained previous image tags are preserved; no image or data-volume pruning was performed"
+  ],
+  "realAccountOperations": false,
+  "realProviderMessages": false,
+  "productionDeployment": false
+}

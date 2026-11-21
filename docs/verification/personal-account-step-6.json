@@ -1,0 +1,488 @@
+{
+  "date": "2026-11-06T17:50:40.001Z",
+  "status": "technically-closed-account-checks-deferred-by-user",
+  "scope": {
+    "step": 6,
+    "followingStep": 7,
+    "productionDeployed": false,
+    "newDatabaseMigrations": false,
+    "newCredentialSystem": false
+  },
+  "automated": {
+    "command": "npm test -- --runInBand",
+    "suites": 44,
+    "tests": 275,
+    "snapshots": 1,
+    "passed": true,
+    "targetedLintPassed": true
+  },
+  "docker": {
+    "apiBuiltAndHealthy": true,
+    "adminBuiltAndHealthy": true,
+    "expectedApiEntrypointChecked": true,
+    "existingVolumesPreserved": true,
+    "currentDeviceRefinementBuiltAndRunning": true,
+    "anonymousAccountReadsDenied401": true
+  },
+  "consumer": {
+    "date": "2026-11-06T11:32:43.126Z",
+    "disposableSubject": true,
+    "realSsoLogin": true,
+    "personalApiStatuses": {
+      "/account": 200,
+      "/account/security": 200,
+      "/account/sessions": 200,
+      "/account/notifications": 200,
+      "/team": 403,
+      "/dashboard/revenue": 403
+    },
+    "routeAccessibleWithoutBusinessPermissions": true,
+    "fourViewportsWithoutOverflow": true,
+    "origin": "http://127.0.0.1:53020"
+  },
+  "provider": {
+    "date": "2026-11-06T11:38:42.107Z",
+    "disposableIdentityOnly": true,
+    "emailSent": false,
+    "providerProfileEditVerified": true,
+    "passwordChangedInProvider": true,
+    "newCredentialLoginVerified": true,
+    "totpConfiguredInProvider": true,
+    "realTotpChallengeAndLoginVerified": true,
+    "aloraReadsConfiguredTotp": true,
+    "trustedDeviceCount": 0
+  },
+  "sessions": {
+    "date": "2026-11-06T11:52:06.748Z",
+    "realProvider": true,
+    "nativeTotpStatusReadBack": true,
+    "mfaPreferenceUnavailableOnNativeFlow": true,
+    "otherOwnedSessionLogout201": true,
+    "revokedSessionReplay401": true,
+    "currentSessionPreserved200": true,
+    "foreignSessionId404": true,
+    "foreignDeniedWithoutLocalLogout": true,
+    "cancelSentNoMutation": true,
+    "logoutAllUiConfirmedOnce": true,
+    "localBrowserSessionCleared": true,
+    "appliesOnlyToTemporaryOperator": true
+  },
+  "ui": {
+    "date": "2026-11-06T11:53:04.748Z",
+    "realProviderAccount": true,
+    "fourViewportsWithoutOverflow": true,
+    "unsupportedMfaPreferenceNotOffered": true,
+    "dialogInitiallyFocusesCancel": true,
+    "dialogTabCyclesWithinButtons": true,
+    "escapeCancelsWithoutLogout": true,
+    "qaSessionLoggedOut": true,
+    "verifiedBeforeDeviceRefinement": true,
+    "deviceRefinementVerifiedSeparately": true
+  },
+  "email": {
+    "date": "2026-11-06T11:42:08.551Z",
+    "authorizedRecipientProvided": true,
+    "temporaryCollaboratorCreated": true,
+    "originalOwnerCredentialsUnchanged": true,
+    "delegatedAloraRequestStatus": 201,
+    "providerAccepted": true,
+    "deliveryVerified": true,
+    "passwordResetLinkVerified": true,
+    "newPasswordLoginVerified": false,
+    "noAutomaticRetry": true,
+    "userConfirmedEmailAndPasswordChange": true,
+    "connectAdminAccessConcernReported": true
+  },
+  "adminAccess": {
+    "date": "2026-11-06T12:01:46.582Z",
+    "freshIsolatedBrowser": true,
+    "preExistingConfiguredAdminCredentialLoginSucceeded": true,
+    "adminRolesEndpoint200": true,
+    "noPasswordResetPerformed": true,
+    "accountSwitchRegression": {
+      "date": "2026-11-06T12:00:12.780Z",
+      "reproducedNonAdminSharedSession": true,
+      "switchAccountReachesEditableLogin": true,
+      "originalAdminCredentialUnchanged": true,
+      "adminOverview200InSameBrowser": true,
+      "noRoleOrPasswordMutation": true
+    },
+    "userReportedDifferentAdminEmail": true,
+    "awaitingExactUrlAndError": false,
+    "confirmedUserFacingUrl": "http://localhost:8088",
+    "gmailAdminRoleRestoredAfterExplicitClarification": true,
+    "recovery": {
+      "date": "2026-11-06T17:45:59.843Z",
+      "authorizedEmailRestoredAsConnectAdmin": true,
+      "centralRole": "eulab-admin",
+      "providerSubjectPreserved": true,
+      "currentPasswordCredentialUnchanged": true,
+      "temporaryCollaboratorRemovedFromAlora": true,
+      "temporaryApplicationMappingsAndMembershipRemoved": true,
+      "temporaryRoleRemoved": true,
+      "identityRetainedPermanentlyAsAdmin": true,
+      "previousSessionsRevokedByProvider": true,
+      "originalBootstrapAdminRetained": true,
+      "noResetEmailSent": true,
+      "userLoginStillToConfirm": true
+    },
+    "bootstrapAdminControl": {
+      "date": "2026-11-06T17:48:38.768Z",
+      "freshIsolatedBrowser": true,
+      "preExistingConfiguredAdminCredentialLoginSucceeded": true,
+      "adminRolesEndpoint200": true,
+      "noPasswordResetPerformed": true
+    },
+    "postRecoveryReadback": {
+      "checkedAt": "2026-11-06T17:52:39.958Z",
+      "authorizedEmailEnabled": true,
+      "connectAdminRolePresent": true,
+      "providerSubjectPreserved": true,
+      "userLoginStillToConfirm": true
+    },
+    "evidenceScope": "historical-observations-not-current-account-acceptance",
+    "accountChecksDeferredByUser": true,
+    "noFurtherLoginRequested": true
+  },
+  "cleanup": {
+    "date": "2026-11-06T12:00:56.633Z",
+    "temporaryOperatorRemoved": true,
+    "temporaryRecipientRemoved": false,
+    "providerAndLocalIdentitiesRemovedByExactIds": true,
+    "originalCredentialsAndGrantsUnchanged": true,
+    "auditPreserved": true,
+    "recipientRetainedForReportedAdminAccessConcern": false,
+    "temporaryRecipientApplicationProfileRemoved": true,
+    "temporaryApplicationFixturesFullyRemoved": true,
+    "recipientIdentityPreservedPermanentlyAsAdmin": true
+  },
+  "reconciliation": {
+    "date": "2026-11-06T17:48:36.384Z",
+    "temporaryRestoreDatabasesRemoved": true,
+    "alora": [
+      {
+        "table": "Tenant",
+        "count": 1,
+        "matchesBaseline": true
+      },
+      {
+        "table": "User",
+        "count": 2,
+        "matchesBaseline": true
+      },
+      {
+        "table": "Customer",
+        "count": 4,
+        "matchesBaseline": true
+      },
+      {
+        "table": "Service",
+        "count": 4,
+        "matchesBaseline": true
+      },
+      {
+        "table": "Product",
+        "count": 5,
+        "matchesBaseline": true
+      },
+      {
+        "table": "Collaborator",
+        "count": 4,
+        "matchesBaseline": true
+      },
+      {
+        "table": "CollaboratorWeeklySchedule",
+        "count": 28,
+        "matchesBaseline": true
+      },
+      {
+        "table": "CollaboratorDayOverride",
+        "count": 0,
+        "matchesBaseline": true
+      },
+      {
+        "table": "TenantHoliday",
+        "count": 0,
+        "matchesBaseline": true
+      },
+      {
+        "table": "Room",
+        "count": 0,
+        "matchesBaseline": true
+      },
+      {
+        "table": "Appointment",
+        "count": 11,
+        "matchesBaseline": true
+      },
+      {
+        "table": "Sale",
+        "count": 4,
+        "matchesBaseline": true
+      },
+      {
+        "table": "SaleItem",
+        "count": 8,
+        "matchesBaseline": true
+      },
+      {
+        "table": "TeamAccountIntent",
+        "count": 1,
+        "matchesBaseline": true
+      }
+    ],
+    "connect": [
+      {
+        "table": "customers",
+        "count": 1,
+        "matchesBaseline": true
+      },
+      {
+        "table": "applications",
+        "count": 1,
+        "matchesBaseline": true
+      },
+      {
+        "table": "installations",
+        "count": 1,
+        "matchesBaseline": true
+      },
+      {
+        "table": "licenses",
+        "count": 1,
+        "matchesBaseline": true
+      },
+      {
+        "table": "entitlements",
+        "count": 25,
+        "matchesBaseline": true
+      },
+      {
+        "table": "identities",
+        "count": 3,
+        "matchesBaseline": true
+      },
+      {
+        "table": "memberships",
+        "count": 2,
+        "matchesBaseline": true
+      },
+      {
+        "table": "roles",
+        "count": 2,
+        "matchesBaseline": true
+      },
+      {
+        "table": "role_permissions",
+        "count": 27,
+        "matchesBaseline": true
+      },
+      {
+        "table": "assignments",
+        "count": 2,
+        "matchesBaseline": true
+      },
+      {
+        "table": "local_links",
+        "count": 2,
+        "matchesBaseline": true
+      },
+      {
+        "table": "features",
+        "count": 25,
+        "matchesBaseline": true
+      },
+      {
+        "table": "permissions",
+        "count": 25,
+        "matchesBaseline": true
+      },
+      {
+        "table": "app_local_users",
+        "count": 2,
+        "matchesBaseline": true
+      },
+      {
+        "table": "catalogs",
+        "count": 4,
+        "matchesBaseline": true
+      },
+      {
+        "table": "app_access_revocations",
+        "count": 0,
+        "matchesBaseline": true
+      },
+      {
+        "table": "connect_sources",
+        "count": 1,
+        "matchesBaseline": true
+      },
+      {
+        "table": "source_installation_bindings",
+        "count": 1,
+        "matchesBaseline": true
+      },
+      {
+        "table": "source_tenant_bindings",
+        "count": 1,
+        "matchesBaseline": true
+      }
+    ],
+    "retainedAuthorizedEmailTestFixtureExcludedByExactIds": false,
+    "authorizedPermanentAdminIdentityExcludedByExactSubject": true,
+    "temporaryRecipientApplicationDataRemoved": true,
+    "originalDataReconciledOnly": true,
+    "customerComparisonExcludesOnlyAlignmentTimestamps": true,
+    "userComparisonExcludesOnlyLoginUpdatedAt": true,
+    "applicationComparisonExcludesCatalogCheckAndSyncTimestamps": true,
+    "expectedApplicationStatusChange": {
+      "field": "catalog_sync_error",
+      "before": "GET matrice: HTTP 404",
+      "after": null
+    },
+    "auditAndRuntimeSessionHistoryExcluded": true
+  },
+  "notActivated": {
+    "connectMfaFlow": true,
+    "emailOtp": true,
+    "extendedTrustedDevices": true,
+    "securityEventNotifications": true
+  },
+  "notes": [
+    "Provider changes affected disposable identities only.",
+    "Recipient confirmed receipt and password change; new-credential ALORA login is not confirmed.",
+    "Native browser flow remains active; SMTP and original administrator credentials are unchanged.",
+    "Device refusal/preflight refinement is verified by regression tests and compiled UI HTTP simulation only; it does not activate the extended provider flow.",
+    "After explicit user clarification, the authorized email identity is preserved permanently with eulab-admin. Its current password credential is unchanged; all temporary ALORA bindings/profile/role are removed.",
+    "Original data reconciliation records the one authorized permanent administrator identity separately.",
+    "The user must sign in again after the provider revokes old sessions on the role change.",
+    "Current instruction closes technical delivery and defers account investigations; historical account restoration reports are not current acceptance evidence."
+  ],
+  "deviceRejectionUiSimulation": {
+    "date": "2026-11-06T12:11:36.155Z",
+    "scope": "compiled-ui-with-mocked-http-only",
+    "realProviderUsed": false,
+    "noActualDeviceOrCredentialMutation": true,
+    "cases": [
+      {
+        "name": "foreign-device",
+        "preservesLocalSession": true,
+        "requests": 1,
+        "passed": true
+      },
+      {
+        "name": "provider-denial",
+        "preservesLocalSession": true,
+        "requests": 1,
+        "passed": true
+      },
+      {
+        "name": "preflight-unavailable",
+        "preservesLocalSession": true,
+        "requests": 1,
+        "passed": true
+      },
+      {
+        "name": "uncertain-mutation",
+        "preservesLocalSession": false,
+        "requests": 1,
+        "passed": true
+      }
+    ]
+  },
+  "deviceRevocationRefinement": {
+    "ownershipCheckedBeforeMutation": true,
+    "definiteRejectionsPreserveLocalAccess": true,
+    "preflightFailureCode": "account_operation_not_started",
+    "uncertainStartedMutationStillClosesLocalAccess": true,
+    "realDeviceRevocationVerified": false,
+    "identitiesOrSmtpChanged": false
+  },
+  "previousGoalBlocker": {
+    "checkedAt": "2026-11-06T12:14:42.847Z",
+    "reason": "Reported Gmail administrator access cannot be reconciled with the verified local realm without identifying the user-facing instance and error.",
+    "requiredInput": [
+      "Connect base URL used by the user",
+      "Exact visible error"
+    ],
+    "browserInspectionAvailable": false,
+    "independentChecksComplete": true,
+    "temporaryRecipientPreserved": true,
+    "administratorEmailRolesAndCredentialNotChanged": true,
+    "resolvedByUserClarification": true,
+    "resolvedAt": "2026-11-06T17:45:59.843Z"
+  },
+  "providerIdentityReconciliation": {
+    "date": "2026-11-06T17:52:13.075Z",
+    "scope": "pre-existing-keycloak-identity-data",
+    "authorizedPermanentAdministratorRecordedSeparately": true,
+    "passwordContentsOrHashesExposed": false,
+    "tables": [
+      {
+        "table": "user_entity",
+        "count": 5,
+        "matchesBaseline": true
+      },
+      {
+        "table": "credential",
+        "count": 4,
+        "matchesBaseline": true
+      },
+      {
+        "table": "user_role_mapping",
+        "count": 14,
+        "matchesBaseline": true
+      },
+      {
+        "table": "user_attribute",
+        "count": 3,
+        "matchesBaseline": true
+      },
+      {
+        "table": "user_required_action",
+        "count": 0,
+        "matchesBaseline": true
+      },
+      {
+        "table": "user_group_membership",
+        "count": 0,
+        "matchesBaseline": true
+      }
+    ],
+    "temporaryRestoreDatabaseRemoved": true
+  },
+  "technicalClosure": {
+    "date": "2026-11-06T18:14:09.366Z",
+    "steps": [
+      5,
+      6
+    ],
+    "scope": "ALORA consumer implementation and technical delivery",
+    "userInstruction": "procedi con la chiusura degli step lascia perdere gli account",
+    "accountChecksDeferred": true,
+    "accountChecksCountedAsPassed": false,
+    "productionAcceptance": false,
+    "providerExtendedMfaActivated": false,
+    "newAccountOrRoleOperationsPerformed": false,
+    "finalValidation": {
+      "testSuites": 44,
+      "tests": 275,
+      "snapshots": 1,
+      "testExitCode": 0,
+      "fullLintExitCode": 0,
+      "apiBuildExitCode": 0,
+      "adminBuildExitCode": 0,
+      "publicBuildExitCode": 0,
+      "apiEntrypointExists": true
+    },
+    "report": "docs/chiusura-step-5-6.md"
+  },
+  "accountInvestigation": {
+    "status": "deferred-by-user",
+    "lastObservedAt": "2026-11-06T18:06:56.578Z",
+    "lastObservedAdminRolePresent": false,
+    "roleDefinitionReadReturned404": true,
+    "causeEstablished": false,
+    "additionalAccountChecksDuringClosure": false
+  }
+}

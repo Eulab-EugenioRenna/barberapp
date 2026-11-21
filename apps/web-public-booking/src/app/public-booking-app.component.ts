@@ -92,274 +92,441 @@ import { CustomSelectComponent } from "./custom-select.component";
               Stiamo preparando gli orari disponibili...
             </p>
             <div
-              class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"
+              *ngIf="facade.pendingState().kind !== 'empty'"
+              role="status"
+              class="rounded-2xl bg-amber-50 p-4 mb-4 text-sm text-amber-950"
             >
-              <div>
-                <p class="eyebrow text-[var(--accent)]">Prenotazione</p>
-                <h2 class="font-display text-2xl sm:text-4xl">
-                  Scegli servizio e orario
-                </h2>
-              </div>
-              <label class="field public-date-field">
-                <span
-                  >Data
-                  <em class="required-mark" aria-hidden="true">*</em></span
-                >
-                <barber-calendar-input
-                  [value]="selectedDateValue"
-                  (valueChange)="onSelectedDateChange($event)"
-                  [min]="todayKey"
-                  label="Data"
-                  name="selectedDate"
-                  placeholder="Scegli il giorno"
-                ></barber-calendar-input>
-              </label>
-            </div>
-
-            <div
-              class="mt-4 flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-7 md:overflow-visible md:pb-0"
-            >
+              <p>
+                L’invio precedente è ancora da verificare. Recuperane l’esito
+                prima di iniziare una nuova prenotazione.
+              </p>
               <button
-                *ngFor="let day of facade.availabilityWeek()"
                 type="button"
-                class="w-[6.75rem] shrink-0 rounded-[1rem] border px-3 py-3 text-left text-sm md:w-auto md:shrink"
-                [ngClass]="{
-                  'border-[var(--accent)] bg-[rgba(var(--accent-rgb),0.12)]':
-                    day.isSelected,
-                  'ring-1 ring-[rgba(var(--accent-rgb),0.28)]':
-                    day.isToday && !day.isSelected,
-                  'border-amber-200 bg-amber-50 text-amber-900':
-                    day.isUnavailable,
-                  'border-[var(--line)]/70 bg-white/80':
-                    !day.isSelected && !day.isUnavailable && !day.isPast,
-                  'opacity-40': day.isPast,
-                }"
-                [disabled]="day.isPast"
-                (click)="onSelectedDateChange(day.key)"
-              >
-                <strong class="block">{{ day.label }}</strong>
-                <span class="mt-1 block text-xs opacity-70">
-                  {{ day.statusLabel }}
-                </span>
-              </button>
-            </div>
-
-            <div class="mt-3 grid grid-cols-7 gap-1.5 sm:gap-2">
-              <button
-                *ngFor="let day of facade.availabilityMonth()"
-                type="button"
-                class="min-h-[3.25rem] rounded-[0.9rem] border px-1.5 py-1.5 text-left text-xs sm:min-h-[4.25rem] sm:rounded-[1rem] sm:px-3 sm:py-2 sm:text-sm"
-                [ngClass]="{
-                  'border-[var(--accent)] bg-[rgba(var(--accent-rgb),0.12)]':
-                    day.isSelected,
-                  'ring-1 ring-[rgba(var(--accent-rgb),0.28)]':
-                    day.isToday && !day.isSelected,
-                  'border-amber-200 bg-amber-50 text-amber-900':
-                    day.isUnavailable,
-                  'border-[var(--line)]/60 bg-slate-50/70 text-slate-400':
-                    !day.inMonth,
-                  'border-[var(--line)]/70 bg-white/80':
-                    day.inMonth &&
-                    !day.isSelected &&
-                    !day.isUnavailable &&
-                    !day.isPast,
-                  'opacity-40': day.isPast,
-                }"
-                [disabled]="day.isPast"
-                (click)="onSelectedDateChange(day.key)"
-              >
-                <strong class="block text-center sm:text-left">{{
-                  day.dayNumber
-                }}</strong>
-                <span class="mt-1 hidden text-[11px] opacity-70 sm:block">
-                  {{ day.statusLabel }}
-                </span>
-              </button>
-            </div>
-
-            <div class="mt-6 grid gap-3">
-              <button
-                *ngFor="let service of services()"
-                type="button"
-                class="service-card text-left"
-                [ngClass]="{ active: selectedService()?.id === service.id }"
-                [style.border-color]="service.color || 'var(--brand)'"
-                [style.box-shadow]="
-                  selectedService()?.id === service.id
-                    ? '0 0 0 1px ' + (service.color || 'var(--brand)')
-                    : null
+                class="primary-btn mt-3"
+                [disabled]="
+                  loading() || facade.pendingState().kind !== 'pending'
                 "
-                (click)="selectService(service)"
+                (click)="submitBooking()"
               >
-                <div>
-                  <div class="flex items-center gap-3">
-                    <span
-                      class="inline-flex size-3 rounded-full"
-                      [style.background]="service.color || 'var(--brand)'"
-                    ></span>
-                    <h3 class="font-display text-2xl">{{ service.name }}</h3>
-                  </div>
-                  <p class="mt-1 text-sm text-[var(--muted)]">
-                    {{
-                      service.publicDescription ||
-                        "Prenotazione online disponibile"
-                    }}
-                  </p>
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    <span class="status-pill status-pill-neutral"
-                      >{{
-                        service.collaborators?.length || 0
-                      }}
-                      professionisti</span
-                    >
-                    <span
-                      *ngFor="
-                        let linkedProduct of service.serviceProducts || []
-                      "
-                      class="status-pill status-pill-blue"
-                    >
-                      {{ linkedProduct.product?.name }}
-                    </span>
-                  </div>
-                </div>
-                <div class="text-right">
-                  <strong class="text-lg"
-                    >€{{ service.basePrice | number: "1.0-2" }}</strong
-                  >
-                  <p class="text-sm text-[var(--muted)]">
-                    {{ service.durationMinutes }} min
-                  </p>
-                </div>
+                Verifica prenotazione precedente
               </button>
-              <article
-                *ngIf="!loading() && !services().length"
-                class="rounded-[1.4rem] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
-              >
-                Nessun servizio prenotabile online in questo momento.
-              </article>
             </div>
-
-            <div
-              *ngIf="selectedService()"
-              class="mt-6 grid gap-4 md:grid-cols-2"
+            <fieldset
+              *ngIf="!bookingResult()"
+              style="border:0;padding:0;margin:0;min-width:0"
+              [disabled]="loading() || facade.pendingState().kind !== 'empty'"
             >
-              <label class="field">
-                <span
-                  >Professionista
-                  <em class="required-mark" aria-hidden="true">*</em></span
-                >
-                <barber-custom-select
-                  [value]="selectedCollaboratorId()"
-                  (valueChange)="onSelectedCollaboratorChange($event)"
-                  [options]="collaboratorSelectOptions"
-                  label="Professionista"
-                  placeholder="Scegli chi si prenderà cura di te"
-                ></barber-custom-select>
-              </label>
-              <label class="field">
-                <span
-                  >Orari disponibili
-                  <em class="required-mark" aria-hidden="true">*</em></span
-                >
-                <barber-custom-select
-                  [value]="selectedSlot()"
-                  (valueChange)="onSelectedSlotChange($event)"
-                  [disabled]="!selectedCollaboratorId() || !slots().length"
-                  [options]="slotSelectOptions"
-                  label="Orario"
-                  [placeholder]="
-                    !selectedCollaboratorId()
-                      ? 'Prima scegli il professionista'
-                      : slots().length
-                        ? 'Seleziona orario'
-                        : 'Nessun orario disponibile'
-                  "
-                ></barber-custom-select>
-              </label>
-            </div>
-
-            <form class="mt-6 grid gap-4" (ngSubmit)="submitBooking()">
-              <div class="grid gap-4 md:grid-cols-2">
-                <label class="field">
+              <div
+                class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="eyebrow text-[var(--accent)]">Prenotazione</p>
+                  <h2 class="font-display text-2xl sm:text-4xl">
+                    Scegli servizio e orario
+                  </h2>
+                  <div
+                    class="mt-4 grid gap-3 sm:grid-cols-2"
+                    *ngIf="settings()?.locations?.length"
+                  >
+                    <label class="field"
+                      ><span>Sede</span
+                      ><select
+                        class="min-w-0 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3"
+                        aria-label="Sede della prenotazione"
+                        [ngModel]="facade.selectedLocationId()"
+                        (ngModelChange)="facade.selectLocation($event)"
+                      >
+                        <option
+                          *ngFor="let location of settings().locations"
+                          [value]="location.id"
+                        >
+                          {{ location.name
+                          }}{{
+                            location.address ? " · " + location.address : ""
+                          }}
+                        </option>
+                      </select></label
+                    >
+                    <label
+                      class="field"
+                      *ngIf="facade.selectedLocation()?.sectors?.length > 1"
+                      ><span>Settore</span
+                      ><select
+                        class="min-w-0 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3"
+                        aria-label="Settore della prenotazione"
+                        [ngModel]="facade.selectedSectorId()"
+                        (ngModelChange)="facade.selectSector($event)"
+                      >
+                        <option value="">Tutti i settori</option>
+                        <option
+                          *ngFor="
+                            let sector of facade.selectedLocation().sectors
+                          "
+                          [value]="sector.id"
+                        >
+                          {{ sector.name }}
+                        </option>
+                      </select></label
+                    >
+                  </div>
+                </div>
+                <label class="field public-date-field">
                   <span
-                    >Nome e cognome
+                    >Data
                     <em class="required-mark" aria-hidden="true">*</em></span
                   >
-                  <input
-                    [ngModel]="bookingForm().customerName"
-                    (ngModelChange)="
-                      onBookingFieldChange('customerName', $event)
-                    "
-                    name="customerName"
-                    placeholder="Mario Rossi"
-                    autocomplete="name"
-                    required
-                  />
-                </label>
-                <label class="field">
-                  <span>Email</span>
-                  <input
-                    [ngModel]="bookingForm().email"
-                    (ngModelChange)="onBookingFieldChange('email', $event)"
-                    name="email"
-                    type="email"
-                    placeholder="mario@email.it"
-                    autocomplete="email"
-                  />
-                </label>
-              </div>
-              <div class="grid gap-4 md:grid-cols-2">
-                <label class="field">
-                  <span>Telefono</span>
-                  <input
-                    [ngModel]="bookingForm().phone"
-                    (ngModelChange)="onBookingFieldChange('phone', $event)"
-                    name="phone"
-                    type="tel"
-                    placeholder="+39 333 123 4567"
-                    autocomplete="tel"
-                  />
-                </label>
-                <label class="field">
-                  <span>Richieste</span>
-                  <input
-                    [ngModel]="bookingForm().customerNotes"
-                    (ngModelChange)="
-                      onBookingFieldChange('customerNotes', $event)
-                    "
-                    name="customerNotes"
-                    placeholder="Preferenze o richieste utili al salone"
-                  />
+                  <barber-calendar-input
+                    [value]="selectedDateValue"
+                    (valueChange)="onSelectedDateChange($event)"
+                    [min]="todayKey"
+                    label="Data"
+                    name="selectedDate"
+                    placeholder="Scegli il giorno"
+                  ></barber-calendar-input>
                 </label>
               </div>
 
-              <p
-                *ngIf="feedback()"
-                role="status"
-                aria-live="polite"
-                class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+              <div
+                class="mt-4 flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-7 md:overflow-visible md:pb-0"
               >
-                {{ feedback() }}
-              </p>
+                <button
+                  *ngFor="let day of facade.availabilityWeek()"
+                  [attr.data-date]="day.key"
+                  type="button"
+                  class="w-[6.75rem] shrink-0 rounded-[1rem] border px-3 py-3 text-left text-sm md:w-auto md:shrink"
+                  [ngClass]="{
+                    'border-[var(--accent)] bg-[rgba(var(--accent-rgb),0.12)]':
+                      day.isSelected,
+                    'ring-1 ring-[rgba(var(--accent-rgb),0.28)]':
+                      day.isToday && !day.isSelected,
+                    'border-amber-200 bg-amber-50 text-amber-900':
+                      day.isUnavailable,
+                    'border-[var(--line)]/70 bg-white/80':
+                      !day.isSelected && !day.isUnavailable && !day.isPast,
+                    'opacity-40': day.isPast,
+                  }"
+                  [disabled]="day.isPast"
+                  (click)="onSelectedDateChange(day.key)"
+                >
+                  <strong class="block">{{ day.label }}</strong>
+                  <span class="mt-1 block text-xs opacity-70">
+                    {{ day.statusLabel }}
+                  </span>
+                </button>
+              </div>
 
-              <button
-                type="submit"
-                class="primary-btn"
-                [disabled]="
-                  loading() ||
-                  !selectedService() ||
-                  !selectedSlot() ||
-                  !bookingForm().customerName.trim()
-                "
+              <div class="mt-3 grid grid-cols-7 gap-1.5 sm:gap-2">
+                <button
+                  *ngFor="let day of facade.availabilityMonth()"
+                  [attr.data-date]="day.key"
+                  type="button"
+                  class="min-h-[3.25rem] rounded-[0.9rem] border px-1.5 py-1.5 text-left text-xs sm:min-h-[4.25rem] sm:rounded-[1rem] sm:px-3 sm:py-2 sm:text-sm"
+                  [ngClass]="{
+                    'border-[var(--accent)] bg-[rgba(var(--accent-rgb),0.12)]':
+                      day.isSelected,
+                    'ring-1 ring-[rgba(var(--accent-rgb),0.28)]':
+                      day.isToday && !day.isSelected,
+                    'border-amber-200 bg-amber-50 text-amber-900':
+                      day.isUnavailable,
+                    'border-[var(--line)]/60 bg-slate-50/70 text-slate-400':
+                      !day.inMonth,
+                    'border-[var(--line)]/70 bg-white/80':
+                      day.inMonth &&
+                      !day.isSelected &&
+                      !day.isUnavailable &&
+                      !day.isPast,
+                    'opacity-40': day.isPast,
+                  }"
+                  [disabled]="day.isPast"
+                  (click)="onSelectedDateChange(day.key)"
+                >
+                  <strong class="block text-center sm:text-left">{{
+                    day.dayNumber
+                  }}</strong>
+                  <span class="mt-1 hidden text-[11px] opacity-70 sm:block">
+                    {{ day.statusLabel }}
+                  </span>
+                </button>
+              </div>
+
+              <div class="mt-6 grid gap-3">
+                <button
+                  *ngFor="let service of services()"
+                  type="button"
+                  class="service-card text-left"
+                  [ngClass]="{ active: selectedService()?.id === service.id }"
+                  [style.border-color]="service.color || 'var(--brand)'"
+                  [style.box-shadow]="
+                    selectedService()?.id === service.id
+                      ? '0 0 0 1px ' + (service.color || 'var(--brand)')
+                      : null
+                  "
+                  (click)="selectService(service)"
+                >
+                  <div>
+                    <div class="flex items-center gap-3">
+                      <span
+                        class="inline-flex size-3 rounded-full"
+                        [style.background]="service.color || 'var(--brand)'"
+                      ></span>
+                      <h3 class="font-display text-2xl">{{ service.name }}</h3>
+                    </div>
+                    <p class="mt-1 text-sm text-[var(--muted)]">
+                      {{
+                        service.publicDescription ||
+                          "Prenotazione online disponibile"
+                      }}
+                    </p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <span class="status-pill status-pill-neutral"
+                        >{{
+                          service.collaborators?.length || 0
+                        }}
+                        professionisti</span
+                      >
+                      <span
+                        *ngFor="
+                          let linkedProduct of service.serviceProducts || []
+                        "
+                        class="status-pill status-pill-blue"
+                      >
+                        {{ linkedProduct.product?.name }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <strong class="text-lg"
+                      >€{{ service.basePrice | number: "1.0-2" }}</strong
+                    >
+                    <p class="text-sm text-[var(--muted)]">
+                      {{ service.durationMinutes }} min
+                    </p>
+                  </div>
+                </button>
+                <article
+                  *ngIf="!loading() && !services().length"
+                  class="rounded-[1.4rem] border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
+                >
+                  Nessun servizio prenotabile online in questo momento.
+                </article>
+              </div>
+
+              <section
+                *ngIf="selectedService()"
+                class="mt-6 grid gap-4 rounded-2xl border border-[var(--line)] p-4"
+                aria-label="Sequenza dei servizi"
               >
-                {{
-                  loading()
-                    ? "Stiamo inviando la richiesta..."
-                    : "Richiedi la prenotazione"
-                }}
-              </button>
-            </form>
+                <h3 class="font-display text-2xl">La tua prenotazione</h3>
+                <p class="text-sm text-[var(--muted)]">
+                  1. {{ selectedService().name }} ·
+                  {{ selectedService().durationMinutes }} min
+                </p>
+                <article
+                  *ngFor="
+                    let row of facade.additionalServices();
+                    let index = index
+                  "
+                  class="grid min-w-0 gap-3 rounded-xl bg-slate-50 p-3"
+                  [attr.aria-label]="'Servizio ' + (index + 2)"
+                >
+                  <strong
+                    >{{ index + 2 }}. {{ row.service.name }} ·
+                    {{ row.service.durationMinutes }} min</strong
+                  >
+                  <barber-custom-select
+                    *ngIf="row.service.requiresCollaborator"
+                    [value]="row.collaboratorId"
+                    [options]="facade.professionalOptions(row.service)"
+                    [label]="'Professionista per ' + row.service.name"
+                    (valueChange)="facade.setServiceCollaborator(index, $event)"
+                  ></barber-custom-select>
+                  <div class="flex flex-wrap gap-3 text-sm">
+                    <button
+                      type="button"
+                      [disabled]="index === 0"
+                      (click)="facade.moveService(index, -1)"
+                      aria-label="Anticipa servizio"
+                    >
+                      Anticipa
+                    </button>
+                    <button
+                      type="button"
+                      [disabled]="
+                        index === facade.additionalServices().length - 1
+                      "
+                      (click)="facade.moveService(index, 1)"
+                      aria-label="Posticipa servizio"
+                    >
+                      Posticipa
+                    </button>
+                    <button
+                      type="button"
+                      (click)="facade.removeService(index)"
+                      [attr.aria-label]="'Rimuovi ' + row.service.name"
+                    >
+                      Rimuovi
+                    </button>
+                  </div>
+                </article>
+                <barber-custom-select
+                  *ngIf="facade.bookingLines().length < 20"
+                  value=""
+                  label="Aggiungi un servizio"
+                  placeholder="Aggiungi un altro servizio della sede"
+                  [options]="facade.additionalServiceOptions()"
+                  (valueChange)="facade.addService($event)"
+                ></barber-custom-select>
+                <p class="text-sm text-[var(--muted)]">
+                  I servizi si svolgono in quest'ordine. Gli orari disponibili
+                  valgono per tutta la prenotazione.
+                </p>
+              </section>
 
+              <div
+                *ngIf="selectedService()"
+                class="mt-6 grid gap-4 md:grid-cols-2"
+              >
+                <label
+                  class="field"
+                  *ngIf="selectedService()?.requiresCollaborator"
+                >
+                  <span>Professionista</span>
+                  <barber-custom-select
+                    [value]="selectedCollaboratorId()"
+                    (valueChange)="onSelectedCollaboratorChange($event)"
+                    [options]="collaboratorSelectOptions"
+                    label="Professionista"
+                    placeholder="Scegli chi si prenderà cura di te"
+                  ></barber-custom-select>
+                </label>
+                <label class="field">
+                  <span
+                    >Orari disponibili
+                    <em class="required-mark" aria-hidden="true">*</em></span
+                  >
+                  <barber-custom-select
+                    [value]="selectedSlot()"
+                    (valueChange)="onSelectedSlotChange($event)"
+                    [disabled]="facade.availabilityLoading() || !slots().length"
+                    [options]="slotSelectOptions"
+                    label="Orario"
+                    [placeholder]="
+                      facade.availabilityLoading()
+                        ? 'Verifica degli orari...'
+                        : slots().length
+                          ? 'Seleziona orario'
+                          : 'Nessun orario disponibile'
+                    "
+                  ></barber-custom-select>
+                </label>
+              </div>
+
+              <article
+                *ngIf="selectedSlotRecord"
+                class="mt-4 rounded-2xl bg-slate-50 p-4"
+                aria-label="Riepilogo orario"
+              >
+                <p
+                  *ngFor="let line of selectedSlotRecord.lines"
+                  class="text-sm"
+                >
+                  {{ line.name }} · {{ formatDateTime(line.startsAt) }} –
+                  {{ formatTime(line.endsAt) }}
+                </p>
+                <p class="mt-2 font-semibold">
+                  Totale €{{
+                    selectedSlotRecord.estimatedTotal | number: "1.2-2"
+                  }}
+                </p>
+              </article>
+
+              <form class="mt-6 grid gap-4" (ngSubmit)="submitBooking()">
+                <div class="grid gap-4 md:grid-cols-2">
+                  <label class="field">
+                    <span
+                      >Nome e cognome
+                      <em class="required-mark" aria-hidden="true">*</em></span
+                    >
+                    <input
+                      [ngModel]="bookingForm().customerName"
+                      (ngModelChange)="
+                        onBookingFieldChange('customerName', $event)
+                      "
+                      name="customerName"
+                      placeholder="Mario Rossi"
+                      autocomplete="name"
+                      required
+                    />
+                  </label>
+                  <label class="field">
+                    <span>Email</span>
+                    <input
+                      [ngModel]="bookingForm().email"
+                      (ngModelChange)="onBookingFieldChange('email', $event)"
+                      name="email"
+                      type="email"
+                      placeholder="mario@email.it"
+                      autocomplete="email"
+                    />
+                  </label>
+                </div>
+                <div class="grid gap-4 md:grid-cols-2">
+                  <label class="field">
+                    <span>Telefono</span>
+                    <input
+                      [ngModel]="bookingForm().phone"
+                      (ngModelChange)="onBookingFieldChange('phone', $event)"
+                      name="phone"
+                      type="tel"
+                      placeholder="+39 333 123 4567"
+                      autocomplete="tel"
+                    />
+                  </label>
+                  <label class="field">
+                    <span>Richieste</span>
+                    <input
+                      [ngModel]="bookingForm().customerNotes"
+                      (ngModelChange)="
+                        onBookingFieldChange('customerNotes', $event)
+                      "
+                      name="customerNotes"
+                      placeholder="Preferenze o richieste utili al salone"
+                    />
+                  </label>
+                </div>
+
+                <label class="flex items-start gap-3 text-sm leading-6">
+                  <input type="checkbox" name="appointmentWhatsAppConsent" class="mt-1" [ngModel]="facade.displayedWhatsAppConsent()" (ngModelChange)="facade.updateBookingForm({appointmentWhatsAppConsent: $event})" />
+                  <span>Desidero ricevere su WhatsApp promemoria e richieste di conferma per questa prenotazione. Il numero deve includere il prefisso internazionale. Consenso facoltativo, revocabile contattando il salone.</span>
+                </label>
+                <p
+                  *ngIf="feedback()"
+                  role="status"
+                  aria-live="polite"
+                  class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                >
+                  {{ feedback() }}
+                </p>
+
+                <button
+                  type="submit"
+                  class="primary-btn"
+                  [disabled]="
+                    loading() ||
+                    facade.availabilityLoading() ||
+                    !selectedService() ||
+                    !selectedSlot() ||
+                    !bookingForm().customerName.trim()
+                  "
+                >
+                  {{
+                    loading()
+                      ? "Stiamo inviando la richiesta..."
+                      : "Richiedi la prenotazione"
+                  }}
+                </button>
+              </form>
+            </fieldset>
             <article
               *ngIf="bookingResult()"
               class="success-card mt-6 rounded-[1.8rem] p-5"
@@ -376,14 +543,39 @@ import { CustomSelectComponent } from "./custom-select.component";
                 {{ bookingResult().customer.lastName }}
               </h3>
               <p class="mt-2 text-sm text-emerald-900/76">
-                {{ bookingResult().service.name }} ·
-                {{ formatDateTime(bookingResult().startsAt) }}.
                 {{
                   bookingResult().status === "confirmed"
                     ? "Ti aspettiamo in salone."
                     : "Il salone ti comunicherà la conferma."
                 }}
               </p>
+              <p
+                *ngFor="
+                  let appointment of bookingResult().appointments || [
+                    bookingResult(),
+                  ]
+                "
+                class="mt-2 text-sm text-emerald-900/76"
+              >
+                {{ appointment.service.name }} ·
+                {{ formatDateTime(appointment.startsAt) }} –
+                {{ formatTime(appointment.endsAt) }}
+              </p>
+              <p
+                *ngIf="bookingResult().estimatedTotal"
+                class="mt-3 font-semibold text-emerald-950"
+              >
+                Importo previsto €{{
+                  bookingResult().estimatedTotal | number: "1.2-2"
+                }}
+              </p>
+              <button
+                type="button"
+                class="primary-btn mt-5"
+                (click)="facade.startNewBooking()"
+              >
+                Nuova prenotazione
+              </button>
             </article>
           </div>
         </section>
@@ -399,7 +591,7 @@ export class PublicBookingAppComponent implements OnInit {
   loading = this.facade.loading;
   feedback = this.facade.feedback;
   settings = this.facade.settings;
-  services = this.facade.services;
+  services = this.facade.visibleServices;
   selectedService = this.facade.selectedService;
   selectedCollaboratorId = this.facade.selectedCollaboratorId;
   selectedSlot = this.facade.selectedSlot;
@@ -504,6 +696,12 @@ export class PublicBookingAppComponent implements OnInit {
     return new Date(value).toLocaleString("it-IT", {
       day: "2-digit",
       month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  formatTime(value: string): string {
+    return new Date(value).toLocaleTimeString("it-IT", {
       hour: "2-digit",
       minute: "2-digit",
     });

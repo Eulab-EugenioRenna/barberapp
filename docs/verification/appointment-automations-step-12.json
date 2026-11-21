@@ -1,0 +1,504 @@
+{
+  "checkedAt": "2026-11-11T11:55:16.348966+00:00",
+  "status": "implemented-and-installed-locally-real-provider-acceptance-open",
+  "step12Closed": false,
+  "mainRuntimeUpdated": true,
+  "scope": {
+    "realAccountsModified": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "identity": "synthetic users in disposable PostgreSQL",
+    "domainProvider": "synthetic only",
+    "transportProvider": "actual Nodemailer and HTTP clients against loopback simulators only"
+  },
+  "migration": {
+    "checkedAt": "2026-11-09T18:01:39.014Z",
+    "sourceDatabaseModified": false,
+    "backupReadable": true,
+    "restoredAndReapplied": true,
+    "originalTablesUnchanged": 45,
+    "originalColumnsUnchanged": 504,
+    "noInferredEventsOrDeliveries": true,
+    "draftPoliciesCreated": 0,
+    "policyMigrationApplied": true,
+    "legacyDeliveryStatusesUnchanged": true,
+    "assertions": [
+      "PASS:immutable-and-tenant-consistent-domain-events",
+      "PASS:stable-delivery-identity-immutable-payload-and-cross-tenant-rejection",
+      "PASS:claimed-dispatch-requires-token-and-lease-no-unsafe-retry-and-closed-event-cannot-reopen",
+      "PASS:tenant-cascade-is-coherent-with-preserved-event-history"
+    ],
+    "evidence": ".local/step12/migration-1794247277550/result.json"
+  },
+  "http": {
+    "checkedAt": "2026-11-09T20:33:04.338Z",
+    "database": "step7_http_1794256348734",
+    "identity": "isolated-synthetic-http",
+    "providerCalls": "synthetic-only",
+    "mainDatabaseModified": false,
+    "checks": [
+      "two-service-command-persists-one-account-creation-event-and-complete-safe-snapshot-without-replay-duplicates",
+      "failure-after-acknowledgement-and-event-insert-rolls-back-account-bookings-command-and-event-and-same-key-recovers-once",
+      "single-rescheduling-snapshots-are-immutable-and-notes-only-or-financial-revision-do-not-create-calendar-events",
+      "status-transition-and-whole-account-cancellation-are-transactional-grouped-and-do-not-repeat-unchanged-status",
+      "public-multiple-booking-persists-customer-safe-creation-and-status-events-in-same-transaction-without-exposing-private-account-id",
+      "cashier-execution-is-not-a-new-future-booking-and-deposit-does-not-produce-calendar-events",
+      "redis-outage-does-not-lose-prepared-deliveries-and-restored-queue-rebuilds-with-original-snapshots-and-no-duplicate-history",
+      "failure-after-history-inbox-insert-rolls-back-materialization-and-two-concurrent-transactions-claim-one-event-delivery-set",
+      "two-concurrent-delivery-workers-and-repeated-job-have-one-committed-claim-and-one-provider-call",
+      "ambiguous-provider-result-remains-uncertain-through-recovery-and-repeated-job-without-another-provider-call",
+      "real-killed-dispatch-process-leaves-durable-attempt-and-expired-lease-becomes-uncertain-without-replay",
+      "current-plan-check-rejects-superseded-schedule-before-effect-but-financial-revision-does-not-invalidate-unchanged-calendar",
+      "only-definitive-no-effect-failure-can-retry-after-deadline-using-same-delivery-identity",
+      "changed-recipient-address-or-disabled-provider-cancels-pending-effect-and-never-retargets-original-delivery",
+      "multi-sector-notice-requires-all-account-memberships-and-revocation-hides-history-inbox-and-blocks-pending-email-without-contact-payload-leaks",
+      "generic-notification-endpoint-cannot-forge-an-appointment-confirmation-without-domain-transition",
+      "legacy-external-pending-status-is-not-reinterpreted-as-a-safe-new-send",
+      "shared-webhook-setting-requires-whole-company-operational-scope"
+    ],
+    "fixture": {
+      "serviceId": "66195597-b2db-4b05-948c-1bf02fb51667",
+      "locationId": "9b4af275-a1af-461c-b563-bda1c1277980",
+      "sectorId": "08d35796-3c81-47b7-a6d5-68ebf04178a9",
+      "orderId": "af1501e4-7128-4ec2-bcf3-614cf233cbf7"
+    }
+  },
+  "httpRegressions": {
+    "checkedAt": "2026-11-09T12:32:52.683Z",
+    "checks": [
+      {
+        "name": "operational-order",
+        "status": "passed"
+      },
+      {
+        "name": "pricing-inventory",
+        "status": "passed"
+      },
+      {
+        "name": "payment-ledger",
+        "status": "passed"
+      },
+      {
+        "name": "booking-resources",
+        "status": "passed"
+      },
+      {
+        "name": "booking-command",
+        "status": "passed"
+      },
+      {
+        "name": "booking-availability",
+        "status": "passed"
+      },
+      {
+        "name": "booking-mutation",
+        "status": "passed"
+      },
+      {
+        "name": "cashier-fulfilment",
+        "status": "passed"
+      },
+      {
+        "name": "rescheduling",
+        "status": "passed"
+      },
+      {
+        "name": "calendar-configuration",
+        "status": "passed"
+      }
+    ]
+  },
+  "browserRegressions": {
+    "checkedAt": "2026-11-09T12:35:44.171Z",
+    "checks": [
+      {
+        "name": "locations",
+        "status": "passed"
+      },
+      {
+        "name": "operational-order",
+        "status": "passed"
+      },
+      {
+        "name": "pricing-inventory",
+        "status": "passed"
+      },
+      {
+        "name": "payment-ledger",
+        "status": "passed"
+      },
+      {
+        "name": "booking-resources",
+        "status": "passed"
+      },
+      {
+        "name": "create-recovery",
+        "status": "passed"
+      },
+      {
+        "name": "booking-sequence",
+        "status": "passed"
+      },
+      {
+        "name": "booking-mutation",
+        "status": "passed"
+      },
+      {
+        "name": "cashier-fulfilment",
+        "status": "passed"
+      },
+      {
+        "name": "rescheduling",
+        "status": "passed"
+      }
+    ]
+  },
+  "validation": {
+    "jest": {
+      "passed": true,
+      "suites": 61,
+      "tests": 381,
+      "snapshots": 1,
+      "evidence": ".local/step12/policy-unit.log"
+    },
+    "transportProtocol": {
+      "passed": true,
+      "tests": 6,
+      "realExternalProvider": false,
+      "evidence": ".local/step12/transport-unit.log"
+    },
+    "lint": true,
+    "hostApiBuild": true,
+    "hostAdminBuild": true,
+    "hostPublicBuild": true,
+    "dockerCandidateBuilt": true,
+    "gitDiffCheck": true,
+    "timingAndSettingsTests": 18
+  },
+  "defaults": {
+    "newEmailProviderAndPreferencesDisabled": true,
+    "existingConfigurationPreserved": true,
+    "legacyPendingExternalDeliveriesNotReplayed": true
+  },
+  "mainRuntime": {
+    "checkedAt": "2026-11-11T11:52:54.961822+00:00",
+    "status": "passed",
+    "environment": "local Docker only",
+    "mainRuntimeUpdated": true,
+    "candidateImages": {
+      "api": {
+        "name": "api",
+        "tag": "alora-step12-events-candidate-api:20261111",
+        "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+        "files": 344,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      "admin": {
+        "name": "admin",
+        "tag": "alora-step12-events-candidate-admin:20261111",
+        "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+        "files": 20,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      "booking": {
+        "name": "booking",
+        "tag": "alora-step12-events-candidate-booking:20261111",
+        "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+        "files": 17,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      }
+    },
+    "migrationCount": 9,
+    "originalTablesPreserved": 54,
+    "originalColumnsPreserved": 632,
+    "exactDataTablesUnchanged": 53,
+    "technicalStoreRenewal": {
+      "checkedAt": "2026-11-11T11:52:54.636Z",
+      "table": "connect_sdk_records",
+      "recordKind": "configuration",
+      "recordCountUnchanged": true,
+      "plaintextConfigurationUnchanged": true,
+      "changedTopLevelFields": [],
+      "cipherUnchanged": false,
+      "expiresAtUnchanged": false,
+      "namespaceUnchanged": true,
+      "configurationHash": "8e8c244071ba8dda1d2d027db6a6f58d7fe4e063bd90f42dd72015a2c69ce7db",
+      "credentialsExposed": false
+    },
+    "accountsAndSessionsPreserved": true,
+    "contactConsentsInferred": 0,
+    "automationPlansInferred": 0,
+    "domainEventsInferred": 0,
+    "notificationQueueEmptyBeforeRollout": true,
+    "applicationWritersStoppedForBackup": true,
+    "coordinatedDatabaseUploadBackup": true,
+    "databaseBackupReadable": true,
+    "databaseBackupSha256": "51ca3b8dd647f6d0d9bfc8d6541c71af5cb69f4498efc4f207a064dc4db56e0f",
+    "uploadArchiveSha256": "0a729b5b83fbfe824bb5e70fb1a4440e71bdf6fc66351da6319fc50ebf5f5d13",
+    "uploadArchiveUnchanged": true,
+    "configurationUnchanged": true,
+    "environmentVariablesUnchanged": true,
+    "sharedServicesAndConnectContainersUnchanged": true,
+    "staticAssetChecks": [
+      "admin",
+      "booking"
+    ],
+    "anonymousGuardsChecked": 3,
+    "health": {
+      "status": "ok",
+      "timestamp": "2026-11-11T11:52:39.977Z"
+    },
+    "rollbackImages": {
+      "api": "alora-workflow-before-events-api:20261111t115220z",
+      "admin": "alora-workflow-before-events-admin:20261111t115220z",
+      "booking": "alora-workflow-before-events-booking:20261111t115220z"
+    },
+    "realAccountSessionsUsed": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "realProviderAcceptance": false,
+    "evidence": ".local/step12/local-events-rollout-20261111T115220Z/result.json"
+  },
+  "qaCleanup": {
+    "currentOwnedContainersRemaining": 0,
+    "currentOwnedDatabasesRemaining": 0,
+    "sharedServicesPreserved": true,
+    "backupsAndRollbackImagesRetained": true
+  },
+  "sourceChecksums": {
+    "prisma/schema.prisma": "25c476df7166b109c53b3e02f7b73e9ac913599e264572a1945d952a952ac072",
+    "prisma/migrations/20261109120000_notification_dispatch_states/migration.sql": "b1063297946c0501b2ef8bdd45bbff470c2e0f490b96fa40210bb6a2e2d824db",
+    "prisma/migrations/20261109121000_notification_domain_outbox/migration.sql": "101dfe0972ba9d78efad4b527f4b30b58669e536b9dc4da04342191a7589af02",
+    "apps/api/src/modules/notifications/appointment-events.ts": "159326558301de4ff15c4b91cb8500f9f4034def770c7219c687ad3adb001d01",
+    "apps/api/src/modules/notifications/notification-scope.sql.ts": "4bc3ab6802b5e9abc7566111b9ff41630f42e6f0022a411a4783219baa3dc54a",
+    "apps/api/src/modules/notifications/notifications.outbox.service.ts": "bc3ac5b92dc61e89c7282489f76880fdbf16be9ccbf66458d0681dc5b273431d",
+    "apps/api/src/modules/notifications/notifications.service.ts": "68f42fc0f2b67a956d52a03e674dc246378510f0a0b44c3ee0f37357892d280a",
+    "apps/api/src/modules/notifications/notifications.events.service.ts": "86eda7149aebb1848f48b6c37ce1ed88f6bcd8d4854621e76d8536bed83fffc9",
+    "apps/api/src/modules/notifications/notifications.dispatch.service.ts": "bfaf46a7b4079d694c50ced1230476a48b8f50c178cb3c1f4a21bae0a413aabc",
+    "apps/api/src/modules/notifications/notifications.providers.ts": "8ab6bc177319179b0e84842c103c637c4fc6560f65dcba9e65d9ba9436717cda",
+    "apps/api/src/modules/notifications/notifications.providers.spec.ts": "b8fe6d4e78ae2e482d68d121962a69888b3e183e203d7c4f7800a77c112fe54e",
+    "apps/api/src/modules/notifications/notifications.controller.ts": "46979b524547c7df2c66247bf3c8871682e1217773c82e82a8b79af4c106d096",
+    "apps/api/src/modules/notifications/notifications.module.ts": "31aacbc435be14c9dfc79a422ed67b41ba1d8719672e9565e9092a70a970ead5",
+    "apps/api/src/modules/notifications/notifications.types.ts": "35f660f3d976ce30fd171132fd23157450a3cba072c2c3718ba015008166c443",
+    "apps/api/src/modules/orders/booking-command.service.ts": "e6bcf47242c832ed84736fb27071a77b0f3ddebac082639023a6f478948ff230",
+    "apps/api/src/modules/orders/booking-mutation.service.ts": "befd42bd5a5e9c02344853091a6c7fd4339020792647ee73eed0e3a6a43f3ce4",
+    "apps/api/src/modules/sales/sales.controller.ts": "28a930368d70d7a4f4265122d3bf2f8196f4cc5e33de6086bd4f299092104e65",
+    "apps/api/src/modules/appointments/appointments.controller.ts": "d44bf77aa9edb0a06c863c48fcda741b7ccfbf5da7d3f647e5ff98b3be74ab7b",
+    "apps/api/src/modules/public-booking/public-booking.controller.ts": "81feececd3ec4edd13d8cd8ae30d7b9b18f5532f178a5f27eba6d426708683b1"
+  },
+  "verificationScriptChecksums": {
+    "scripts/verify-notification-outbox-migration.mjs": "2a5e76bd99fc1462600e18406f9312d89018b2c5adaee369ac046482f4de8744",
+    "scripts/verify-notification-outbox-fixtures.sql": "53976af332fc2bd5903ffe16935ca4451c135901af08a70c90d4965196331b4d",
+    "scripts/verify-notification-outbox-http.mjs": "5404ff14009a756c4fe3cc7debd593e5073cd5ba5a93783e69572efb7c29a836",
+    "scripts/notification-crash-qa.cjs": "9c63abe2b14d0addc34a1d698d58a765db6cf41be398f25203a19184048eddd9",
+    "scripts/locations-qa-server.cjs": "293b441c37f649472516d029d261a39f93f3e5b8f38fa9256ece5192e3a30ccf",
+    "scripts/verify-locations-http.mjs": "9b9e4ba4f25e118ff357d7796cedb4f89c2b893c5b6aee492657c4814bb0720f"
+  },
+  "remaining": [
+    "Controlled public HTTPS webhook origin and real provider/device acceptance remain unverified",
+    "Physical devices, commercial acceptance and production remain separate",
+    "Account work remains deferred by user instruction"
+  ],
+  "currentSourceRegression": {
+    "checkedAt": "2026-11-09T20:35:57.155719+00:00",
+    "http": {
+      "checkedAt": "2026-11-09T20:33:04.338Z",
+      "database": "step7_http_1794256348734",
+      "identity": "isolated-synthetic-http",
+      "providerCalls": "synthetic-only",
+      "mainDatabaseModified": false,
+      "checks": [
+        "two-service-command-persists-one-account-creation-event-and-complete-safe-snapshot-without-replay-duplicates",
+        "failure-after-acknowledgement-and-event-insert-rolls-back-account-bookings-command-and-event-and-same-key-recovers-once",
+        "single-rescheduling-snapshots-are-immutable-and-notes-only-or-financial-revision-do-not-create-calendar-events",
+        "status-transition-and-whole-account-cancellation-are-transactional-grouped-and-do-not-repeat-unchanged-status",
+        "public-multiple-booking-persists-customer-safe-creation-and-status-events-in-same-transaction-without-exposing-private-account-id",
+        "cashier-execution-is-not-a-new-future-booking-and-deposit-does-not-produce-calendar-events",
+        "redis-outage-does-not-lose-prepared-deliveries-and-restored-queue-rebuilds-with-original-snapshots-and-no-duplicate-history",
+        "failure-after-history-inbox-insert-rolls-back-materialization-and-two-concurrent-transactions-claim-one-event-delivery-set",
+        "two-concurrent-delivery-workers-and-repeated-job-have-one-committed-claim-and-one-provider-call",
+        "ambiguous-provider-result-remains-uncertain-through-recovery-and-repeated-job-without-another-provider-call",
+        "real-killed-dispatch-process-leaves-durable-attempt-and-expired-lease-becomes-uncertain-without-replay",
+        "current-plan-check-rejects-superseded-schedule-before-effect-but-financial-revision-does-not-invalidate-unchanged-calendar",
+        "only-definitive-no-effect-failure-can-retry-after-deadline-using-same-delivery-identity",
+        "changed-recipient-address-or-disabled-provider-cancels-pending-effect-and-never-retargets-original-delivery",
+        "multi-sector-notice-requires-all-account-memberships-and-revocation-hides-history-inbox-and-blocks-pending-email-without-contact-payload-leaks",
+        "generic-notification-endpoint-cannot-forge-an-appointment-confirmation-without-domain-transition",
+        "legacy-external-pending-status-is-not-reinterpreted-as-a-safe-new-send",
+        "shared-webhook-setting-requires-whole-company-operational-scope"
+      ],
+      "fixture": {
+        "serviceId": "66195597-b2db-4b05-948c-1bf02fb51667",
+        "locationId": "9b4af275-a1af-461c-b563-bda1c1277980",
+        "sectorId": "08d35796-3c81-47b7-a6d5-68ebf04178a9",
+        "orderId": "af1501e4-7128-4ec2-bcf3-614cf233cbf7"
+      }
+    },
+    "jest": {
+      "passed": true,
+      "suites": 61,
+      "tests": 381,
+      "snapshots": 1,
+      "evidence": ".local/step12/policy-unit.log"
+    },
+    "qaCleanup": {
+      "checkedAt": "2026-11-09T20:35:57.155719+00:00",
+      "ownedContainersAbsent": true,
+      "step7HttpAndStep12DatabasesAbsent": true
+    },
+    "mainRuntimeUpdated": false
+  },
+  "templateEditor": {
+    "report": "docs/verification/notification-templates-step-12.json",
+    "httpGroups": 6,
+    "browserGroups": 4,
+    "events": 11,
+    "realProviderMessages": false
+  },
+  "latestDockerCandidate": {
+    "report": "docs/verification/connect-automation-withdrawal-step-12.json",
+    "imagePrefix": "alora-step12-withdrawal-candidate-",
+    "exactHostMatch": true,
+    "fullAppStartupIsolated": true,
+    "mainRuntimeUpdated": false
+  },
+  "draftPolicy": {
+    "report": "docs/verification/appointment-policy-step-12.json",
+    "httpGroups": 6,
+    "browserGroups": 4,
+    "timingAndSettingsTests": 18,
+    "activationAvailable": false,
+    "durableReminderLifecycleImplemented": false
+  },
+  "connectConsumer": {
+    "report": "docs/verification/connect-automation-consumer-step-12.json",
+    "sdkVersion": "0.12.0-rc.1",
+    "grantHttpGroups": 9,
+    "webhookHttpGroups": 6,
+    "accessBrowserGroups": 4,
+    "reminderLifecycleImplemented": false,
+    "customerCommandsImplemented": false,
+    "activationAvailable": false
+  },
+  "withdrawalConsumer": {
+    "report": "docs/verification/connect-automation-withdrawal-step-12.json",
+    "sdkVersion": "0.12.0-rc.2",
+    "httpGroups": 8,
+    "durableOriginalCommand": true,
+    "freshProcessRecoveryVerified": true,
+    "contractDependencyResolved": true
+  },
+  "currentVerification": "docs/verification/appointment-automations-workflow-step-12.json",
+  "currentSourceChecksums": {
+    "apps/api/src/common/appointment-automation-policy.ts": "2fa3780e85a81823187b4c798a09893f5e12eef13b754f7206f35ccb09d3fb82",
+    "apps/api/src/modules/notifications/appointment-automation-dispatch.service.ts": "32d2cbe373e0669131c4a9a97fcf4164531ede8f552d081d056bb7e795e6a7c5",
+    "apps/api/src/modules/notifications/appointment-automation-messages.ts": "8b1c36bb38d96042bc5789cdf7b80958649574edeac1cdd0c5a564d362a6bbca",
+    "apps/api/src/modules/notifications/appointment-automation-monitor.controller.ts": "586822411c73241695499cbdd15dcb03b9d3818b7df5a74d05927d076499f9c1",
+    "apps/api/src/modules/notifications/appointment-automation-planner.service.ts": "537822e715e43be923b7eb1b9c79a1a695fe677d9f841a85a0a3780367949714",
+    "apps/api/src/modules/notifications/appointment-automation-policy.controller.ts": "872ed5d46b13dc9d2fe04edffa34cfdee09a2fa55879f8d51700a28ae394142e",
+    "apps/api/src/modules/notifications/appointment-automation-policy.service.ts": "83712d808c0ad090eb3f39dd13055fb0a4cb2e8efa40bfba3cc5968acfe48788",
+    "apps/api/src/modules/notifications/appointment-automation-recovery.service.ts": "5425b809bd44444eebe03f3c6bc6725a37a683c7fa45c8f4be51b9d1795c5664",
+    "apps/api/src/modules/notifications/appointment-automation-staff.service.ts": "db1516098270ae2b4f3f28f80aef5654276a2ff80fa7ef16280155428a96d23d",
+    "apps/api/src/modules/notifications/appointment-automation-state.ts": "e86dd8e324ca0b30ef57cfa9f6c719b3750b8a5eb65e72c37a3a829301f0b5a4",
+    "apps/api/src/modules/notifications/appointment-automations.module.ts": "02e752c2445f7409849df488440bd367b1b5754074caee8511f849b1a5b7221a",
+    "apps/api/src/modules/notifications/appointment-contact.controller.ts": "e0907fcadcfd22e5a38ef6f239bcb88270b76788ebdbbd8102218935c455c851",
+    "apps/api/src/modules/notifications/appointment-contact.service.ts": "74de8e94c9994295e6f8fc6b5d93d8a769afa89cd983cf6cfc30f3a17b6d9bcc",
+    "apps/api/src/modules/notifications/appointment-customer-actions.service.ts": "d71a3aa1c3b8a175134e11fd6bd381567bfb6639a99a5e4e08073b2063500d58",
+    "apps/api/src/modules/notifications/appointment-customer-contract.spec.ts": "635e221ad925cbb1b8d2567cde3ebfc32d47e50fe32bb921aca1e9a6f5c6f14d",
+    "apps/api/src/modules/notifications/appointment-events.ts": "c7a96bcd655314ac34e2c86e1e253987cea92d4d573d2c0484dddc6ca9b4595b",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.spec.ts": "b5392bf72b142dac65652de5f83c511e7604c7134cdc532a5e96af767f5f1540",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.ts": "ae0db3355a5b3baebad505782e995380e5575090f250e2d9786d02dac75594d2",
+    "apps/web-admin/src/app/core/appointment-automation-access-api.service.ts": "7bf3ac15abdadd1f5f1bd7a40a43ebdbac810246c76a987f0982d035e3d2e9f7",
+    "apps/web-admin/src/app/core/appointment-automation-policy-api.service.ts": "f28da7936a49af971495b13cd1f7d1532ebace62beb2b88fa120a69a96480c0c",
+    "apps/web-admin/src/app/shared/appointment-automation-access.component.ts": "e885ade9b2beff33f1ca5e496eb30ca8a4f58cb0c7a4d46b3400e52854ec6178",
+    "apps/web-admin/src/app/shared/appointment-automation-monitor.component.ts": "c50125c1de2b51236dc82b187cc259ad27e9e961de4132806d48483bcb6844cb",
+    "apps/web-admin/src/app/shared/appointment-automation-policy.component.ts": "d0db852edbd1835ae0f97189ceff9d57f06dfbb8df87389d214d95aad4142f0d",
+    "apps/web-admin/src/app/shared/appointment-contact.component.ts": "987829e28a08c9094d0bc347e63b1f42caed50a25489243e77c4b57d26a3b9be",
+    "prisma/migrations/20261110100000_notification_automation_grants/migration.sql": "c7c0dd6afee498ed17d20de6d76eb98d2add9a84712034adbc1fd40f571f5138",
+    "prisma/migrations/20261110101000_notification_automation_webhooks/migration.sql": "461021e5b791323331cc7fec4839835e4a9dfa08ecd02a867b616b5c60d54b69",
+    "prisma/migrations/20261110160000_notification_automation_commands/migration.sql": "2abb5d26e49e7ded368748e02d3296800ee65ce0ab7618922d0a2ed8c4cbc237",
+    "prisma/migrations/20261110200000_automation_queued_state/migration.sql": "1c9c0b5fb4854dcd65897d4ab764ef5b517469110134bf98be0e6eefc32fabd5",
+    "prisma/migrations/20261110201000_appointment_automation_workflow/migration.sql": "6b1829d265990ea0524a97313ae4a52c2d8cac105935428052ebec873b2e70bc",
+    "prisma/migrations/20261111200000_appointment_event_notices/migration.sql": "8fc8a585d22e1d74f60cbf33ab77fa105cf9e2aa1459142e848722888d233924",
+    "prisma/schema.prisma": "23b63a44a20bdba52df5c3c2099b6285d88eca02fe641c6f88e5b327977baa4e"
+  },
+  "previousStatusCheckpoint": {
+    "checkedAt": "2026-11-10T15:13:47.363237+00:00",
+    "status": "in-progress-foundation-template-editor-and-draft-policy-verified-isolated-candidate-built",
+    "step12Closed": false,
+    "mainRuntimeUpdated": false,
+    "remaining": [
+      "appointment reminder intent lifecycle and invalidation against authoritative current plan/policy",
+      "explicit per-booking recipient authorization and separate channel delegation gates",
+      "WhatsApp templates and correlated one-use customer confirmation/change-request/cancellation commands",
+      "no-response handling and operational monitoring",
+      "complete local rollout with preserved data",
+      "separate provider/device/public-webhook and ALORA acceptance"
+    ],
+    "mainRuntime": {
+      "phase": "Step 10",
+      "step12Applied": false,
+      "notificationDomainEventAbsent": true,
+      "migration20261109Count": 0,
+      "policyAbsent": true
+    }
+  },
+  "evidenceTimeScope": "Detailed preceding test/build/checksum fields retain their original checkpoint dates; current verification is linked separately.",
+  "technicalImplementationComplete": true,
+  "subsequentConnectRuntimeVerification": "docs/verification/connect-runtime-015-local.json",
+  "localConnectRuntimeUpdated": true,
+  "latestRuntimePackagingVerification": "docs/verification/runtime-only-images.json",
+  "currentMainImages": {
+    "barber-api-1": {
+      "imageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-admin-1": {
+      "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-public-booking-1": {
+      "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-api-1": {
+      "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-runner-1": {
+      "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-web-1": {
+      "imageId": "sha256:73df58837c66c998dda4745ff2d4c856c4e824b3507ca1719ffefccbf83d9338",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    }
+  }
+}

@@ -38,7 +38,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
   template: `
     <div
       class="absolute inset-0 bg-[rgba(15,23,32,0.4)]"
-      (click)="cancel.emit()"
+      (click)="!busy && cancel.emit()"
     ></div>
     <section
       barberAutofocusFirst
@@ -48,7 +48,10 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
       class="absolute left-1/2 top-1/2 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 panel rounded-[2rem] p-4 sm:p-5"
     >
       <p class="eyebrow text-[var(--accent)]">Sposta appuntamento</p>
-      <h3 id="quick-reschedule-title" class="mt-2 font-display text-2xl sm:text-3xl">
+      <h3
+        id="quick-reschedule-title"
+        class="mt-2 font-display text-2xl sm:text-3xl"
+      >
         Scegli il nuovo orario
       </h3>
       <p class="mt-2 text-sm text-[var(--muted)]">
@@ -75,46 +78,76 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
         </div>
       </article>
 
-      <div class="mt-4 grid gap-4">
-        <barber-calendar-input
-          [value]="state?.targetDate || ''"
-          (valueChange)="fieldChange.emit({ key: 'targetDate', value: $event })"
-          label="Data"
-          name="quickRescheduleDate"
-        ></barber-calendar-input>
-
-        <barber-custom-select
-          [value]="state?.collaboratorId || ''"
-          (valueChange)="
-            fieldChange.emit({ key: 'collaboratorId', value: $event })
-          "
-          [options]="collaboratorOptions"
-          label="Professionista"
-        ></barber-custom-select>
-
-        <barber-custom-select
-          [value]="state?.startsAt || ''"
-          (valueChange)="fieldChange.emit({ key: 'startsAt', value: $event })"
-          [options]="slotOptions"
-          label="Orario"
-          placeholder="Seleziona orario"
-        ></barber-custom-select>
-
-        <p *ngIf="!slotOptions.length" class="text-sm text-amber-800">
-          Nessun orario disponibile. Prova un'altra data o un altro professionista.
+      <p *ngIf="feedback" role="status" class="mt-3 text-sm">{{ feedback }}</p>
+      <article *ngIf="pending" role="status" class="quick-modal-card mt-3">
+        <p>
+          Lo spostamento precedente è ancora da verificare. Recupera la stessa
+          richiesta prima di modificarlo.
         </p>
-      </div>
+        <button
+          type="button"
+          class="primary-btn mt-2"
+          [disabled]="!canRecover || saving"
+          (click)="retry.emit()"
+        >
+          Verifica spostamento precedente
+        </button>
+      </article>
+      <fieldset [disabled]="busy" style="border:0;padding:0;min-width:0">
+        <div class="mt-4 grid gap-4">
+          <barber-calendar-input
+            [value]="state?.targetDate || ''"
+            (valueChange)="
+              fieldChange.emit({ key: 'targetDate', value: $event })
+            "
+            label="Data"
+            name="quickRescheduleDate"
+          ></barber-calendar-input>
 
+          <barber-custom-select
+            [value]="state?.collaboratorId || ''"
+            (valueChange)="
+              fieldChange.emit({ key: 'collaboratorId', value: $event })
+            "
+            [options]="collaboratorOptions"
+            label="Professionista"
+          ></barber-custom-select>
+
+          <barber-custom-select
+            [value]="state?.startsAt || ''"
+            (valueChange)="fieldChange.emit({ key: 'startsAt', value: $event })"
+            [options]="slotOptions"
+            label="Orario"
+            placeholder="Seleziona orario"
+          ></barber-custom-select>
+
+          <p *ngIf="loadingSlots" role="status">
+            Verifica disponibilità sul server…
+          </p>
+          <p
+            *ngIf="!loadingSlots && !slotOptions.length"
+            class="text-sm text-amber-800"
+          >
+            Nessun orario disponibile. Prova un'altra data o un altro
+            professionista.
+          </p>
+        </div>
+      </fieldset>
       <div class="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
           class="primary-btn"
-          [disabled]="!state?.startsAt"
+          [disabled]="busy || loadingSlots || !state?.startsAt"
           (click)="confirm.emit()"
         >
           Conferma
         </button>
-        <button type="button" class="secondary-btn" (click)="cancel.emit()">
+        <button
+          type="button"
+          class="secondary-btn"
+          [disabled]="busy"
+          (click)="!busy && cancel.emit()"
+        >
           Annulla
         </button>
       </div>
@@ -122,6 +155,13 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
   `,
 })
 export class AdminAppointmentsQuickRescheduleModalComponent {
+  @Input() busy = false;
+  @Input() saving = false;
+  @Input() loadingSlots = false;
+  @Input() feedback = "";
+  @Input() pending = false;
+  @Input() canRecover = false;
+  @Output() retry = new EventEmitter<void>();
   @Input() appointment: any = null;
   @Input() state: any = null;
   @Input() collaboratorOptions: Array<{ value: string; label: string }> = [];
@@ -135,7 +175,7 @@ export class AdminAppointmentsQuickRescheduleModalComponent {
 
   @HostListener("document:keydown.escape")
   closeOnEscape(): void {
-    this.cancel.emit();
+    if (!this.busy) this.cancel.emit();
   }
 
   originalTimeLabel(): string {

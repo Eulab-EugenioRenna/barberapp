@@ -1,0 +1,923 @@
+{
+  "checkedAt": "2026-11-11T12:23:39.801730+00:00",
+  "status": "implemented-verified-and-installed-locally-real-provider-acceptance-open",
+  "technicalImplementationComplete": true,
+  "localRolloutComplete": true,
+  "goalComplete": false,
+  "step12ProviderAccepted": false,
+  "userRequest": "collegare promemoria e azioni cliente",
+  "localUrl": "http://127.0.0.1:53020/admin/",
+  "defaults": {
+    "policyActive": false,
+    "historicalBackfill": false,
+    "inferredConsent": false,
+    "newConfirmationAndCancellationNotices": false
+  },
+  "features": {
+    "authoritativeBookingAccount": true,
+    "transactionalEvents": true,
+    "explicitPerBookingContactConsent": true,
+    "consentRevocationAndPhoneChangeInvalidateOriginalCommands": true,
+    "reminderCountRange": [
+      0,
+      5
+    ],
+    "configurableEvents": [
+      "initial",
+      "reminder",
+      "confirmation",
+      "cancellation",
+      "rescheduling"
+    ],
+    "editableWhatsAppTexts": 5,
+    "casDraftAndExplicitActivation": true,
+    "separateWhatsAppAgendaNativeAndEmailGrants": true,
+    "browserTokenUsedByWorker": false,
+    "sameNotificationHistoryBullMQAndConnectOutbox": true,
+    "stableEncryptedOriginalCommandAndIdempotencyKey": true,
+    "oneUseCorrelatedActions": [
+      "confirm",
+      "change_request",
+      "cancel"
+    ],
+    "cancellationCutoffElapsedHours": 24,
+    "lateCancellation": "staff_request_booking_kept",
+    "noResponse": "booking_kept_with_optional_separately_authorized_staff_notice",
+    "changeRequest": "staff_review_without_automatic_calendar_move",
+    "customerPrincipalImpersonatesStaff": false,
+    "financialOnlyRevisionInvalidatesCalendar": false,
+    "completedLinesPreserved": true,
+    "monitorRecentLimit": 50,
+    "monitorOpenRequestsSeparateLimit": 50,
+    "retargetOldRecipient": false,
+    "retryAmbiguousSendWithNewKey": false,
+    "queuedImpliesSentOrReceived": false,
+    "withdrawReportsAlreadyAcquiredEffectAsCancelled": false,
+    "staleEventsMustMatchSourceCalendarAndContactProof": true,
+    "eventTimeFollowsTenantLockAcquisition": true
+  },
+  "validation": {
+    "unitSuites": 62,
+    "unitTests": 391,
+    "snapshots": 1,
+    "lint": "passed",
+    "builds": [
+      "api",
+      "admin",
+      "public booking"
+    ],
+    "workflowHttp": {
+      "checkedAt": "2026-11-11T11:48:49.580Z",
+      "database": "step11_qa_1794397610177",
+      "realSdk": true,
+      "realDomainServices": true,
+      "provider": "synthetic-loopback",
+      "realAccounts": false,
+      "realProviderMessages": false,
+      "checks": [
+        "activation-requires-separate-channel-and-agenda-authorities-with-current-SDK-verification",
+        "per-booking-explicit-consent-and-revision-checked-later-authorization-without-account-mutation",
+        "durable-queue-ack-is-queued-and-repeated-jobs-poll-existing-command-without-second-send",
+        "signed-bound-one-use-confirmation-cannot-impersonate-staff-and-deposits-do-not-invalidate-or-change",
+        "change-request-is-visible-and-reviewable-without-moving-booking-or-money",
+        "customer-cancellation-outside-24-hours-records-customer-principal-without-refund-or-stock-return",
+        "late-cancellation-becomes-staff-request-and-retains-booking",
+        "consent-revocation-stops-original-outbox-command-and-rejects-late-customer-actions",
+        "lost-provider-ack-reconciles-original-receipt-without-requeue-and-only-sent-receipt-marks-history-sent",
+        "customer-cancels-only-future-pending-rows-and-preserves-performed-row-and-open-account",
+        "redis-outage-keeps-transactional-intents-and-recovery-rebuilds-existing-queue",
+        "rescheduling-invalidates-old-plan-and-action-and-creates-only-one-current-plan",
+        "phone-formatting-keeps-consent-but-number-change-invalidates-frozen-recipient-without-retargeting",
+        "current-agenda-revocation-denies-customer-writes-even-while-whatsapp-authority-remains",
+        "failure-after-operation-insert-rolls-back-booking-operation-response-and-receipt-and-same-event-retries-once",
+        "competing-confirm-cancel-callbacks-serialize-to-one-customer-operation",
+        "no-response-deadline-keeps-booking-and-materializes-at-most-one-separately-authorized-staff-notice",
+        "customer-action-does-not-imply-email-or-native-notification-authority",
+        "policy-stop-closes-waiting-plans-and-monitor-retains-tenant-isolation",
+        "database-freezes-plan-action-schedule-and-tenant-and-retains-domain-evidence"
+      ]
+    },
+    "eventNoticesHttp": {
+      "checkedAt": "2026-11-11T11:48:27.826Z",
+      "database": "step11_qa_1794397610177",
+      "realSdk": true,
+      "realDomainServices": true,
+      "provider": "synthetic-loopback",
+      "realAccounts": false,
+      "realProviderMessages": false,
+      "checks": [
+        "activation-requires-separate-channel-and-agenda-authorities-with-current-SDK-verification",
+        "event-preview-renders-status-specific-operational-example-values",
+        "new-confirmation-and-cancellation-events-stay-disabled-until-explicit-policy-choice",
+        "staff-confirmation-prepares-one-frozen-text-notice-with-configured-renderer-and-same-outbox",
+        "cancelled-booking-can-notify-customer-without-reopening-agenda-changing-deposit-or-adding-buttons",
+        "customer-confirmation-notice-acknowledges-one-domain-operation-without-starting-another-response-cycle",
+        "delayed-old-event-cannot-build-a-new-intent-for-a-different-schedule-and-current-reschedule-uses-own-text",
+        "phone-change-stops-queued-event-notice-transactionally-and-reconciles-original-withdrawal",
+        "event-notification-choice-does-not-authorize-a-customer-number-without-booking-consent",
+        "pending-old-event-never-adopts-a-later-contact-authorization-or-recipient",
+        "event-notice-context-and-original-history-are-immutable-and-booked-activity-deletion-remains-blocked",
+        "reschedule-event-can-be-disabled-while-future-reminders-replan-for-the-new-slot",
+        "monitor-distinguishes-event-notices-from-response-plans-without-message-payloads-or-cross-tenant-data",
+        "scheduled-first-and-repeated-reminder-dispatch-with-original-due-times-and-bounded-command-count",
+        "owner-can-select-cancellation-only-without-initial-message-or-reminders",
+        "booking-event-time-follows-tenant-lock-order-and-does-not-drop-post-activation-work"
+      ]
+    },
+    "workflowBrowser": {
+      "checkedAt": "2026-11-11T11:48:55.687Z",
+      "database": "step11_qa_1794397610177",
+      "realAngular": true,
+      "realSdk": true,
+      "provider": "synthetic-loopback",
+      "realAccounts": false,
+      "realProviderMessages": false,
+      "checks": [
+        "real-ui-persists-template-reload-retains-conflicting-draft-and-previews-with-production-renderer",
+        "event-choices-and-five-message-templates-persist-and-preview-from-real-policy-api",
+        "agenda-authority-can-be-created-from-ui-separately-from-native-notifications",
+        "explicit-policy-activation-and-durable-monitor-show-real-domain-states-and-review-without-calendar-mutation",
+        "policy-and-monitor-work-in-four-viewports-and-explicit-stop-closes-new-dispatch"
+      ],
+      "screenshots": ".local/step12/workflow-screenshots"
+    },
+    "contactBrowser": {
+      "checkedAt": "2026-11-11T11:46:00.657Z",
+      "database": "step7_http_1794397039699",
+      "realAngular": true,
+      "realDomainCommands": true,
+      "realAccounts": false,
+      "providerCalls": false,
+      "checks": [
+        "lost-response-freezes-contact-command-and-reload-recovers-identical-key-once-in-real-booking-editor",
+        "explicit-contact-revocation-and-masked-number-work-in-four-viewports"
+      ],
+      "screenshots": ".local/step12/contact-screenshots"
+    },
+    "publicConsentBrowser": {
+      "checkedAt": "2026-11-11T11:46:00.468Z",
+      "database": "step7_http_1794397039699",
+      "realAngular": true,
+      "realDomainCommands": true,
+      "realAccounts": false,
+      "realProviderMessages": false,
+      "checks": [
+        "public-consent-is-off-by-default-and-explicit-opt-in-is-persisted-for-only-the-booking",
+        "lost-public-ack-freezes-and-restores-selected-consent-and-replays-identical-command-after-reload",
+        "public-consent-is-readable-without-horizontal-overflow-in-four-viewports"
+      ],
+      "screenshots": ".local/step12/public-consent-screenshots"
+    },
+    "legacyDomainRegressions": [
+      {
+        "script": "verify-notification-templates-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-automation-policy-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-operational-order-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-pricing-inventory-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-payment-ledger-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-booking-command-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-booking-availability-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-booking-resources-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-booking-mutation-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-rescheduling-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-calendar-configuration-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-cashier-fulfilment-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-operational-options-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-financial-report-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-financial-valuation-http.mjs",
+        "exitCode": 0
+      },
+      {
+        "script": "verify-notification-outbox-http.mjs",
+        "exitCode": 0,
+        "evidence": ".local/step12/events-regression-outbox-isolated.log",
+        "isolation": "fresh disposable QA runtime; previous combined-run failure kept in original log because provider counters include prior scenarios"
+      }
+    ],
+    "sdkRegressions": [
+      {
+        "script": "verify-automation-webhooks-http.mjs",
+        "exitCode": 0,
+        "evidence": ".local/step12/events-sdk-verify-automation-webhooks-http.mjs.log"
+      },
+      {
+        "script": "verify-automation-grants-http.mjs",
+        "exitCode": 0,
+        "evidence": ".local/step12/events-sdk-verify-automation-grants-http.mjs.log"
+      },
+      {
+        "script": "verify-automation-withdrawals-http.mjs",
+        "exitCode": 0,
+        "evidence": ".local/step12/events-sdk-verify-automation-withdrawals-http.mjs.log"
+      }
+    ],
+    "sdkManualBaseline": {
+      "checkedAt": "2026-11-11T11:51:41.581Z",
+      "database": "step11_qa_1794397880648",
+      "realSdk": true,
+      "sdkVersion": "0.12.0-rc.2",
+      "connectProvider": "synthetic-loopback",
+      "realAccounts": false,
+      "realProviderMessages": false,
+      "checks": [
+        "real-sdk-session-authentication-and-installation-scope-safe-qr-archives-conversations-and-50-message-pagination",
+        "explicit-independent-grants-whole-company-sector-access-origin-and-strict-payload-boundaries",
+        "stable-actor-bound-provider-idempotency-original-acknowledgement-no-inferred-delivery-and-conflicting-payload-rejected",
+        "real-sdk-request-deadline-bounds-hung-provider-after-commit-and-same-key-recovery-does-not-requeue",
+        "lost-provider-response-after-queue-commit-explicit-same-command-recovery-no-duplicate-and-provider-uncertain-state-retained",
+        "current-central-revocation-and-transient-or-malformed-provider-failures-deny-request-without-destroying-valid-sdk-session",
+        "explicit-connect-disconnect-and-reconnect-use-existing-provider-state-machine-and-preserve-archive",
+        "mutations-audited-without-message-content-phone-token-or-command-key",
+        "definitive-connect-access-revocation-invalidates-sdk-session-and-does-not-silently-restore-it"
+      ]
+    },
+    "screenshotsVisuallyInspected": [
+      ".local/step12/workflow-screenshots/policy-desktop.png",
+      ".local/step12/workflow-screenshots/policy-mobile.png"
+    ]
+  },
+  "sdk": {
+    "version": "0.12.0-rc.2",
+    "package": "vendor/eulab-connect-0.12.0-rc.2.tgz",
+    "sha256": "a76152931bf69b41d77aef679de1a623a607679cc0441b2d1e2016bf94acc44d",
+    "installedOffline": true,
+    "published": false,
+    "connectCodeOrContainersChanged": true
+  },
+  "migration": {
+    "checkedAt": "2026-11-11T11:26:35.851Z",
+    "sourceDatabaseModified": false,
+    "backupReadable": true,
+    "restoredAndReapplied": true,
+    "originalTablesUnchanged": 54,
+    "originalColumnsUnchanged": 632,
+    "newMigrationApplied": 1,
+    "eventNoticesInferred": 0,
+    "contactConsentsInferred": 0,
+    "existingRunLinksUnchanged": true,
+    "evidence": ".local/step12/event-migration-1794396384104/result.json"
+  },
+  "candidateArtifacts": {
+    "checkedAt": "2026-11-11T11:46:59.801992+00:00",
+    "checks": [
+      {
+        "name": "api",
+        "tag": "alora-step12-events-candidate-api:20261111",
+        "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+        "files": 344,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      {
+        "name": "admin",
+        "tag": "alora-step12-events-candidate-admin:20261111",
+        "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+        "files": 20,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      {
+        "name": "booking",
+        "tag": "alora-step12-events-candidate-booking:20261111",
+        "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+        "files": 17,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      }
+    ],
+    "sdkVersion": "0.12.0-rc.2",
+    "mainRuntimeUpdated": false,
+    "builder": "desktop-linux with cache; all three targets rebuilt",
+    "noCacheBuild": false
+  },
+  "isolatedRuntime": {
+    "checkedAt": "2026-11-11T11:47:02.669Z",
+    "imagePrefix": "alora-step12-events-candidate-",
+    "checks": [
+      "full-candidate-AppModule-starts-with-isolated-Redis-and-empty-PostgreSQL-migrations",
+      "entrypoint-applies-pending-notification-migrations-and-does-not-seed-accounts-tenants-or-sales",
+      "actual-global-guards-deny-anonymous-operational-options-without-an-account-or-Connect-login",
+      "actual-global-guards-deny-anonymous-template-read-preview-and-save-without-seeding-identities",
+      "draft-policy-migration-does-not-create-configuration-or-work-and-real-guards-deny-anonymous-policy-read-save-and-preview",
+      "SDK-012-rc2-five-empty-automation-migrations-current-guards-public-raw-webhook-route-and-ordinary-body-limit",
+      "durable-command-journal-and-withdrawal-recovery-module-start-empty-without-provider-effects",
+      "generated-Linux-Prisma-client-and-native-bcrypt-work-and-QA-server-scripts-are-excluded",
+      "actual-full-app-wires-workflow-and-customer-commands-with-empty-plans-and-guards-all-new-operations",
+      "event-notice-migration-and-nullable-run-client-start-without-inferred-deliveries",
+      "both-candidate-Nginx-images-serve-real-HTML-and-JavaScript-assets-on-the-private-network"
+    ],
+    "identity": "empty disposable database; no auth session created",
+    "networkInternal": true,
+    "hostPortsPublished": false,
+    "realAccounts": false,
+    "realProviders": false,
+    "mainDatabaseModified": false,
+    "mainRuntimeUpdated": false,
+    "evidence": ".local/step12/events-docker/runtime-1794397611325/result.json"
+  },
+  "isolatedRestore": {
+    "checkedAt": "2026-11-11T11:48:59.044Z",
+    "checks": [
+      "fresh-database-and-upload-archives-read-without-stopping-or-changing-main-services",
+      "database-restores-before-migration-and-upload-archive-restores-byte-identical-paths-types-modes-and-symlinks",
+      "candidate-normal-entrypoint-applies-nine-automation-migrations-and-preserves-existing-workflow-data-and-media",
+      "previous-workflow-image-boots-on-event-notice-schema-before-new-writes-with-original-data-and-media",
+      "cold-restore-boots-retained-workflow-image-and-restores-original-data-and-media",
+      "main-image-identities-health-schema-and-source-uploads-remain-unchanged-and-no-source-write-was-issued"
+    ],
+    "candidateImageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+    "candidateTag": "alora-step12-events-candidate-api:20261111",
+    "candidateMigrationCount": 9,
+    "rollbackImageId": "sha256:c1fd73d7b860e624f6df1761d4cd99d10a4105d2c1189170b20bda701a911f12",
+    "originalTablesUnchanged": 54,
+    "originalColumnsUnchanged": 632,
+    "sourceUploadFiles": 0,
+    "syntheticUploadFixtures": 3,
+    "syntheticSymlinkFixtures": 1,
+    "originalMediaArchiveSha256": "0a729b5b83fbfe824bb5e70fb1a4440e71bdf6fc66351da6319fc50ebf5f5d13",
+    "sourceOperationsReadOnly": true,
+    "mainRuntimeUpdated": false,
+    "sourceConfigurationChanged": false,
+    "realAccountSessionsCreated": false,
+    "copiedAccountRowsUnchanged": true,
+    "realProviderMessages": false,
+    "networkInternal": true,
+    "hostPortsPublished": false,
+    "productionDeployment": false,
+    "commercialAcceptance": false,
+    "limits": [
+      "Live source was not quiesced; concurrent database/media point-in-time consistency is not certified",
+      "Source uploads were empty; non-empty media recovery used synthetic files only in isolated volumes",
+      "Binary rollback is verified before any post-upgrade user writes or provider effects",
+      "Redis queues, external Connect configuration/keys, DNS/TLS and production infrastructure recovery are not covered",
+      "No real login, provider delivery or customer acceptance was attempted"
+    ],
+    "evidence": ".local/step14/restore-1794397701747/result.json"
+  },
+  "localRollout": {
+    "checkedAt": "2026-11-11T11:52:54.961822+00:00",
+    "status": "passed",
+    "environment": "local Docker only",
+    "mainRuntimeUpdated": true,
+    "candidateImages": {
+      "api": {
+        "name": "api",
+        "tag": "alora-step12-events-candidate-api:20261111",
+        "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+        "files": 344,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      "admin": {
+        "name": "admin",
+        "tag": "alora-step12-events-candidate-admin:20261111",
+        "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+        "files": 20,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      },
+      "booking": {
+        "name": "booking",
+        "tag": "alora-step12-events-candidate-booking:20261111",
+        "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+        "files": 17,
+        "exactHostMatch": true,
+        "difference": {
+          "missing": [],
+          "extra": [],
+          "changed": []
+        }
+      }
+    },
+    "migrationCount": 9,
+    "originalTablesPreserved": 54,
+    "originalColumnsPreserved": 632,
+    "exactDataTablesUnchanged": 53,
+    "technicalStoreRenewal": {
+      "checkedAt": "2026-11-11T11:52:54.636Z",
+      "table": "connect_sdk_records",
+      "recordKind": "configuration",
+      "recordCountUnchanged": true,
+      "plaintextConfigurationUnchanged": true,
+      "changedTopLevelFields": [],
+      "cipherUnchanged": false,
+      "expiresAtUnchanged": false,
+      "namespaceUnchanged": true,
+      "configurationHash": "8e8c244071ba8dda1d2d027db6a6f58d7fe4e063bd90f42dd72015a2c69ce7db",
+      "credentialsExposed": false
+    },
+    "accountsAndSessionsPreserved": true,
+    "contactConsentsInferred": 0,
+    "automationPlansInferred": 0,
+    "domainEventsInferred": 0,
+    "notificationQueueEmptyBeforeRollout": true,
+    "applicationWritersStoppedForBackup": true,
+    "coordinatedDatabaseUploadBackup": true,
+    "databaseBackupReadable": true,
+    "databaseBackupSha256": "51ca3b8dd647f6d0d9bfc8d6541c71af5cb69f4498efc4f207a064dc4db56e0f",
+    "uploadArchiveSha256": "0a729b5b83fbfe824bb5e70fb1a4440e71bdf6fc66351da6319fc50ebf5f5d13",
+    "uploadArchiveUnchanged": true,
+    "configurationUnchanged": true,
+    "environmentVariablesUnchanged": true,
+    "sharedServicesAndConnectContainersUnchanged": true,
+    "staticAssetChecks": [
+      "admin",
+      "booking"
+    ],
+    "anonymousGuardsChecked": 3,
+    "health": {
+      "status": "ok",
+      "timestamp": "2026-11-11T11:52:39.977Z"
+    },
+    "rollbackImages": {
+      "api": "alora-workflow-before-events-api:20261111t115220z",
+      "admin": "alora-workflow-before-events-admin:20261111t115220z",
+      "booking": "alora-workflow-before-events-booking:20261111t115220z"
+    },
+    "realAccountSessionsUsed": false,
+    "realProviderMessages": false,
+    "productionDeployment": false,
+    "realProviderAcceptance": false,
+    "evidence": ".local/step12/local-events-rollout-20261111T115220Z/result.json"
+  },
+  "qaCleanup": {
+    "currentOwnedContainersRemaining": 0,
+    "currentOwnedDatabasesRemaining": 0,
+    "sharedServicesPreserved": true,
+    "backupsAndRollbackImagesRetained": true
+  },
+  "sourceChecksums": {
+    "apps/api/src/common/appointment-automation-policy.ts": "2fa3780e85a81823187b4c798a09893f5e12eef13b754f7206f35ccb09d3fb82",
+    "apps/api/src/modules/notifications/appointment-automation-dispatch.service.ts": "32d2cbe373e0669131c4a9a97fcf4164531ede8f552d081d056bb7e795e6a7c5",
+    "apps/api/src/modules/notifications/appointment-automation-messages.ts": "8b1c36bb38d96042bc5789cdf7b80958649574edeac1cdd0c5a564d362a6bbca",
+    "apps/api/src/modules/notifications/appointment-automation-monitor.controller.ts": "586822411c73241695499cbdd15dcb03b9d3818b7df5a74d05927d076499f9c1",
+    "apps/api/src/modules/notifications/appointment-automation-planner.service.ts": "537822e715e43be923b7eb1b9c79a1a695fe677d9f841a85a0a3780367949714",
+    "apps/api/src/modules/notifications/appointment-automation-policy.controller.ts": "872ed5d46b13dc9d2fe04edffa34cfdee09a2fa55879f8d51700a28ae394142e",
+    "apps/api/src/modules/notifications/appointment-automation-policy.service.ts": "83712d808c0ad090eb3f39dd13055fb0a4cb2e8efa40bfba3cc5968acfe48788",
+    "apps/api/src/modules/notifications/appointment-automation-recovery.service.ts": "5425b809bd44444eebe03f3c6bc6725a37a683c7fa45c8f4be51b9d1795c5664",
+    "apps/api/src/modules/notifications/appointment-automation-staff.service.ts": "db1516098270ae2b4f3f28f80aef5654276a2ff80fa7ef16280155428a96d23d",
+    "apps/api/src/modules/notifications/appointment-automation-state.ts": "e86dd8e324ca0b30ef57cfa9f6c719b3750b8a5eb65e72c37a3a829301f0b5a4",
+    "apps/api/src/modules/notifications/appointment-automations.module.ts": "02e752c2445f7409849df488440bd367b1b5754074caee8511f849b1a5b7221a",
+    "apps/api/src/modules/notifications/appointment-contact.controller.ts": "e0907fcadcfd22e5a38ef6f239bcb88270b76788ebdbbd8102218935c455c851",
+    "apps/api/src/modules/notifications/appointment-contact.service.ts": "74de8e94c9994295e6f8fc6b5d93d8a769afa89cd983cf6cfc30f3a17b6d9bcc",
+    "apps/api/src/modules/notifications/appointment-customer-actions.service.ts": "d71a3aa1c3b8a175134e11fd6bd381567bfb6639a99a5e4e08073b2063500d58",
+    "apps/api/src/modules/notifications/appointment-customer-contract.spec.ts": "635e221ad925cbb1b8d2567cde3ebfc32d47e50fe32bb921aca1e9a6f5c6f14d",
+    "apps/api/src/modules/notifications/appointment-events.ts": "c7a96bcd655314ac34e2c86e1e253987cea92d4d573d2c0484dddc6ca9b4595b",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.spec.ts": "b5392bf72b142dac65652de5f83c511e7604c7134cdc532a5e96af767f5f1540",
+    "apps/api/src/modules/notifications/appointment-reminder-plan.ts": "ae0db3355a5b3baebad505782e995380e5575090f250e2d9786d02dac75594d2",
+    "apps/web-admin/src/app/core/appointment-automation-access-api.service.ts": "7bf3ac15abdadd1f5f1bd7a40a43ebdbac810246c76a987f0982d035e3d2e9f7",
+    "apps/web-admin/src/app/core/appointment-automation-policy-api.service.ts": "f28da7936a49af971495b13cd1f7d1532ebace62beb2b88fa120a69a96480c0c",
+    "apps/web-admin/src/app/shared/appointment-automation-access.component.ts": "e885ade9b2beff33f1ca5e496eb30ca8a4f58cb0c7a4d46b3400e52854ec6178",
+    "apps/web-admin/src/app/shared/appointment-automation-monitor.component.ts": "c50125c1de2b51236dc82b187cc259ad27e9e961de4132806d48483bcb6844cb",
+    "apps/web-admin/src/app/shared/appointment-automation-policy.component.ts": "d0db852edbd1835ae0f97189ceff9d57f06dfbb8df87389d214d95aad4142f0d",
+    "apps/web-admin/src/app/shared/appointment-contact.component.ts": "987829e28a08c9094d0bc347e63b1f42caed50a25489243e77c4b57d26a3b9be",
+    "prisma/migrations/20261110100000_notification_automation_grants/migration.sql": "c7c0dd6afee498ed17d20de6d76eb98d2add9a84712034adbc1fd40f571f5138",
+    "prisma/migrations/20261110101000_notification_automation_webhooks/migration.sql": "461021e5b791323331cc7fec4839835e4a9dfa08ecd02a867b616b5c60d54b69",
+    "prisma/migrations/20261110160000_notification_automation_commands/migration.sql": "2abb5d26e49e7ded368748e02d3296800ee65ce0ab7618922d0a2ed8c4cbc237",
+    "prisma/migrations/20261110200000_automation_queued_state/migration.sql": "1c9c0b5fb4854dcd65897d4ab764ef5b517469110134bf98be0e6eefc32fabd5",
+    "prisma/migrations/20261110201000_appointment_automation_workflow/migration.sql": "6b1829d265990ea0524a97313ae4a52c2d8cac105935428052ebec873b2e70bc",
+    "prisma/migrations/20261111200000_appointment_event_notices/migration.sql": "8fc8a585d22e1d74f60cbf33ab77fa105cf9e2aa1459142e848722888d233924",
+    "prisma/schema.prisma": "23b63a44a20bdba52df5c3c2099b6285d88eca02fe641c6f88e5b327977baa4e"
+  },
+  "limits": [
+    "Compatible API/runner/schema 015 now installed locally; real identity/provider/device acceptance is still open",
+    "Real WhatsApp device pairing, interactive capability, sent/received acknowledgements and customer button handling remain unverified",
+    "Public HTTPS webhook reachability and real signing/provider setup remain unverified",
+    "Physical devices, production and commercial acceptance remain separate",
+    "Connect account/password/role work and real messages remain excluded by the user",
+    "Binary rollback is proven only before post-upgrade user writes or provider effects; no automatic restore over newer business data",
+    "SDK is a vendored local release candidate; no registry publication was performed"
+  ],
+  "realAccountsUsedOrModified": false,
+  "realProviderMessages": false,
+  "productionDeployment": false,
+  "commercialAcceptance": false,
+  "subsequentConnectRuntime": {
+    "checkedAt": "2026-11-11T12:23:39.801730+00:00",
+    "status": "connect-local-runtime-015-installed-provider-device-and-public-webhook-acceptance-open",
+    "authorization": "User explicitly instructed this agent to work directly in ../eulab connect after the read-only readiness finding",
+    "localRuntimeUpdated": true,
+    "unitTests": {
+      "total": 192,
+      "passed": 187,
+      "failed": 0,
+      "reservedForPostgres": 5,
+      "evidence": "backups/automation-runtime-20261111/unit-tests-final.log"
+    },
+    "postgresIsolated": {
+      "passed": 24,
+      "failed": 0,
+      "realMigratorAppliedTwice": true,
+      "evidence": "dist/verification/automations/isolated-run.json"
+    },
+    "packagingRegression": {
+      "beforeFix": "runner image included src/license.ts due to license-name exemption",
+      "reproducedRedTest": true,
+      "fixed": "TypeScript and source map extensions cannot claim the legal-document exemption",
+      "greenTestAndRuntimeChecks": true,
+      "legalDocumentsRetained": true,
+      "filesChanged": [
+        "scripts/prune-runtime-deps.mjs",
+        "tests/runtime-packaging.test.mjs"
+      ]
+    },
+    "sdkVersion": "0.12.0-rc.2",
+    "sdkPackageSha256": "a76152931bf69b41d77aef679de1a623a607679cc0441b2d1e2016bf94acc44d",
+    "aloraUsesIdenticalVendoredPackage": true,
+    "rehearsal": {
+      "checkedAt": "2026-11-11T12:19:14.950488+00:00",
+      "status": "passed",
+      "checks": [
+        "actual-source-backup-restores-on-isolated-tmpfs-PostgreSQL-without-source-writes",
+        "candidate-migrator-applied-twice-preserves-every-original-public-field",
+        "candidate-API-and-runner-boot-health-heartbeat-no-inferred-automations-and-unchanged-business-fields-and-profiles",
+        "previous-API-and-runner-boot-health-heartbeat-no-inferred-automations-and-unchanged-business-fields-and-profiles",
+        "cold-restored-backup-recovers-original-schema-and-every-original-field"
+      ],
+      "sourceBackupReadable": true,
+      "originalTablesPreserved": 45,
+      "originalColumnsPreserved": 337,
+      "newSchemaVersion": "015",
+      "expectedStartupTechnicalFields": [
+        "runners.heartbeat_at",
+        "applications.catalog_checked_at",
+        "applications.catalog_sync_error",
+        "applications.catalog_synced_at"
+      ],
+      "allOriginalFieldsExactBeforeStartup": true,
+      "accountsSessionsAndOutboxPreserved": true,
+      "profileDataAndModesPreserved": true,
+      "emptyProfileRootMtimeMayChangeOnDockerMount": true,
+      "sourceProfileFiles": 0,
+      "realAccountLogin": false,
+      "realProviderMessages": false,
+      "internalNetwork": true,
+      "hostPorts": false,
+      "sourceWrites": false,
+      "binaryRollbackBeforeNewWritesOnly": true,
+      "candidateImages": {
+        "api": {
+          "target": "api",
+          "tag": "connect-automations-candidate-api:20261111",
+          "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+          "artifactSha256": "a52607ed573c1b1ec6de68817a274ad57789a7315751554b04d48e8793e7609f",
+          "exactHostMatch": true,
+          "runtimePackagingAndDependencies": "passed",
+          "chromiumBlankPageVerified": false
+        },
+        "runner": {
+          "target": "runner",
+          "tag": "connect-automations-candidate-runner:20261111",
+          "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+          "artifactSha256": "aa46f2b71904df6520f6b047e6060b0b507398b5e90e08c1ace3738e8003f657",
+          "exactHostMatch": true,
+          "runtimePackagingAndDependencies": "passed",
+          "chromiumBlankPageVerified": true
+        },
+        "migrate": {
+          "target": "migrate",
+          "tag": "connect-automations-candidate-migrate:20261111",
+          "imageId": "sha256:6a0cd43a60905437e8806f8336b5f6a6c1c33e3ceca3cdeb7e004e6660fc4a85",
+          "artifactSha256": "ae654b1d1e8aa053f7907fc26c034bd8a1e98bdaa404b4da7ecc94eb9110bc2e",
+          "exactHostMatch": true,
+          "runtimePackagingAndDependencies": "passed",
+          "chromiumBlankPageVerified": false
+        }
+      }
+    },
+    "cleanup": {
+      "ownedContainersRemoved": true,
+      "ownedVolumeRemoved": true,
+      "ownedNetworkRemoved": true
+    },
+    "rollout": {
+      "checkedAt": "2026-11-11T12:20:52.583435+00:00",
+      "status": "passed",
+      "localRuntimeUpdated": true,
+      "schemaVersion": "015",
+      "migrations": 15,
+      "candidateImages": {
+        "api": {
+          "target": "api",
+          "tag": "connect-automations-candidate-api:20261111",
+          "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+          "artifactSha256": "a52607ed573c1b1ec6de68817a274ad57789a7315751554b04d48e8793e7609f",
+          "exactHostMatch": true,
+          "runtimePackagingAndDependencies": "passed",
+          "chromiumBlankPageVerified": false
+        },
+        "runner": {
+          "target": "runner",
+          "tag": "connect-automations-candidate-runner:20261111",
+          "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+          "artifactSha256": "aa46f2b71904df6520f6b047e6060b0b507398b5e90e08c1ace3738e8003f657",
+          "exactHostMatch": true,
+          "runtimePackagingAndDependencies": "passed",
+          "chromiumBlankPageVerified": true
+        },
+        "migrate": {
+          "target": "migrate",
+          "tag": "connect-automations-candidate-migrate:20261111",
+          "imageId": "sha256:6a0cd43a60905437e8806f8336b5f6a6c1c33e3ceca3cdeb7e004e6660fc4a85",
+          "artifactSha256": "ae654b1d1e8aa053f7907fc26c034bd8a1e98bdaa404b4da7ecc94eb9110bc2e",
+          "exactHostMatch": true,
+          "runtimePackagingAndDependencies": "passed",
+          "chromiumBlankPageVerified": false
+        }
+      },
+      "originalPublicTables": 45,
+      "originalPublicColumnsRetained": 337,
+      "allOriginalPublicValuesUnchangedAfterMigrationBeforeStartup": true,
+      "startupTechnicalTablesChanged": [
+        "runners"
+      ],
+      "startupTechnicalFieldsPermitted": {
+        "runners": [
+          "heartbeat_at"
+        ],
+        "applications": [
+          "catalog_checked_at",
+          "catalog_sync_error",
+          "catalog_synced_at"
+        ]
+      },
+      "allOtherPublicValuesUnchanged": true,
+      "keycloakAccountTablesVerifiedUnchanged": [
+        "user_entity",
+        "credential",
+        "user_role_mapping",
+        "keycloak_role",
+        "realm",
+        "client",
+        "user_group_membership",
+        "user_attribute",
+        "federated_identity"
+      ],
+      "accountRolesPasswordsAndSessionsNotModified": true,
+      "databaseBackupReadable": true,
+      "databaseBackupSha256": "5971d65364aa9847279f09d4d3d5fed85939ba9d57fd6da71d5bb93b55ba1e03",
+      "coordinatedBackupWithApiAndRunnerStopped": true,
+      "profilesPreserved": true,
+      "sourceProfileFiles": 0,
+      "emptyRootMtimeMayChangeOnDockerMount": true,
+      "applicationConfigurationUnchanged": true,
+      "runtimeEnvironmentUnchanged": true,
+      "sharedServicesAndAloraContainersUnchanged": true,
+      "migratorExecutedTwice": true,
+      "newAutomationDelegations": 0,
+      "pendingEffectsBeforeAndAfter": 0,
+      "existingSentAndUncertainOutboxPreserved": true,
+      "runnerHeartbeatVerified": true,
+      "publicProxyHealth": {
+        "status": "ok",
+        "service": "eulab-connect",
+        "capacityVerified": false
+      },
+      "automationPaths": [
+        "/v1/installations/{installationId}/automations/delegations",
+        "/v1/installations/{installationId}/automations/delegations/by-key/{key}",
+        "/v1/installations/{installationId}/automations/delegations/{id}",
+        "/v1/installations/{installationId}/automations/delegations/{id}/verify",
+        "/v1/installations/{installationId}/automations/delegations/{id}/messages",
+        "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}",
+        "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}/withdraw",
+        "/v1/installations/{installationId}/automations/webhooks",
+        "/v1/installations/{installationId}/automations/webhooks/by-key/{key}"
+      ],
+      "anonymousGrantReadDenied": true,
+      "rollbackImages": {
+        "api": "connect-before-automations-api:20261111t122016z",
+        "runner": "connect-before-automations-runner:20261111t122016z",
+        "migrate": "connect-before-automations-migrate:20261111t122016z"
+      },
+      "evidence": "backups/automation-runtime-20261111/rollout-20261111T122016Z",
+      "realAccountLogin": false,
+      "realProviderMessages": false,
+      "productionDeployment": false,
+      "deviceAcceptance": false
+    },
+    "currentReadOnlyReadiness": {
+      "checkedAt": "2026-11-11T12:22:52.384826+00:00",
+      "readOnly": true,
+      "status": "local-provider-runtime-compatible-public-webhook-and-device-acceptance-open",
+      "runtimeContractInstalled": true,
+      "publicWebhookOriginConfigured": false,
+      "goalComplete": false,
+      "goalTurnClassification": "progress: explicitly authorized Connect rollout completed and read-only readiness refreshed",
+      "alora": {
+        "installedSdkVersion": "0.12.0-rc.2",
+        "runtimeHealthy": true,
+        "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+        "workflowSourceChecksumDrift": [],
+        "webhookOrigins": {
+          "ALORA_CONNECT_WEBHOOK_ORIGIN": {
+            "configured": false
+          },
+          "PUBLIC_APP_URL": {
+            "configured": true,
+            "https": false,
+            "loopback": true,
+            "defaultHttpsPort": false
+          }
+        }
+      },
+      "connect": {
+        "apiImageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+        "runnerImageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+        "apiStartedAt": "2026-11-11T12:20:37.853982166Z",
+        "runnerStartedAt": "2026-11-11T12:20:37.854554458Z",
+        "openApi": {
+          "healthStatus": 200,
+          "service": "eulab-connect",
+          "capacityVerified": false,
+          "openapiStatus": 200,
+          "pathCount": 127,
+          "automationPaths": [
+            "/v1/installations/{installationId}/automations/delegations",
+            "/v1/installations/{installationId}/automations/delegations/by-key/{key}",
+            "/v1/installations/{installationId}/automations/delegations/{id}",
+            "/v1/installations/{installationId}/automations/delegations/{id}/verify",
+            "/v1/installations/{installationId}/automations/delegations/{id}/messages",
+            "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}",
+            "/v1/installations/{installationId}/automations/delegations/{id}/messages/by-key/{key}/withdraw",
+            "/v1/installations/{installationId}/automations/webhooks",
+            "/v1/installations/{installationId}/automations/webhooks/by-key/{key}"
+          ],
+          "manualMessagesRoutePresent": true
+        },
+        "apiBundle": {
+          "sha256": "a52607ed573c1b1ec6de68817a274ad57789a7315751554b04d48e8793e7609f",
+          "bytes": 373709,
+          "markers": {
+            "v1/installations/:installationId/automations": true,
+            "messages/by-key/:key/withdraw": true,
+            "automation_delegations": true,
+            "AutomationController": true
+          }
+        },
+        "runnerBundle": {
+          "sha256": "aa46f2b71904df6520f6b047e6060b0b507398b5e90e08c1ace3738e8003f657",
+          "bytes": 87310,
+          "markers": {
+            "automation_delegations": true,
+            "delegation_id": true,
+            "effect_started": true
+          }
+        },
+        "schema015DelegationsTableExists": true,
+        "inspectedDatabaseMatchesApiDatabase": true,
+        "containersUnchangedDuringReadOnlyAudit": true
+      },
+      "requiredNextExternalState": [
+        "A controlled HTTPS application origin is provided and the signed webhook is registered through the existing SDK flow",
+        "A controlled business WhatsApp number, licensed capabilities and explicitly authorized test recipient are supplied for device acceptance"
+      ],
+      "excluded": [
+        "No account creation, login, password reset, role change or modification",
+        "No Connect deployment, migration or code edit by this audit",
+        "No webhook registration, QR pairing or real provider message",
+        "No public tunnel, DNS/TLS change or production deployment"
+      ],
+      "acceptance": [
+        "Current API OpenAPI must expose the automation delegation, message status, withdrawal and webhook recovery paths",
+        "Schema 015 and runner must be the compatible release; an SDK tarball alone is insufficient runtime evidence",
+        "Real device must demonstrate one original send, callback correlation, action state transition and receipt without duplicate send",
+        "Revocation and pending withdrawal require real provider outcome evidence; acquired effects cannot be reported cancelled"
+      ],
+      "evidenceSources": [
+        "evolve.md sections 8, 13 and 14",
+        "docs/connect-sdk-integration-contract.md",
+        "/Users/eugeniorenna/eulab connect/packages/sdk/AUTOMATIONS.md",
+        "docs/verification/appointment-automations-workflow-step-12.json"
+      ]
+    },
+    "realAccountsUsedOrModified": false,
+    "realProviderMessages": false,
+    "npmPublication": false,
+    "productionDeployment": false,
+    "goalComplete": false,
+    "limits": [
+      "Runtime API/schema/routes/runner are verified; no real personal delegation or device send was exercised",
+      "Public HTTPS webhook origin is still absent in ALORA; the Connect runner rejects private destination addresses and non-HTTPS URLs",
+      "A controlled business number and explicitly authorized recipient are still needed for device tests",
+      "Source profile volume was empty; data preservation checks do not prove recovery of an existing paired authentication profile",
+      "Binary rollback was proven only before any new application writes or external effects",
+      "All preexisting worktree modifications were preserved; only the runtime-pruning fix and its regression were added"
+    ],
+    "sourceChecksums": {
+      "scripts/prune-runtime-deps.mjs": "1b13a19d14ca6e7b9a6ae47b685f467ea9882b097957cf05b7ed74efa0ef98f7",
+      "tests/runtime-packaging.test.mjs": "6468ff1e55da5f8202bff51c0f2a9bd5f7b52ad7f801963069bf535bac980092",
+      "apps/api/src/automation.service.ts": "5a8f1d6d35a103a8467d9c9bf9dc2e0b6e4ce8d09201da5fdd31794ee0dcb016",
+      "apps/api/src/automation.controller.ts": "7e964845f828b1d00a50fd368698bb78ccee5115bae4834b980f3a8bd2dcaa3f",
+      "apps/runner/src/outbox.ts": "9ef835d6913a7fa13993d651d374255b55eb595f0b05c20bc246fbc6237cb6c8",
+      "apps/runner/src/main.ts": "1fb9991fe3a7a17d440c995d85901f1c295d1f30f2919ecc576d56cb6064669d",
+      "apps/runner/src/webhooks.ts": "0eab178583cf45b1d6eac97b26a1511a4968b480982957855a0f53e0e1fd603a",
+      "infra/postgres/015-automation-delegations.sql": "32505c5c033314f04a7d4922f18a55919cadff6a6a4221a2e7ad112b61cbb039"
+    }
+  },
+  "initialAloraRolloutConnectScope": {
+    "checkedAt": "2026-11-11T11:55:16.348966+00:00",
+    "connectCodeOrContainersChanged": false
+  },
+  "latestRuntimePackagingVerification": "docs/verification/runtime-only-images.json",
+  "currentMainImages": {
+    "barber-api-1": {
+      "imageId": "sha256:4b474f4ccb95a50c2dcf3addfa7ef1be3245f76eda319363aa8079dbc95d7141",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-admin-1": {
+      "imageId": "sha256:cd4f2122f40cd935f5c6ce0a0c0ebdba85ec312a3d5432f65519240bcd4df54a",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "barber-web-public-booking-1": {
+      "imageId": "sha256:6da3426668f6b7b80b9667d63c072fdc223cfd3cd1017562169cf34c8df34104",
+      "running": true,
+      "health": "healthy",
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-api-1": {
+      "imageId": "sha256:8ab43e77e75325c604d221a9ad39a77ea3248a0990783d17cb88fb66d2f4d298",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-runner-1": {
+      "imageId": "sha256:5ee617b11b7e7e9f9f1bd1821f07a74415e5262329ed43f96d0e75baa031d113",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    },
+    "eulab-connect-web-1": {
+      "imageId": "sha256:73df58837c66c998dda4745ff2d4c856c4e824b3507ca1719ffefccbf83d9338",
+      "running": true,
+      "health": null,
+      "repositorySourceMounts": false
+    }
+  }
+}

@@ -1,5 +1,9 @@
 import { canUseLocalFunction } from "./function-catalog";
-import { connectConfig, openConnect, sealConnect } from "./connect-runtime";
+import { connectConfig, openConnect, sealConnect, resolveConnectPermissions } from "./connect-runtime";
+import { UnauthorizedException, ServiceUnavailableException } from "@nestjs/common";
+import type { PrismaClient } from "@prisma/client";
+import { connectApplication } from "./connect-application";
+jest.mock("./connect-application", () => ({ connectApplication: jest.fn() }));
 
 describe("Connect boundary", () => {
   const original = { ...process.env };
@@ -96,5 +100,14 @@ describe("Connect boundary", () => {
         "appointments.read.all",
       ),
     ).toBe(false);
+  });
+  it("distinguishes an invalidated SDK session from temporary provider unavailability", async () => {
+    const prisma = { connectSession: { findUnique: jest.fn(async () => ({ userId: "u1", installationId: "i1", sdkSessionCipher: sealConnect("private-handle"), expiresAt: new Date(Date.now() + 60000), revokedAt: null })) } } as unknown as PrismaClient;
+    const services = jest.fn();
+    jest.mocked(connectApplication).mockResolvedValue({ services } as unknown as Awaited<ReturnType<typeof connectApplication>>);
+    services.mockRejectedValue({ code: "access_denied" });
+    await expect(resolveConnectPermissions(prisma, "s1", { id: "u1", tenantId: "t1", connectSubject: "subject" })).rejects.toBeInstanceOf(UnauthorizedException);
+    services.mockRejectedValue({ code: "provider_unavailable" });
+    await expect(resolveConnectPermissions(prisma, "s1", { id: "u1", tenantId: "t1", connectSubject: "subject" })).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 });

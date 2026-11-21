@@ -243,6 +243,10 @@ export async function resolveConnectPermissions(
       throw new ForbiddenException("Collegamento Connect non valido");
     return access.functions.map((item) => item.key);
   } catch (error) {
+    // At this boundary the SDK validates the session itself and invalidates it on
+    // definitive access_denied. Business permission checks run after resolution.
+    if (error && typeof error === "object" && "code" in error && error.code === "access_denied")
+      throw new UnauthorizedException("Sessione Connect revocata o non più autorizzata");
     return connectHttpError(error);
   }
 }

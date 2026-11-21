@@ -16,6 +16,7 @@ import { SessionStore } from "../core/session.store";
         <h1 class="text-2xl font-semibold">Accesso da configurare</h1>
         <p class="mt-3 text-[var(--muted)]">Il tuo account non dispone ancora di una sezione abilitata. Chiedi al titolare di verificare le autorizzazioni.</p>
         <a class="secondary-btn mt-6" routerLink="/login">Torna all’accesso</a>
+        <a *ngIf="canOpenAccount" class="secondary-btn mt-3" routerLink="/account">Il mio account</a>
       </ng-template>
     </article>
   </main>`,
@@ -26,6 +27,7 @@ export class AccessUnavailableComponent {
   private readonly session = inject(SessionStore);
   get temporary(): boolean { return this.route.snapshot.queryParamMap.get("reason") === "temporary"; }
   busy = false;
+  get canOpenAccount(): boolean { return this.session.currentUser()?.role !== "platform_admin" && !this.session.currentUser()?.technicalAccess; }
   async retry(): Promise<void> {
     if (this.busy) return;
     this.busy = true;

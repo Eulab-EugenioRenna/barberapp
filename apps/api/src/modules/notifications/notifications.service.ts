@@ -1,8 +1,18 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  notificationReadScope,
+  type NotificationReadScope,
+} from "./notification-scope.sql";
+import { randomUUID } from "node:crypto";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   Prisma,
   NotificationChannel,
   NotificationStatus,
+  NotificationHistory,
   UserRole,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -20,6 +30,11 @@ import {
   TenantNotificationPreference,
 } from "./notifications.types";
 import { renderTemplate } from "./notifications.utils";
+import {
+  TEMPLATE_PLACEHOLDERS,
+  TEMPLATE_SAMPLE,
+  validateTemplateInput,
+} from "./notification-template-editor";
 
 type JsonObject = Record<string, unknown>;
 
@@ -45,10 +60,12 @@ export class NotificationsService {
   async listAppointmentsAwaitingOrder(
     tenantId: string,
     now = new Date(),
+    sectorIds: string[] = [],
   ): Promise<unknown[]> {
     return this.prisma.appointment.findMany({
       where: {
         tenantId,
+        sectorId: { in: sectorIds },
         startsAt: { lte: now },
         status: {
           in: [
@@ -59,7 +76,10 @@ export class NotificationsService {
             "completed",
           ],
         },
-        sales: { none: {} },
+        OR: [
+          { orderItem: { sale: { orderStatus: "open" } } },
+          { orderItemId: null, sales: { none: {} } },
+        ],
       },
       orderBy: { startsAt: "desc" },
       take: 20,
@@ -283,24 +303,33 @@ export class NotificationsService {
     channel: NotificationChannel,
     body: Record<string, unknown>,
   ): Promise<unknown> {
+    const data = validateTemplateInput(eventType, channel, body, true);
     await this.ensureTenantTemplates(tenantId);
-
-    const template = await this.prisma.notificationTemplate.update({
-      where: {
-        tenantId_eventType_channel: { tenantId, eventType, channel },
-      },
-      data: {
-        subject:
-          typeof body["subject"] === "string"
-            ? String(body["subject"])
-            : undefined,
-        title:
-          typeof body["title"] === "string" ? String(body["title"]) : undefined,
-        body:
-          typeof body["body"] === "string" && String(body["body"]).trim()
-            ? String(body["body"])
-            : undefined,
-      },
+    const template = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.notificationTemplate.updateMany({
+        where: {
+          tenantId,
+          eventType,
+          channel,
+          updatedAt: new Date(String(body["expectedUpdatedAt"])),
+        },
+        data: {
+          ...data,
+          updatedAt: new Date(
+            Math.max(
+              Date.now(),
+              Date.parse(String(body["expectedUpdatedAt"])) + 1,
+            ),
+          ),
+        },
+      });
+      if (result.count !== 1)
+        throw new ConflictException(
+          "Il template è cambiato. Ricarica la versione corrente prima di salvare.",
+        );
+      return tx.notificationTemplate.findUniqueOrThrow({
+        where: { tenantId_eventType_channel: { tenantId, eventType, channel } },
+      });
     });
 
     await this.cacheManager.del(
@@ -310,32 +339,43 @@ export class NotificationsService {
     return template;
   }
 
-  async listInbox(tenantId: string, userId: string): Promise<unknown> {
-    return this.prisma.notificationInbox.findMany({
-      where: { tenantId, recipientUserId: userId },
-      orderBy: { createdAt: "desc" },
-    });
+  previewTemplate(
+    eventType: string,
+    channel: NotificationChannel,
+    body: Record<string, unknown>,
+  ) {
+    const template = validateTemplateInput(eventType, channel, body);
+    return {
+      ...this.renderResolvedTemplate(template, {
+        eventType,
+        tenantId: "sample",
+        ...TEMPLATE_SAMPLE,
+      }),
+      placeholders: TEMPLATE_PLACEHOLDERS,
+      sampleOnly: true,
+    };
   }
 
-  async unreadCount(tenantId: string, userId: string): Promise<unknown> {
-    const cacheKey = this.buildUnreadCountCacheKey(tenantId, userId);
-    const cached = await this.cacheManager.get<number>(cacheKey);
+  async listInbox(
+    tenantId: string,
+    userId: string,
+    scope: NotificationReadScope = { sectorIds: [], fullAccess: false },
+  ): Promise<unknown> {
+    return this.prisma
+      .$queryRaw`SELECT i.id,i."eventType",i.title,i.message,i."entityType",i."entityId",i."readAt",i."createdAt" FROM "NotificationInbox" i WHERE i."tenantId"=${tenantId}
+      AND i."recipientUserId"=${userId} AND ${notificationReadScope("i", scope)} ORDER BY i."createdAt" DESC, i.id LIMIT 200`;
+  }
 
-    if (typeof cached === "number") {
-      return { unreadCount: cached };
-    }
-
-    const unreadCount = await this.prisma.notificationInbox.count({
-      where: { tenantId, recipientUserId: userId, readAt: null },
-    });
-
-    await this.cacheManager.set(
-      cacheKey,
-      unreadCount,
-      NOTIFICATION_DEFAULT_TTL_SECONDS * 1000,
-    );
-
-    return { unreadCount };
+  async unreadCount(
+    tenantId: string,
+    userId: string,
+    scope: NotificationReadScope = { sectorIds: [], fullAccess: false },
+  ): Promise<unknown> {
+    const [row] = await this.prisma.$queryRaw<
+      Array<{ count: number }>
+    >`SELECT count(*)::int AS count FROM "NotificationInbox" i
+      WHERE i."tenantId"=${tenantId} AND i."recipientUserId"=${userId} AND i."readAt" IS NULL AND ${notificationReadScope("i", scope)}`;
+    return { unreadCount: row.count };
   }
 
   async markInboxAsRead(
@@ -348,8 +388,6 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
 
-    await this.invalidateUnreadCount(tenantId, userId);
-
     return { updated: result.count > 0 };
   }
 
@@ -359,32 +397,113 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
 
-    await this.invalidateUnreadCount(tenantId, userId);
-
     return { updated: result.count };
   }
 
-  async listHistory(tenantId: string): Promise<unknown> {
-    return this.prisma.notificationHistory.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    });
+  async listHistory(
+    tenantId: string,
+    scope: NotificationReadScope = { sectorIds: [], fullAccess: false },
+  ): Promise<unknown> {
+    // Delivery monitoring exposes state and identifiers, never CRM contacts or complete message payloads.
+    return this.prisma
+      .$queryRaw`SELECT h.id,h."domainEventId",h."eventType",h.channel,h.status,h."providerKey",h."recipientType",
+      CASE WHEN h."domainEventId" IS NULL THEN 'legacy_unknown' ELSE 'durable_intent' END AS "deliveryBasis",
+      h."createdAt",h."sentAt",h."lastAttemptAt",h."nextRetryAt",h."attemptCount",(h.error IS NOT NULL) AS "hasError"
+      FROM "NotificationHistory" h WHERE h."tenantId"=${tenantId} AND ${notificationReadScope("h", scope)}
+      ORDER BY h."createdAt" DESC,h.id LIMIT 200`;
   }
 
-  async resolveDispatchPlan(payload: NotificationEventPayload): Promise<{
+  async snapshotEventPayload(
+    client: Prisma.TransactionClient,
+    payload: NotificationEventPayload,
+  ) {
+    return this.enrichPayload(
+      {
+        eventType: payload.eventType,
+        tenantId: payload.tenantId,
+        entityType: payload.entityType,
+        entityId: payload.entityId,
+        actor: payload.actor,
+        flags: payload.flags,
+        eventData: payload.eventData,
+        occurredAt: payload.occurredAt,
+      },
+      client,
+    );
+  }
+
+  async resolveDispatchPlan(
+    payload: NotificationEventPayload,
+    options: { client?: Prisma.TransactionClient; snapshot?: boolean } = {},
+  ): Promise<{
     payload: NotificationEventPayload;
     targets: NotificationDispatchTarget[];
   }> {
-    const resolvedPayload = await this.enrichPayload(payload);
-    await this.ensureTenantNotificationDefaults(resolvedPayload.tenantId);
+    const client = options.client || this.prisma;
+    const resolvedPayload = options.snapshot
+      ? payload
+      : await this.enrichPayload(payload, client);
+    await this.ensureTenantNotificationDefaults(
+      resolvedPayload.tenantId,
+      client,
+    );
 
+    const sectorId = this.optionalString(
+      resolvedPayload.appointment?.["sectorId"],
+    );
+    const accountRows = resolvedPayload.eventData?.["accountAppointments"];
+    const hasUnknownScope =
+      !sectorId ||
+      (Array.isArray(accountRows) &&
+        accountRows.some((row) => !this.optionalString(row?.["sectorId"])));
+    const requiredSectors = hasUnknownScope
+      ? (
+          await client.sector.findMany({
+            where: { tenantId: resolvedPayload.tenantId },
+            select: { id: true },
+          })
+        ).map((row) => row.id)
+      : [
+          ...new Set(
+            [
+              sectorId,
+              ...(Array.isArray(accountRows)
+                ? accountRows.map((row) =>
+                    this.optionalString(row?.["sectorId"]),
+                  )
+                : []),
+            ].filter((id): id is string => !!id),
+          ),
+        ];
+    const staffPayload = this.staffPayload(resolvedPayload);
     const [tenantPreferences, providerConfigs, tenantUsers] = await Promise.all(
       [
-        this.getTenantPreferences(resolvedPayload.tenantId),
-        this.getProviderConfigs(resolvedPayload.tenantId),
-        this.prisma.user.findMany({
-          where: { tenantId: resolvedPayload.tenantId, isActive: true },
+        this.getTenantPreferences(resolvedPayload.tenantId, client),
+        this.getProviderConfigs(resolvedPayload.tenantId, client),
+        client.user.findMany({
+          where: {
+            tenantId: resolvedPayload.tenantId,
+            isActive: true,
+            OR: [
+              { role: "owner" },
+              {
+                role: { in: ["manager", "reception"] },
+                AND: requiredSectors.map((id) => ({
+                  sectorAccess: { some: { sectorId: id } },
+                })),
+              },
+              {
+                role: "collaborator",
+                collaborator: {
+                  id:
+                    this.optionalString(resolvedPayload.collaborator?.["id"]) ||
+                    "",
+                  isActive: true,
+                  sectors: { some: { sectorId: sectorId || "" } },
+                },
+              },
+            ],
+          },
           select: {
             id: true,
             email: true,
@@ -408,7 +527,7 @@ export class NotificationsService {
           item.channel === channel,
       );
 
-      if (preference && !preference.enabled) {
+      if (!preference?.enabled) {
         continue;
       }
 
@@ -427,6 +546,7 @@ export class NotificationsService {
             providerKey,
             recipientType: "webhook",
             recipientWebhookUrl: webhookUrl,
+            payload: staffPayload,
             message: resolvedPayload.eventType,
           });
         }
@@ -438,6 +558,7 @@ export class NotificationsService {
         resolvedPayload.tenantId,
         resolvedPayload.eventType,
         channel,
+        client,
       );
 
       for (const user of tenantUsers) {
@@ -446,7 +567,7 @@ export class NotificationsService {
         }
 
         const userPreference =
-          await this.prisma.notificationPreferenceUser.findFirst({
+          await client.notificationPreferenceUser.findFirst({
             where: {
               tenantId: resolvedPayload.tenantId,
               userId: user.id,
@@ -459,7 +580,7 @@ export class NotificationsService {
           continue;
         }
 
-        const rendered = this.renderResolvedTemplate(template, resolvedPayload);
+        const rendered = this.renderResolvedTemplate(template, staffPayload);
 
         if (channel === NotificationChannel.in_app) {
           targets.push({
@@ -470,6 +591,7 @@ export class NotificationsService {
             title: rendered.title,
             message: rendered.body,
             metadata: { role: user.role },
+            payload: staffPayload,
           });
         }
 
@@ -483,6 +605,7 @@ export class NotificationsService {
             subject: rendered.subject,
             message: rendered.body,
             metadata: { role: user.role },
+            payload: staffPayload,
           });
         }
       }
@@ -495,9 +618,36 @@ export class NotificationsService {
           preference as Record<string, unknown> | undefined,
         ) &&
         collaborator &&
-        typeof collaborator === "object"
+        typeof collaborator === "object" &&
+        !!sectorId &&
+        !!this.optionalString(collaborator["id"]) &&
+        !!(await client.collaboratorSector.count({
+          where: { collaboratorId: String(collaborator["id"]), sectorId },
+        })) &&
+        (!this.optionalString(collaborator["userId"]) ||
+          tenantUsers.some((user) => user.id === collaborator["userId"])) &&
+        (!this.optionalString(collaborator["userId"]) ||
+          !(await client.notificationPreferenceUser.findFirst({
+            where: {
+              tenantId: resolvedPayload.tenantId,
+              userId: String(collaborator["userId"]),
+              eventType: resolvedPayload.eventType,
+              channel,
+              enabled: false,
+            },
+          })))
       ) {
-        const rendered = this.renderResolvedTemplate(template, resolvedPayload);
+        const targetUser = tenantUsers.find(
+          (user) => user.id === collaborator["userId"],
+        );
+        const collaboratorPayload =
+          targetUser && targetUser.role !== "collaborator"
+            ? staffPayload
+            : this.staffPayload(resolvedPayload, String(collaborator["id"]));
+        const rendered = this.renderResolvedTemplate(
+          template,
+          collaboratorPayload,
+        );
         const collaboratorUserId = this.optionalString(collaborator["userId"]);
         const collaboratorEmail = this.optionalString(collaborator["email"]);
 
@@ -509,6 +659,7 @@ export class NotificationsService {
             recipientUserId: collaboratorUserId,
             title: rendered.title,
             message: rendered.body,
+            payload: collaboratorPayload,
           });
         }
 
@@ -521,6 +672,7 @@ export class NotificationsService {
             recipientEmail: collaboratorEmail,
             subject: rendered.subject,
             message: rendered.body,
+            payload: collaboratorPayload,
           });
         }
       }
@@ -562,132 +714,400 @@ export class NotificationsService {
   async createHistoryEntry(
     payload: NotificationEventPayload,
     target: NotificationDispatchTarget,
+    options: {
+      client: Prisma.TransactionClient;
+      eventId: string;
+      dispatchKey: string;
+    },
   ) {
-    const inbox =
-      target.channel === NotificationChannel.in_app && target.recipientUserId
-        ? await this.prisma.notificationInbox.create({
-            data: {
-              tenantId: payload.tenantId,
-              recipientUserId: target.recipientUserId,
-              eventType: payload.eventType,
-              title: target.title ?? "Notifica",
-              message: target.message,
-              payload: payload as unknown as Prisma.InputJsonValue,
-              entityType: payload.entityType,
-              entityId: payload.entityId,
+    const content = target.payload || payload;
+    if (
+      content.tenantId !== payload.tenantId ||
+      content.eventType !== payload.eventType ||
+      content.entityId !== payload.entityId
+    )
+      throw new NotFoundException("Contesto della notifica non coerente");
+    const insert = async (client: Prisma.TransactionClient) => {
+      if (options.eventId && options.dispatchKey) {
+        const existing = await client.notificationHistory.findUnique({
+          where: {
+            domainEventId_dispatchKey: {
+              domainEventId: options.eventId,
+              dispatchKey: options.dispatchKey,
             },
-          })
-        : null;
+          },
+        });
+        if (existing) return existing;
+      }
+      const inbox =
+        target.channel === NotificationChannel.in_app && target.recipientUserId
+          ? await client.notificationInbox.create({
+              data: {
+                tenantId: payload.tenantId,
+                recipientUserId: target.recipientUserId,
+                eventType: payload.eventType,
+                title: target.title ?? "Notifica",
+                message: target.message,
+                payload: content as unknown as Prisma.InputJsonValue,
+                entityType: payload.entityType,
+                entityId: payload.entityId,
+              },
+            })
+          : null;
 
-    const history = await this.prisma.notificationHistory.create({
-      data: {
-        tenantId: payload.tenantId,
-        recipientUserId: target.recipientUserId,
-        customerId: target.customerId,
-        channel: target.channel,
-        providerKey: target.providerKey,
-        recipientType: target.recipientType as never,
-        recipientEmail: target.recipientEmail,
-        recipientWebhookUrl: target.recipientWebhookUrl,
-        eventType: payload.eventType,
-        payload: {
-          ...payload,
+      const history = await client.notificationHistory.create({
+        data: {
+          tenantId: payload.tenantId,
+          domainEventId: options.eventId,
+          dispatchKey: options.dispatchKey,
+          recipientUserId: target.recipientUserId,
+          customerId: target.customerId,
+          channel: target.channel,
           providerKey: target.providerKey,
-          recipientType: target.recipientType,
+          recipientType: target.recipientType as never,
           recipientEmail: target.recipientEmail,
           recipientWebhookUrl: target.recipientWebhookUrl,
-          renderedTitle: target.title,
-          renderedSubject: target.subject,
-          renderedMessage: target.message,
-        } as unknown as Prisma.InputJsonValue,
-        status: NotificationStatus.pending,
-        metadata: asJsonValue(target.metadata),
-        notificationInboxId: inbox?.id,
+          eventType: payload.eventType,
+          payload: {
+            ...content,
+            providerKey: target.providerKey,
+            recipientType: target.recipientType,
+            recipientEmail: target.recipientEmail,
+            recipientWebhookUrl: target.recipientWebhookUrl,
+            renderedTitle: target.title,
+            renderedSubject: target.subject,
+            renderedMessage: target.message,
+          } as unknown as Prisma.InputJsonValue,
+          status: NotificationStatus.pending,
+          metadata: asJsonValue(target.metadata),
+          notificationInboxId: inbox?.id,
+        },
+      });
+
+      return history;
+    };
+    return insert(options.client);
+  }
+
+  async claimHistory(id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<
+        Array<{ id: string }>
+      >`SELECT id FROM "NotificationHistory" WHERE id=${id} FOR UPDATE`;
+      if (!rows.length) return null;
+      const history = await tx.notificationHistory.findUniqueOrThrow({
+        where: { id },
+      });
+      // Legacy external attempts have no durable intent and cannot be inferred safe to repeat.
+      if (
+        !history.domainEventId &&
+        history.channel !== NotificationChannel.in_app
+      )
+        return null;
+      if (
+        history.status !== NotificationStatus.pending &&
+        !(
+          history.status === NotificationStatus.failed &&
+          history.retrySafe &&
+          history.nextRetryAt &&
+          history.nextRetryAt <= new Date() &&
+          history.attemptCount < 5
+        )
+      )
+        return null;
+      return tx.notificationHistory.update({
+        where: { id },
+        data: {
+          status: NotificationStatus.dispatching,
+          dispatchToken: randomUUID(),
+          dispatchLeaseUntil: new Date(Date.now() + 60000),
+          attemptCount: { increment: 1 },
+          lastAttemptAt: new Date(),
+          retrySafe: false,
+          nextRetryAt: null,
+        },
+      });
+    });
+  }
+
+  async finishHistory(
+    id: string,
+    token: string,
+    outcome: {
+      status: "sent" | "failed" | "skipped" | "uncertain" | "queued";
+      providerMessageId?: string;
+      reason?: string;
+      retrySafe?: boolean;
+    },
+  ) {
+    const result = await this.prisma.notificationHistory.updateMany({
+      where: {
+        id,
+        dispatchToken: token,
+        status: {
+          in: [NotificationStatus.dispatching, NotificationStatus.uncertain, NotificationStatus.queued],
+        },
+      },
+      data: {
+        status: outcome.status,
+        providerMessageId: outcome.providerMessageId,
+        sentAt: outcome.status === "sent" ? new Date() : undefined,
+        error: outcome.reason || null,
+        retrySafe: !!outcome.retrySafe,
+        nextRetryAt: outcome.retrySafe ? new Date(Date.now() + 30000) : null,
+        dispatchLeaseUntil: null,
       },
     });
+    return result.count === 1;
+  }
 
-    if (target.recipientUserId) {
-      await this.invalidateUnreadCount(
-        payload.tenantId,
-        target.recipientUserId,
+  async dispatchPolicyActive(history: NotificationHistory) {
+    const [tenant, preference, provider] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: history.tenantId },
+        select: { isActive: true, isSuspended: true },
+      }),
+      this.prisma.notificationPreferenceTenant.findUnique({
+        where: {
+          tenantId_eventType_channel: {
+            tenantId: history.tenantId,
+            eventType: history.eventType,
+            channel: history.channel,
+          },
+        },
+      }),
+      this.prisma.notificationProviderConfig.findUnique({
+        where: {
+          tenantId_channel: {
+            tenantId: history.tenantId,
+            channel: history.channel,
+          },
+        },
+      }),
+    ]);
+    if (
+      !tenant?.isActive ||
+      tenant.isSuspended ||
+      !preference?.enabled ||
+      !provider?.enabled ||
+      provider.providerKey !== history.providerKey
+    )
+      return false;
+    if (history.recipientUserId) {
+      const user = await this.prisma.user.findFirst({
+        where: {
+          id: history.recipientUserId,
+          tenantId: history.tenantId,
+          isActive: true,
+        },
+        select: { role: true, email: true },
+      });
+      const payload = history.payload as Record<string, unknown> | null;
+      const collaborator = payload?.["collaborator"] as Record<
+        string,
+        unknown
+      > | null;
+      const assigned =
+        collaborator?.["userId"] === history.recipientUserId &&
+        preference.sendToAssignedCollaborator;
+      if (
+        !user ||
+        !(this.matchesRolePreference(user.role, preference) || assigned) ||
+        (history.recipientEmail && history.recipientEmail !== user.email)
+      )
+        return false;
+      const personal = await this.prisma.notificationPreferenceUser.findUnique({
+        where: {
+          tenantId_userId_eventType_channel: {
+            tenantId: history.tenantId,
+            userId: history.recipientUserId,
+            eventType: history.eventType,
+            channel: history.channel,
+          },
+        },
+      });
+      if (personal && !personal.enabled) return false;
+    } else if (history.customerId) {
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: history.customerId, tenantId: history.tenantId },
+        select: { email: true },
+      });
+      if (
+        !customer ||
+        !preference.sendToCustomer ||
+        customer.email !== history.recipientEmail
+      )
+        return false;
+    } else if (history.recipientType === "collaborator") {
+      if (!preference.sendToAssignedCollaborator) return false;
+      const payload = history.payload as Record<string, unknown> | null;
+      const snapshot = payload?.["collaborator"] as Record<
+        string,
+        unknown
+      > | null;
+      if (typeof snapshot?.["id"] !== "string") return false;
+      const collaborator = await this.prisma.collaborator.findFirst({
+        where: {
+          id: snapshot["id"],
+          tenantId: history.tenantId,
+          isActive: true,
+        },
+        select: { email: true },
+      });
+      if (!collaborator || collaborator.email !== history.recipientEmail)
+        return false;
+    }
+    if (
+      history.channel === NotificationChannel.webhook &&
+      this.extractWebhookUrl(provider.config) !== history.recipientWebhookUrl
+    )
+      return false;
+    const payload = history.payload as Record<string, unknown> | null;
+    const data = payload?.["eventData"] as Record<string, unknown> | null;
+    const snapshots =
+      history.eventType === "appointment.cancelled"
+        ? data?.["affectedAppointments"]
+        : data?.["accountAppointments"];
+    const rows = Array.isArray(snapshots)
+      ? snapshots
+      : payload?.["appointment"]
+        ? [payload["appointment"]]
+        : [];
+    for (const snapshot of rows) {
+      if (
+        !snapshot ||
+        typeof snapshot !== "object" ||
+        typeof snapshot["id"] !== "string"
+      )
+        return false;
+      const current = await this.prisma.appointment.findFirst({
+        where: { id: snapshot["id"], tenantId: history.tenantId },
+        select: {
+          status: true,
+          startsAt: true,
+          endsAt: true,
+          serviceId: true,
+          collaboratorId: true,
+          roomId: true,
+          locationId: true,
+          sectorId: true,
+        },
+      });
+      if (!current) return false;
+      for (const key of [
+        "status",
+        "startsAt",
+        "endsAt",
+        "serviceId",
+        "collaboratorId",
+        "roomId",
+        "locationId",
+        "sectorId",
+      ] as const) {
+        if (snapshot[key] === undefined) continue;
+        const value =
+          current[key] instanceof Date
+            ? (current[key] as Date).toISOString()
+            : current[key];
+        if (snapshot[key] !== value) return false;
+      }
+    }
+    return this.canDispatchInScope(history);
+  }
+
+  /** Recheck queued targets after operational access is revoked; never retarget an email. */
+  async canDispatchInScope(history: {
+    tenantId: string;
+    recipientUserId?: string | null;
+    recipientType: string | null;
+    payload: unknown;
+  }): Promise<boolean> {
+    const payload = history.payload as Record<string, unknown> | null;
+    if (
+      payload?.["entityType"] !== "appointment" ||
+      typeof payload["entityId"] !== "string"
+    )
+      return true;
+    const appointment = await this.prisma.appointment.findFirst({
+      where: { id: payload["entityId"], tenantId: history.tenantId },
+      select: { sectorId: true, collaboratorId: true },
+    });
+    if (!appointment) return false;
+    const data = payload?.["eventData"] as Record<string, unknown> | null;
+    const accountRows = data?.["accountAppointments"];
+    const unknown =
+      !appointment.sectorId ||
+      (Array.isArray(accountRows) &&
+        accountRows.some((row) => typeof row?.sectorId !== "string"));
+    const requiredSectors = unknown
+      ? (
+          await this.prisma.sector.findMany({
+            where: { tenantId: history.tenantId },
+            select: { id: true },
+          })
+        ).map((row) => row.id)
+      : [
+          ...new Set([
+            appointment.sectorId,
+            ...(Array.isArray(accountRows)
+              ? accountRows.map((row) => String(row.sectorId))
+              : []),
+          ]),
+        ];
+    if (history.recipientUserId)
+      return !!(await this.prisma.user.count({
+        where: {
+          id: history.recipientUserId,
+          tenantId: history.tenantId,
+          isActive: true,
+          OR: [
+            { role: "owner" },
+            {
+              role: { in: ["manager", "reception"] },
+              AND: requiredSectors.map((sectorId) => ({
+                sectorAccess: { some: { sectorId } },
+              })),
+            },
+            {
+              role: "collaborator",
+              collaborator: {
+                id: appointment.collaboratorId || "",
+                isActive: true,
+                AND: requiredSectors.map((sectorId) => ({
+                  sectors: { some: { sectorId } },
+                })),
+              },
+            },
+          ],
+        },
+      }));
+    if (history.recipientType === "collaborator") {
+      const collaborator = payload["collaborator"] as Record<
+        string,
+        unknown
+      > | null;
+      return (
+        typeof collaborator?.["id"] === "string" &&
+        !!(await this.prisma.collaborator.count({
+          where: {
+            id: collaborator["id"],
+            tenantId: history.tenantId,
+            isActive: true,
+            AND: requiredSectors.map((sectorId) => ({
+              sectors: { some: { sectorId } },
+            })),
+          },
+        }))
       );
     }
-
-    return history;
+    return true;
   }
 
-  async markHistoryAsSent(
-    notificationHistoryId: string,
-    providerMessageId?: string,
+  async ensureTenantTemplates(
+    tenantId: string,
+    client: Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
-    await this.prisma.notificationHistory.update({
-      where: { id: notificationHistoryId },
-      data: {
-        status: NotificationStatus.sent,
-        providerMessageId,
-        sentAt: new Date(),
-        attemptCount: { increment: 1 },
-        lastAttemptAt: new Date(),
-        error: null,
-      },
-    });
-  }
-
-  async markHistoryAsFailed(
-    notificationHistoryId: string,
-    error: string,
-  ): Promise<void> {
-    await this.prisma.notificationHistory.update({
-      where: { id: notificationHistoryId },
-      data: {
-        status: NotificationStatus.failed,
-        error,
-        attemptCount: { increment: 1 },
-        lastAttemptAt: new Date(),
-        nextRetryAt: new Date(Date.now() + 5 * 60 * 1000),
-      },
-    });
-  }
-
-  async markHistoryAsSkipped(
-    notificationHistoryId: string,
-    reason: string,
-  ): Promise<void> {
-    await this.prisma.notificationHistory.update({
-      where: { id: notificationHistoryId },
-      data: {
-        status: NotificationStatus.skipped,
-        error: reason,
-        attemptCount: { increment: 1 },
-        lastAttemptAt: new Date(),
-      },
-    });
-  }
-
-  async getHistoryById(notificationHistoryId: string) {
-    const history = await this.prisma.notificationHistory.findUnique({
-      where: { id: notificationHistoryId },
-    });
-
-    if (!history) {
-      throw new NotFoundException(
-        "La comunicazione richiesta non è stata trovata",
-      );
-    }
-
-    return history;
-  }
-
-  async ensureTenantTemplates(tenantId: string): Promise<void> {
-    const count = await this.prisma.notificationTemplate.count({
-      where: { tenantId },
-    });
-
-    if (count > 0) {
-      return;
-    }
-
-    await this.prisma.notificationTemplate.createMany({
+    await client.notificationTemplate.createMany({
       data: DEFAULT_NOTIFICATION_TEMPLATES.map((template) => ({
         tenantId,
         eventType: template.eventType,
@@ -700,45 +1120,42 @@ export class NotificationsService {
     });
   }
 
-  async ensureTenantNotificationDefaults(tenantId: string): Promise<void> {
-    await this.ensureTenantTemplates(tenantId);
+  async ensureTenantNotificationDefaults(
+    tenantId: string,
+    client: Prisma.TransactionClient = this.prisma,
+  ): Promise<void> {
+    await this.ensureTenantTemplates(tenantId, client);
 
-    const preferenceCount =
-      await this.prisma.notificationPreferenceTenant.count({
-        where: { tenantId },
-      });
+    const defaults = DEFAULT_NOTIFICATION_TEMPLATES.map((template) => ({
+      tenantId,
+      eventType: template.eventType,
+      channel: template.channel,
+      enabled:
+        template.defaultEnabled ??
+        template.channel === NotificationChannel.in_app,
+      sendToCustomer: [
+        "appointment.created.public",
+        "appointment.requested",
+        "appointment.confirmed",
+        "appointment.cancelled",
+      ].includes(template.eventType),
+      sendToAssignedCollaborator: [
+        "appointment.created.internal",
+        "appointment.assigned",
+        "appointment.reassigned",
+        "appointment.cancelled",
+      ].includes(template.eventType),
+      sendToOwners: true,
+      sendToManagers: true,
+      sendToReception: true,
+    }));
 
-    if (preferenceCount === 0) {
-      const defaults = DEFAULT_NOTIFICATION_TEMPLATES.map((template) => ({
-        tenantId,
-        eventType: template.eventType,
-        channel: template.channel,
-        enabled: true,
-        sendToCustomer: [
-          "appointment.created.public",
-          "appointment.requested",
-          "appointment.confirmed",
-          "appointment.cancelled",
-        ].includes(template.eventType),
-        sendToAssignedCollaborator: [
-          "appointment.created.internal",
-          "appointment.assigned",
-          "appointment.reassigned",
-          "appointment.cancelled",
-        ].includes(template.eventType),
-        sendToOwners: true,
-        sendToManagers: true,
-        sendToReception: true,
-      }));
-
-      await this.prisma.notificationPreferenceTenant.createMany({
-        data: defaults,
-        skipDuplicates: true,
-      });
-    }
-
+    await client.notificationPreferenceTenant.createMany({
+      data: defaults,
+      skipDuplicates: true,
+    });
     await Promise.all([
-      this.prisma.notificationProviderConfig.upsert({
+      client.notificationProviderConfig.upsert({
         where: {
           tenantId_channel: {
             tenantId,
@@ -749,11 +1166,11 @@ export class NotificationsService {
           tenantId,
           channel: NotificationChannel.email,
           providerKey: NOTIFICATION_PROVIDER_KEYS.email,
-          enabled: true,
+          enabled: false,
         },
         update: {},
       }),
-      this.prisma.notificationProviderConfig.upsert({
+      client.notificationProviderConfig.upsert({
         where: {
           tenantId_channel: {
             tenantId,
@@ -768,7 +1185,7 @@ export class NotificationsService {
         },
         update: {},
       }),
-      this.prisma.notificationProviderConfig.upsert({
+      client.notificationProviderConfig.upsert({
         where: {
           tenantId_channel: {
             tenantId,
@@ -786,15 +1203,16 @@ export class NotificationsService {
       }),
     ]);
 
-    await this.invalidateTenantCaches(tenantId);
+    if (client === this.prisma) await this.invalidateTenantCaches(tenantId);
   }
 
   private async enrichPayload(
     payload: NotificationEventPayload,
+    client: Prisma.TransactionClient = this.prisma,
   ): Promise<NotificationEventPayload> {
     const tenant = payload.tenant
       ? payload.tenant
-      : await this.prisma.tenant.findUnique({
+      : await client.tenant.findUnique({
           where: { id: payload.tenantId },
           select: {
             id: true,
@@ -814,7 +1232,7 @@ export class NotificationsService {
       };
     }
 
-    const appointment = await this.prisma.appointment.findFirst({
+    const appointment = await client.appointment.findFirst({
       where: { id: payload.entityId, tenantId: payload.tenantId },
       include: {
         customer: true,
@@ -833,10 +1251,15 @@ export class NotificationsService {
       ...payload,
       appointment: {
         id: appointment.id,
+        sectorId: appointment.sectorId,
+        locationId: appointment.locationId,
         status: appointment.status,
         startsAt: appointment.startsAt.toISOString(),
         endsAt: appointment.endsAt.toISOString(),
         source: appointment.source,
+        serviceId: appointment.serviceId,
+        collaboratorId: appointment.collaboratorId,
+        roomId: appointment.roomId,
       },
       customer: {
         id: appointment.customer.id,
@@ -865,7 +1288,12 @@ export class NotificationsService {
 
   private async getTenantPreferences(
     tenantId: string,
+    client: Prisma.TransactionClient = this.prisma,
   ): Promise<TenantNotificationPreference[]> {
+    if (client !== this.prisma)
+      return client.notificationPreferenceTenant.findMany({
+        where: { tenantId },
+      });
     const cacheKey = `${NOTIFICATIONS_CACHE_PREFIX}:tenant-preferences:${tenantId}`;
     const cached =
       await this.cacheManager.get<TenantNotificationPreference[]>(cacheKey);
@@ -883,7 +1311,7 @@ export class NotificationsService {
     await this.cacheManager.set(
       cacheKey,
       preferences,
-      NOTIFICATION_DEFAULT_TTL_SECONDS * 1000,
+      NOTIFICATION_DEFAULT_TTL_SECONDS,
     );
 
     return preferences;
@@ -891,7 +1319,12 @@ export class NotificationsService {
 
   private async getProviderConfigs(
     tenantId: string,
+    client: Prisma.TransactionClient = this.prisma,
   ): Promise<NotificationProviderConfigValue[]> {
+    if (client !== this.prisma)
+      return client.notificationProviderConfig.findMany({
+        where: { tenantId },
+      });
     const cacheKey = `${NOTIFICATIONS_CACHE_PREFIX}:provider-configs:${tenantId}`;
     const cached =
       await this.cacheManager.get<NotificationProviderConfigValue[]>(cacheKey);
@@ -907,7 +1340,7 @@ export class NotificationsService {
     await this.cacheManager.set(
       cacheKey,
       configs,
-      NOTIFICATION_DEFAULT_TTL_SECONDS * 1000,
+      NOTIFICATION_DEFAULT_TTL_SECONDS,
     );
 
     return configs;
@@ -917,19 +1350,23 @@ export class NotificationsService {
     tenantId: string,
     eventType: string,
     channel: NotificationChannel,
+    client: Prisma.TransactionClient = this.prisma,
   ) {
     const cacheKey = this.buildTemplateCacheKey(tenantId, eventType, channel);
-    const cached = await this.cacheManager.get<{
-      subject?: string | null;
-      title?: string | null;
-      body: string;
-    }>(cacheKey);
+    const cached =
+      client === this.prisma
+        ? await this.cacheManager.get<{
+            subject?: string | null;
+            title?: string | null;
+            body: string;
+          }>(cacheKey)
+        : null;
 
     if (cached) {
       return cached;
     }
 
-    const template = await this.prisma.notificationTemplate.findUnique({
+    const template = await client.notificationTemplate.findUnique({
       where: {
         tenantId_eventType_channel: { tenantId, eventType, channel },
       },
@@ -945,13 +1382,74 @@ export class NotificationsService {
       body: template.body,
     };
 
-    await this.cacheManager.set(
-      cacheKey,
-      normalized,
-      NOTIFICATION_DEFAULT_TTL_SECONDS * 1000,
-    );
+    if (client === this.prisma)
+      await this.cacheManager.set(
+        cacheKey,
+        normalized,
+        NOTIFICATION_DEFAULT_TTL_SECONDS,
+      );
 
     return normalized;
+  }
+
+  private staffPayload(
+    payload: NotificationEventPayload,
+    professionalId?: string,
+  ): NotificationEventPayload {
+    const customer = payload.customer;
+    const collaborator = payload.collaborator;
+    const actor = payload.actor;
+    const filtered = (rows: unknown) =>
+      Array.isArray(rows)
+        ? rows.filter(
+            (row) => !professionalId || row?.collaboratorId === professionalId,
+          )
+        : [];
+    const account = filtered(payload.eventData?.["accountAppointments"]);
+    const affected = filtered(payload.eventData?.["affectedAppointments"]);
+    const own = professionalId
+      ? affected.find((row) => row.id === payload.entityId) ||
+        affected[0] ||
+        account[0]
+      : null;
+    return {
+      ...payload,
+      customer: customer
+        ? {
+            id: customer["id"],
+            firstName: customer["firstName"],
+            lastName: customer["lastName"],
+          }
+        : null,
+      collaborator: collaborator
+        ? {
+            id: collaborator["id"],
+            userId: collaborator["userId"],
+            firstName: collaborator["firstName"],
+            lastName: collaborator["lastName"],
+          }
+        : null,
+      actor: actor
+        ? {
+            id: actor.id,
+            firstName: actor.firstName,
+            lastName: actor.lastName,
+            role: actor.role,
+          }
+        : undefined,
+      ...(own ? { appointment: { ...own }, service: own.service } : {}),
+      ...(professionalId
+        ? {
+            eventData: {
+              affectedAppointments: affected,
+              accountAppointments: account,
+              previousAppointments: filtered(
+                payload.eventData?.["previousAppointments"],
+              ),
+            },
+          }
+        : {}),
+    };
   }
 
   private renderResolvedTemplate(
@@ -1053,15 +1551,6 @@ export class NotificationsService {
     return typeof value === "string" && value.trim() ? value : null;
   }
 
-  private async invalidateUnreadCount(
-    tenantId: string,
-    userId: string,
-  ): Promise<void> {
-    await this.cacheManager.del(
-      this.buildUnreadCountCacheKey(tenantId, userId),
-    );
-  }
-
   private async invalidateTenantCaches(tenantId: string): Promise<void> {
     await Promise.all([
       this.cacheManager.del(
@@ -1071,10 +1560,6 @@ export class NotificationsService {
         `${NOTIFICATIONS_CACHE_PREFIX}:provider-configs:${tenantId}`,
       ),
     ]);
-  }
-
-  private buildUnreadCountCacheKey(tenantId: string, userId: string): string {
-    return `${NOTIFICATIONS_CACHE_PREFIX}:inbox:${tenantId}:${userId}:unread-count`;
   }
 
   private buildTemplateCacheKey(

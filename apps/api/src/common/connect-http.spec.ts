@@ -97,4 +97,9 @@ describe("Connect HTTP adapter", () => {
       ForbiddenException,
     );
   });
+  it("reports a revoked provider session as 401 while preserving permission and transient distinctions", () => {
+    expect(() => connectHttpError({ code: "access_denied", authorizationDetail: "http_401", message: "private provider response" })).toThrow(UnauthorizedException);
+    expect(() => connectHttpError({ code: "access_denied", authorizationDetail: "http_403" })).toThrow(ForbiddenException);
+    expect(() => connectHttpError({ code: "provider_unavailable" })).toThrow(ServiceUnavailableException);
+  });
 });

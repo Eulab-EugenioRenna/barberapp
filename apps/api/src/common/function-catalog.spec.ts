@@ -98,6 +98,16 @@ describe("ALORA function catalog", () => {
     expect(canUseLocalFunction({ ...user, permissionsConfigured: true, connectFunctions: [] }, "dashboard.personal.values.read")).toBe(false);
   });
 
+  it("requires dedicated Connect and local grants for WhatsApp without settings aliases", () => {
+    for (const key of ["whatsapp.read", "whatsapp.send", "whatsapp.manage"]) {
+      expect(canUseLocalFunction({ role: "owner" }, key)).toBe(false);
+      expect(canUseLocalFunction({ role: "owner", connectFunctions: [key] }, key)).toBe(true);
+      expect(canUseLocalFunction({ role: "manager", permissions: ["settings.manage"], connectFunctions: [key] }, key)).toBe(false);
+      expect(canUseLocalFunction({ role: "manager", permissions: [key], connectFunctions: [key] }, key)).toBe(true);
+      expect(canUseLocalFunction({ role: "manager", permissions: [key], connectFunctions: [] }, key)).toBe(false);
+    }
+  });
+
   it("projects only Connect contract fields, with a stable versioned document", () => {
     const matrix = createFunctionMatrix("alora-test");
     expect(Object.keys(matrix).sort()).toEqual([

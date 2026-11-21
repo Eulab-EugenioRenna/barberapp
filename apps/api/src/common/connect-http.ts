@@ -74,6 +74,9 @@ export function connectHttpError(error: unknown): never {
     throw new BadRequestException(
       "Scegli una nuova password Connect diversa da quella locale",
     );
+  if (code === "access_denied" && error && typeof error === "object" &&
+      "authorizationDetail" in error && error.authorizationDetail === "http_401")
+    throw new UnauthorizedException("Ripeti l’accesso Connect");
   if (code === "access_denied" || code === "provision_conflict")
     throw new ForbiddenException(
       "Accesso o collegamento Connect da verificare con EULAB",

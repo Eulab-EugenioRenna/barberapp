@@ -1,6 +1,32 @@
+import { customerCancellationAllowed } from "../orders/booking-cancellation";
+import { beginAppointmentEvents } from "../notifications/appointment-events";
+import {
+  lockOperationalTenant,
+  setOperationalActor,
+} from "../../common/operational-lock";
+import { BookingMutationService } from "../orders/booking-mutation.service";
+import {
+  BookingRevisionDto,
+  BookingCancellationDto,
+} from "../../common/booking-mutation.dto";
+import { BookingCommandService } from "../orders/booking-command.service";
+import { BookingAvailabilityService } from "../orders/booking-availability.service";
+import { BookingAvailabilityDto } from "../../common/booking-availability.dto";
+import { BookingCreateDto } from "../../common/booking-write.dto";
+import {
+  resolveOperationalScope,
+  sectorFilter,
+  collaboratorFilter,
+} from "../locations/operational-scope";
 import type { Prisma } from "@prisma/client";
-import { PERSONAL_APPOINTMENT_SELECT, PERSONAL_STATUS_TRANSITIONS } from "../../common/personal-appointment";
-import { canUseLocalFunction, requiresOwnAppointmentScope } from "../../common/function-catalog";
+import {
+  PERSONAL_APPOINTMENT_SELECT,
+  PERSONAL_STATUS_TRANSITIONS,
+} from "../../common/personal-appointment";
+import {
+  canUseLocalFunction,
+  requiresOwnAppointmentScope,
+} from "../../common/function-catalog";
 import {
   LegacyWriteDto,
   AppointmentStatusDto,
@@ -9,6 +35,8 @@ import { assertTenantReferences } from "../../common/tenant-references";
 import {
   BadRequestException,
   ForbiddenException,
+  ConflictException,
+  NotFoundException,
   Body,
   Controller,
   Delete,
@@ -18,6 +46,7 @@ import {
   Post,
   Query,
   Req,
+  SetMetadata,
 } from "@nestjs/common";
 import { AppointmentStatus } from "../../common/domain-types";
 import { CacheInvalidationService } from "../../cache/cache-invalidation.service";
@@ -35,21 +64,19 @@ import {
   parsePagination,
 } from "../../common/pagination";
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
-import { NotificationsEventsService } from "../notifications/notifications.events.service";
-import { CollaboratorScheduleService } from "../availability/collaborator-schedule.service";
-import { parseZonedDateTime } from "../../common/zoned-time";
 
 type AppointmentPayload = Record<string, unknown>;
 
 @Controller("appointments")
 export class AppointmentsController {
   constructor(
+    private readonly bookings: BookingCommandService,
+    private readonly bookingAvailability: BookingAvailabilityService,
+    private readonly mutations: BookingMutationService,
     private readonly prisma: PrismaService,
     private readonly cacheService: AppCacheService,
     private readonly cacheInvalidationService: CacheInvalidationService,
-    private readonly notificationsEventsService: NotificationsEventsService,
     private readonly customersAlignmentService: CustomersAlignmentService,
-    private readonly collaboratorScheduleService: CollaboratorScheduleService,
   ) {}
 
   // Projection required by agenda rendering, independent of catalog administration.
@@ -62,25 +89,40 @@ export class AppointmentsController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
     const [services, collaborators] = await Promise.all([
       this.prisma.service.findMany({
-        where: { tenantId, isActive: true },
+        where: { tenantId, ...sectorFilter(scope), isActive: true },
         select: {
           id: true,
           name: true,
+          sectorId: true,
+          sector: { select: { id: true, name: true, locationId: true } },
+          requiresCollaborator: true,
+          requiresRoom: true,
           durationMinutes: true,
           bufferBeforeMinutes: true,
           bufferAfterMinutes: true,
           basePrice: true,
+          priceMode: true,
+          vatRate: true,
         },
       }),
       this.prisma.collaborator.findMany({
-        where: { tenantId, isActive: true },
+        where: { tenantId, ...collaboratorFilter(scope), isActive: true },
         select: {
           id: true,
           firstName: true,
           lastName: true,
           calendarColor: true,
+          sectors: {
+            where: { sectorId: { in: scope.sectorIds } },
+            select: { sectorId: true },
+          },
           weeklySchedules: {
             select: {
               weekday: true,
@@ -102,91 +144,6 @@ export class AppointmentsController {
       }),
     ]);
     return { services, collaborators };
-  }
-
-  private async resolveTenantTimezone(tenantId: string): Promise<string> {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { timezone: true },
-    });
-
-    return tenant?.timezone || "Europe/Rome";
-  }
-
-  private async ensureWorkingWindow(input: {
-    tenantId: string;
-    collaboratorId?: string | null;
-    startsAt: Date;
-    endsAt: Date;
-  }): Promise<void> {
-    if (!input.collaboratorId) {
-      return;
-    }
-
-    const window = await this.collaboratorScheduleService.resolveWorkingWindow(
-      input.tenantId,
-      input.collaboratorId,
-      input.startsAt,
-    );
-
-    if (!window.isAvailable) {
-      throw new BadRequestException(
-        window.isHoliday
-          ? "Il professionista non è disponibile per una chiusura programmata"
-          : "Il professionista non lavora nel giorno scelto",
-      );
-    }
-
-    const slotStartMinutes =
-      input.startsAt.getHours() * 60 + input.startsAt.getMinutes();
-    const slotEndMinutes =
-      input.endsAt.getHours() * 60 + input.endsAt.getMinutes();
-
-    if (
-      slotStartMinutes < window.startMinutes ||
-      slotEndMinutes > window.endMinutes
-    ) {
-      throw new BadRequestException(
-        "L'appuntamento è fuori dall'orario di lavoro del professionista",
-      );
-    }
-  }
-
-  private async ensureNoConflicts(
-    tenantId: string,
-    input: {
-      startsAt: Date;
-      endsAt: Date;
-      collaboratorId?: string | null;
-      roomId?: string | null;
-      excludeId?: string;
-    },
-  ): Promise<void> {
-    const resourceClauses: Array<Record<string, string>> = [];
-
-    if (input.collaboratorId) {
-      resourceClauses.push({ collaboratorId: input.collaboratorId });
-    }
-
-    if (input.roomId) {
-      resourceClauses.push({ roomId: input.roomId });
-    }
-
-    const overlapping = await this.prisma.appointment.findFirst({
-      where: {
-        tenantId,
-        id: input.excludeId ? { not: input.excludeId } : undefined,
-        status: { notIn: ["cancelled", "no_show"] },
-        startsAt: { lt: input.endsAt },
-        endsAt: { gt: input.startsAt },
-        OR: resourceClauses,
-      },
-      select: { id: true },
-    });
-
-    if (overlapping) {
-      throw new BadRequestException("L'orario scelto non è disponibile");
-    }
   }
 
   private async resolveCustomer(
@@ -239,14 +196,36 @@ export class AppointmentsController {
     );
 
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
     const from = query["from"] ? new Date(query["from"]) : undefined;
     const to = query["to"] ? new Date(query["to"]) : undefined;
-    const personal = requiresOwnAppointmentScope(session.user, "appointments.read.all");
+    const personal = requiresOwnAppointmentScope(
+      session.user,
+      "appointments.read.all",
+    );
     const ownCollaboratorId = personal ? session.user?.collaboratorId : null;
-    if (personal && !ownCollaboratorId) throw new ForbiddenException("Professionista non associato");
+    if (personal && !ownCollaboratorId)
+      throw new ForbiddenException("Professionista non associato");
     const where = {
       tenantId,
-      ...(ownCollaboratorId ? { collaboratorId: ownCollaboratorId, collaborator: { tenantId, userId: session.user!.id, isActive: true }, customer: { tenantId }, service: { tenantId }, OR: [{ roomId: null }, { room: { tenantId } }] } : {}),
+      ...sectorFilter(scope),
+      ...(ownCollaboratorId
+        ? {
+            collaboratorId: ownCollaboratorId,
+            collaborator: {
+              tenantId,
+              userId: session.user!.id,
+              isActive: true,
+            },
+            customer: { tenantId },
+            service: { tenantId },
+            OR: [{ roomId: null }, { room: { tenantId } }],
+          }
+        : {}),
       ...(from && !Number.isNaN(from.getTime())
         ? { startsAt: { gte: from } }
         : {}),
@@ -263,11 +242,27 @@ export class AppointmentsController {
       : `:range:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`;
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.appointmentsList(tenantId)}:${ownCollaboratorId ? "ownv2:" + ownCollaboratorId : "all"}${cacheSuffix}:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`,
+      `${cacheKeys.appointmentsList(tenantId)}:${ownCollaboratorId ? "ownv2:" + ownCollaboratorId : "allv10"}${cacheSuffix}:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`,
       CACHE_TTL_SECONDS.appointments,
       async () => {
-        const findAppointments = (args: Prisma.AppointmentFindManyArgs) => this.prisma.appointment.findMany(args);
-        const projection = personal ? { select: PERSONAL_APPOINTMENT_SELECT } : { include: { customer: true, service: true, collaborator: true, room: true } as const };
+        const findAppointments = (args: Prisma.AppointmentFindManyArgs) =>
+          this.prisma.appointment.findMany(args);
+        const projection = personal
+          ? { select: PERSONAL_APPOINTMENT_SELECT }
+          : {
+              include: {
+                customer: true,
+                service: true,
+                collaborator: true,
+                room: true,
+                orderItem: {
+                  select: {
+                    saleId: true,
+                    sale: { select: { revision: true, orderStatus: true } },
+                  },
+                },
+              } as const,
+            };
 
         if (!paginated) {
           return findAppointments({
@@ -293,140 +288,144 @@ export class AppointmentsController {
     );
   }
 
-  @Post()
-  async create(
+  @Post("availability")
+  @SetMetadata("alora.readOnly", true)
+  async previewAvailability(
     @Req() request: { headers: { authorization?: string } },
-    @Body() body: LegacyWriteDto,
+    @Body() body: BookingAvailabilityDto,
   ): Promise<unknown> {
     const session = await resolveRequestSession(
       this.prisma,
       request.headers.authorization,
     );
-    const user = requireUser(session);
-    const tenantId = requireTenantId(session);
-    const serviceId = String(body["serviceId"] ?? "");
-    const timezone = await this.resolveTenantTimezone(tenantId);
-    const startsAt = parseZonedDateTime(
-      String(body["startsAt"] ?? ""),
-      timezone,
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
     );
-
-    if (!serviceId || !startsAt) {
-      throw new BadRequestException("Scegli servizio e orario");
-    }
-
-    const service = await this.prisma.service.findUnique({
-      where: { id: serviceId, tenantId: requireTenantId(session) },
-    });
-
-    if (!service) {
-      throw new BadRequestException("Il servizio scelto non è disponibile");
-    }
-
-    const endsAt = new Date(
-      startsAt.getTime() + service.durationMinutes * 60000,
-    );
-    const collaboratorId =
-      typeof body["collaboratorId"] === "string"
-        ? body["collaboratorId"]
-        : undefined;
-    const roomId =
-      typeof body["roomId"] === "string" ? body["roomId"] : undefined;
-
-    await assertTenantReferences(this.prisma, requireTenantId(session), {
-      collaboratorId,
-      roomId,
-    });
-    await this.ensureNoConflicts(tenantId, {
-      startsAt,
-      endsAt,
-      collaboratorId,
-      roomId,
-    });
-    await this.ensureWorkingWindow({
-      tenantId,
-      collaboratorId,
-      startsAt,
-      endsAt,
-    });
-    const customerId = await this.resolveCustomer(tenantId, body);
-
-    const appointment = await this.prisma.appointment.create({
-      data: {
-        tenantId,
-        customerId,
-        serviceId,
-        collaboratorId,
-        roomId,
-        startsAt,
-        endsAt,
-        status:
-          typeof body["status"] === "string"
-            ? (body["status"] as AppointmentStatus)
-            : AppointmentStatus.Confirmed,
+    if (
+      body.appointmentId &&
+      !canUseLocalFunction(requireUser(session), "appointments.update.all")
+    )
+      throw new ForbiddenException(
+        "La riprogrammazione richiede il permesso di modifica agenda",
+      );
+    return this.bookingAvailability.read(
+      {
+        tenantId: requireTenantId(session),
+        actorId: requireUser(session).id,
         source: "internal",
-        estimatedPrice: service.basePrice,
-        finalPrice:
-          body["finalPrice"] === undefined
-            ? undefined
-            : Number(body["finalPrice"]),
-        customerNotes:
-          typeof body["customerNotes"] === "string"
-            ? body["customerNotes"]
-            : undefined,
-        internalNotes:
-          typeof body["internalNotes"] === "string"
-            ? body["internalNotes"]
-            : undefined,
-        createdById: user.id,
-        updatedById: user.id,
+        scope,
       },
-      include: {
-        customer: true,
-        service: true,
-        collaborator: true,
-      },
-    });
-
-    await this.notificationsEventsService.emit({
-      eventType: "appointment.created.internal",
-      tenantId,
-      entityType: "appointment",
-      entityId: appointment.id,
-      actor: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
-    });
-
-    if (appointment.collaboratorId) {
-      await this.notificationsEventsService.emit({
-        eventType: "appointment.assigned",
-        tenantId,
-        entityType: "appointment",
-        entityId: appointment.id,
-        actor: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-        },
-      });
-    }
-
-    await this.cacheInvalidationService.invalidateBookingReadModels(tenantId);
-
-    await this.customersAlignmentService.queueCustomerRefresh(
-      tenantId,
-      appointment.customerId,
-      "appointment_created",
+      body,
     );
+  }
 
-    return appointment;
+  @Post(":id/availability")
+  @SetMetadata("alora.readOnly", true)
+  async reschedulingAvailability(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Body() body: BookingAvailabilityDto,
+  ): Promise<unknown> {
+    return this.bookingAvailability.read(await this.mutationContext(request), {
+      ...body,
+      appointmentId: id,
+    });
+  }
+
+  @Post()
+  async create(
+    @Req() request: { headers: { authorization?: string } },
+    @Body() body: BookingCreateDto,
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const user = requireUser(session),
+      tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const outcome = await this.bookings.execute(
+      { tenantId, actorId: user.id, source: "internal", scope },
+      body,
+    );
+    if (!outcome.replayed) {
+      await this.customersAlignmentService.queueCustomerRefresh(
+        tenantId,
+        outcome.customerId,
+        "appointment_created",
+      );
+    }
+    await this.cacheInvalidationService.invalidateBookingReadModels(tenantId);
+    return outcome.result;
+  }
+
+  private async mutationContext(request: {
+    headers: { authorization?: string };
+  }) {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    return {
+      tenantId: requireTenantId(session),
+      actorId: requireUser(session).id,
+      source: "internal" as const,
+      canReadEconomics: canUseLocalFunction(requireUser(session), "sales.read"),
+      scope: await resolveOperationalScope(
+        this.prisma,
+        session,
+        request.headers,
+      ),
+    };
+  }
+  @Get(":id/order")
+  async bookingOrder(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+  ): Promise<unknown> {
+    return this.mutations.read(await this.mutationContext(request), id);
+  }
+  @Post(":id/order/preview")
+  @SetMetadata("alora.readOnly", true)
+  async previewOrder(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Body() body: BookingRevisionDto,
+  ): Promise<unknown> {
+    const context = await this.mutationContext(request);
+    return this.mutations.preview(context, id, body, context.canReadEconomics);
+  }
+  @Patch(":id/order")
+  async reviseOrder(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Body() body: BookingRevisionDto,
+  ): Promise<unknown> {
+    const context = await this.mutationContext(request);
+    const outcome = await this.mutations.revise(context, id, body);
+    await this.cacheInvalidationService.invalidateBookingReadModels(
+      context.tenantId,
+    );
+    return outcome.result;
+  }
+  @Post(":id/order/cancel")
+  async cancelOrder(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Body() body: BookingCancellationDto,
+  ): Promise<unknown> {
+    const context = await this.mutationContext(request);
+    const outcome = await this.mutations.cancel(context, id, body);
+    await this.cacheInvalidationService.invalidateBookingReadModels(
+      context.tenantId,
+    );
+    return outcome.result;
   }
 
   @Get(":id")
@@ -439,16 +438,58 @@ export class AppointmentsController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
-    const personal = requiresOwnAppointmentScope(session.user, "appointments.read.all");
-    if (personal && !session.user?.collaboratorId) throw new ForbiddenException("Professionista non associato");
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const personal = requiresOwnAppointmentScope(
+      session.user,
+      "appointments.read.all",
+    );
+    if (personal && !session.user?.collaboratorId)
+      throw new ForbiddenException("Professionista non associato");
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.appointmentDetail(tenantId, id)}:${personal ? "ownv2:" + session.user!.collaboratorId : "all"}`,
+      `${cacheKeys.appointmentDetail(tenantId, id)}:${personal ? "ownv2:" + session.user!.collaboratorId : "allv10"}`,
       CACHE_TTL_SECONDS.appointments,
       () => {
         const args: Prisma.AppointmentFindFirstArgs = {
-          where: { id, tenantId, ...(personal ? { collaboratorId: session.user!.collaboratorId!, collaborator: { tenantId, userId: session.user!.id, isActive: true }, customer: { tenantId }, service: { tenantId }, OR: [{ roomId: null }, { room: { tenantId } }] } : {}) },
-          ...(personal ? { select: PERSONAL_APPOINTMENT_SELECT } : { include: { customer: true, service: true, collaborator: true, room: true, cancellations: true } }),
+          where: {
+            id,
+            tenantId,
+            ...sectorFilter(scope),
+            ...(personal
+              ? {
+                  collaboratorId: session.user!.collaboratorId!,
+                  collaborator: {
+                    tenantId,
+                    userId: session.user!.id,
+                    isActive: true,
+                  },
+                  customer: { tenantId },
+                  service: { tenantId },
+                  OR: [{ roomId: null }, { room: { tenantId } }],
+                }
+              : {}),
+          },
+          ...(personal
+            ? { select: PERSONAL_APPOINTMENT_SELECT }
+            : {
+                include: {
+                  customer: true,
+                  service: true,
+                  collaborator: true,
+                  room: true,
+                  orderItem: {
+                    select: {
+                      saleId: true,
+                      sale: { select: { revision: true, orderStatus: true } },
+                    },
+                  },
+                  cancellations: true,
+                },
+              }),
         };
         return this.prisma.appointment.findFirst(args);
       },
@@ -461,134 +502,33 @@ export class AppointmentsController {
     @Param("id") id: string,
     @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
-    const session = await resolveRequestSession(
-      this.prisma,
-      request.headers.authorization,
-    );
-    const user = requireUser(session);
-    const current = await this.prisma.appointment.findUnique({
-      where: { id, tenantId: requireTenantId(session) },
-    });
-
-    if (!current) {
-      throw new BadRequestException("L'appuntamento non è stato trovato");
+    if (body.status === AppointmentStatus.Cancelled) {
+      if (
+        Object.keys(body).some(
+          (key) =>
+            body[key] !== undefined &&
+            !["status", "reason", "revision", "idempotencyKey"].includes(key),
+        )
+      )
+        throw new BadRequestException(
+          "Annulla il servizio separatamente dalle altre modifiche",
+        );
+      return this.cancel(request, id, body);
     }
-
-    const serviceId =
-      typeof body["serviceId"] === "string"
-        ? body["serviceId"]
-        : current.serviceId;
-    const service = await this.prisma.service.findUnique({
-      where: { id: serviceId, tenantId: requireTenantId(session) },
-    });
-
-    if (!service) {
-      throw new BadRequestException("Il servizio scelto non è disponibile");
-    }
-
-    const timezone = await this.resolveTenantTimezone(requireTenantId(session));
-    let startsAt = current.startsAt;
-    if (body["startsAt"]) {
-      const parsedStartsAt = parseZonedDateTime(
-        String(body["startsAt"]),
-        timezone,
-      );
-      if (!parsedStartsAt) {
-        throw new BadRequestException("L'orario indicato non è valido");
-      }
-      startsAt = parsedStartsAt;
-    }
-    const endsAt = new Date(
-      startsAt.getTime() + service.durationMinutes * 60000,
-    );
-    const collaboratorId =
-      typeof body["collaboratorId"] === "string"
-        ? body["collaboratorId"]
-        : current.collaboratorId;
-    const roomId =
-      typeof body["roomId"] === "string" ? body["roomId"] : current.roomId;
-
-    await assertTenantReferences(this.prisma, requireTenantId(session), {
-      collaboratorId,
-      roomId,
-    });
-    await this.ensureNoConflicts(requireTenantId(session), {
-      startsAt,
-      endsAt,
-      collaboratorId,
-      roomId,
-      excludeId: id,
-    });
-    await this.ensureWorkingWindow({
-      tenantId: requireTenantId(session),
-      collaboratorId,
-      startsAt,
-      endsAt,
-    });
-
-    const previousCollaboratorId = current.collaboratorId;
-    const updated = await this.prisma.appointment.update({
-      where: { id, tenantId: requireTenantId(session) },
-      data: {
-        serviceId,
-        collaboratorId,
-        roomId,
-        startsAt,
-        endsAt,
-        status:
-          typeof body["status"] === "string"
-            ? (body["status"] as AppointmentStatus)
-            : undefined,
-        finalPrice:
-          body["finalPrice"] === undefined
-            ? undefined
-            : Number(body["finalPrice"]),
-        customerNotes:
-          typeof body["customerNotes"] === "string"
-            ? body["customerNotes"]
-            : undefined,
-        internalNotes:
-          typeof body["internalNotes"] === "string"
-            ? body["internalNotes"]
-            : undefined,
-        updatedById: user.id,
-      },
-      include: {
-        customer: true,
-        service: true,
-        collaborator: true,
-      },
-    });
-
-    if (collaboratorId && collaboratorId !== previousCollaboratorId) {
-      await this.notificationsEventsService.emit({
-        eventType: previousCollaboratorId
-          ? "appointment.reassigned"
-          : "appointment.assigned",
-        tenantId: requireTenantId(session),
-        entityType: "appointment",
-        entityId: updated.id,
-        actor: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-        },
-      });
-    }
-
+    const context = await this.mutationContext(request);
+    const outcome = await this.mutations.reviseLine(context, id, body);
     await this.cacheInvalidationService.invalidateBookingReadModels(
-      requireTenantId(session),
+      context.tenantId,
     );
-
-    await this.customersAlignmentService.queueCustomerRefresh(
-      requireTenantId(session),
-      updated.customerId,
-      "appointment_created",
-    );
-
-    return updated;
+    if (!outcome.replayed) {
+      if (typeof outcome.customerId === "string")
+        await this.customersAlignmentService.queueCustomerRefresh(
+          context.tenantId,
+          outcome.customerId,
+          "appointment_created",
+        );
+    }
+    return outcome.result;
   }
 
   @Delete(":id")
@@ -596,21 +536,8 @@ export class AppointmentsController {
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
   ): Promise<unknown> {
-    const session = await resolveRequestSession(
-      this.prisma,
-      request.headers.authorization,
-    );
-    const user = requireUser(session);
-
-    await this.cacheInvalidationService.invalidateBookingReadModels(
-      requireTenantId(session),
-    );
-    return this.prisma.appointment.update({
-      where: { id, tenantId: requireTenantId(session) },
-      data: {
-        status: AppointmentStatus.Cancelled,
-        updatedById: user.id,
-      },
+    return this.cancel(request, id, {
+      reason: "Annullato dalla direzione del salone",
     });
   }
 
@@ -627,37 +554,94 @@ export class AppointmentsController {
     const user = requireUser(session);
 
     const tenantId = requireTenantId(session);
-    const personal = requiresOwnAppointmentScope(user, "appointments.update.all");
-    if (personal && (!user.collaboratorId || !canUseLocalFunction(user, "appointments.update.own"))) throw new ForbiddenException("Esecuzione personale non abilitata");
-    const scope = { id, tenantId, ...(personal ? { collaboratorId: user.collaboratorId!, collaborator: { tenantId, userId: user.id, isActive: true }, customer: { tenantId }, service: { tenantId }, OR: [{ roomId: null }, { room: { tenantId } }] } : {}) };
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const personal = requiresOwnAppointmentScope(
+      user,
+      "appointments.update.all",
+    );
+    if (
+      personal &&
+      (!user.collaboratorId ||
+        !canUseLocalFunction(user, "appointments.update.own"))
+    )
+      throw new ForbiddenException("Esecuzione personale non abilitata");
+    const appointmentScope = {
+      id,
+      tenantId,
+      ...sectorFilter(scope),
+      ...(personal
+        ? {
+            collaboratorId: user.collaboratorId!,
+            collaborator: { tenantId, userId: user.id, isActive: true },
+            customer: { tenantId },
+            service: { tenantId },
+            OR: [{ roomId: null }, { room: { tenantId } }],
+          }
+        : {}),
+    };
     let previousStatus: AppointmentStatus | undefined;
     if (personal) {
-      const current = await this.prisma.appointment.findFirst({ where: scope, select: { status: true } });
+      const current = await this.prisma.appointment.findFirst({
+        where: appointmentScope,
+        select: { status: true },
+      });
       if (!current) throw new ForbiddenException("Appuntamento non assegnato");
-      if (!PERSONAL_STATUS_TRANSITIONS[current.status]?.includes(body.status)) throw new ForbiddenException("Questo stato richiede l’intervento del salone");
+      if (!PERSONAL_STATUS_TRANSITIONS[current.status]?.includes(body.status))
+        throw new ForbiddenException(
+          "Questo stato richiede l’intervento del salone",
+        );
       previousStatus = current.status as AppointmentStatus;
     }
-    const updated = await this.prisma.appointment.update({
-      where: { ...scope, ...(previousStatus ? { status: previousStatus } : {}) },
-      data: { status: body.status, updatedById: user.id },
-      ...(personal ? { select: canUseLocalFunction(user, "appointments.read.own") ? PERSONAL_APPOINTMENT_SELECT : { id: true, status: true } } : {}),
-    });
-
-    if (body.status === AppointmentStatus.Confirmed) {
-      await this.notificationsEventsService.emit({
-        eventType: "appointment.confirmed",
-        tenantId: requireTenantId(session),
-        entityType: "appointment",
-        entityId: updated.id,
-        actor: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-        },
+    if (!personal && body.status === AppointmentStatus.Cancelled)
+      return this.cancel(request, id, {
+        reason: "Annullato dalla direzione del salone",
       });
-    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await lockOperationalTenant(tx, tenantId);
+      await setOperationalActor(tx, user.id);
+      const recordEvents = await beginAppointmentEvents(
+        tx,
+        { tenantId, actorId: user.id, source: "internal" },
+        { id },
+      );
+      const current = await tx.appointment.findFirst({
+        where: appointmentScope,
+        select: { status: true },
+      });
+      if (!current) throw new NotFoundException("Appuntamento non accessibile");
+      if (
+        ["completed", "cancelled", "no_show"].includes(current.status) &&
+        current.status !== body.status
+      )
+        throw new ConflictException(
+          "Lo stato storico non si riapre: pianifica un nuovo servizio dal conto",
+        );
+      const updated = await tx.appointment.update({
+        where: {
+          ...appointmentScope,
+          ...(previousStatus ? { status: previousStatus } : {}),
+        },
+        data: { status: body.status, updatedById: user.id },
+        ...(personal
+          ? {
+              select: canUseLocalFunction(user, "appointments.read.own")
+                ? PERSONAL_APPOINTMENT_SELECT
+                : { id: true, status: true },
+            }
+          : {}),
+      });
+      await tx.sale.updateMany({
+        where: { tenantId, items: { some: { booking: { id } } } },
+        data: { revision: { increment: 1 } },
+      });
+      await tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+      await recordEvents({ id });
+      return updated;
+    });
 
     await this.cacheInvalidationService.invalidateBookingReadModels(
       requireTenantId(session),
@@ -672,52 +656,29 @@ export class AppointmentsController {
     @Param("id") id: string,
     @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
-    const session = await resolveRequestSession(
-      this.prisma,
-      request.headers.authorization,
+    const context = await this.mutationContext(request);
+    const outcome = await this.mutations.cancel(
+      context,
+      id,
+      {
+        idempotencyKey:
+          body.idempotencyKey || `legacy-cancel:${context.actorId}:${id}`,
+        revision: body.revision ?? null,
+        reason:
+          typeof body.reason === "string"
+            ? body.reason
+            : "Annullato dalla direzione del salone",
+      },
+      "line",
     );
-    const user = requireUser(session);
-
-    await this.prisma.appointment.update({
-      where: { id, tenantId: requireTenantId(session) },
-      data: {
-        status: AppointmentStatus.Cancelled,
-        updatedById: user.id,
-      },
-    });
-
-    const cancellation = await this.prisma.appointmentCancellation.create({
-      data: {
-        appointmentId: id,
-        cancelledByType: session.user?.role ?? "owner",
-        cancelledById: user.id,
-        reason: typeof body["reason"] === "string" ? body["reason"] : undefined,
-        policyResult: "allowed_until_24h_before",
-      },
-    });
-
-    await this.notificationsEventsService.emit({
-      eventType: "appointment.cancelled",
-      tenantId: requireTenantId(session),
-      entityType: "appointment",
-      entityId: id,
-      actor: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
-      eventData: {
-        reason: typeof body["reason"] === "string" ? body["reason"] : undefined,
-      },
-    });
-
     await this.cacheInvalidationService.invalidateBookingReadModels(
-      requireTenantId(session),
+      context.tenantId,
     );
-
-    return { id, status: AppointmentStatus.Cancelled, cancellation };
+    return {
+      ...(typeof outcome.result === "object" ? outcome.result : {}),
+      id,
+      status: AppointmentStatus.Cancelled,
+    };
   }
 
   @Get(":id/cancellation-policy")
@@ -730,8 +691,17 @@ export class AppointmentsController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
-    const personal = requiresOwnAppointmentScope(session.user, "appointments.read.all");
-    if (personal && !session.user?.collaboratorId) throw new ForbiddenException("Professionista non associato");
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const personal = requiresOwnAppointmentScope(
+      session.user,
+      "appointments.read.all",
+    );
+    if (personal && !session.user?.collaboratorId)
+      throw new ForbiddenException("Professionista non associato");
 
     return this.cacheService.getOrSet(
       cacheKeys.appointmentCancellationPolicy(tenantId, id),
@@ -741,8 +711,16 @@ export class AppointmentsController {
           where: {
             id,
             tenantId,
+            ...sectorFilter(scope),
             ...(personal
-              ? { collaboratorId: session.user!.collaboratorId!, collaborator: { tenantId, userId: session.user!.id, isActive: true } }
+              ? {
+                  collaboratorId: session.user!.collaboratorId!,
+                  collaborator: {
+                    tenantId,
+                    userId: session.user!.id,
+                    isActive: true,
+                  },
+                }
               : {}),
           },
         });
@@ -751,12 +729,9 @@ export class AppointmentsController {
           throw new BadRequestException("L'appuntamento non è stato trovato");
         }
 
-        const diffHours =
-          (appointment.startsAt.getTime() - Date.now()) / 3600000;
-
         return {
           appointmentId: id,
-          allowed: diffHours >= 24,
+          allowed: customerCancellationAllowed(appointment.startsAt),
           policy: "allowed_until_24h_before",
         };
       },

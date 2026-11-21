@@ -18,7 +18,7 @@ Vedi [sicurezza e migrazione](docs/security-step-1.md), [rebranding e compatibil
 - Sessioni revocabili, controlli di accesso per azienda e persona, audit delle mutazioni e agenda personale transitoria.
 - PWA installabile con aggiornamento differito mentre sono aperti modali.
 
-SSO Connect è integrato; lo [Step 5, ruoli e squadra](docs/team-step-5.md), è in implementazione con il pannello Accessi squadra. Sedi e settori, conto unico, registro dei pagamenti e magazzino restano nella roadmap. I provider di pagamento simulati restano disabilitati.
+SSO Connect è integrato; gli step 5 (Squadra e agenda personale) e 6 (profilo e sicurezza personale) hanno una [chiusura tecnica documentata](docs/chiusura-step-5-6.md). Le verifiche account sono rinviate su richiesta dell’utente, distinte dall’accettazione di produzione. Sedi/settori, conto unico, registro dei pagamenti e magazzino sono implementati localmente. Anche dashboard, console WhatsApp e [promemoria/azioni cliente](docs/appointment-automations-workflow-step-12.md) sono installati nel Docker locale; le accettazioni provider, dispositivi e commerciali restano separate. I provider di pagamento simulati restano disabilitati.
 
 ## Local Setup
 
@@ -100,7 +100,7 @@ Prima che il tenant esista, lancia (dentro il container API, che ha gia
 `DATABASE_URL`):
 
 ```bash
-docker compose exec api npm run demo:create
+docker compose exec api node dist/scripts/create-demo-account.js
 ```
 
 Se lanciato due volte con lo stesso slug non cambia nulla. Configura `DEMO_OWNER_PASSWORD` nel solo file locale `.env`: le password non vengono stampate. Con il runtime compilato la creazione della demo è un comando esplicito anche in locale. `prisma/seed.ts` con `SEED_DEMO=1` usa lo stesso generatore completo, evitando dataset duplicati.
@@ -163,13 +163,22 @@ di iOS sui campi di input.
 
 This is a production-oriented foundation, not the complete SaaS. The API now includes a Redis-backed notification pipeline with BullMQ, tenant/user notification preferences, a notification inbox center, SMTP/webhook/in-app providers, and appointment/public-booking event triggers.
 
-### Catalogo delle funzioni Connect
+### Sedi e settori
 
-Il registro ALORA associa 22 funzioni alle operazioni API e alla UI. Configurare `ALORA_CONNECT_APP_ID` con l’ID registrato su Connect per esporre `/.well-known/eulab-connect.json` (anche sotto `/admin/` tramite Nginx). La pubblicazione non assegna licenze o ruoli. Vedere [risultati e verifiche dello Step 3](docs/function-catalog-step-3.md) e [contratto di onboarding richiesto a Connect](docs/connect-onboarding-contract-request.md).
+Lo [Step 7](docs/locations-sectors-step-7.md) introduce sedi, settori, appartenenze operative, aperture e chiusure, risorse e attribuzione storica di appuntamenti e righe di vendita. La configurazione è in `/admin/#/locations`, con le nuove funzioni esplicite `locations.read` e `locations.manage`; il catalogo pubblicato non concede ruoli. [Verifiche e confini](docs/verification/locations-sectors-step-7.json). Il conto unico, i prezzi/IVA e il magazzino restano nei passi successivi.
+
+#
+### Conto operativo unico — Step 8
+
+Agenda e cassa condividono la stessa riga del conto. Il booking apre un conto non pagato; la cassa lo salva aperto o registra la vendita conservando gli ID. Migrazione e collaudi locali: [verbale](docs/operational-order-step-8.md), [evidenze](docs/verification/operational-order-step-8.json). Acconti e saldi puntuali appartengono allo Step 10.
+
+## Catalogo delle funzioni Connect
+
+Il registro ALORA associa 32 funzioni alle operazioni API e alla UI, con matrice versione 7. Configurare `ALORA_CONNECT_APP_ID` con l’ID registrato su Connect per esporre `/.well-known/eulab-connect.json` (anche sotto `/admin/` tramite Nginx). La pubblicazione non assegna licenze o ruoli. Vedere [risultati e verifiche dello Step 3](docs/function-catalog-step-3.md), [aggiornamenti degli step 5 e 6](docs/chiusura-step-5-6.md) e [contratto di onboarding richiesto a Connect](docs/connect-onboarding-contract-request.md).
 
 ### Accesso Connect e migrazione assistita
 
-L’accesso operativo richiede Connect. ALORA usa una sola facciata SDK, ora **candidata 0.11.0 nello sviluppo** (flusso SSO adottato con 0.10.0/schema Connect 013): presenter tecnico prima dell’integrazione, verifica locale e modale obbligatoria, richiesta sugli endpoint esistenti, approvazione amministrativa e sincronizzazione server della configurazione SSO. Nessun intake parallelo o accesso gestionale locale. I profili vengono collegati/provisionati dopo SSO verificato, senza copia della password provider o unione per email. Presenter configurato nel `.env`; il collaudo consumer locale è stato autorizzato ed eseguito nei limiti descritti nello Step 5. Vedi [istruzioni e limiti](docs/auth-flow-step-4.md), [stato Step 4](docs/sso-step-4.md). La 0.10.0 npm era la distribuzione precedente; la nuova creazione delegata richiede API Connect aggiornata e schema 014.
+L’accesso operativo richiede Connect. ALORA usa una sola facciata SDK, ora **candidata 0.12.0-rc.2 installata localmente** (flusso SSO adottato con 0.10.0/schema Connect 013): presenter tecnico prima dell’integrazione, verifica locale e modale obbligatoria, richiesta sugli endpoint esistenti, approvazione amministrativa e sincronizzazione server della configurazione SSO. Nessun intake parallelo o accesso gestionale locale. I profili vengono collegati/provisionati dopo SSO verificato, senza copia della password provider o unione per email. Presenter configurato nel `.env`; il collaudo consumer locale è stato autorizzato ed eseguito nei limiti descritti nello Step 5. Vedi [istruzioni e limiti](docs/auth-flow-step-4.md), [stato Step 4](docs/sso-step-4.md). La 0.10.0 npm era la distribuzione precedente; la nuova creazione delegata richiede API Connect aggiornata e schema 014.
 
 Per individuare subito i problemi di configurazione, dopo `npm run build:api` eseguire `npm run connect:check`. Legge il `.env` locale e mostra soltanto stato e nomi delle variabili mancanti. `npm run connect:check -- --online` delega a ConnectApplication.diagnose la discovery OIDC e un lookup sorgente con indirizzo QA casuale riservato: non crea utenti o pratiche. Il report distingue configurazione, discovery, sorgente e autorizzazione `not_checked`; una sorgente raggiungibile non certifica licenze, associazioni o login completo. La configurazione operativa attuale è ancora da fornire; nessun hostname pubblico o segreto viene inserito automaticamente.
 
@@ -179,4 +188,24 @@ Lo store ufficiale e gli adattatori ALORA sono collegati agli handler HTTP. I to
 
 Pacchetto ufficiale: [@eulab/connect su npm](https://www.npmjs.com/package/@eulab/connect). Codice e guida: [SDK nel repository Connect](https://github.com/Eulab-EugenioRenna/connect/tree/main/packages/sdk). Gli ingressi usati dal backend sono `@eulab/connect/application` e `@eulab/connect/server`.
 
-ALORA sviluppo usa temporaneamente **la candidata `@eulab/connect@0.11.0` da `vendor/eulab-connect-0.11.0-team-security.tgz`**, su autorizzazione dell’utente del 26 ottobre. `npm ci` e Docker installano quel tarball con integrità nel lockfile; checksum e condizioni in [Step 5](docs/team-step-5.md). Nessuna pubblicazione npm o distribuzione in produzione implicita. La precedente distribuzione approvata era la 0.10.0 pubblica; il passaggio della candidata al registry richiede una pubblicazione concordata. API Connect, schema 014 e bootstrap Keycloak sono verificati nel Docker locale; creazione e login consumer sono passati su account temporanei, poi rimossi. [Evidenze e sottocasi aperti](docs/team-step-5-acceptance.md).
+ALORA usa **la candidata `@eulab/connect@0.12.0-rc.2` da `vendor/eulab-connect-0.12.0-rc.2.tgz`**. `npm ci` e Docker installano il tarball con integrità nel lockfile; installazione offline e contratti consumer verificati. Il pacchetto include deleghe revocabili, webhook e ritiro durevole; [integrazione e limiti](docs/appointment-automations-workflow-step-12.md). Nessuna pubblicazione npm o distribuzione in produzione eseguita. La precedente candidata locale 0.11.0 e i relativi collaudi team restano documentati nello [Step 5](docs/team-step-5.md); il passaggio al registry e l’accettazione del runtime Connect reale restano distinti.
+
+### Prezzi, IVA e magazzino — Step 9
+
+Calcolo decimale e anteprima server, prezzi netti/lordi e storici immutabili, IVA acquisto/vendita indipendenti, giacenze per sede, movimenti idempotenti, costo medio ponderato, consumi dichiarati, resi e trasferimenti. Dati legacy riconciliati senza stock o aliquote inventati. [Verbale](docs/pricing-inventory-step-9.md) e [verifiche locali](docs/verification/pricing-inventory-step-9.json). Le funzioni nuove richiedono concessione esplicita; gli incassi puntuali sono lo Step 10.
+
+### Prenotazioni e incassi — Step 10
+
+Prenotazione multipla, conto unico, cassa, acconti/saldi, metodi misti e rimborsi sono implementati e installati nel Docker locale. Comandi idempotenti, riconciliazione storica e recupero dopo reload verificati su PostgreSQL e browser isolati. [Chiusura tecnica e limiti](docs/booking-payments-step-10.md), [evidenze](docs/verification/payment-ledger-step-10.json).
+
+
+### WhatsApp, promemoria e azioni cliente — Step 11/12
+
+Nella pagina WhatsApp: connessione, autorizzazioni separate, policy attivabile esplicitamente, eventi selezionabili, cinque testi con anteprima e monitor. Conferma, richiesta modifica e annullamento sono correlati al conto e al consenso della singola prenotazione; nessuna risposta mantiene la prenotazione. Il runtime locale è aggiornato con nove migrazioni notifiche/automazioni, senza consenso o invii storici inferiti. [Funzionamento e prove](docs/appointment-automations-workflow-step-12.md). Pairing, webhook pubblico e messaggi reali richiedono accettazione separata; account esclusi.
+
+[Dashboard e responsive](docs/dashboard-responsive-step-13.md) sono incluse nelle immagini locali. [Ripristino e stato commerciale](docs/release-readiness-step-14.md) distinguono le prove tecniche dalle accettazioni ancora aperte.
+
+
+### Immagini Docker runtime-only
+
+Le immagini finali di ALORA e Connect contengono build, eseguibili, dipendenze e asset necessari. L’API ALORA esclude TypeScript, source map, Angular e strumenti di sviluppo; il CLI Prisma resta disponibile per le migrazioni e il comando demo è compilato. Il controllo ripetibile è `node scripts/verify-runtime-images.mjs`. [Contenuto, prove e passaggio locale](docs/docker-runtime-only.md).

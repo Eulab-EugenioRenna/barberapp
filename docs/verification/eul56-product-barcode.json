@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-11-13T09:55:53.824Z",
+  "sourceDatabaseModified": false,
+  "restoredCopy": "eul56_barcode_1794563734561",
+  "tablesCompared": 55,
+  "assertions": [
+    "restore succeeded",
+    "all original rows and fields preserved",
+    "existing barcodes NULL",
+    "duplicate tenant barcode rejected",
+    "same barcode allowed across tenants",
+    "multiple NULL barcodes allowed",
+    "rollback removes column",
+    "rollback preserves original data",
+    "reapply succeeds"
+  ],
+  "backup": ".local/eul56/migration-1794563734561/before.dump",
+  "retainedCopy": true
+}

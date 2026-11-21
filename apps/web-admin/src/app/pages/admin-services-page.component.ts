@@ -1,3 +1,5 @@
+import { PriceSettingsComponent } from "../shared/price-settings.component";
+import { SectorPickerComponent } from "../shared/sector-picker.component";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
@@ -12,6 +14,8 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
   selector: "barber-admin-services-page",
   standalone: true,
   imports: [
+    PriceSettingsComponent,
+    SectorPickerComponent,
     FunctionAccessDirective,
     CommonModule,
     FormsModule,
@@ -65,7 +69,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             (click)="openEditService(service)"
           >
             <div>
-              <strong>{{ service.name }}</strong>
+              <strong>{{ service.name }}</strong><span *ngIf="service.isActive===false" class="status-pill">Disattivato</span>
               <p class="mt-1 text-sm text-[var(--muted)]">
                 {{
                   service.publicDescription || "Descrizione non ancora inserita"
@@ -134,7 +138,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             class="list-card text-left"
             (click)="openEditProduct(product)"
           >
-            <strong>{{ product.name }}</strong>
+            <strong>{{ product.name }}</strong><span *ngIf="product.isActive===false" class="status-pill">Disattivato</span>
             <span class="text-sm text-[var(--muted)]">
               {{
                 product.price === null || product.price === undefined
@@ -198,6 +202,21 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               >Nome <em class="required-mark" aria-hidden="true">*</em></span
             >
             <input [(ngModel)]="serviceForm.name" name="serviceName" required />
+          </label>
+          <alora-price-settings kind="service" [value]="serviceForm"></alora-price-settings>
+          <alora-sector-picker
+            [(value)]="serviceForm.sectorId"
+          ></alora-sector-picker>
+          <label class="field">
+            <span>Risorse richieste</span>
+            <span
+              ><input
+                type="checkbox"
+                [(ngModel)]="serviceForm.requiresRoom"
+                name="requiresRoom"
+              />
+              Richiede una risorsa del settore</span
+            >
           </label>
           <label class="field">
             <span>Descrizione pubblica</span>
@@ -302,7 +321,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                 <span>Prodotto</span>
                 <barber-custom-select
                   [value]="serviceProductForm.productId"
-                  (valueChange)="serviceProductForm.productId = $event"
+                  (valueChange)="selectServiceProduct($event)"
                   [options]="productSelectOptions"
                   label="Prodotto"
                   placeholder="Seleziona prodotto"
@@ -327,6 +346,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                   step="1"
                 />
               </label>
+              <label class="field md:col-span-2" aloraFunction="inventory.manage"><span>Consumo fisico per servizio (opzionale)</span><input type="number" min="0.001" step="0.001" [(ngModel)]="serviceProductForm.consumptionUnits" name="consumptionUnits" placeholder="Vuoto: nessuno scarico automatico"></label>
               <label class="field checkbox-field md:col-span-2">
                 <input
                   [(ngModel)]="serviceProductForm.priceLocked"
@@ -416,6 +436,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
         </div>
 
         <form class="mt-4 grid gap-3" (ngSubmit)="submitProduct()">
+          <alora-price-settings kind="product" [value]="productForm"></alora-price-settings>
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="field"
               ><span
@@ -571,6 +592,7 @@ export class AdminServicesPageComponent {
     );
   }
 
+  selectServiceProduct(id:string){const old=this.serviceForm.serviceProducts?.find((row:any)=>row.productId===id);Object.assign(this.serviceProductForm,{productId:id,mode:old?.mode||"optional",quantity:old?.quantity??1,priceLocked:old?.priceLocked??false,consumptionUnits:old?.consumptionUnits??""});}
   get productFormValid(): boolean {
     return Boolean(textValue(this.productForm.name));
   }

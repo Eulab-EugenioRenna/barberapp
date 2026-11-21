@@ -36,8 +36,8 @@ function request(method: string, url = "/api/sales") {
   return {
     method,
     url,
-    headers: { has: () => false },
-    clone: jest.fn().mockReturnValue({ method, url }),
+    headers: { has: () => false, get: () => null },
+    clone: jest.fn(function (this: unknown) { return this; }),
   };
 }
 beforeEach(() => {

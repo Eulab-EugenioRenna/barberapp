@@ -1,8 +1,7 @@
 # Collaudo operativo Step 5 — Ruoli e squadra
 
-Stato: **casi tecnici del consumer verificati sul Docker reale; collaudo operativo Squadra/La mia agenda accettato dall’utente il 4 novembre 2026; prova email pendente**, dopo
-l’autorizzazione dell’utente al collaudo ALORA con Connect schema 014. Non equivale
-a chiusura dello Step 5 o accettazione di produzione.
+Stato corrente — 6 novembre 2026: **chiusura tecnica dello Step 5**, con creazione collaboratori e apertura agenda confermate dall’utente. Le verifiche account sono **rinviate su richiesta dell’utente** e non costituiscono prove superate; accettazione di produzione separata. Fonte corrente: [verbale di chiusura degli step 5 e 6](chiusura-step-5-6.md).
+
 [Prima evidenza](verification/team-real-consumer.json), [prosecuzione estesa](verification/team-extended-consumer.json) e [ultimo ciclo consumer](verification/team-final-consumer.json) e [controllo dopo riavvio](verification/team-post-restart.json).
 
 ## Ripresa verificata — 4 novembre 2026
@@ -19,14 +18,13 @@ Connect verificate senza inviare email. Keycloak ha SMTP STARTTLS configurato;
 questo non prova la consegna del suo link di recupero.
 [Evidenza del runtime](verification/team-runtime-resume-2026-11-04.json).
 
-| Condizione di chiusura residua | Stato e prova necessaria |
+| Accettazione o verifica separata | Stato corrente |
 | --- | --- |
-| Recupero password delegato | Non eseguito: identificare un account collaboratore di collaudo e una casella controllata, con autorizzazione all'invio; verificare ricezione del link, cambio nel provider e accesso con nuova credenziale. Non pubblicare link, password o token. |
+| Recupero password delegato e account | Ricezione e cambio password confermati; nuovo login e incidente relativo al ruolo amministrativo non conclusi. Ulteriori verifiche rinviate per indicazione «lascia perdere gli account»; nessuna nuova richiesta al destinatario e nessuna mutazione degli account nella chiusura tecnica. |
 | Squadra rivista | Collaudo operativo sui dispositivi del salone confermato dall’utente il 4 novembre 2026. |
 | La mia agenda | Collaudo operativo sui dispositivi del salone confermato dall’utente il 4 novembre 2026. |
 
-Non ripetere le fixture già rimosse per sostituire queste prove. Non avviare
-lo Step 6 prima della chiusura e dell'autorizzazione prevista dal piano.
+L’utente ha successivamente autorizzato l’avvio dello Step 6, mantenendo questi gate separati. Non considerare la sola ricezione del messaggio come prova del login finale. Stato e collaudo del nuovo dominio in [Step 6](personal-account-step-6.md).
 
 L’utente ha risposto «Confermo anche il collaudo operativo» alla domanda esplicita su Squadra e La mia agenda sui dispositivi del salone. Questa conferma supera le indicazioni storiche di accettazione pendente sotto. Non attesta la ricezione o l’utilizzo del link password, che resta da verificare separatamente.
 
@@ -168,4 +166,4 @@ La preassegnazione EULAB Admin o un login locale non sostituiscono questo caso. 
 
 Per ogni ID registrare esito (non eseguito / passato / fallito / bloccato), ruolo e azienda di prova, browser/formato, comportamento osservato e sola evidenza priva di segreti. Data e versione devono identificare il collaudo; eventuali concessioni manuali vanno esplicitate. In caso di errore di rete dopo una scrittura, rileggere lo stato prima di un nuovo invio.
 
-Lo Step 5 si chiude solo dopo C1 e i casi applicabili superati, senza sostituire l’accettazione reale con le 190 prove automatiche del sorgente corrente. Step 6 e successivi restano nel piano; il passaggio di fase segue evolve.md e richiede autorizzazione. Nessuna distribuzione in produzione è implicita nel collaudo locale.
+La chiusura tecnica corrente è registrata nel verbale degli step 5 e 6 su richiesta dell’utente. I criteri e gli esiti storici sopra rimangono consultabili; i collaudi account rinviati non sono conteggiati come passati. Nessuna accettazione finale dei provider o distribuzione in produzione è implicita nella chiusura locale.

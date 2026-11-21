@@ -1,5 +1,7 @@
 # Step 5 — Ruoli e squadra
 
+> Stato corrente — 6 novembre 2026: chiusura tecnica registrata nel [verbale degli step 5 e 6](chiusura-step-5-6.md). Creazione collaboratori e apertura agenda confermate dall’utente; verifiche account rinviate su sua richiesta, senza dichiararle superate. Le sezioni datate sotto conservano la cronologia delle implementazioni e dei collaudi.
+
 Stato storico al 25 ottobre 2026 (aggiornamento 0.11.0 in fondo): implementazione avviata su autorizzazione «procedi con il piano». Non concluso. L’accesso all’admin tramite Connect è stato confermato dall’utente nello Step 4; rinnovo, revoca e accettazione di produzione restano prove distinte.
 
 ## Revisione richiesta dall’utente — Squadra e ruoli

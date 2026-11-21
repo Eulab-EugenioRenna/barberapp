@@ -17,6 +17,8 @@ export const authGuard: CanActivateFn = async (_, state) => {
       // Re-read operational restrictions on navigation; the server remains authoritative.
       const user = await firstValueFrom(auth.me());
       sessionStore.setCurrentUser(user);
+      if (state.url.split("?")[0] === "/account" && user.role !== "platform_admin")
+        return user.technicalAccess ? router.createUrlTree(["/access-unavailable"]) : true;
       const selectedProfile = new URLSearchParams(state.url.split("?")[1] || "").get("collaboratorId");
       const teamAgenda = state.url.split("?")[0] === "/my-agenda" && !!selectedProfile;
       if (teamAgenda && !canUseLocalFunction(user, "appointments.read.all")) return router.createUrlTree(["/access-unavailable"]);

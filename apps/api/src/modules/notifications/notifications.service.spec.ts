@@ -2,7 +2,7 @@ import { NotificationChannel } from "@prisma/client";
 import { NotificationsService } from "./notifications.service";
 
 describe("NotificationsService", () => {
-  it("lists started appointments without an order", async () => {
+  it("lists started appointments with an open account or unreconciled legacy absence", async () => {
     const findMany = jest.fn().mockResolvedValue([{ id: "appointment-1" }]);
     const service = new NotificationsService(
       { appointment: { findMany } } as never,
@@ -16,6 +16,7 @@ describe("NotificationsService", () => {
     expect(findMany).toHaveBeenCalledWith({
       where: {
         tenantId: "tenant-1",
+        sectorId: { in: [] },
         startsAt: { lte: now },
         status: {
           in: [
@@ -26,7 +27,7 @@ describe("NotificationsService", () => {
             "completed",
           ],
         },
-        sales: { none: {} },
+        OR: [{orderItem:{sale:{orderStatus:"open"}}},{orderItemId:null,sales:{none:{}}}],
       },
       orderBy: { startsAt: "desc" },
       take: 20,

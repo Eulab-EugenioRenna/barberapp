@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -17,6 +18,10 @@ export class CollaboratorScheduleService {
     tenantId: string,
     collaboratorId: string,
     date: Date,
+    client: Pick<
+      Prisma.TransactionClient,
+      "collaboratorDayOverride" | "collaboratorWeeklySchedule" | "tenantHoliday"
+    > = this.prisma,
   ): Promise<WorkingWindow> {
     const dayDate = new Date(
       Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
@@ -24,13 +29,13 @@ export class CollaboratorScheduleService {
     const weekday = (date.getDay() + 6) % 7;
 
     const [override, weekly, tenantHoliday] = await Promise.all([
-      this.prisma.collaboratorDayOverride.findFirst({
+      client.collaboratorDayOverride.findFirst({
         where: { collaboratorId, date: dayDate },
       }),
-      this.prisma.collaboratorWeeklySchedule.findFirst({
+      client.collaboratorWeeklySchedule.findFirst({
         where: { collaboratorId, weekday },
       }),
-      this.prisma.tenantHoliday.findFirst({
+      client.tenantHoliday.findFirst({
         where: { tenantId, date: dayDate },
       }),
     ]);

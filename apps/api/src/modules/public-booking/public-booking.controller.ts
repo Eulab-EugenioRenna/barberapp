@@ -1,3 +1,8 @@
+import { BookingCommandService } from "../orders/booking-command.service";
+import { BookingAvailabilityService } from "../orders/booking-availability.service";
+import { BookingAvailabilityDto } from "../../common/booking-availability.dto";
+import { BookingCreateDto } from "../../common/booking-write.dto";
+import { catalogGross } from "../pricing/pricing.service";
 import {
   BadRequestException,
   Body,
@@ -7,8 +12,8 @@ import {
   Post,
   Query,
   Req,
+  SetMetadata,
 } from "@nestjs/common";
-import { AppointmentStatus, BookingMode } from "../../common/domain-types";
 import { CacheInvalidationService } from "../../cache/cache-invalidation.service";
 import { CACHE_TTL_SECONDS, cacheKeys } from "../../cache/cache.constants";
 import { normalizeCacheToken } from "../../cache/cache.helpers";
@@ -16,7 +21,6 @@ import { AppCacheService } from "../../cache/cache.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AvailabilityService } from "../availability/availability.service";
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
-import { NotificationsEventsService } from "../notifications/notifications.events.service";
 import { resolveZonedDateKey } from "../../common/zoned-time";
 
 @Controller()
@@ -26,11 +30,12 @@ export class PublicBookingController {
   private static readonly PUBLIC_BOOKING_MAX_BY_EMAIL = 3;
 
   constructor(
+    private readonly bookings: BookingCommandService,
+    private readonly bookingAvailability: BookingAvailabilityService,
     private readonly prisma: PrismaService,
     private readonly cacheService: AppCacheService,
     private readonly cacheInvalidationService: CacheInvalidationService,
     private readonly availabilityService: AvailabilityService,
-    private readonly notificationsEventsService: NotificationsEventsService,
     private readonly customersAlignmentService: CustomersAlignmentService,
   ) {}
 
@@ -138,7 +143,9 @@ export class PublicBookingController {
     );
 
     if (!tenant) {
-      throw new BadRequestException("Questa pagina di prenotazione non è disponibile");
+      throw new BadRequestException(
+        "Questa pagina di prenotazione non è disponibile",
+      );
     }
 
     return tenant;
@@ -148,7 +155,7 @@ export class PublicBookingController {
     const tenant = await this.resolveTenant(tenantSlug, host);
 
     return this.cacheService.getOrSet(
-      cacheKeys.publicSettings(tenant.id),
+      cacheKeys.publicSettings(tenant.id) + ":scope9-v1",
       CACHE_TTL_SECONDS.publicSettings,
       async () => ({
         id: tenant.id,
@@ -168,6 +175,24 @@ export class PublicBookingController {
         timezone: tenant.timezone,
         currency: tenant.currency,
         language: tenant.language,
+        locations: await this.prisma.location.findMany({
+          where: {
+            tenantId: tenant.id,
+            isActive: true,
+            isPublic: true,
+            sectors: { some: { isActive: true, isPublic: true } },
+          },
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            sectors: {
+              where: { isActive: true, isPublic: true },
+              select: { id: true, name: true },
+            },
+          },
+          orderBy: { name: "asc" },
+        }),
       }),
     );
   }
@@ -176,7 +201,7 @@ export class PublicBookingController {
     const tenant = await this.resolveTenant(tenantSlug, host);
 
     return this.cacheService.getOrSet(
-      cacheKeys.publicServices(tenant.id),
+      cacheKeys.publicServices(tenant.id) + ":scope9-v1",
       CACHE_TTL_SECONDS.publicServices,
       () =>
         this.prisma.service
@@ -186,9 +211,39 @@ export class PublicBookingController {
               isActive: true,
               isPublic: true,
               isBookableOnline: true,
+              sector: {
+                isActive: true,
+                isPublic: true,
+                location: { isActive: true, isPublic: true },
+              },
             },
             orderBy: { name: "asc" },
-            include: {
+            select: {
+              id: true,
+              name: true,
+              publicDescription: true,
+              durationMinutes: true,
+              basePrice: true,
+              priceMode: true,
+              vatRate: true,
+              category: true,
+              color: true,
+              requiresCollaborator: true,
+              requiresRoom: true,
+              bufferBeforeMinutes: true,
+              bufferAfterMinutes: true,
+              isActive: true,
+              isPublic: true,
+              isBookableOnline: true,
+              sectorId: true,
+              sector: {
+                select: {
+                  id: true,
+                  name: true,
+                  locationId: true,
+                  location: { select: { id: true, name: true, address: true } },
+                },
+              },
               serviceProducts: {
                 include: {
                   product: {
@@ -197,13 +252,35 @@ export class PublicBookingController {
                       name: true,
                       category: true,
                       price: true,
+                      priceMode: true,
+                      vatRate: true,
                     },
                   },
                 },
               },
             },
           })
-          .then(async (services) => {
+          .then(async (catalogServices) => {
+            const services = catalogServices.map((service) => ({
+              ...service,
+              basePrice: catalogGross(service),
+              priceMode: service.priceMode === "legacy" ? "legacy" : "gross",
+              serviceProducts: service.serviceProducts.map((link) => ({
+                ...link,
+                product: {
+                  ...link.product,
+                  price:
+                    link.product.price === null
+                      ? null
+                      : catalogGross({
+                          ...link.product,
+                          basePrice: link.product.price,
+                        }),
+                  priceMode:
+                    link.product.priceMode === "legacy" ? "legacy" : "gross",
+                },
+              })),
+            }));
             const collaborators = await this.prisma.collaborator.findMany({
               where: { tenantId: tenant.id, isActive: true, isPublic: true },
               select: {
@@ -211,9 +288,19 @@ export class PublicBookingController {
                 firstName: true,
                 lastName: true,
                 calendarColor: true,
+                sectors: { select: { sectorId: true } },
               },
             });
-            return services.map((service) => ({ ...service, collaborators }));
+            return services.map((service) => ({
+              ...service,
+              collaborators: collaborators
+                .filter((person) =>
+                  person.sectors.some(
+                    (membership) => membership.sectorId === service.sectorId,
+                  ),
+                )
+                .map(({ sectors: _sectors, ...person }) => person),
+            }));
           }),
     );
   }
@@ -240,7 +327,7 @@ export class PublicBookingController {
         serviceId,
         date,
         collaboratorId,
-        { requireExplicitCollaborator: true, publicOnly: true },
+        { requireExplicitCollaborator: false, publicOnly: true },
       ),
     };
   }
@@ -270,12 +357,12 @@ export class PublicBookingController {
 
     while (cursor.getTime() <= end && days.length < maxDays) {
       const dateKey = this.formatDateKey(cursor);
-      const slots = await this.availabilityService.getCachedAvailability(
+      const slots = await this.availabilityService.buildAvailability(
         tenant.id,
         serviceId,
         dateKey,
         collaboratorId,
-        { requireExplicitCollaborator: true, publicOnly: true },
+        { requireExplicitCollaborator: false, publicOnly: true },
       );
       days.push({ date: dateKey, hasSlots: slots.length > 0 });
       cursor.setUTCDate(cursor.getUTCDate() + 1);
@@ -297,156 +384,31 @@ export class PublicBookingController {
   }
 
   private async createBookingResponse(
-    body: Record<string, unknown>,
+    body: BookingCreateDto,
     requestHeaders: { [key: string]: string | undefined },
     tenantSlug?: string,
     host?: string,
   ) {
     const tenant = await this.resolveTenant(tenantSlug, host);
-
-    if (tenant.bookingMode === BookingMode.Closed) {
-      throw new BadRequestException(
-        "Il salone al momento non accetta prenotazioni online",
+    const outcome = await this.bookings.execute(
+      { tenantId: tenant.id, actorId: null, source: "public" },
+      body,
+      () =>
+        this.enforcePublicBookingRateLimit({
+          tenantId: tenant.id,
+          ip: this.getRequestIp(requestHeaders),
+          email: body.email?.toLowerCase().trim(),
+        }),
+    );
+    if (!outcome.replayed) {
+      await this.customersAlignmentService.queueCustomerRefresh(
+        tenant.id,
+        outcome.customerId,
+        "appointment_created",
       );
     }
-
-    const serviceId = String(body["serviceId"] ?? "");
-    const startsAt = new Date(String(body["startsAt"] ?? ""));
-    const customerName = String(body["customerName"] ?? "").trim();
-    const [firstName, ...rest] = customerName.split(" ").filter(Boolean);
-    const lastName = rest.join(" ") || "Cliente";
-
-    if (!serviceId || !firstName || Number.isNaN(startsAt.getTime())) {
-      throw new BadRequestException(
-        "Scegli servizio e orario e indica il tuo nome",
-      );
-    }
-
-    const service = await this.prisma.service.findFirst({
-      where: {
-        id: serviceId,
-        tenantId: tenant.id,
-        isActive: true,
-        isBookableOnline: true,
-      },
-    });
-
-    if (!service) {
-      throw new BadRequestException("Il servizio scelto non è più disponibile");
-    }
-
-    const email =
-      typeof body["email"] === "string"
-        ? body["email"].toLowerCase().trim()
-        : undefined;
-    const phone =
-      typeof body["phone"] === "string" ? body["phone"].trim() : undefined;
-    const requestedCollaboratorId =
-      typeof body["collaboratorId"] === "string"
-        ? body["collaboratorId"]
-        : undefined;
-
-    await this.enforcePublicBookingRateLimit({
-      tenantId: tenant.id,
-      ip: this.getRequestIp(requestHeaders),
-      email,
-    });
-
-    if (service.requiresCollaborator && !requestedCollaboratorId) {
-      throw new BadRequestException("Scegli il professionista");
-    }
-
-    const endsAt = new Date(
-      startsAt.getTime() + service.durationMinutes * 60000,
-    );
-
-    const slots = await this.availabilityService.getCachedAvailability(
-      tenant.id,
-      serviceId,
-      startsAt.toISOString(),
-      requestedCollaboratorId,
-      { requireExplicitCollaborator: true, publicOnly: true },
-    );
-    const matchedSlot = slots.find(
-      (slot) =>
-        slot.startsAt === startsAt.toISOString() &&
-        (requestedCollaboratorId
-          ? slot.collaboratorId === requestedCollaboratorId
-          : true),
-    );
-
-    if (!matchedSlot) {
-      throw new BadRequestException("L'orario scelto non è più disponibile. Scegline un altro.");
-    }
-
-    const collaboratorId =
-      requestedCollaboratorId ?? matchedSlot.collaboratorId ?? undefined;
-
-    const customer = await this.customersAlignmentService.findOrCreateCustomer({
-      tenantId: tenant.id,
-      firstName,
-      lastName,
-      email,
-      phone,
-    });
-
-    const appointment = await this.prisma.appointment.create({
-      data: {
-        tenantId: tenant.id,
-        customerId: customer.id,
-        serviceId,
-        collaboratorId,
-        startsAt,
-        endsAt,
-        source: "public",
-        status:
-          tenant.bookingMode === BookingMode.Public
-            ? AppointmentStatus.Confirmed
-            : AppointmentStatus.Requested,
-        estimatedPrice: service.basePrice,
-        customerNotes:
-          typeof body["customerNotes"] === "string"
-            ? body["customerNotes"]
-            : undefined,
-      },
-      include: {
-        customer: true,
-        service: true,
-        collaborator: true,
-      },
-    });
-
     await this.cacheInvalidationService.invalidateBookingReadModels(tenant.id);
-
-    await this.customersAlignmentService.queueCustomerRefresh(
-      tenant.id,
-      customer.id,
-      "appointment_created",
-    );
-
-    await this.notificationsEventsService.emit({
-      eventType: "appointment.created.public",
-      tenantId: tenant.id,
-      entityType: "appointment",
-      entityId: appointment.id,
-      flags: {
-        createdFromPublicBooking: true,
-      },
-    });
-    await this.notificationsEventsService.emit({
-      eventType:
-        appointment.status === AppointmentStatus.Confirmed
-          ? "appointment.confirmed"
-          : "appointment.requested",
-      tenantId: tenant.id,
-      entityType: "appointment",
-      entityId: appointment.id,
-      flags: {
-        createdFromPublicBooking: true,
-      },
-    });
-
-    return appointment;
+    return outcome.result;
   }
 
   @Get("public/settings")
@@ -497,6 +459,19 @@ export class PublicBookingController {
     );
   }
 
+  @Post("public/availability")
+  @SetMetadata("alora.readOnly", true)
+  async previewHostAvailability(
+    @Req() request: { headers: { host?: string } },
+    @Body() body: BookingAvailabilityDto,
+  ): Promise<unknown> {
+    const tenant = await this.resolveTenant(undefined, request.headers.host);
+    return this.bookingAvailability.read(
+      { tenantId: tenant.id, actorId: null, source: "public" },
+      body,
+    );
+  }
+
   @Post("public/bookings")
   createHostBooking(
     @Req()
@@ -507,7 +482,7 @@ export class PublicBookingController {
         "x-real-ip"?: string;
       };
     },
-    @Body() body: Record<string, unknown>,
+    @Body() body: BookingCreateDto,
   ): Promise<unknown> {
     return this.createBookingResponse(
       body,
@@ -569,6 +544,20 @@ export class PublicBookingController {
     );
   }
 
+  @Post("public/:tenantSlug/availability")
+  @SetMetadata("alora.readOnly", true)
+  async previewAvailability(
+    @Param("tenantSlug") tenantSlug: string,
+    @Req() request: { headers: { host?: string } },
+    @Body() body: BookingAvailabilityDto,
+  ): Promise<unknown> {
+    const tenant = await this.resolveTenant(tenantSlug, request.headers.host);
+    return this.bookingAvailability.read(
+      { tenantId: tenant.id, actorId: null, source: "public" },
+      body,
+    );
+  }
+
   @Post("public/:tenantSlug/bookings")
   createBooking(
     @Param("tenantSlug") tenantSlug: string,
@@ -580,7 +569,7 @@ export class PublicBookingController {
         "x-real-ip"?: string;
       };
     },
-    @Body() body: Record<string, unknown>,
+    @Body() body: BookingCreateDto,
   ): Promise<unknown> {
     return this.createBookingResponse(
       body,

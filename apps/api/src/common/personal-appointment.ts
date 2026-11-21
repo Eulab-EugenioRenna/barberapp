@@ -1,5 +1,6 @@
 /** Public personal view contract: no customer history, internal notes, cost or payment fields. */
 export const PERSONAL_APPOINTMENT_SELECT = {
+  location: { select: { id: true, name: true } }, sector: { select: { id: true, name: true } },
   id: true, startsAt: true, endsAt: true, status: true, customerNotes: true,
   customer: { select: { id: true, firstName: true, lastName: true, phone: true } },
   service: { select: { id: true, name: true, durationMinutes: true } },
@@ -11,6 +12,7 @@ export const PERSONAL_STATUS_TRANSITIONS: Readonly<Record<string, readonly strin
   checked_in: ["completed"], completed: [], cancelled: [], no_show: [], rescheduled: [],
 };
 export interface PersonalAppointment {
+  location?: { id: string; name: string }; sector?: { id: string; name: string };
   id: string; startsAt: string; endsAt: string; status: string; customerNotes: string | null;
   customer: { id: string; firstName: string; lastName: string; phone: string | null };
   service: { id: string; name: string; durationMinutes: number };
@@ -28,6 +30,6 @@ export interface PersonalDashboard {
   range: { start: string; end: string };
   schedule: PersonalSchedule;
   activity: { totalAppointments: number; completedAppointments: number; cancelledAppointments: number; noShows: number; attributedServices: number };
-  values: { registeredServiceLineTotal: string; currency: string } | null;
+  values: { registeredServiceLineTotal: string; basis: "confirmed-completed-service-lines-gross"; currency: string } | null;
   appointments: { items: PersonalAppointment[]; total: number; page: number; pageSize: number; hasMore: boolean };
 }

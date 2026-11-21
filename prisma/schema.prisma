@@ -57,6 +57,9 @@ enum NotificationChannel {
 }
 
 enum NotificationStatus {
+  queued
+  dispatching
+  uncertain
   pending
   sent
   failed
@@ -85,6 +88,23 @@ enum BillingInterval {
 }
 
 model Tenant {
+  appointmentAutomationRuns AppointmentAutomationRun[]
+  notificationAutomationWebhook NotificationAutomationWebhook?
+  notificationAutomationWebhookEvents NotificationAutomationWebhookEvent[]
+  notificationAutomationGrants NotificationAutomationGrant[]
+  notificationAutomationCommands NotificationAutomationCommand[]
+  appointmentAutomationPolicy AppointmentAutomationPolicy?
+  notificationDomainEvents NotificationDomainEvent[]
+  orderOperations OrderOperation[]
+  paymentOperations PaymentOperation[]
+  paymentEntries PaymentEntry[]
+  orderPriceRevisions OrderPriceRevision[]
+  catalogPriceHistory CatalogPriceHistory[]
+  inventoryOperations InventoryOperation[]
+  stockBalances StockBalance[]
+  stockMovements StockMovement[]
+  locations                     Location[]
+  sectors                       Sector[]
   connectBinding ConnectTenantBinding?
   id                            String                         @id @default(uuid())
   name                          String
@@ -146,6 +166,9 @@ model TenantHoliday {
 }
 
 model User {
+  orderOperations OrderOperation[]
+  paymentOperations PaymentOperation[]
+  sectorAccess                UserSectorAccess[]
   id                          String                       @id @default(uuid())
   tenantId                    String?
   tenant                      Tenant?                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -196,6 +219,7 @@ model TeamAccountIntent {
 }
 
 model Collaborator {
+  sectors         CollaboratorSector[]
   id              String                       @id @default(uuid())
   tenantId        String
   tenant          Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -244,6 +268,7 @@ model CollaboratorDayOverride {
 }
 
 model Customer {
+  appointmentAutomationRuns AppointmentAutomationRun[]
   id                   String        @id @default(uuid())
   tenantId             String
   tenant               Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -273,6 +298,10 @@ model Customer {
 }
 
 model Service {
+  priceMode String @default("legacy")
+  priceHistory CatalogPriceHistory[]
+  sectorId             String           @default(dbgenerated())
+  sector               Sector           @relation(fields: [sectorId, tenantId], references: [id, tenantId], onDelete: Restrict)
   id                   String           @id @default(uuid())
   tenantId             String
   tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -297,9 +326,12 @@ model Service {
 
   @@index([tenantId, isActive])
   @@index([tenantId, isBookableOnline])
+  @@index([tenantId, sectorId], map: "Service_tenant_sector_idx")
 }
 
 model Room {
+  sectorId     String        @default(dbgenerated())
+  sector       Sector        @relation(fields: [sectorId, tenantId], references: [id, tenantId], onDelete: Restrict)
   id           String        @id @default(uuid())
   tenantId     String
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -311,9 +343,17 @@ model Room {
   appointments Appointment[]
 
   @@index([tenantId, isActive])
+  @@index([tenantId, sectorId], map: "Room_tenant_sector_idx")
 }
 
 model Appointment {
+  orderItemId    String? @unique
+  orderItem      SaleItem? @relation("BookedOrderItem", fields: [orderItemId], references: [id], onDelete: Restrict)
+  orderIssue     String?
+  locationId     String                    @default(dbgenerated())
+  location       Location                  @relation(fields: [locationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sectorId       String                    @default(dbgenerated())
+  sector         Sector                    @relation(fields: [sectorId, tenantId, locationId], references: [id, tenantId, locationId], onDelete: Restrict)
   id             String                    @id @default(uuid())
   tenantId       String
   tenant         Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -345,9 +385,17 @@ model Appointment {
   @@index([tenantId, collaboratorId, startsAt])
   @@index([tenantId, customerId])
   @@index([tenantId, serviceId])
+  @@index([tenantId, locationId, sectorId, startsAt], map: "Appointment_tenant_scope_time_idx")
 }
 
 model Product {
+  purchaseVatRate Decimal? @db.Decimal(5,2)
+  costMode String @default("legacy")
+  priceMode String @default("legacy")
+  stockTracked Boolean @default(false)
+  priceHistory CatalogPriceHistory[]
+  stockBalances StockBalance[]
+  stockMovements StockMovement[]
   id              String           @id @default(uuid())
   tenantId        String
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -355,6 +403,7 @@ model Product {
   description     String?
   imageUrl        String?
   sku             String?
+  barcode         String?
   category        String?
   price           Decimal?         @db.Decimal(10, 2)
   vatRate         Decimal?         @db.Decimal(5, 2)
@@ -366,9 +415,11 @@ model Product {
 
   @@index([tenantId, isActive])
   @@index([tenantId, sku])
+  @@unique([tenantId, barcode], map: "Product_tenantId_barcode_key")
 }
 
 model ServiceProduct {
+  consumptionUnits Decimal? @db.Decimal(14,3)
   id          String  @id @default(uuid())
   serviceId   String
   service     Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
@@ -382,6 +433,18 @@ model ServiceProduct {
 }
 
 model Sale {
+  automationContact Json?
+  appointmentAutomationRuns AppointmentAutomationRun[]
+  orderOperations OrderOperation[]
+  paymentBasis String @default("ledger")
+  paymentOperations PaymentOperation[]
+  paymentEntries PaymentEntry[]
+  orderDiscount Decimal @default(0) @db.Decimal(10,2)
+  orderStatus    String @default("confirmed")
+  orderOrigin    String @default("legacy_sale")
+  revision       Int @default(0)
+  locationId     String        @default(dbgenerated())
+  location       Location      @relation(fields: [locationId, tenantId], references: [id, tenantId], onDelete: Restrict)
   id             String        @id @default(uuid())
   tenantId       String
   tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -404,9 +467,66 @@ model Sale {
   @@index([tenantId, soldAt])
   @@index([tenantId, paymentStatus])
   @@index([appointmentId])
+  @@index([tenantId, locationId, soldAt], map: "Sale_tenant_location_time_idx")
+}
+
+// Append-only operational declarations. These records do not charge a provider.
+model PaymentOperation {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  saleId String
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  actorUserId String
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  idempotencyKey String
+  fingerprint String
+  kind String
+  expectedRevision Int
+  reason String?
+  result Json
+  createdAt DateTime @default(now())
+  entries PaymentEntry[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([saleId, expectedRevision])
+  @@index([tenantId, saleId, createdAt])
+}
+
+model PaymentEntry {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  saleId String
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  operationId String
+  operation PaymentOperation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  kind String
+  amount Decimal @db.Decimal(10,2)
+  method String?
+  receivedAt DateTime?
+  refundOfId String?
+  refundOf PaymentEntry? @relation("PaymentRefund", fields: [refundOfId], references: [id], onDelete: Restrict)
+  refunds PaymentEntry[] @relation("PaymentRefund")
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, saleId, createdAt])
+  @@index([refundOfId])
 }
 
 model SaleItem {
+  nonPerformanceChargeReason String?
+  priceMode String @default("legacy")
+  vatRate Decimal? @db.Decimal(5,2)
+  lineSubtotal Decimal? @db.Decimal(10,2)
+  discountNet Decimal? @db.Decimal(10,2)
+  orderDiscountShare Decimal @default(0) @db.Decimal(10,2)
+  priceOverrideReason String?
+  stockState String @default("legacy")
+  inventoryRequirements Json?
+  booking        Appointment? @relation("BookedOrderItem")
+  sectorId       String        @default(dbgenerated())
+  sector         Sector        @relation(fields: [sectorId], references: [id], onDelete: Restrict)
   id        String            @id @default(uuid())
   saleId    String
   sale      Sale              @relation(fields: [saleId], references: [id], onDelete: Cascade)
@@ -426,6 +546,7 @@ model SaleItem {
   @@index([productId])
   @@index([serviceId])
   @@index([collaboratorId])
+  @@index([sectorId], map: "SaleItem_sector_idx")
 }
 
 model AppointmentCancellation {
@@ -442,7 +563,204 @@ model AppointmentCancellation {
   @@index([appointmentId])
 }
 
+// Saved configuration only; dispatch activation requires the central delegation contract.
+model NotificationAutomationWebhook {
+  id String @id @default(uuid())
+  tenantId String @unique
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actorUserId String
+  actorSubject String
+  installationId String
+  appId String
+  requestKey String
+  url String
+  endpointId String?
+  secretCipher String?
+  status String @default("preparing")
+  lastReceivedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  events NotificationAutomationWebhookEvent[]
+}
+
+model NotificationAutomationWebhookEvent {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  registrationId String
+  registration NotificationAutomationWebhook @relation(fields: [registrationId], references: [id], onDelete: NoAction)
+  installationId String
+  eventId String
+  kind String
+  sessionId String
+  bodyHash String
+  occurredAt DateTime
+  receivedAt DateTime @default(now())
+  status String
+  reason String?
+  payloadCipher String?
+  processedAt DateTime?
+  nextAttemptAt DateTime @default(now())
+  @@unique([installationId, eventId])
+  @@index([status, nextAttemptAt, receivedAt])
+}
+
+model NotificationAutomationGrant {
+  whatsappRuns AppointmentAutomationRun[] @relation("AutomationWhatsappGrant")
+  actionRuns AppointmentAutomationRun[] @relation("AutomationActionGrant")
+  staffRuns AppointmentAutomationRun[] @relation("AutomationStaffGrant")
+  commands NotificationAutomationCommand[]
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actorUserId String
+  actorSubject String
+  appId String
+  installationId String
+  channel String
+  requestKey String
+  requestHash String
+  request Json
+  sessionId String?
+  grantId String?
+  credentialCipher String?
+  status String @default("preparing")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([tenantId, requestKey])
+  @@index([tenantId, status])
+}
+
+model NotificationAutomationCommand {
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  commandId String
+  grantId String
+  grant NotificationAutomationGrant @relation(fields: [grantId], references: [id], onDelete: NoAction)
+  inputHash String
+  payloadCipher String
+  sendStartedAt DateTime?
+  withdrawRequestedAt DateTime?
+  withdrawResolvedAt DateTime?
+  withdrawOutcome String?
+  receiptId String?
+  lastReceipt Json?
+  nextAttemptAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@id([tenantId, commandId])
+  @@index([withdrawResolvedAt, nextAttemptAt])
+}
+
+model AppointmentAutomationPolicy {
+  emailGrantId String?
+  enabled Boolean @default(false)
+  enabledAt DateTime?
+  whatsappGrantId String?
+  actionGrantId String?
+  staffGrantId String?
+  businessNumber String?
+  texts Json?
+  tenantId String @id
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  revision Int @default(1)
+  settings Json
+  updatedByUserId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AppointmentAutomationRun {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId String
+  order Sale @relation(fields: [orderId], references: [id], onDelete: NoAction)
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: NoAction)
+  anchorAppointmentId String
+  policyRevision Int
+  planHash String
+  contactHash String
+  recipientCipher String
+  whatsappGrantId String
+  whatsappGrant NotificationAutomationGrant @relation("AutomationWhatsappGrant", fields: [whatsappGrantId], references: [id], onDelete: NoAction)
+  actionGrantId String?
+  actionGrant NotificationAutomationGrant? @relation("AutomationActionGrant", fields: [actionGrantId], references: [id], onDelete: NoAction)
+  staffGrantId String?
+  staffGrant NotificationAutomationGrant? @relation("AutomationStaffGrant", fields: [staffGrantId], references: [id], onDelete: NoAction)
+  archiveId String
+  businessNumber String
+  startsAt DateTime
+  expiresAt DateTime
+  snapshot Json
+  status String @default("waiting")
+  responseAction String?
+  responseEventId String?
+  respondedAt DateTime?
+  reviewedAt DateTime?
+  reviewedByUserId String?
+  staffNoticeAt DateTime?
+  staffNoticeReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  actions AppointmentAutomationAction[]
+  deliveries AppointmentAutomationDelivery[]
+  @@unique([tenantId, orderId, policyRevision, planHash, contactHash])
+  @@index([tenantId, status, expiresAt])
+}
+
+model AppointmentAutomationAction {
+  tokenHash String @id
+  runId String
+  run AppointmentAutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  kind String
+  @@unique([runId, kind])
+}
+
+model AppointmentAutomationDelivery {
+  historyId String @id
+  history NotificationHistory @relation(fields: [historyId], references: [id], onDelete: Cascade)
+  runId String?
+  run AppointmentAutomationRun? @relation(fields: [runId], references: [id], onDelete: Cascade)
+  noticeContext Json?
+  sequence Int
+  dueAt DateTime
+  validUntil DateTime
+  nextAttemptAt DateTime
+  @@unique([runId, sequence])
+  @@index([nextAttemptAt, dueAt])
+}
+
+model NotificationDomainEvent {
+  id           String @id @default(uuid())
+  tenantId     String
+  tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  eventKey     String
+  eventType    String
+  entityType   String
+  entityId     String?
+  actorUserId  String?
+  payload      Json
+  createdAt    DateTime @default(now())
+  processedAt  DateTime?
+  nextAttemptAt DateTime @default(now())
+  attemptCount Int @default(0)
+  lastError    String?
+  histories    NotificationHistory[]
+
+  @@unique([tenantId, eventKey])
+  @@index([processedAt, nextAttemptAt, createdAt])
+}
+
 model NotificationHistory {
+  automationDelivery AppointmentAutomationDelivery?
+  domainEventId String?
+  domainEvent NotificationDomainEvent? @relation(fields: [domainEventId], references: [id], onDelete: NoAction)
+  dispatchKey String?
+  dispatchToken String?
+  dispatchLeaseUntil DateTime?
+  retrySafe Boolean @default(false)
   id                  String                     @id @default(uuid())
   tenantId            String
   tenant              Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -467,6 +785,8 @@ model NotificationHistory {
   createdAt           DateTime                   @default(now())
   sentAt              DateTime?
 
+  @@unique([domainEventId, dispatchKey])
+  @@index([status, nextRetryAt])
   @@index([tenantId, createdAt])
   @@index([tenantId, status])
 }
@@ -737,4 +1057,190 @@ model ConnectSdkRecord {
   @@id([namespace, id])
   @@index([expiresAt], map: "connect_sdk_expiry")
   @@map("connect_sdk_records")
+}
+
+// legacyKey identifies the single, repeatable mapping of previously unscoped data.
+model Location {
+  stockBalances StockBalance[]
+  stockMovements StockMovement[]
+  id           String        @id @default(uuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  legacyKey    String?
+  name         String
+  address      String?
+  isActive     Boolean       @default(true)
+  isPublic     Boolean       @default(true)
+  weeklyHours  Json?
+  closures     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  sectors      Sector[]
+  appointments Appointment[]
+  sales        Sale[]
+
+  @@unique([tenantId, legacyKey])
+  @@unique([id, tenantId])
+}
+
+model Sector {
+  id            String               @id @default(uuid())
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locationId    String
+  location      Location             @relation(fields: [locationId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  legacyKey     String?
+  name          String
+  isActive      Boolean              @default(true)
+  isPublic      Boolean              @default(true)
+  weeklyHours   Json?
+  closures      Json?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  services      Service[]
+  rooms         Room[]
+  appointments  Appointment[]
+  saleItems     SaleItem[]
+  collaborators CollaboratorSector[]
+  access        UserSectorAccess[]
+
+  @@unique([tenantId, legacyKey])
+  @@unique([id, tenantId])
+  @@unique([id, locationId])
+  @@index([tenantId, locationId])
+  @@unique([id, tenantId, locationId])
+}
+
+model CollaboratorSector {
+  collaboratorId String
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  sectorId       String
+  sector         Sector       @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+
+  @@id([collaboratorId, sectorId])
+}
+
+// Operational visibility only. This grants no function and never changes Connect roles.
+model UserSectorAccess {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sectorId String
+  sector   Sector @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sectorId])
+}
+
+
+model CatalogPriceHistory {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Restrict)
+  productId String?
+  product Product? @relation(fields:[productId], references:[id], onDelete:Restrict)
+  serviceId String?
+  service Service? @relation(fields:[serviceId], references:[id], onDelete:Restrict)
+  snapshot Json
+  actorUserId String?
+  reason String
+  source String
+  createdAt DateTime @default(now())
+  @@index([tenantId, productId, createdAt])
+  @@index([tenantId, serviceId, createdAt])
+}
+
+model InventoryOperation {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Restrict)
+  idempotencyKey String
+  fingerprint String
+  kind String
+  actorUserId String
+  reason String
+  result Json?
+  createdAt DateTime @default(now())
+  movements StockMovement[]
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, createdAt])
+}
+
+model StockBalance {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Restrict)
+  locationId String
+  location Location @relation(fields:[locationId], references:[id], onDelete:Restrict)
+  productId String
+  product Product @relation(fields:[productId], references:[id], onDelete:Restrict)
+  quantity Decimal @default(0) @db.Decimal(14,3)
+  value Decimal @default(0) @db.Decimal(18,6)
+  initialized Boolean @default(false)
+  version Int @default(0)
+  @@unique([locationId, productId])
+  @@index([tenantId, locationId])
+}
+
+model StockMovement {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields:[tenantId], references:[id], onDelete:Restrict)
+  operationId String
+  operation InventoryOperation @relation(fields:[operationId], references:[id], onDelete:Restrict)
+  locationId String
+  location Location @relation(fields:[locationId], references:[id], onDelete:Restrict)
+  productId String
+  product Product @relation(fields:[productId], references:[id], onDelete:Restrict)
+  sectorId String?
+  saleId String?
+  saleItemId String?
+  origin Json?
+  kind String
+  quantityDelta Decimal @db.Decimal(14,3)
+  valueDelta Decimal @db.Decimal(18,6)
+  quantityAfter Decimal @db.Decimal(14,3)
+  valueAfter Decimal @db.Decimal(18,6)
+  purchaseVatRate Decimal? @db.Decimal(5,2)
+  purchaseTax Decimal? @db.Decimal(10,2)
+  returnOfId String?
+  returnOf StockMovement? @relation("StockReturn",fields:[returnOfId],references:[id],onDelete:Restrict)
+  returns StockMovement[] @relation("StockReturn")
+  createdAt DateTime @default(now())
+  @@index([tenantId, locationId, createdAt])
+  @@index([tenantId, saleId])
+  @@index([returnOfId])
+}
+
+model OrderPriceRevision {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:Restrict)
+  saleId String
+  saleItemId String
+  snapshot Json
+  previousSnapshot Json?
+  actorUserId String?
+  reason String
+  source String
+  createdAt DateTime @default(now())
+  @@index([tenantId,saleId,createdAt])
+}
+
+// Immutable command acknowledgements. A replay never creates a second account.
+model OrderOperation {
+  id String @id @default(uuid())
+  tenantId String
+  tenant Tenant @relation(fields:[tenantId],references:[id],onDelete:Restrict)
+  saleId String
+  sale Sale @relation(fields:[saleId],references:[id],onDelete:Restrict)
+  actorUserId String?
+  actor User? @relation(fields:[actorUserId],references:[id],onDelete:Restrict)
+  idempotencyKey String
+  fingerprint String
+  kind String
+  source String
+  result Json
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId,idempotencyKey])
+  @@index([tenantId,saleId,createdAt])
 }

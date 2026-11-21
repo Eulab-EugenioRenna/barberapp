@@ -27,13 +27,17 @@ type SelectOption = {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="select-shell" [class.open]="open" [class.disabled]="disabled">
+    <div
+      class="select-shell"
+      [class.open]="open"
+      [class.disabled]="interactionDisabled"
+    >
       <div
         role="combobox"
-        [attr.tabindex]="disabled ? -1 : 0"
+        [attr.tabindex]="interactionDisabled ? -1 : 0"
         class="select-trigger"
         [attr.aria-expanded]="open"
-        [attr.aria-disabled]="disabled"
+        [attr.aria-disabled]="interactionDisabled"
         aria-haspopup="listbox"
         [attr.aria-controls]="listboxId"
         [attr.aria-label]="label || placeholder"
@@ -246,6 +250,12 @@ export class CustomSelectComponent implements OnDestroy {
   @Input() label = "";
   @Input() placeholder = "Seleziona";
   @Input() disabled = false;
+  get interactionDisabled(): boolean {
+    return (
+      this.disabled ||
+      !!this.elementRef.nativeElement.closest("fieldset[disabled]")
+    );
+  }
   @Output() valueChange = new EventEmitter<string>();
 
   open = false;
@@ -302,7 +312,7 @@ export class CustomSelectComponent implements OnDestroy {
     event.preventDefault();
     event.stopPropagation();
 
-    if (this.disabled) {
+    if (this.interactionDisabled) {
       return;
     }
 
@@ -310,7 +320,7 @@ export class CustomSelectComponent implements OnDestroy {
   }
 
   toggleOpen(): void {
-    if (this.disabled) {
+    if (this.interactionDisabled) {
       return;
     }
 
@@ -325,7 +335,7 @@ export class CustomSelectComponent implements OnDestroy {
     event?.preventDefault();
     event?.stopPropagation();
 
-    if (option.disabled) {
+    if (this.interactionDisabled || option.disabled) {
       return;
     }
 

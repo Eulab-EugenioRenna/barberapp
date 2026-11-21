@@ -10,9 +10,49 @@ type NotificationTemplateSeed = {
   subject?: string;
   title?: string;
   body: string;
+  defaultEnabled?: boolean;
 };
 
 export const DEFAULT_NOTIFICATION_TEMPLATES: NotificationTemplateSeed[] = [
+  ...(
+    [
+      [
+        NOTIFICATION_EVENT_TYPES.appointmentRescheduled,
+        "Prenotazione riprogrammata",
+        "La prenotazione per {{service.name}} è stata riprogrammata al {{appointment.startsAt}}.",
+      ],
+      [
+        NOTIFICATION_EVENT_TYPES.appointmentCompleted,
+        "Appuntamento completato",
+        "L’appuntamento per {{service.name}} del {{appointment.startsAt}} è stato completato.",
+      ],
+      [
+        NOTIFICATION_EVENT_TYPES.appointmentNoShow,
+        "Cliente non presentato",
+        "{{customer.firstName}} {{customer.lastName}} non si è presentato all’appuntamento del {{appointment.startsAt}}.",
+      ],
+      [
+        NOTIFICATION_EVENT_TYPES.appointmentCheckedIn,
+        "Cliente arrivato",
+        "{{customer.firstName}} {{customer.lastName}} è arrivato per {{service.name}}.",
+      ],
+    ] as const
+  ).flatMap(([eventType, heading, body]) => [
+    {
+      eventType,
+      channel: NotificationChannel.email,
+      subject: heading,
+      body,
+      defaultEnabled: false,
+    },
+    {
+      eventType,
+      channel: NotificationChannel.in_app,
+      title: heading,
+      body,
+      defaultEnabled: false,
+    },
+  ]),
   {
     eventType: NOTIFICATION_EVENT_TYPES.appointmentCreatedInternal,
     channel: NotificationChannel.email,
@@ -28,8 +68,7 @@ export const DEFAULT_NOTIFICATION_TEMPLATES: NotificationTemplateSeed[] = [
   {
     eventType: NOTIFICATION_EVENT_TYPES.appointmentCreatedPublic,
     channel: NotificationChannel.email,
-    subject:
-      "Richiesta di {{customer.firstName}} {{customer.lastName}}",
+    subject: "Richiesta di {{customer.firstName}} {{customer.lastName}}",
     body: "Hai ricevuto una richiesta per {{service.name}} il {{appointment.startsAt}}.",
   },
   {

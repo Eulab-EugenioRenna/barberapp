@@ -7,7 +7,9 @@ export function getValueByPath(
       return undefined;
     }
 
-    return (value as Record<string, unknown>)[key];
+    return Object.prototype.hasOwnProperty.call(value, key)
+      ? (value as Record<string, unknown>)[key]
+      : undefined;
   }, source);
 }
 
@@ -22,6 +24,6 @@ export function renderTemplate(
       return "";
     }
 
-    return String(value);
+    return ["string", "number", "boolean"].includes(typeof value) ? String(value) : "";
   });
 }

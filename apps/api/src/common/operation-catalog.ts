@@ -4,7 +4,62 @@ export type OperationDefinition =
   | { kind: "function"; key: FunctionKey; own?: FunctionKey }
   | { kind: "public" | "session" | "tenant-context" | "platform" | "disabled" };
 export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
-  "PersonalDashboardController.overview": { kind: "function", key: "appointments.read.all", own: "appointments.read.own" },
+  "WhatsAppController.sessions": { kind: "function", key: "whatsapp.read" },
+  "WhatsAppController.archives": { kind: "function", key: "whatsapp.read" },
+  "WhatsAppController.conversations": { kind: "function", key: "whatsapp.read" },
+  "WhatsAppController.messages": { kind: "function", key: "whatsapp.read" },
+  "WhatsAppController.outbox": { kind: "function", key: "whatsapp.read" },
+  "WhatsAppController.qr": { kind: "function", key: "whatsapp.manage" },
+  "WhatsAppController.connect": { kind: "function", key: "whatsapp.manage" },
+  "WhatsAppController.reconnect": { kind: "function", key: "whatsapp.manage" },
+  "WhatsAppController.disconnect": { kind: "function", key: "whatsapp.manage" },
+  "WhatsAppController.send": { kind: "function", key: "whatsapp.send" },
+  "LocationsController.context": { kind: "session" },
+  "LocationsController.totals": {
+    kind: "function",
+    key: "dashboard.revenue.read",
+  },
+  "LocationsController.list": { kind: "function", key: "locations.read" },
+  "LocationsController.create": { kind: "function", key: "locations.manage" },
+  "LocationsController.update": { kind: "function", key: "locations.manage" },
+  "LocationsController.createSector": {
+    kind: "function",
+    key: "locations.manage",
+  },
+  "LocationsController.updateSector": {
+    kind: "function",
+    key: "locations.manage",
+  },
+  "LocationsController.professionalSectors": {
+    kind: "function",
+    key: "locations.manage",
+  },
+  "LocationsController.accessContext": {
+    kind: "function",
+    key: "locations.manage",
+  },
+  "LocationsController.access": { kind: "function", key: "locations.manage" },
+  "LocationsController.createRoom": {
+    kind: "function",
+    key: "locations.manage",
+  },
+  "LocationsController.updateRoom": {
+    kind: "function",
+    key: "locations.manage",
+  },
+
+  "PersonalAccountController.profile": { kind: "session" },
+  "PersonalAccountController.security": { kind: "session" },
+  "PersonalAccountController.sessions": { kind: "session" },
+  "PersonalAccountController.notices": { kind: "session" },
+  "PersonalAccountController.logoutAll": { kind: "session" },
+  "PersonalAccountController.logoutSession": { kind: "session" },
+  "PersonalAccountController.revokeDevice": { kind: "session" },
+  "PersonalDashboardController.overview": {
+    kind: "function",
+    key: "appointments.read.all",
+    own: "appointments.read.own",
+  },
   "TeamController.pendingAccounts": { kind: "function", key: "team.manage" },
   "TeamController.createAccount": { kind: "function", key: "team.manage" },
   "TeamController.resumeAccount": { kind: "function", key: "team.manage" },
@@ -17,7 +72,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "TeamController.removeRole": { kind: "function", key: "team.manage" },
   "TeamController.assignRoles": { kind: "function", key: "team.manage" },
   "TeamController.revoke": { kind: "function", key: "team.manage" },
-  "TeamController.passwordReset": { kind: "function", key: "team.password.reset" },
+  "TeamController.passwordReset": {
+    kind: "function",
+    key: "team.password.reset",
+  },
   "TeamController.restore": { kind: "function", key: "team.manage" },
 
   "AuthController.method": { kind: "public" },
@@ -54,6 +112,12 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "services.manage",
   },
+  "InventoryController.balances": { kind: "function", key: "inventory.read" },
+  "InventoryController.movements": { kind: "function", key: "inventory.read" },
+  "InventoryController.execute": { kind: "function", key: "inventory.manage" },
+  "ProductsController.priceHistory": { kind: "function", key: "products.read" },
+  "ProductsController.byBarcode": { kind: "function", key: "products.read" },
+  "ServicesController.priceHistory": { kind: "function", key: "services.read" },
   "ProductsController.findAll": {
     kind: "function",
     key: "products.read",
@@ -70,8 +134,15 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "products.manage",
   },
-  "CollaboratorsController.findOne": { kind: "function", key: "collaborators.read" },
+  "CollaboratorsController.findOne": {
+    kind: "function",
+    key: "collaborators.read",
+  },
   "CollaboratorsController.findAll": {
+    kind: "function",
+    key: "collaborators.read",
+  },
+  "CollaboratorsController.options": {
     kind: "function",
     key: "collaborators.read",
   },
@@ -115,10 +186,13 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "clients.manage",
   },
+  "SalesController.quote": { kind: "function", key: "sales.manage" },
+  "SalesController.priceHistory": { kind: "function", key: "sales.read" },
   "SalesController.findAll": {
     kind: "function",
     key: "sales.read",
   },
+  "SalesController.forAppointment": { kind: "function", key: "sales.manage" },
   "SalesController.findOne": {
     kind: "function",
     key: "sales.read",
@@ -159,10 +233,36 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     key: "appointments.update.all",
     own: "appointments.update.own",
   },
+  "AppointmentsController.bookingOrder": {
+    kind: "function",
+    key: "appointments.read.all",
+  },
+  "AppointmentsController.previewOrder": {
+    kind: "function",
+    key: "appointments.update.all",
+  },
+  "AppointmentsController.reschedulingAvailability": {
+    kind: "function",
+    key: "appointments.update.all",
+  },
+  "AppointmentsController.reviseOrder": {
+    kind: "function",
+    key: "appointments.update.all",
+  },
+  "AppointmentsController.cancelOrder": {
+    kind: "function",
+    key: "appointments.update.all",
+  },
   "AppointmentsController.create": {
     kind: "function",
     key: "appointments.create",
   },
+  "AppointmentsController.previewAvailability": {
+    kind: "function",
+    key: "appointments.create",
+  },
+  "PublicBookingController.previewAvailability": { kind: "public" },
+  "PublicBookingController.previewHostAvailability": { kind: "public" },
   "AppointmentsController.update": {
     kind: "function",
     key: "appointments.update.all",
@@ -291,7 +391,27 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "notifications.manage",
   },
+  "NotificationAutomationGrantsController.list": { kind: "function", key: "notifications.manage" },
+  "NotificationAutomationWebhooksController.get": { kind: "function", key: "notifications.manage" },
+  "NotificationAutomationWebhooksController.prepare": { kind: "function", key: "notifications.manage" },
+  "NotificationAutomationWebhooksController.receive": { kind: "public" },
+  "NotificationAutomationGrantsController.prepare": { kind: "function", key: "notifications.manage" },
+  "NotificationAutomationGrantsController.recover": { kind: "function", key: "notifications.manage" },
+  "NotificationAutomationGrantsController.revoke": { kind: "function", key: "notifications.manage" },
+  "AppointmentAutomationPolicyController.get": { kind: "function", key: "notifications.manage" },
+  "AppointmentAutomationPolicyController.save": { kind: "function", key: "notifications.manage" },
+  "AppointmentAutomationPolicyController.preview": { kind: "function", key: "notifications.manage" },
+  "AppointmentAutomationPolicyController.activate": { kind: "function", key: "notifications.manage" },
+  "AppointmentAutomationPolicyController.deactivate": { kind: "function", key: "notifications.manage" },
+  "AppointmentAutomationMonitorController.list": { kind: "function", key: "notifications.manage" },
+  "AppointmentAutomationMonitorController.review": { kind: "function", key: "notifications.manage" },
+  "AppointmentContactController.get": { kind: "function", key: "appointments.update.all" },
+  "AppointmentContactController.save": { kind: "function", key: "appointments.update.all" },
   "NotificationsController.updateTemplate": {
+    kind: "function",
+    key: "notifications.manage",
+  },
+  "NotificationsController.previewTemplate": {
     kind: "function",
     key: "notifications.manage",
   },
@@ -303,6 +423,8 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "notifications.manage",
   },
+  "PaymentLedgerController.read": { kind: "function", key: "sales.read" },
+  "PaymentLedgerController.record": { kind: "function", key: "sales.manage" },
   "PaymentsController.settings": {
     kind: "disabled",
   },

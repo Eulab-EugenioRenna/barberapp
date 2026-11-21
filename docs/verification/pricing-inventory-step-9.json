@@ -1,0 +1,192 @@
+{
+  "step": 9,
+  "title": "Prezzi, IVA e magazzino",
+  "checkedAt": "2026-11-07T17:05:47.862Z",
+  "status": "implemented-and-technically-verified-local",
+  "scope": {
+    "environment": "local Docker",
+    "connectAccountsModified": false,
+    "realAccountLogin": false,
+    "realMessagingInTests": false,
+    "productionDeployment": false,
+    "syntheticTestBoundary": "Isolated PostgreSQL and compiled controllers/guards/audit/cache service; synthetic sessions, stubbed outbound events and in-memory Redis adapter."
+  },
+  "automated": {
+    "jest": {
+      "passed": true,
+      "suites": 53,
+      "tests": 321,
+      "snapshots": 1,
+      "evidence": ".local/step9/jest-result.json"
+    },
+    "lint": {
+      "passed": true,
+      "command": "npm run lint"
+    },
+    "build": {
+      "passed": true,
+      "host": "npm run build",
+      "docker": "docker compose -f docker-compose.yml -f docker-compose.connect-local.yml build api web-admin web-public-booking"
+    }
+  },
+  "migration": {
+    "checkedAt": "2026-11-07T16:59:17.427Z",
+    "sourceDatabaseModified": false,
+    "restoreVerified": true,
+    "reapplied": true,
+    "originalFieldsPreserved": true,
+    "tablesCompared": 15,
+    "initialInventoryRows": 0,
+    "historicalRepricing": false,
+    "priceObservations": 12,
+    "appliedPriceObservations": 18,
+    "assertions": [
+      "PASS:all-original-fields-counts-and-financial-values-preserved",
+      "PASS:no-invented-stock-consumption-vat-mode-or-historical-price-events",
+      "PASS:only-future-open-booked-work-pending-for-first-delivery",
+      "PASS:reapplication-does-not-duplicate-price-observations",
+      "PASS:ledger-and-balance-reconcile-in-one-transaction",
+      "PASS:cross-tenant-stock-and-unbalanced-direct-writes-rejected",
+      "PASS:movement-price-and-finalized-operation-history-immutable"
+    ],
+    "backup": ".local/step9/migration-1794070751811/before.dump",
+    "evidence": ".local/step9/migration-1794070751811/result.json"
+  },
+  "http": {
+    "checkedAt": "2026-11-07T16:58:12.390Z",
+    "identity": "synthetic-local-test-sessions",
+    "providerCalls": false,
+    "checks": [
+      "explicit-opening-independent-purchase-vat-weighted-average-and-idempotent-replay",
+      "tenant-location-isolation-and-semantic-command-validation",
+      "sale-tax-price-snapshots-catalog-history-and-quantity-difference-posting",
+      "physical-return-uses-original-cost-and-is-not-repeated-by-payment-status-edits",
+      "atomic-transfer-reconciliation-adjustments-and-concurrent-negative-stock-rejection",
+      "configured-consumption-and-net-public-price-use-stable-order-snapshots",
+      "insufficient-stock-rolls-back-order-rows-status-appointment-and-all-consumption-movements",
+      "removed-order-row-reverses-remaining-original-costs-and-prevents-a-second-return",
+      "shared-location-stock-with-sector-filtered-history-and-both-end-transfer-authorization",
+      "real-sse-queue-keeps-open-booked-accounts-and-removes-confirmed-ones",
+      "database-enforces-immutable-history-and-ledger-balance-equality"
+    ],
+    "evidence": ".local/step9/http-result.json"
+  },
+  "browser": {
+    "checkedAt": "2026-11-07T16:58:14.799Z",
+    "identity": "synthetic-local-test-sessions",
+    "providerCalls": false,
+    "checks": [
+      "authorized-inventory-route-and-location-selection",
+      "receipt-through-real-form-and-updated-balance",
+      "mobile-390-no-horizontal-overflow",
+      "independent-purchase-sale-vat-and-persistent-price-history",
+      "server-quoted-order-discount-and-vat-on-existing-booked-row"
+    ],
+    "screenshots": [
+      ".local/step9/inventory-desktop.png",
+      ".local/step9/inventory-mobile.png",
+      ".local/step9/catalog-price-history.png",
+      ".local/step9/checkout-vat-discount.png"
+    ],
+    "evidence": ".local/step9/browser-result.json"
+  },
+  "regressions": {
+    "locationsHttp": {
+      "evidence": ".local/step7/http-1794070681342/result.json",
+      "checks": 7
+    },
+    "locationsBrowser": {
+      "evidence": ".local/step7/browser-result.json",
+      "checks": 9
+    },
+    "orderHttp": {
+      "evidence": ".local/step8/http-result.json",
+      "checks": 7,
+      "rollbackTest": "Fault injected after appointment insertion inside actual order attachment; no booking persisted."
+    },
+    "orderBrowser": {
+      "evidence": ".local/step8/browser-result.json",
+      "checks": 4
+    }
+  },
+  "runtime": {
+    "checkedAt": "2026-11-07T17:02:46.721Z",
+    "endpoints": {
+      "/api/health": 200,
+      "/admin/": 200,
+      "/booking/": 200,
+      "/.well-known/eulab-connect.json": 200,
+      "/api/public/default/services": 200
+    },
+    "catalog": {
+      "version": 6,
+      "functions": 29
+    },
+    "syntheticTokenRejected": true,
+    "migrationChecksumMatches": true,
+    "metadata": {
+      "stockBalances": 0,
+      "stockMovements": 0,
+      "inventoryOperations": 0,
+      "catalogPriceObservations": 9,
+      "appliedPriceObservations": 17,
+      "futurePendingRows": 0
+    },
+    "containers": [
+      {
+        "name": "barber-api-1",
+        "image": "sha256:ac2af898c30105842808f5315bdbc7b4d855a30a6a1dc9a54b362a5b57b96418",
+        "health": "healthy"
+      },
+      {
+        "name": "barber-web-admin-1",
+        "image": "sha256:11e6f0b724b2f9ece1c518b4df0b6ab04ae0ecfe4050847acac61d235a704c85",
+        "health": "healthy"
+      },
+      {
+        "name": "barber-web-public-booking-1",
+        "image": "sha256:1c578ebf9faa0acebd3427c63cd428e0cb0cdb0c87305b421b51e0568a7df7fe",
+        "health": "healthy"
+      }
+    ],
+    "tablesCompared": 15,
+    "originalFieldsAndCountsPreserved": true,
+    "historicalRevenueUnchanged": true,
+    "configurationKeysChanged": [],
+    "sharedServicesAndDataVolumesPreserved": true,
+    "evidence": ".local/step9/runtime-result.json",
+    "testedApiArtifactsMatchRuntime": true
+  },
+  "rollback": {
+    "backup": ".local/step9/before-runtime-deploy.dump",
+    "backupReadable": true,
+    "restoreTestedOnCopies": true,
+    "images": [
+      {
+        "tag": "alora-step9-before-api:20261107",
+        "method": "stream-rootfs-export-import-without-application-environment",
+        "sourceImage": "sha256:7d36b569ca58cf9ee21a6c34e4f07a66f7b425d61ee880cefd15f9477db6d0ce"
+      },
+      {
+        "tag": "alora-step9-before-admin:20261107",
+        "method": "stream-rootfs-export-import-without-application-environment",
+        "sourceImage": "sha256:e4669d3026d2070a06365da36e21a6a48c332560fdfd3e604b11478a5a351cb6"
+      },
+      {
+        "tag": "alora-step9-before-booking:20261107",
+        "method": "stream-rootfs-export-import-without-application-environment",
+        "sourceImage": "sha256:e4a3765149a3958c8338957773fdbdb860f7378db127761489be180581856a8b"
+      }
+    ],
+    "imageReadabilityVerified": true,
+    "mainDatabaseRestored": false,
+    "boundary": "Legacy writers do not maintain inventory and applied-price metadata. After activation, use forward fix or a planned restore with reconciliation of subsequent operations."
+  },
+  "remaining": [
+    "Step 10: multi-service scheduling, individual payment ledger, deposits, settlement, mixed payments and managerial refunds.",
+    "Steps 11-12: Connect WhatsApp and durable appointment automations with separate real-provider acceptance.",
+    "Step 13: complete financial/stock reporting and tablet acceptance.",
+    "Step 14: production baseline, deployment and commercial operational acceptance.",
+    "Connect account tests remain excluded by user instruction."
+  ]
+}

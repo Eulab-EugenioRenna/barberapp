@@ -18,6 +18,19 @@ export interface FunctionDefinition {
 // legacy è una concessione transitoria esplicita al titolare, non un default per nuove funzioni.
 export const ALORA_FUNCTIONS = [
   {
+    key: "locations.read",
+    name: "Consultazione sedi e settori",
+    description: "Consultare le sedi e i settori operativi abilitati.",
+    legacy: false,
+  },
+  {
+    key: "locations.manage",
+    name: "Gestione sedi e settori",
+    description:
+      "Configurare sedi, settori, orari, risorse e appartenenze operative senza concedere funzioni Connect.",
+    legacy: false,
+  },
+  {
     key: "appointments.read.all",
     name: "Agenda aziendale",
     description: "Consultare gli appuntamenti aziendali.",
@@ -70,6 +83,19 @@ export const ALORA_FUNCTIONS = [
     name: "Gestione listino",
     description: "Modificare servizi e associazioni ai prodotti.",
     legacy: true,
+  },
+  {
+    key: "inventory.read",
+    name: "Consultazione magazzino",
+    description: "Consultare giacenze e movimenti delle sedi autorizzate.",
+    legacy: false,
+  },
+  {
+    key: "inventory.manage",
+    name: "Gestione magazzino",
+    description:
+      "Registrare aperture, carichi, rettifiche, resi e trasferimenti nelle sedi autorizzate.",
+    legacy: false,
   },
   {
     key: "products.read",
@@ -129,19 +155,40 @@ export const ALORA_FUNCTIONS = [
   {
     key: "dashboard.personal.values.read",
     name: "Valori dei propri servizi",
-    description: "Consultare i valori registrati delle righe servizio attribuite al proprio professionista; esclusi incassi e compensi.",
+    description:
+      "Consultare i valori registrati delle righe servizio attribuite al proprio professionista; esclusi incassi e compensi.",
     legacy: false,
   },
   {
     key: "team.manage",
     name: "Ruoli e accessi della squadra",
-    description: "Gestire ruoli, assegnazioni e accesso alla sola installazione entro la delega Connect.",
+    description:
+      "Gestire ruoli, assegnazioni e accesso alla sola installazione entro la delega Connect.",
     legacy: false,
   },
   {
     key: "team.password.reset",
     name: "Recupero accessi dei collaboratori",
-    description: "Richiedere al provider un link di cambio password per un collaboratore amministrabile, senza leggere o impostare la sua password.",
+    description:
+      "Richiedere al provider un link di cambio password per un collaboratore amministrabile, senza leggere o impostare la sua password.",
+    legacy: false,
+  },
+  {
+    key: "whatsapp.read",
+    name: "Conversazioni WhatsApp",
+    description: "Consultare connessioni, conversazioni e stato degli invii dell’intera attività.",
+    legacy: false,
+  },
+  {
+    key: "whatsapp.send",
+    name: "Invio WhatsApp",
+    description: "Inviare messaggi espliciti attraverso il numero autorizzato in Connect.",
+    legacy: false,
+  },
+  {
+    key: "whatsapp.manage",
+    name: "Amministrazione WhatsApp",
+    description: "Collegare il numero con QR e gestirne connessione e disconnessione.",
     legacy: false,
   },
   {
@@ -173,7 +220,7 @@ export const ALORA_FUNCTIONS = [
   },
 ] as const satisfies readonly FunctionDefinition[];
 export type FunctionKey = (typeof ALORA_FUNCTIONS)[number]["key"];
-export const FUNCTION_MATRIX_VERSION = 4;
+export const FUNCTION_MATRIX_VERSION = 7;
 export function canUseLocalFunction(
   user: LocalIdentity | null | undefined,
   key: string,
@@ -187,8 +234,12 @@ export function canUseLocalFunction(
     return false;
   if (user.role === "collaborator") {
     if (!user.collaboratorId) return false;
-    if (key === "dashboard.personal.values.read") return !!user.permissionsConfigured && !!user.permissions?.includes(key);
-    return ["appointments.read.own", "appointments.update.own"].includes(key) && (!user.permissionsConfigured || !!user.permissions?.includes(key));
+    if (key === "dashboard.personal.values.read")
+      return !!user.permissionsConfigured && !!user.permissions?.includes(key);
+    return (
+      ["appointments.read.own", "appointments.update.own"].includes(key) &&
+      (!user.permissionsConfigured || !!user.permissions?.includes(key))
+    );
   }
   if (user.role === "owner")
     return (
@@ -201,8 +252,14 @@ export function canUseLocalFunction(
     user.permissions?.includes(permission),
   );
 }
-export function requiresOwnAppointmentScope(user: LocalIdentity | null | undefined, companyPermission: FunctionKey): boolean {
-  return user?.role === "collaborator" || !canUseLocalFunction(user, companyPermission);
+export function requiresOwnAppointmentScope(
+  user: LocalIdentity | null | undefined,
+  companyPermission: FunctionKey,
+): boolean {
+  return (
+    user?.role === "collaborator" ||
+    !canUseLocalFunction(user, companyPermission)
+  );
 }
 export function createFunctionMatrix(appId: string) {
   if (!/^[a-z][a-z0-9_.:-]{0,79}$/.test(appId))
@@ -228,13 +285,20 @@ export const VIEW_FUNCTIONS: Readonly<Record<string, FunctionKey>> = {
   collaborators: "collaborators.read",
   team: "users.manage",
   settings: "settings.manage",
+  locations: "locations.read",
+  inventory: "inventory.read",
+  whatsapp: "whatsapp.read",
 };
 
 export function canAccessLocalView(
   user: LocalIdentity | null | undefined,
   view: string,
 ): boolean {
-  if (view === "collaborators") return canUseLocalFunction(user, "collaborators.read") || canUseLocalFunction(user, "users.manage");
+  if (view === "collaborators")
+    return (
+      canUseLocalFunction(user, "collaborators.read") ||
+      canUseLocalFunction(user, "users.manage")
+    );
   if (view === "services")
     return (
       canUseLocalFunction(user, "services.read") ||

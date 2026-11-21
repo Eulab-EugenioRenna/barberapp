@@ -1,51 +1,44 @@
-import { InjectQueue } from "@nestjs/bullmq";
-import { Injectable } from "@nestjs/common";
-import { Queue } from "bullmq";
-import { NOTIFICATIONS_QUEUE } from "./notifications.constants";
-import {
-  NotificationEventPayload,
-  NotificationQueueJob,
-} from "./notifications.types";
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { NotificationEventPayload } from "./notifications.types";
 import { NotificationsService } from "./notifications.service";
 
+/** Explicit generic notifications also persist before queueing; operational writers use their own transaction. */
 @Injectable()
 export class NotificationsEventsService {
   constructor(
     private readonly notificationsService: NotificationsService,
-    @InjectQueue(NOTIFICATIONS_QUEUE)
-    private readonly notificationsQueue: Queue<NotificationQueueJob>,
+    private readonly prisma: PrismaService,
   ) {}
-
   async emit(payload: NotificationEventPayload): Promise<unknown> {
-    const plan = await this.notificationsService.resolveDispatchPlan(payload);
-    const ids: string[] = [];
-
-    for (const target of plan.targets) {
-      const history = await this.notificationsService.createHistoryEntry(
-        plan.payload,
-        target,
+    if (!payload.eventType || payload.eventType.length > 120)
+      throw new BadRequestException("Evento non valido");
+    const event = await this.prisma.$transaction(async (tx) => {
+      const snapshot = await this.notificationsService.snapshotEventPayload(
+        tx,
+        payload,
       );
-
-      ids.push(history.id);
-
-      await this.notificationsQueue.add(
-        NOTIFICATIONS_QUEUE,
-        { notificationHistoryId: history.id },
-        {
-          attempts: 5,
-          backoff: {
-            type: "exponential",
-            delay: 5000,
-          },
-          removeOnComplete: 200,
-          removeOnFail: 200,
+      return tx.notificationDomainEvent.create({
+        data: {
+          tenantId: payload.tenantId,
+          eventKey: randomUUID(),
+          eventType: payload.eventType,
+          entityType: payload.entityType || "notification",
+          entityId: payload.entityId || null,
+          actorUserId: payload.actor?.id || null,
+          payload: JSON.parse(
+            JSON.stringify({
+              ...snapshot,
+              entityType: payload.entityType || "notification",
+              entityId: payload.entityId || null,
+            }),
+          ) as Prisma.InputJsonValue,
         },
-      );
-    }
-
-    return {
-      queued: ids.length,
-      ids,
-    };
+        select: { id: true },
+      });
+    });
+    return { persisted: true, eventId: event.id, queued: 0, ids: [] };
   }
 }

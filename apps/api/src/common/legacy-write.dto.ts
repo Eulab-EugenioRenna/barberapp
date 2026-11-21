@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { Type } from "class-transformer";
+import { Type, Transform } from "class-transformer";
 import {
   IsOptional,
   IsString,
@@ -14,9 +14,14 @@ import {
   ValidateNested,
   IsISO8601,
   IsEnum,
+  IsIn,
   Matches,
 } from "class-validator";
 import { AppointmentStatus } from "./domain-types";
+const decimalField = () =>
+  Transform(({ value }: { value: unknown }) =>
+    value === undefined || value === null ? value : String(value),
+  );
 class WeeklyScheduleDto {
   [key: string]: unknown;
   @IsInt() @Min(0) @Max(6) weekday!: number;
@@ -34,7 +39,14 @@ class DayOverrideDto {
   @IsOptional() @IsBoolean() isHoliday?: boolean;
 }
 export class LegacyWriteDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9._:-]{8,128}$/)
+  idempotencyKey?: string;
+  @IsOptional() @IsInt() @Min(0) revision?: number;
   [key: string]: unknown;
+  @IsOptional() @IsString() @MaxLength(100) sectorId?: string;
+  @IsOptional() @IsString() @MaxLength(100) locationId?: string;
   @IsOptional() @IsString() @MaxLength(4000) name?: string;
   @IsOptional() @IsString() @MaxLength(4000) firstName?: string;
   @IsOptional() @IsString() @MaxLength(4000) lastName?: string;
@@ -43,6 +55,7 @@ export class LegacyWriteDto {
   @IsOptional() @IsString() @MaxLength(4000) description?: string;
   @IsOptional() @IsString() @MaxLength(4000) imageUrl?: string;
   @IsOptional() @IsString() @MaxLength(4000) sku?: string;
+  @IsOptional() @IsString() @MaxLength(128) barcode?: string;
   @IsOptional() @IsString() @MaxLength(4000) category?: string;
   @IsOptional() @IsString() @MaxLength(4000) publicDescription?: string;
   @IsOptional() @IsString() @MaxLength(4000) internalDescription?: string;
@@ -62,12 +75,46 @@ export class LegacyWriteDto {
   @IsOptional() @IsBoolean() isActive?: boolean;
   @IsOptional() @IsBoolean() isPublic?: boolean;
   @IsOptional() @IsBoolean() isBookableOnline?: boolean;
+  @IsOptional() @IsBoolean() requiresRoom?: boolean;
   @IsOptional() @IsBoolean() requiresCollaborator?: boolean;
   @IsOptional() @IsBoolean() privacyConsent?: boolean;
   @IsOptional() @IsBoolean() marketingConsent?: boolean;
   @IsOptional() @IsBoolean() priceLocked?: boolean;
-  @IsOptional() @IsNumber() @Min(0) @Max(99999999) basePrice?: number;
-  @IsOptional() @IsNumber() @Min(0) @Max(99999999) price?: number;
+  @IsOptional()
+  @decimalField()
+  @Matches(/^\d+(\.\d{1,6})?$/)
+  @MaxLength(30)
+  basePrice?: string;
+  @IsOptional()
+  @decimalField()
+  @Matches(/^\d+(\.\d{1,6})?$/)
+  @MaxLength(30)
+  price?: string;
+  @IsOptional() @IsIn(["legacy", "net", "gross"]) priceMode?: string;
+  @IsOptional() @IsIn(["legacy", "net", "gross"]) costMode?: string;
+  @IsOptional() @IsBoolean() stockTracked?: boolean;
+  @IsOptional()
+  @decimalField()
+  @Matches(/^\d+(\.\d{1,2})?$/)
+  @MaxLength(10)
+  vatRate?: string;
+  @IsOptional()
+  @decimalField()
+  @Matches(/^\d+(\.\d{1,2})?$/)
+  @MaxLength(10)
+  purchaseVatRate?: string;
+  @IsOptional()
+  @decimalField()
+  @Matches(/^\d+(\.\d{1,6})?$/)
+  @MaxLength(30)
+  cost?: string;
+  @IsOptional()
+  @decimalField()
+  @Matches(/^\d+(\.\d{1,3})?$/)
+  @MaxLength(30)
+  consumptionUnits?: string;
+  @IsOptional() @IsString() @MaxLength(500) priceChangeReason?: string;
+  @IsOptional() @IsString() @MaxLength(500) priceOverrideReason?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(99999999) finalPrice?: number;
   @IsOptional() @IsInt() @Min(1) @Max(10080) durationMinutes?: number;
   @IsOptional() @IsInt() @Min(1) @Max(10080) quantity?: number;

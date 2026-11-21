@@ -1,3 +1,8 @@
+import {
+  resolveOperationalScope,
+  collaboratorFilter,
+  requireSector,
+} from "../locations/operational-scope";
 import { LegacyWriteDto } from "../../common/legacy-write.dto";
 import {
   BadRequestException,
@@ -41,6 +46,11 @@ export class CollaboratorsController {
     );
 
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
     const { page, pageSize, skip, take } = parsePagination(query, {
       defaultPageSize: 50,
     });
@@ -51,11 +61,15 @@ export class CollaboratorsController {
       async () => {
         const [items, total] = await Promise.all([
           this.prisma.collaborator.findMany({
-            where: { tenantId },
+            where: { tenantId, ...collaboratorFilter(scope) },
             orderBy: [{ isActive: "desc" }, { firstName: "asc" }],
             skip,
             take,
             include: {
+              sectors: {
+                where: { sectorId: { in: scope.sectorIds } },
+                include: { sector: { include: { location: true } } },
+              },
               weeklySchedules: {
                 orderBy: { weekday: "asc" },
               },
@@ -64,7 +78,9 @@ export class CollaboratorsController {
               },
             },
           }),
-          this.prisma.collaborator.count({ where: { tenantId } }),
+          this.prisma.collaborator.count({
+            where: { tenantId, ...collaboratorFilter(scope) },
+          }),
         ]);
 
         return buildPaginatedResult(items, total, page, pageSize);
@@ -72,11 +88,67 @@ export class CollaboratorsController {
     );
   }
 
+  /** Operational selectors need the complete active set, without contact/security data. */
+  @Get("options")
+  async options(@Req() request: { headers: { authorization?: string } }) {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    return this.prisma.collaborator.findMany({
+      where: { tenantId, isActive: true, ...collaboratorFilter(scope) },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        sectors: {
+          where: { sectorId: { in: scope.sectorIds } },
+          select: { sectorId: true },
+        },
+      },
+    });
+  }
+
   @Get(":id")
-  async findOne(@Req() request: { headers: { authorization?: string } }, @Param("id") id: string): Promise<unknown> {
-    const session = await resolveRequestSession(this.prisma, request.headers.authorization);
-    const person = await this.prisma.collaborator.findFirst({ where: { id, tenantId: requireTenantId(session) }, include: { weeklySchedules: { orderBy: { weekday: "asc" } }, dayOverrides: { orderBy: { date: "asc" } } } });
-    if (!person) throw new NotFoundException("Professionista non disponibile in questa attività");
+  async findOne(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const person = await this.prisma.collaborator.findFirst({
+      where: {
+        id,
+        tenantId: requireTenantId(session),
+        ...collaboratorFilter(scope),
+      },
+      include: {
+        sectors: {
+          where: { sectorId: { in: scope.sectorIds } },
+          include: { sector: { include: { location: true } } },
+        },
+        weeklySchedules: { orderBy: { weekday: "asc" } },
+        dayOverrides: { orderBy: { date: "asc" } },
+      },
+    });
+    if (!person)
+      throw new NotFoundException(
+        "Professionista non disponibile in questa attività",
+      );
     return person;
   }
 
@@ -91,6 +163,11 @@ export class CollaboratorsController {
     );
 
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
     const weeklySchedules = Array.isArray(body["weeklySchedules"])
       ? (body["weeklySchedules"] as Array<Record<string, unknown>>)
       : [];
@@ -98,60 +175,85 @@ export class CollaboratorsController {
       ? (body["dayOverrides"] as Array<Record<string, unknown>>)
       : [];
 
-    const created = await this.prisma.collaborator.create({
-      data: {
-        tenantId,
-        firstName: String(body["firstName"] ?? ""),
-        lastName: String(body["lastName"] ?? ""),
-        email: typeof body["email"] === "string" ? body["email"] : undefined,
-        phone: typeof body["phone"] === "string" ? body["phone"] : undefined,
-        calendarColor:
-          typeof body["calendarColor"] === "string"
-            ? body["calendarColor"]
-            : "#1c7c64",
-        isPublic: Boolean(body["isPublic"]),
-        weeklySchedules: weeklySchedules.length
-          ? {
-              create: weeklySchedules.map((schedule) => ({
-                weekday: Number(schedule["weekday"]),
-                isWorkingDay: Boolean(schedule["isWorkingDay"]),
-                startTime:
-                  typeof schedule["startTime"] === "string"
-                    ? schedule["startTime"]
-                    : null,
-                endTime:
-                  typeof schedule["endTime"] === "string"
-                    ? schedule["endTime"]
-                    : null,
-              })),
-            }
-          : undefined,
-        dayOverrides: dayOverrides.length
-          ? {
-              create: dayOverrides.map((override) => ({
-                date: new Date(String(override["date"])),
-                isWorkingDay: Boolean(override["isWorkingDay"]),
-                startTime:
-                  typeof override["startTime"] === "string"
-                    ? override["startTime"]
-                    : null,
-                endTime:
-                  typeof override["endTime"] === "string"
-                    ? override["endTime"]
-                    : null,
-                note:
-                  typeof override["note"] === "string"
-                    ? override["note"]
-                    : null,
-                isHoliday: Boolean(override["isHoliday"]),
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        weeklySchedules: { orderBy: { weekday: "asc" } },
-        dayOverrides: { orderBy: { date: "asc" } },
-      },
+    const sector = await requireSector(this.prisma, scope, body["sectorId"]);
+    const created = await this.prisma.$transaction(async (tx) => {
+      const person = await tx.collaborator.create({
+        data: {
+          tenantId,
+          firstName: String(body["firstName"] ?? ""),
+          lastName: String(body["lastName"] ?? ""),
+          email: typeof body["email"] === "string" ? body["email"] : undefined,
+          phone: typeof body["phone"] === "string" ? body["phone"] : undefined,
+          calendarColor:
+            typeof body["calendarColor"] === "string"
+              ? body["calendarColor"]
+              : "#1c7c64",
+          isPublic: Boolean(body["isPublic"]),
+          weeklySchedules: weeklySchedules.length
+            ? {
+                create: weeklySchedules.map((schedule) => ({
+                  weekday: Number(schedule["weekday"]),
+                  isWorkingDay: Boolean(schedule["isWorkingDay"]),
+                  startTime:
+                    typeof schedule["startTime"] === "string"
+                      ? schedule["startTime"]
+                      : null,
+                  endTime:
+                    typeof schedule["endTime"] === "string"
+                      ? schedule["endTime"]
+                      : null,
+                })),
+              }
+            : undefined,
+          dayOverrides: dayOverrides.length
+            ? {
+                create: dayOverrides.map((override) => ({
+                  date: new Date(String(override["date"])),
+                  isWorkingDay: Boolean(override["isWorkingDay"]),
+                  startTime:
+                    typeof override["startTime"] === "string"
+                      ? override["startTime"]
+                      : null,
+                  endTime:
+                    typeof override["endTime"] === "string"
+                      ? override["endTime"]
+                      : null,
+                  note:
+                    typeof override["note"] === "string"
+                      ? override["note"]
+                      : null,
+                  isHoliday: Boolean(override["isHoliday"]),
+                })),
+              }
+            : undefined,
+        },
+        include: {
+          sectors: {
+            where: { sectorId: { in: scope.sectorIds } },
+            include: { sector: { include: { location: true } } },
+          },
+          weeklySchedules: { orderBy: { weekday: "asc" } },
+          dayOverrides: { orderBy: { date: "asc" } },
+        },
+      });
+
+      await tx.collaboratorSector.deleteMany({
+        where: { collaboratorId: person.id },
+      });
+      await tx.collaboratorSector.create({
+        data: { collaboratorId: person.id, sectorId: sector.id },
+      });
+      return tx.collaborator.findUniqueOrThrow({
+        where: { id: person.id },
+        include: {
+          sectors: {
+            where: { sectorId: { in: scope.sectorIds } },
+            include: { sector: { include: { location: true } } },
+          },
+          weeklySchedules: { orderBy: { weekday: "asc" } },
+          dayOverrides: { orderBy: { date: "asc" } },
+        },
+      });
     });
 
     await Promise.all([
@@ -176,6 +278,11 @@ export class CollaboratorsController {
     );
 
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
     const weeklySchedules = Array.isArray(body["weeklySchedules"])
       ? (body["weeklySchedules"] as Array<Record<string, unknown>>)
       : null;
@@ -184,7 +291,7 @@ export class CollaboratorsController {
       : null;
 
     const updated = await this.prisma.collaborator.update({
-      where: { id, tenantId },
+      where: { id, tenantId, ...collaboratorFilter(scope) },
       data: {
         firstName:
           typeof body["firstName"] === "string" ? body["firstName"] : undefined,
@@ -243,6 +350,10 @@ export class CollaboratorsController {
               },
       },
       include: {
+        sectors: {
+          where: { sectorId: { in: scope.sectorIds } },
+          include: { sector: { include: { location: true } } },
+        },
         weeklySchedules: { orderBy: { weekday: "asc" } },
         dayOverrides: { orderBy: { date: "asc" } },
       },
@@ -268,6 +379,11 @@ export class CollaboratorsController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -280,7 +396,9 @@ export class CollaboratorsController {
       );
     }
 
-    await this.prisma.collaborator.delete({ where: { id, tenantId } });
+    await this.prisma.collaborator.delete({
+      where: { id, tenantId, ...collaboratorFilter(scope) },
+    });
 
     await Promise.all([
       this.cacheInvalidationService.invalidateCollaborators(tenantId),

@@ -1,0 +1,84 @@
+{
+  "checkedAt": "2026-11-11T12:03:45.489258+00:00",
+  "readOnly": true,
+  "status": "provider-runtime-and-public-webhook-prerequisites-not-ready",
+  "goalComplete": false,
+  "goalTurnClassification": "progress: observed live incompatibility narrows the external next action",
+  "alora": {
+    "installedSdkVersion": "0.12.0-rc.2",
+    "runtimeHealthy": true,
+    "imageId": "sha256:71a175418bae935361c56cd0f300ea04408fa4d934948c7d83ae6e51284589d5",
+    "workflowSourceChecksumDrift": [],
+    "webhookOrigins": {
+      "ALORA_CONNECT_WEBHOOK_ORIGIN": {
+        "configured": false
+      },
+      "PUBLIC_APP_URL": {
+        "configured": true,
+        "https": false,
+        "loopback": true,
+        "defaultHttpsPort": false
+      }
+    }
+  },
+  "connect": {
+    "apiImageId": "sha256:7d257ad7f4a4bfcf0b758e203d53b2894c3c81f2d4480cf811dc78ac6e891cb9",
+    "runnerImageId": "sha256:d234e9edf547cbf1a2a57bf9b2eee7fceb1dd100f0529635f65aad14a453d28b",
+    "apiStartedAt": "2026-11-09T20:29:23.683313389Z",
+    "runnerStartedAt": "2026-11-09T20:29:51.537641513Z",
+    "openApi": {
+      "healthStatus": 200,
+      "service": "eulab-connect",
+      "capacityVerified": false,
+      "openapiStatus": 200,
+      "pathCount": 118,
+      "automationPaths": [],
+      "manualMessagesRoutePresent": true
+    },
+    "apiBundle": {
+      "sha256": "9db54a60a247c67b29189d62603dcd0b44bfda26447f933ebcb8b45f8afb5ea1",
+      "bytes": 350945,
+      "markers": {
+        "v1/installations/:installationId/automations": false,
+        "messages/by-key/:key/withdraw": false,
+        "automation_delegations": false,
+        "AutomationController": false
+      }
+    },
+    "runnerBundle": {
+      "sha256": "102eb6403635c7f0efb51ca269d36840619088fa50ccfcbc2967e304165343f6",
+      "bytes": 59988,
+      "markers": {
+        "automation_delegations": false,
+        "delegation_id": false,
+        "effect_started": false
+      }
+    },
+    "schema015DelegationsTableExists": false,
+    "inspectedDatabaseMatchesApiDatabase": true,
+    "containersUnchangedDuringReadOnlyAudit": true
+  },
+  "requiredNextExternalState": [
+    "Connect owner deploys compatible API plus runner and schema 015 together, preserving existing data and account roles",
+    "A controlled HTTPS application origin is provided and the signed webhook is registered through the existing SDK flow",
+    "A controlled business WhatsApp number, licensed capabilities and explicitly authorized test recipient are supplied for device acceptance"
+  ],
+  "excluded": [
+    "No account creation, login, password reset, role change or modification",
+    "No Connect deployment, migration or code edit by this audit",
+    "No webhook registration, QR pairing or real provider message",
+    "No public tunnel, DNS/TLS change or production deployment"
+  ],
+  "acceptance": [
+    "Current API OpenAPI must expose the automation delegation, message status, withdrawal and webhook recovery paths",
+    "Schema 015 and runner must be the compatible release; an SDK tarball alone is insufficient runtime evidence",
+    "Real device must demonstrate one original send, callback correlation, action state transition and receipt without duplicate send",
+    "Revocation and pending withdrawal require real provider outcome evidence; acquired effects cannot be reported cancelled"
+  ],
+  "evidenceSources": [
+    "evolve.md sections 8, 13 and 14",
+    "docs/connect-sdk-integration-contract.md",
+    "/Users/eugeniorenna/eulab connect/packages/sdk/AUTOMATIONS.md",
+    "docs/verification/appointment-automations-workflow-step-12.json"
+  ]
+}

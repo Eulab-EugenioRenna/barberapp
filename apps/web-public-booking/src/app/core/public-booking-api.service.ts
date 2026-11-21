@@ -7,6 +7,18 @@ import { PUBLIC_API_URL } from "./public-api-config";
 export class PublicBookingApiService {
   private readonly http = inject(HttpClient);
 
+  sequenceAvailability(
+    basePath: string,
+    payload: {
+      lines: Array<{ serviceId: string; collaboratorId?: string }>;
+      date?: string;
+      from?: string;
+      to?: string;
+    },
+  ): Observable<any> {
+    return this.http.post(`${basePath}/availability`, payload);
+  }
+
   loadInitialData(basePath: string): Observable<Record<string, unknown>> {
     return forkJoin({
       settings: this.http.get(`${basePath}/settings`),

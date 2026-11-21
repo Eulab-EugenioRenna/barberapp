@@ -7,10 +7,12 @@ import helmet from "helmet";
 import { join } from "path";
 import { AppModule } from "./app.module";
 import { CorrelationIdInterceptor } from "./common/correlation-id.interceptor";
+import { configureRequestBodies } from "./common/request-bodies";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    bodyParser: false,
   });
   const config = app.get(ConfigService);
 
@@ -40,6 +42,7 @@ async function bootstrap(): Promise<void> {
     ),
     credentials: true,
   });
+  configureRequestBodies(app);
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
