@@ -1,0 +1,103 @@
+# ALORA in produzione su VM Proxmox (profilo P1 del modello EULAB, §14).
+# Le immagini arrivano da GitHub Container Registry con tag = commit:
+#   ALORA_IMAGE_TAG=<sha> docker compose -f deploy/compose.production.yml --env-file /srv/alora/.env.production up -d
+# Non usare docker-compose.yml (sviluppo: password fisse, MailHog, build locale).
+name: alora-production
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-alora}
+      POSTGRES_USER: ${POSTGRES_USER:-alora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD mancante}
+    networks: [app]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD mancante}"]
+    networks: [app]
+    volumes:
+      - redis_data:/data
+
+  api:
+    image: ghcr.io/eulab-eugeniorenna/barberapp-api:${ALORA_IMAGE_TAG:?ALORA_IMAGE_TAG mancante}
+    restart: unless-stopped
+    env_file: ${ALORA_ENV_FILE:-/srv/alora/.env.production}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-alora}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-alora}?schema=public
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      app:
+        aliases: [api]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 30s
+    volumes:
+      - uploads_data:/app/uploads
+
+  web-admin:
+    image: ghcr.io/eulab-eugeniorenna/barberapp-admin:${ALORA_IMAGE_TAG}
+    restart: unless-stopped
+    networks: [app]
+    healthcheck: &static_health
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+
+  web-public-booking:
+    image: ghcr.io/eulab-eugeniorenna/barberapp-booking:${ALORA_IMAGE_TAG}
+    restart: unless-stopped
+    networks: [app]
+    healthcheck: *static_health
+
+  landing:
+    image: ghcr.io/eulab-eugeniorenna/barberapp-landing:${ALORA_IMAGE_TAG}
+    restart: unless-stopped
+    networks: [app]
+    healthcheck: *static_health
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+      web-admin: { condition: service_healthy }
+      web-public-booking: { condition: service_healthy }
+      landing: { condition: service_healthy }
+    networks: [app]
+    # Ingresso solo verso il tunnel Cloudflare / proxy interno: mai 0.0.0.0 senza filtro.
+    ports:
+      - "${ALORA_BIND_IP:-127.0.0.1}:${ALORA_HTTP_PORT:-8080}:80"
+    volumes:
+      - ../docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:

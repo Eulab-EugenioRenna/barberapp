@@ -1,0 +1,94 @@
+# Profilo P1 del modello EULAB (§14): Docker → Proxmox.
+# 1. "images": su GitHub costruisce le immagini e le pubblica su GHCR con tag = commit.
+# 2. "production": sul runner self-hosted nella rete Proxmox esegue deploy/scripts/deploy.sh,
+#    solo dopo l'approvazione di Eugenio nell'environment GitHub "production".
+# Il job di deploy resta spento finché la variabile di repository ALORA_DEPLOY_ENABLED non vale "true"
+# (da attivare quando runner, environment e /srv/alora/.env.production sono pronti).
+name: deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag immagine da installare (commit). Vuoto = commit corrente. Serve anche per tornare indietro."
+        required: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io/eulab-eugeniorenna
+
+jobs:
+  images:
+    if: github.event_name == 'push' || inputs.tag == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: api
+            target: api-runtime
+          - name: admin
+            target: admin-runtime
+          - name: booking
+            target: booking-runtime
+          - name: landing
+            target: landing-runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/app.Dockerfile
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ env.REGISTRY }}/barberapp-${{ matrix.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  production:
+    needs: images
+    if: >-
+      always() && vars.ALORA_DEPLOY_ENABLED == 'true' &&
+      (needs.images.result == 'success' || needs.images.result == 'skipped')
+    runs-on: [self-hosted, linux, alora-production]
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.ALORA_PUBLIC_URL }}
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy
+        run: deploy/scripts/deploy.sh "${{ inputs.tag || github.sha }}"
+      - name: Controllo pubblico
+        if: vars.ALORA_PUBLIC_URL != ''
+        run: |
+          for path in / /admin/ /api/health; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ vars.ALORA_PUBLIC_URL }}$path")
+            echo "$path -> $code"
+            [ "$code" = 200 ] || exit 1
+          done

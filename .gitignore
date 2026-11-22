@@ -8,7 +8,9 @@ coverage/
 
 # Local environment and runtime data
 .env
+.env.*
 !.env.example
+!deploy/.env.production.example
 uploads/
 
 # Logs
