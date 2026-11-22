@@ -1,5 +1,5 @@
 import {
-  ForbiddenException, HttpException, Injectable, NotFoundException, ServiceUnavailableException,
+  BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException, ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 import type { ConnectServer } from "@eulab/connect/server";
@@ -153,6 +153,51 @@ export class PersonalAccountService {
         throw new ServiceUnavailableException({ code: "account_operation_not_started", message: "Verifica dispositivo non disponibile. Nessuna revoca richiesta." });
       throw error;
     }
+  }
+
+  /** Display name in Connect (single sign-on) and in ALORA together. */
+  updateProfile(authorization: string | undefined, input: { firstName?: unknown; lastName?: unknown }) {
+    const firstName = typeof input.firstName === "string" ? input.firstName.trim() : "";
+    const lastName = typeof input.lastName === "string" ? input.lastName.trim() : "";
+    if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100)
+      throw new BadRequestException("Inserisci nome e cognome (massimo 100 caratteri)");
+    return this.withAccount(authorization, async (client, token, { user }) => {
+      const value = await client.request("/v1/security/me/profile", "PUT", { firstName, lastName }, token);
+      if (value?.firstName !== firstName || value?.lastName !== lastName)
+        throw new ServiceUnavailableException("Esito aggiornamento profilo da verificare");
+      // The operational record follows the identity, so the shell shows the new name at once.
+      await this.prisma.user.update({ where: { id: user.id }, data: { firstName, lastName } });
+      return { profile: { firstName, lastName, email: user.email } };
+    });
+  }
+
+  setMfaPreference(authorization: string | undefined, preferredMethod: unknown) {
+    if (!["auto", "totp", "email"].includes(String(preferredMethod)))
+      throw new BadRequestException("Metodo di verifica non valido");
+    return this.withAccount(authorization, async (client, token) => {
+      await client.request("/v1/security/me/preferences", "PUT", { preferredMethod }, token);
+      return this.security(authorization);
+    });
+  }
+
+  /** Removes one of the person's authenticator apps; Connect closes every SSO session. */
+  removeAuthenticator(authorization: string | undefined, id: string) {
+    return this.withAccount(authorization, async (client, token, { user }) => {
+      const security = await client.accountSecurity(token);
+      if (!security?.authenticators?.some((item: { id?: string } | null) => item?.id === id))
+        throw new NotFoundException("App di autenticazione non trovata");
+      try {
+        const value = await client.request(
+          "/v1/security/me/authenticators/" + encodeURIComponent(id), "DELETE", undefined, token);
+        if (value?.revoked !== true) throw new ServiceUnavailableException("Esito rimozione da verificare");
+        return { removed: true, signedOut: true };
+      } finally { await this.revokeLocal(user.id); }
+    });
+  }
+
+  /** Who may start a provider action (password, authenticator, email check). */
+  actionIdentity(authorization: string | undefined) {
+    return this.withAccount(authorization, async (_client, _token, { user }) => ({ email: user.email }));
   }
 
   notices(authorization?: string): Promise<PersonalNotices> {

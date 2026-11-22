@@ -7,7 +7,7 @@ import {
   Output,
 } from "@angular/core";
 import { CalendarInputComponent } from "../calendar-input.component";
-import { CustomSelectComponent } from "../custom-select.component";
+import { UiSelectComponent } from "@alora/ui";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 
 @Component({
@@ -16,7 +16,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
   imports: [
     CommonModule,
     CalendarInputComponent,
-    CustomSelectComponent,
+    UiSelectComponent,
     AutofocusFirstDirective,
   ],
   styles: [
@@ -104,22 +104,24 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
             name="quickRescheduleDate"
           ></barber-calendar-input>
 
-          <barber-custom-select
+          <ui-select
             [value]="state?.collaboratorId || ''"
             (valueChange)="
               fieldChange.emit({ key: 'collaboratorId', value: $event })
             "
             [options]="collaboratorOptions"
             label="Professionista"
-          ></barber-custom-select>
+            [showLabel]="true"
+          ></ui-select>
 
-          <barber-custom-select
+          <ui-select
             [value]="state?.startsAt || ''"
             (valueChange)="fieldChange.emit({ key: 'startsAt', value: $event })"
             [options]="slotOptions"
             label="Orario"
             placeholder="Seleziona orario"
-          ></barber-custom-select>
+            [showLabel]="true"
+          ></ui-select>
 
           <p *ngIf="loadingSlots" role="status">
             Verifica disponibilità sul server…

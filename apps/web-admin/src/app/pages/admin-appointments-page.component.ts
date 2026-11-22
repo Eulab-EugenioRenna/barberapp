@@ -4,7 +4,7 @@ import { CommonModule } from "@angular/common";
 import { Component, inject, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CalendarInputComponent } from "../calendar-input.component";
-import { CustomSelectComponent } from "../custom-select.component";
+import { UiSelectComponent } from "@alora/ui";
 import { UiIconComponent } from "../shared/ui-icon.component";
 import { appointmentStatusLabel } from "../shared/presentation-copy";
 
@@ -21,7 +21,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
     CommonModule,
     FormsModule,
     CalendarInputComponent,
-    CustomSelectComponent,
+    UiSelectComponent,
     UiIconComponent,
   ],
   styles: [
@@ -124,6 +124,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
       <article
         *ngIf="!formOnly"
         class="appointments-panel panel rounded-[2rem] p-4 sm:p-5"
+        data-tour="appointments-list"
       >
         <div class="min-w-0">
           <p class="eyebrow text-[var(--accent)]">Agenda del salone</p>
@@ -184,12 +185,12 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
           (ngSubmit)="save.emit()"
         >
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field md:col-span-2">
+            <div class="field md:col-span-2">
               <span
                 >Cliente
                 <em class="required-mark" aria-hidden="true">*</em></span
               >
-              <barber-custom-select
+              <ui-select
                 [value]="appointmentForm.customerId"
                 (valueChange)="appointmentCustomerSelect.emit($event)"
                 [options]="appointmentCustomerOptions"
@@ -199,16 +200,36 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                   session.can('clients.manage') ? 'Aggiungi nuovo cliente' : ''
                 "
                 (createRequest)="quickCreate.emit('customer')"
-              ></barber-custom-select>
-            </label>
+              ></ui-select>
+            </div>
+          </div>
+          <div
+            *ngIf="!appointmentForm.id && bookingLocationOptions.length > 1"
+            class="field"
+            data-tour="appointments-location"
+          >
+            <span>Sede</span>
+            <ui-select
+              [value]="bookingLocationId"
+              (valueChange)="
+                appointmentValueChange.emit({ key: 'locationId', value: $event });
+                updateAppointmentSlots.emit()
+              "
+              [options]="bookingLocationOptions"
+              label="Sede"
+              placeholder="Scegli la sede"
+            ></ui-select>
+            <small class="text-xs text-[var(--muted)]"
+              >Compaiono solo i servizi delle attività svolte in questa sede.</small
+            >
           </div>
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
+            <div class="field">
               <span
                 >Servizio
                 <em class="required-mark" aria-hidden="true">*</em></span
               >
-              <barber-custom-select
+              <ui-select
                 [value]="appointmentForm.serviceId"
                 (valueChange)="
                   appointmentValueChange.emit({
@@ -225,11 +246,11 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                     : ''
                 "
                 (createRequest)="quickCreate.emit('service')"
-              ></barber-custom-select>
-            </label>
-            <label class="field">
+              ></ui-select>
+            </div>
+            <div class="field">
               <span>Professionista</span>
-              <barber-custom-select
+              <ui-select
                 [value]="appointmentForm.collaboratorId"
                 (valueChange)="
                   appointmentValueChange.emit({
@@ -241,8 +262,8 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 [options]="appointmentCollaboratorOptions"
                 label="Professionista"
                 placeholder="Nessuna preferenza"
-              ></barber-custom-select>
-            </label>
+              ></ui-select>
+            </div>
           </div>
           <section
             *ngIf="multipleServices && !appointmentForm.id"
@@ -262,15 +283,16 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 >{{ index + 2 }}. {{ row.name }} ·
                 {{ row.durationMinutes }} min</strong
               >
-              <barber-custom-select
+              <ui-select
                 *ngIf="row.requiresCollaborator"
                 [value]="row.collaboratorId"
                 [options]="row.options"
                 [label]="'Professionista per ' + row.name"
+                [showLabel]="true"
                 (valueChange)="
                   serviceCollaborator.emit({ index, collaboratorId: $event })
                 "
-              ></barber-custom-select>
+              ></ui-select>
               <button
                 type="button"
                 class="secondary-btn"
@@ -280,14 +302,15 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 Rimuovi
               </button>
             </article>
-            <barber-custom-select
+            <ui-select
               *ngIf="additionalServices.length < 19"
               value=""
               label="Aggiungi un servizio"
+              [showLabel]="true"
               placeholder="Aggiungi un servizio della sede"
               [options]="additionalServiceOptions"
               (valueChange)="addService.emit($event)"
-            ></barber-custom-select>
+            ></ui-select>
           </section>
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
@@ -303,11 +326,11 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 placeholder="Seleziona una data"
               ></barber-calendar-input>
             </label>
-            <label class="field">
+            <div class="field">
               <span
                 >Ora <em class="required-mark" aria-hidden="true">*</em></span
               >
-              <barber-custom-select
+              <ui-select
                 [value]="appointmentForm.startsAt"
                 (valueChange)="
                   appointmentValueChange.emit({
@@ -325,21 +348,21 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                       ? 'Seleziona orario'
                       : 'Nessun orario disponibile'
                 "
-              ></barber-custom-select>
-            </label>
+              ></ui-select>
+            </div>
           </div>
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
+            <div class="field">
               <span>Stato</span>
-              <barber-custom-select
+              <ui-select
                 [value]="appointmentForm.status"
                 (valueChange)="
                   appointmentValueChange.emit({ key: 'status', value: $event })
                 "
                 [options]="appointmentStatusOptions"
                 label="Stato"
-              ></barber-custom-select>
-            </label>
+              ></ui-select>
+            </div>
           </div>
           <label class="field">
             <span>Note</span>
@@ -427,6 +450,8 @@ export class AdminAppointmentsPageComponent {
   @Input() appointmentCustomerOptions: Array<{ value: string; label: string }> =
     [];
   @Input() serviceSelectOptions: Array<{ value: string; label: string }> = [];
+  @Input() bookingLocationOptions: Array<{ value: string; label: string }> = [];
+  @Input() bookingLocationId = "";
   @Input() appointmentCollaboratorOptions: Array<{
     value: string;
     label: string;

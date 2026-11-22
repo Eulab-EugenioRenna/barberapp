@@ -16,6 +16,7 @@ module.exports = {
     "^@barber/shared/personal$": "<rootDir>/apps/api/src/common/personal-appointment.ts",
     "^@barber/shared/functions$": "<rootDir>/apps/api/src/common/function-catalog.ts",
     "^@barber/shared/utils$": "<rootDir>/libs/shared/utils/src/index.ts",
+    "^@alora/ui$": "<rootDir>/libs/ui/src/index.ts",
   },
   testEnvironment: "node",
   clearMocks: true,

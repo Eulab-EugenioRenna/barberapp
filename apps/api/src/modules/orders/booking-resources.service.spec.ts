@@ -4,7 +4,9 @@ const at = (time: string) => new Date(`2032-11-12T${time}:00Z`);
 function fixture() {
   const services = ["one", "two"].map((id, index) => ({
     id,
+    name: "Servizio " + id,
     sectorId: "sector-" + index,
+    activityId: "activity-" + index,
     tenantId: "tenant",
     sector: { locationId: "location" },
     durationMinutes: 30,
@@ -16,6 +18,10 @@ function fixture() {
   const people = [
     { id: "A", sectors: [{ sectorId: "sector-0" }, { sectorId: "sector-1" }] },
     { id: "B", sectors: [{ sectorId: "sector-0" }] },
+  ];
+  const activitySectors = [
+    { id: "sector-0", locationId: "location", activityId: "activity-0" },
+    { id: "sector-1", locationId: "location", activityId: "activity-1" },
   ];
   const calendar = {
     service: {
@@ -30,6 +36,14 @@ function fixture() {
     room: { findMany: jest.fn().mockResolvedValue([]) },
     appointment: { findMany: jest.fn().mockResolvedValue([]) },
     sector: {
+      // Each service's activity runs in one sector of the location.
+      findMany: jest.fn(async ({ where }: any) =>
+        activitySectors.filter(
+          (row) =>
+            row.locationId === where.locationId &&
+            where.activityId.in.includes(row.activityId),
+        ),
+      ),
       findFirst: jest
         .fn()
         .mockResolvedValue({
@@ -65,7 +79,7 @@ function fixture() {
       { serviceId: "two", startsAt: at("09:00") },
     ],
   ) => planner.plan(calendar as never, "tenant", "Europe/Rome", lines);
-  return { calendar, services, people, plan };
+  return { calendar, services, people, plan, activitySectors };
 }
 describe("transaction-bound booking resource planner", () => {
   it("resolves a complete assignment across sectors of one location", async () => {
@@ -95,13 +109,15 @@ describe("transaction-bound booking resource planner", () => {
     });
   });
   it("rejects company holidays and mixed locations before returning an assignment", async () => {
-    const { calendar, services, plan } = fixture();
+    const { calendar, plan, activitySectors } = fixture();
     calendar.tenantHoliday.count.mockResolvedValue(1);
     await expect(plan()).rejects.toMatchObject({
       response: { code: "BOOKING_OUTSIDE_HOURS" },
     });
-    services[1].sector.locationId = "different-site";
-    await expect(plan()).rejects.toThrow("stessa sede");
+    // The second service's activity does not run at this location.
+    calendar.tenantHoliday.count.mockResolvedValue(0);
+    activitySectors[1].locationId = "different-site";
+    await expect(plan()).rejects.toThrow("non è disponibile in questa sede");
   });
   it("keeps non-grid sequential times exact and honors buffer conflicts between lines", async () => {
     const { services, plan } = fixture();

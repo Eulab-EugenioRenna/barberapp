@@ -1,7 +1,7 @@
 import { OperationalContextService } from "./core/operational-context.service";
-import { OperationalSelectorComponent } from "./shared/operational-selector.component";
-import { canAccessLocalView } from "@barber/shared/functions";
-import { AloraBrandComponent } from "@barber/shared/brand";
+import { UiPageComponent } from "@alora/ui";
+import type { AdminNavKey } from "./core/admin-navigation";
+import { AdminPageHeaderComponent } from "./shell/admin-page-header.component";
 import {
   CommonModule,
   DOCUMENT,
@@ -20,7 +20,7 @@ import {
   inject,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { ActivatedRoute, Router, RouterLink } from "@angular/router";
+import { ActivatedRoute, Router } from "@angular/router";
 import { toLocalDateKey } from "@barber/shared/utils";
 import { firstValueFrom } from "rxjs";
 import { CalendarInputComponent } from "./calendar-input.component";
@@ -41,11 +41,9 @@ import { AdminPlatformPageComponent } from "./pages/admin-platform-page.componen
 import { AdminSalesPageComponent } from "./pages/admin-sales-page.component";
 import { AdminServicesPageComponent } from "./pages/admin-services-page.component";
 import { AdminSettingsPageComponent } from "./pages/admin-settings-page.component";
-import { PendingOrdersQueueComponent } from "./pending-orders/pending-orders-queue.component";
 import { QuickOrderModalComponent } from "./quick-order/quick-order-modal.component";
 import { buildQuickOrderCustomerQuery } from "./quick-order/quick-order-customer-query";
 import { AdminAuthPanelComponent } from "./auth/admin-auth-panel.component";
-import { AdminPwaBannerComponent } from "./shared/admin-pwa-banner.component";
 import { UiIconComponent } from "./shared/ui-icon.component";
 import {
   appointmentStatusLabel,
@@ -56,7 +54,6 @@ type ViewKey =
   | "platform"
   | "dashboard"
   | "appointments"
-  | "confirmations"
   | "sales"
   | "customers"
   | "services"
@@ -65,13 +62,12 @@ type ViewKey =
   | "settings";
 
 @Component({
-  selector: "barber-admin-root",
+  selector: "alora-admin-workspace",
   standalone: true,
   imports: [
-    AloraBrandComponent,
-    OperationalSelectorComponent,
     CommonModule,
-    RouterLink,
+    UiPageComponent,
+    AdminPageHeaderComponent,
     FormsModule,
     NgClass,
     DecimalPipe,
@@ -88,15 +84,13 @@ type ViewKey =
     AdminCollaboratorsPageComponent,
     AdminPlatformPageComponent,
     AdminSettingsPageComponent,
-    PendingOrdersQueueComponent,
     QuickOrderModalComponent,
-    AdminPwaBannerComponent,
     AdminAuthPanelComponent,
     UiIconComponent,
   ],
   providers: [AppointmentsFacade],
   template: `
-    <main class="admin-shell min-h-screen">
+    <ui-page>
       <barber-quick-order-modal
         *ngIf="quickOrderOpen || quickOrderClosing"
         [class.quick-order-closing]="quickOrderClosing"
@@ -176,184 +170,70 @@ type ViewKey =
 
       <barber-admin-auth-panel *ngIf="!sessionToken"></barber-admin-auth-panel>
 
-      <section *ngIf="sessionToken" class="app-frame">
-        <button
-          *ngIf="sidebarOpen"
-          type="button"
-          class="mobile-backdrop"
-          (click)="sidebarOpen = false"
-        ></button>
-
-        <aside
-          class="sidebar"
-          [ngClass]="{
-            'sidebar-open': sidebarOpen,
-            'sidebar-collapsed': sidebarCollapsed,
-          }"
-        >
-          <div class="sidebar-header">
-            <div class="sidebar-brand">
-              <alora-brand [onDark]="true"></alora-brand>
-              <div class="mt-3 flex items-center gap-3 sidebar-brand-copy">
-                <img
-                  *ngIf="
-                    tenant?.logoUrl && currentUser?.role !== 'platform_admin'
-                  "
-                  [src]="absoluteAssetUrl(tenant.logoUrl)"
-                  alt="Logo"
-                  class="h-auto w-auto max-h-20 max-w-[18rem] object-contain"
-                />
-                <h1 class="font-display text-2xl sm:text-3xl text-white">
-                  {{
-                    currentUser?.role === "platform_admin"
-                      ? "Gestione attività"
-                      : (tenant?.publicTitle ?? tenant?.name ?? "Il tuo salone")
-                  }}
-                </h1>
-              </div>
-            </div>
-            <div class="sidebar-actions">
+      <ng-container *ngIf="sessionToken">
+        <alora-page-header [navKey]="headerNavKey">
+          <button
+            uiPageActions
+            type="button"
+            class="icon-btn"
+            data-tour="header-refresh"
+            (click)="refreshCurrentView()"
+            aria-label="Aggiorna i dati"
+            title="Aggiorna i dati"
+          >
+            <barber-ui-icon name="refresh"></barber-ui-icon>
+          </button>
+          <div
+            uiPageActions
+            *ngIf="canCreateSomething && (activeView === 'sales' || activeView === 'dashboard' || activeView === 'appointments')"
+            class="new-menu"
+          >
+            <button
+              type="button"
+              class="primary-btn inline-flex items-center gap-2"
+              data-tour="header-new"
+              aria-haspopup="menu"
+              [attr.aria-expanded]="newMenuOpen"
+              (click)="onNewClick()"
+            >
+              <barber-ui-icon name="plus"></barber-ui-icon>
+              Nuovo
+            </button>
+            <div *ngIf="newMenuOpen" class="new-menu-backdrop" (click)="newMenuOpen = false"></div>
+            <div *ngIf="newMenuOpen" class="new-menu-panel panel" role="menu">
               <button
-                *ngIf="currentUser?.role !== 'platform_admin'"
+                *ngIf="can('sales.manage')"
                 type="button"
-                class="icon-btn sidebar-toggle desktop-only"
-                (click)="toggleSidebarCollapsed()"
-                [attr.aria-label]="
-                  sidebarCollapsed ? 'Espandi sidebar' : 'Comprimi sidebar'
-                "
+                role="menuitem"
+                class="new-menu-item"
+                (click)="newMenuOpen = false; openQuickOrder()"
               >
-                {{ sidebarCollapsed ? ">" : "<" }}
+                <barber-ui-icon name="receipt"></barber-ui-icon>
+                <span>
+                  <strong>Vendi adesso</strong>
+                  <small>Prodotti, servizi o entrambi. I servizi vanno in agenda, anche con orario passato.</small>
+                </span>
               </button>
               <button
+                *ngIf="can('appointments.create')"
                 type="button"
-                class="icon-btn sidebar-toggle mobile-only"
-                (click)="sidebarOpen = false"
+                role="menuitem"
+                class="new-menu-item"
+                (click)="newMenuOpen = false; startAppointmentFlow()"
               >
-                ×
+                <barber-ui-icon name="calendar-plus"></barber-ui-icon>
+                <span>
+                  <strong>Prenota</strong>
+                  <small>Appuntamento futuro: verifica orari e disponibilità. Il conto si chiude in Cassa.</small>
+                </span>
               </button>
             </div>
           </div>
-
-          <alora-operational-selector *ngIf="currentUser?.role !== 'platform_admin'"></alora-operational-selector>
-          <a *ngIf="can('locations.read')" routerLink="/locations" class="nav-btn">Sedi e settori</a>
-          <a *ngIf="can('inventory.read')" routerLink="/inventory" class="nav-btn">Magazzino</a>
-          <a *ngIf="can('whatsapp.read')" routerLink="/whatsapp" class="nav-btn">WhatsApp</a>
-          <div class="sidebar-nav">
-            <button
-              *ngFor="let item of visibleNavItems"
-              type="button"
-              class="nav-btn"
-              [ngClass]="{ active: activeView === item.key }"
-              (click)="selectView(item.key)"
-              [attr.aria-label]="item.label"
-              [title]="sidebarCollapsed ? item.label : null"
-            >
-              <span class="nav-icon">{{
-                item.key === "confirmations" && appointmentOrderAlerts().length
-                  ? appointmentOrderAlerts().length
-                  : item.icon
-              }}</span>
-              <span class="nav-copy">
-                <span>{{ item.label }}</span>
-                <small>{{ item.hint }}</small>
-              </span>
-            </button>
-          </div>
-
-          <article
-            class="sidebar-footer rounded-[1.6rem] border border-white/10 bg-white/6 p-4 text-white/78"
-          >
-            <a *ngIf="currentUser?.role !== 'platform_admin' && !currentUser?.technicalAccess" routerLink="/account" class="secondary-btn mb-4 w-full" title="Il mio account">Il mio account</a>
-            <p class="text-xs uppercase tracking-[0.28em] text-white/40">
-              Prenotazioni online
-            </p>
-            <p class="mt-3 sidebar-footer-copy">
-              <span class="sidebar-footer-label">Pagina clienti</span>
-              <strong class="sidebar-footer-value">{{
-                computedPublicUrl || "non configurata"
-              }}</strong>
-            </p>
-            <p class="mt-2 sidebar-footer-copy">
-              <span class="sidebar-footer-label">Apertura prenotazioni</span>
-              <strong class="sidebar-footer-value">{{
-                formatBookingMode(tenant?.bookingMode)
-              }}</strong>
-            </p>
-            <button
-              type="button"
-              class="secondary-btn sidebar-logout mt-4 w-full"
-              (click)="logout()"
-              [attr.aria-label]="sidebarCollapsed ? 'Esci' : null"
-              [title]="sidebarCollapsed ? 'Esci' : null"
-            >
-              <span class="nav-icon sidebar-footer-icon">L</span>
-              <span class="sidebar-footer-copy">Esci</span>
-            </button>
-          </article>
-        </aside>
-
-        <div class="content-shell">
-          <barber-admin-pwa-banner></barber-admin-pwa-banner>
-
-          <header
-            class="topbar panel rounded-[1.5rem] p-3 sm:rounded-[2rem] sm:p-4 md:p-5"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <div class="min-w-0">
-                <p class="eyebrow text-[var(--accent)]">
-                  {{ activeViewLabel }}
-                </p>
-                <h2
-                  class="truncate font-display text-xl sm:text-3xl md:text-5xl"
-                >
-                  {{
-                    currentUser?.role === "platform_admin"
-                      ? "Gestione attività"
-                      : tenant?.name || "Attività"
-                  }}
-                </h2>
-              </div>
-              <div
-                class="topbar-actions flex shrink-0 items-center gap-2 sm:gap-3"
-              >
-                <button
-                  type="button"
-                  class="icon-btn"
-                  (click)="refreshCurrentView()"
-                  aria-label="Aggiorna i dati"
-                  data-tooltip="Aggiorna i dati"
-                >
-                  <barber-ui-icon name="refresh"></barber-ui-icon>
-                </button>
-                <button
-                  *ngIf="can('sales.manage')"
-                  type="button"
-                  class="icon-btn"
-                  (click)="openQuickOrder()"
-                  aria-label="Nuova vendita"
-                  data-tooltip="Nuova vendita"
-                >
-                  <barber-ui-icon name="receipt"></barber-ui-icon>
-                </button>
-                <button
-                  *ngIf="can('appointments.create')"
-                  type="button"
-                  class="icon-btn icon-btn-accent"
-                  (click)="startAppointmentFlow()"
-                  aria-label="Nuova prenotazione"
-                  data-tooltip="Nuova prenotazione"
-                >
-                  <barber-ui-icon name="calendar-plus"></barber-ui-icon>
-                </button>
-              </div>
-            </div>
-          </header>
-
-          <main class="content-scroll">
+        </alora-page-header>
             <article
               *ngIf="
                 appointmentOrderAlerts().length &&
-                activeView !== 'confirmations'
+                activeView !== 'sales'
               "
               class="panel mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3"
               aria-live="polite"
@@ -367,7 +247,7 @@ type ViewKey =
               <button
                 type="button"
                 class="primary-btn"
-                (click)="selectView('confirmations')"
+                (click)="selectView('sales')"
               >
                 Vai ai conti
               </button>
@@ -401,16 +281,6 @@ type ViewKey =
               (openQuickOrder)="openQuickOrder()"
             ></barber-admin-dashboard-page>
 
-            <barber-pending-orders-queue
-              *ngIf="activeView === 'confirmations'"
-              [appointments]="appointmentOrderAlerts()"
-              [unlinkedSales]="unlinkedSales"
-              [loading]="loading"
-              (confirmOrder)="confirmPendingOrder($event)"
-              (linkOrder)="linkPendingOrder($event)"
-              (cancelAppointment)="cancelPendingAppointment($event)"
-            ></barber-pending-orders-queue>
-
             <barber-admin-appointments-feature-page
               *ngIf="activeView === 'appointments'"
               (createOrder)="openQuickOrder($event)"
@@ -421,12 +291,17 @@ type ViewKey =
             <barber-admin-sales-page
               *ngIf="activeView === 'sales'"
               [sales]="adminData().sales"
+              [toClose]="appointmentOrderAlerts()"
+              [openSales]="openSales"
+              [unlinkedSales]="unlinkedSales"
               [loading]="loading"
               [hasMore]="salesHasMore()"
               (loadMore)="loadMoreSales()"
-              (openQuickOrder)="openQuickOrder()"
               (editOrder)="openQuickOrder(null, $event)"
               (deleteOrder)="deleteSale($event)"
+              (closeAccount)="closeAccount($event)"
+              (linkOrder)="linkPendingOrder($event)"
+              (cancelAppointment)="cancelPendingAppointment($event)"
             ></barber-admin-sales-page>
 
             <barber-admin-customers-page
@@ -466,7 +341,7 @@ type ViewKey =
               (editProduct)="editProduct($event)"
               (saveProduct)="saveProduct()"
               (removeProduct)="removeProduct()"
-              (resetProduct)="resetProductForm()"
+              (resetProduct)="resetProductForm($event)"
               (loadMoreServices)="loadMoreServices()"
               (loadMoreProducts)="loadMoreProducts()"
             ></barber-admin-services-page>
@@ -557,48 +432,8 @@ type ViewKey =
               (uploadMedia)="uploadMedia($event)"
               (deleteMedia)="deleteMedia($event)"
             ></barber-admin-settings-page>
-          </main>
-        </div>
-
-        <nav
-          *ngIf="currentUser?.role !== 'platform_admin'"
-          class="mobile-bottom-nav"
-          aria-label="Navigazione principale"
-        >
-          <button
-            *ngFor="let item of mobileNavItems"
-            type="button"
-            class="mobile-nav-btn"
-            [ngClass]="{ active: activeView === item.key }"
-            [attr.aria-label]="item.label"
-            [attr.aria-current]="activeView === item.key ? 'page' : null"
-            (click)="selectView(item.key)"
-          >
-            <span class="mobile-nav-icon">
-              {{ item.icon }}
-              <span
-                *ngIf="
-                  item.key === 'confirmations' &&
-                  appointmentOrderAlerts().length
-                "
-                class="mobile-nav-badge"
-                >{{ appointmentOrderAlerts().length }}</span
-              >
-            </span>
-            <span class="mobile-nav-label">{{ item.short || item.label }}</span>
-          </button>
-          <button
-            type="button"
-            class="mobile-nav-btn"
-            aria-label="Apri tutte le sezioni"
-            (click)="sidebarOpen = true"
-          >
-            <span class="mobile-nav-icon">☰</span>
-            <span class="mobile-nav-label">Altro</span>
-          </button>
-        </nav>
-      </section>
-    </main>
+      </ng-container>
+    </ui-page>
   `,
 })
 export class AdminAppComponent implements OnInit, OnDestroy {
@@ -640,8 +475,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   });
 
   sessionToken = this.sessionStore.token();
-  sidebarOpen = false;
-  sidebarCollapsed = false;
   loading = false;
   feedback = "";
   activeView: ViewKey = "dashboard";
@@ -764,81 +597,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   appointmentSelectedDate = toLocalDateKey(new Date());
   appointmentSlots: Array<{ startsAt: string; label: string }> = [];
 
-  navItems: Array<{
-    key: ViewKey;
-    label: string;
-    hint: string;
-    icon: string;
-    short?: string;
-  }> = [
-    { key: "dashboard", label: "Panoramica", hint: "andamento", icon: "P" },
-    { key: "appointments", label: "Agenda", hint: "appuntamenti", icon: "A" },
-    {
-      key: "confirmations",
-      label: "Conti da chiudere",
-      hint: "fine servizio",
-      icon: "!",
-      short: "Conferme",
-    },
-    { key: "sales", label: "Cassa", hint: "vendite", icon: "C" },
-    { key: "customers", label: "Clienti", hint: "relazioni", icon: "R" },
-    {
-      key: "services",
-      label: "Listino",
-      hint: "servizi e prodotti",
-      icon: "L",
-    },
-    { key: "collaborators", label: "Squadra", hint: "persone e ruoli", icon: "S" },
-    {
-      key: "settings",
-      label: "Il tuo salone",
-      hint: "immagine e prenotazioni",
-      icon: "I",
-    },
-  ];
-
   can(key: string): boolean {
     return this.sessionStore.can(key);
   }
 
-  get activeViewLabel(): string {
-    if (this.isPlatformRoute) {
-      return "Gestione attività";
-    }
-
-    return (
-      this.visibleNavItems.find((item) => item.key === this.activeView)
-        ?.label ?? "Panoramica"
-    );
-  }
-
-  get visibleNavItems(): Array<{
-    key: ViewKey;
-    label: string;
-    hint: string;
-    icon: string;
-    short?: string;
-  }> {
-    return this.navItems.filter((item) =>
-      canAccessLocalView(this.currentUser, item.key),
-    );
-  }
-
-  /** Sezioni sempre a portata di pollice nella barra inferiore mobile. */
-  get mobileNavItems(): Array<{
-    key: ViewKey;
-    label: string;
-    hint: string;
-    icon: string;
-    short?: string;
-  }> {
-    const keys: ViewKey[] = [
-      "dashboard",
-      "appointments",
-      "confirmations",
-      "sales",
-    ];
-    return this.visibleNavItems.filter((item) => keys.includes(item.key));
+  /** Header entry for the current view; `team` is an alias of the team page. */
+  get headerNavKey(): AdminNavKey {
+    return this.activeView === "team" ? "collaborators" : this.activeView;
   }
 
   get serviceSelectOptions(): Array<{ value: string; label: string }> {
@@ -1076,7 +841,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       if (this.activeView === "appointments") {
         void this.refreshShell();
       } else {
-        void this.refreshAll();
+        void this.refreshAll(true);
       }
     }
     this.dashboardRefreshTimer = setInterval(() => {
@@ -1226,6 +991,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       priceMode:"legacy",vatRate:"",priceChangeReason:"",isActive:true,
       id: "",
       sectorId: "",
+      activityId: "",
       requiresRoom: false,
       name: "",
       publicDescription: "",
@@ -1244,6 +1010,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       id: "",
       name: "",
       description: "",
+      barcode: "",
+      activityId: "",
       price: null as number | null,
     };
   }
@@ -1284,6 +1052,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       phone: "",
       tagsText: "",
       notes: "",
+      autoTags: [] as string[],
     };
   }
 
@@ -1316,10 +1085,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     };
   }
 
-  async refreshAll(): Promise<void> {
+  async refreshAll(firstLoad = false): Promise<void> {
     this.syncAutoRevenueDate();
     try {
-      const state = await this.adminFacade.refreshAll(this.revenueFilters);
+      const state = await this.adminFacade.refreshAll(
+        this.revenueFilters,
+        firstLoad ? () => this.applyStats() : undefined,
+      );
       this.loading = this.adminFacade.loading();
       this.feedback = this.adminFacade.feedback();
       this.currentUser = this.adminFacade.currentUser();
@@ -1341,15 +1113,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.tenant = this.adminFacade.tenant();
       void this.operationalContext.loadTotals().catch(() => undefined);
       this.appointmentOrderNotifications.connect(this.sessionStore.token());
-      this.revenueMetrics = this.adminFacade.revenueMetrics();
-      this.revenueReport = this.adminFacade.revenueReport();
-      this.appointmentStats = this.adminFacade.appointmentStats();
-      this.collaboratorStats = this.adminFacade.collaboratorStats();
-      this.serviceStats = this.adminFacade.serviceStats();
+      this.applyStats();
       this.appointments = this.adminFacade.appointments();
-      this.sales = this.adminFacade.sales();
+      if (this.activeView === "sales") void this.loadOpenSales();
       this.services = this.adminFacade.services();
-      this.products = this.adminFacade.products();
       this.collaborators = this.adminFacade.collaborators();
       this.customers = this.adminFacade.customers();
       this.filteredAppointmentCustomers = [...this.customers];
@@ -1394,6 +1161,17 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         error?.message ||
         "Non riusciamo a caricare la panoramica";
     }
+  }
+
+  /** Reports and the sales/products lists (they may land after the rest on first load). */
+  private applyStats(): void {
+    this.revenueMetrics = this.adminFacade.revenueMetrics();
+    this.revenueReport = this.adminFacade.revenueReport();
+    this.appointmentStats = this.adminFacade.appointmentStats();
+    this.collaboratorStats = this.adminFacade.collaboratorStats();
+    this.serviceStats = this.adminFacade.serviceStats();
+    this.sales = this.adminFacade.sales();
+    this.products = this.adminFacade.products();
   }
 
   async refreshCurrentView(): Promise<void> {
@@ -1507,16 +1285,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     } else {
       void this.router.navigate([`/${view}`]);
     }
-    if (window.innerWidth < 1024) {
-      this.sidebarOpen = false;
-    }
     if (view === "dashboard") {
       void this.refreshDashboardQueries();
     }
-  }
-
-  toggleSidebarCollapsed(): void {
-    this.sidebarCollapsed = !this.sidebarCollapsed;
   }
 
   prepareNewAppointment(): void {
@@ -1528,9 +1299,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.appointmentSlots = [];
     if (this.services[0]) {
       this.appointmentForm.serviceId = this.services[0].id;
-    }
-    if (window.innerWidth < 1024) {
-      this.sidebarOpen = false;
     }
   }
 
@@ -1947,6 +1715,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       id: service.id,
       name: service.name,
       sectorId: service.sectorId,
+      activityId: service.activityId || "",
       requiresRoom: service.requiresRoom,
       publicDescription: service.publicDescription || "",
       durationMinutes: Number(service.durationMinutes || 30),
@@ -1973,6 +1742,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       id: product.id,
       name: product.name || "",
       description: product.description || "",
+      barcode: product.barcode || "",
+      activityId: product.activityId || "",
       price:
         product.price === null || product.price === undefined
           ? null
@@ -2021,6 +1792,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       phone: customer.phone || "",
       tagsText: Array.isArray(customer.tags) ? customer.tags.join(", ") : "",
       notes: customer.notes || "",
+      // Read-only: computed by the server (e.g. "fedele"), shown on the card.
+      autoTags: Array.isArray(customer.autoTags) ? customer.autoTags : [],
     };
     this.customerHistory = null;
     this.customerHistoryLoading = true;
@@ -2517,8 +2290,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.resetServiceProductForm();
   }
 
-  resetProductForm(): void {
-    this.productForm = this.emptyProductForm();
+  resetProductForm(prefill?: { barcode?: string } | void): void {
+    this.productForm = { ...this.emptyProductForm(), ...(prefill || {}) };
   }
 
   resetCollaboratorForm(): void {
@@ -2587,12 +2360,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     }
   }
 
-  async refreshDashboardQueries(): Promise<void> {
+  /** `lists`: also reload sales and products (after a change, not on the timer). */
+  async refreshDashboardQueries(lists = false): Promise<void> {
     this.dashboardRefreshInFlight += 1;
     this.syncAutoRevenueDate();
     try {
       await Promise.all([
-        this.adminFacade.refreshStatsData(this.revenueFilters),
+        this.adminFacade.refreshStatsData(this.revenueFilters, lists),
         this.loadDashboardActivity(true),
       ]);
       this.revenueReport = this.adminFacade.revenueReport();
@@ -2615,7 +2389,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       await this.refreshAll();
       return;
     }
-    await this.refreshDashboardQueries();
+    await this.refreshDashboardQueries(true);
   }
 
   async loadMoreDashboardActivity(): Promise<void> {
@@ -2756,6 +2530,47 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   confirmPendingOrder(appointment: any): void {
     this.openQuickOrder(appointment);
+  }
+
+  /** Open accounts of the till (saved open, or booked and started). */
+  openSales: any[] = [];
+  newMenuOpen = false;
+
+  get canCreateSomething(): boolean {
+    return this.can("sales.manage") || this.can("appointments.create");
+  }
+
+  /** One entry point; with a single permitted choice it opens it directly. */
+  onNewClick(): void {
+    const sell = this.can("sales.manage");
+    const book = this.can("appointments.create");
+    if (sell && book) {
+      this.newMenuOpen = !this.newMenuOpen;
+      return;
+    }
+    if (sell) void this.openQuickOrder();
+    else if (book) this.startAppointmentFlow();
+  }
+
+  async loadOpenSales(): Promise<void> {
+    if (!this.can("sales.read")) {
+      this.openSales = [];
+      return;
+    }
+    try {
+      this.openSales = await firstValueFrom(this.adminApi.loadOpenSales());
+    } catch {
+      this.openSales = [];
+    }
+  }
+
+  /** "Chiudi il conto": a booked account goes through its appointment. */
+  closeAccount(event: { appointment: any; sale: any }): void {
+    if (event.appointment?.id) {
+      void this.openQuickOrder(event.appointment);
+      return;
+    }
+    if (event.sale) void this.openQuickOrder(null, event.sale);
   }
 
   cancelPendingAppointment(appointment: any): void {
@@ -2942,7 +2757,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     try {
       const payload = {
         name: this.serviceForm.name,
-      sectorId: this.serviceForm.sectorId,
+      // The activity decides where the service is offered (every location running it).
+      activityId: this.serviceForm.activityId || undefined,
       requiresRoom: this.serviceForm.requiresRoom,
         publicDescription: this.serviceForm.publicDescription,
         durationMinutes: Number(this.serviceForm.durationMinutes),
@@ -2994,6 +2810,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         this.adminApi.createOrUpdateProduct(this.productForm.id, {
           name: this.productForm.name.trim(),
           description: this.productForm.description || undefined,
+          // Empty clears the code, so a wrong association can be undone.
+          barcode: String(this.productForm.barcode || "").trim() || null,
+          // Empty keeps «Rivendita» (default of the account).
+          ...(this.productForm.activityId ? { activityId: this.productForm.activityId } : {}),
           isActive:this.productForm.isActive,
           priceMode:this.productForm.priceMode,vatRate:this.productForm.vatRate===""?null:String(this.productForm.vatRate),cost:this.productForm.cost,costMode:this.productForm.costMode,purchaseVatRate:this.productForm.purchaseVatRate===""?null:String(this.productForm.purchaseVatRate),priceChangeReason:this.productForm.priceChangeReason,
           ...(this.can("inventory.manage")?{stockTracked:this.productForm.stockTracked}:{}),
@@ -3287,7 +3107,6 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.adminFacade.clearSession();
     this.appointmentOrderNotifications.stop();
     this.feedback = "";
-    this.sidebarOpen = false;
     void this.router.navigate(["/login"]);
   }
 

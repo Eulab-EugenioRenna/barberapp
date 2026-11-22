@@ -53,6 +53,18 @@ export class SessionStore {
 
   setCurrentUser(user: any | null): void {
     this.currentUserState.set(user);
+    this.userLoadedAt = user ? Date.now() : 0;
+  }
+
+  private userLoadedAt = 0;
+
+  /**
+   * Profile just re-read by the route guard: the page that opens right after
+   * can use it instead of asking the server again in the same second.
+   */
+  freshUser(maxAgeMs = 5_000): any | null {
+    const user = this.currentUserState();
+    return user && Date.now() - this.userLoadedAt <= maxAgeMs ? user : null;
   }
 
   clear(): void {

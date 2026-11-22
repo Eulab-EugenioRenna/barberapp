@@ -1,18 +1,15 @@
 import { Component, OnDestroy, OnInit, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { RouterLink } from "@angular/router";
 import type {
   WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView,
 } from "@barber/shared/whatsapp";
 import { SessionStore } from "../core/session.store";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
-import { NotificationTemplateEditorComponent } from "../shared/notification-template-editor.component";
-import { AppointmentAutomationPolicyComponent } from "../shared/appointment-automation-policy.component";
-import { AppointmentAutomationMonitorComponent } from "../shared/appointment-automation-monitor.component";
-import { AppointmentAutomationAccessComponent } from "../shared/appointment-automation-access.component";
+import { UiPageComponent, UiSelectComponent, UiTabsComponent, type UiOption, type UiTab } from "@alora/ui";
+import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 @Component({
-  standalone: true, imports: [CommonModule, FormsModule, RouterLink, NotificationTemplateEditorComponent, AppointmentAutomationPolicyComponent, AppointmentAutomationAccessComponent, AppointmentAutomationMonitorComponent],
+  standalone: true, imports: [CommonModule, FormsModule, UiPageComponent, UiTabsComponent, UiSelectComponent, AdminPageHeaderComponent],
   templateUrl: "./whatsapp.component.html", styleUrl: "./whatsapp.component.css",
 })
 export class WhatsAppComponent implements OnInit, OnDestroy {
@@ -27,7 +24,21 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   to = ""; message = ""; recipientAuthorized = false;
   feedback = ""; connectionFeedback = ""; sendFeedback = ""; updatedAt: Date | null = null;
   loading = true; refreshing = false; busy = false; sending = false; loadingMessages = false;
-  fresh = false; hasOlder = false; disconnectId = "";
+  fresh = false; hasOlder = false; disconnectId = ""; removeId = "";
+  section: "connection" | "chats" | "compose" | "outbox" = "connection";
+  readonly tabs: UiTab[] = [
+    { key: "connection", label: "Collegamento" },
+    { key: "chats", label: "Conversazioni" },
+    { key: "compose", label: "Nuovo messaggio" },
+    { key: "outbox", label: "Invii" },
+  ];
+  private qrTimer?: ReturnType<typeof setInterval>;
+  private archiveOptionsCache: { source: WhatsAppArchiveView[]; value: UiOption[] } | null = null;
+  get archiveOptions(): UiOption[] {
+    if (this.archiveOptionsCache?.source !== this.archives)
+      this.archiveOptionsCache = { source: this.archives, value: this.archives.map(a => ({ value: a.id, label: a.number })) };
+    return this.archiveOptionsCache.value;
+  }
   private destroyed = false;
   private timer?: ReturnType<typeof setInterval>;
   private selection = 0;
@@ -47,7 +58,25 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     await this.refresh();
     if (!this.destroyed) this.timer = setInterval(() => { if (!document.hidden) void this.refresh(); }, 8000);
   }
-  ngOnDestroy() { this.destroyed = true; this.selection++; clearInterval(this.timer); this.qr = null; }
+  ngOnDestroy() { this.destroyed = true; this.selection++; clearInterval(this.timer); this.stopQr(); this.qr = null; }
+  /** While pairing, the QR rotates: refresh it often, stop as soon as it is linked. */
+  private syncQrPolling() {
+    const pairing = this.active?.state === "pairing" && this.canManage;
+    if (pairing && !this.qrTimer) this.qrTimer = setInterval(() => { if (!document.hidden) void this.refreshQr(); }, 3000);
+    if (!pairing) this.stopQr();
+  }
+  private stopQr() { if (this.qrTimer) clearInterval(this.qrTimer); this.qrTimer = undefined; }
+  private async refreshQr() {
+    const active = this.active;
+    if (!active || active.state !== "pairing") return this.stopQr();
+    try {
+      const result = await this.api.qr(active.id);
+      if (this.destroyed) return;
+      this.qr = result.qr;
+      // Linked on the phone: reload the whole state once.
+      if (result.state !== "pairing") { this.stopQr(); await this.refresh(); }
+    } catch { /* the 8s refresh reports errors */ }
+  }
   private error(error: any): string { return error?.error?.message || error?.message || "WhatsApp non disponibile. Aggiorna lo stato."; }
   async refresh() {
     if (this.refreshing || this.destroyed) return;
@@ -65,6 +94,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
         const result = await this.api.qr(this.active.id);
         if (!this.destroyed) this.qr = result.qr;
       } else this.qr = null;
+      this.syncQrPolling();
     } catch (error) {
       this.fresh = false; this.qr = null;
       this.feedback = this.error(error);
@@ -110,12 +140,17 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     try { await this.loadMessages(true); }
     catch (error) { this.feedback = this.error(error); this.fresh = false; }
   }
-  async connectionAction(action: "connect" | "reconnect" | "disconnect", id = "") {
+  async connectionAction(action: "connect" | "reconnect" | "disconnect" | "remove", id = "") {
     if (this.busy || !this.fresh) return;
-    this.busy = true; this.qr = null; this.disconnectId = ""; this.connectionFeedback = "";
+    this.busy = true; this.qr = null; this.disconnectId = ""; this.removeId = ""; this.connectionFeedback = "";
     try {
-      if (action === "connect") await this.api.connect(); else await this.api.action(id, action);
-      this.connectionFeedback = "Richiesta registrata. Attendi l’aggiornamento dello stato.";
+      if (action === "connect") await this.api.connect();
+      else if (action === "remove") await this.api.remove(id);
+      else await this.api.action(id, action);
+      this.connectionFeedback = action === "connect"
+        ? "Collegamento creato. Inquadra il QR con il telefono."
+        : action === "remove" ? "Collegamento eliminato. Lo storico dei messaggi resta in Connect."
+        : "Richiesta registrata. Attendi l’aggiornamento dello stato.";
     } catch (error) { this.connectionFeedback = this.error(error); }
     finally { this.busy = false; this.fresh = false; }
     await this.refresh();

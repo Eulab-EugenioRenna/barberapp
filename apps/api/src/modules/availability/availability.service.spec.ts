@@ -5,6 +5,11 @@ describe("AvailabilityService", () => {
     const service = new AvailabilityService(
       {
         sector: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([
+              { id: "sector-1", locationId: "location-1", activityId: "activity-1" },
+            ]),
           findFirst: jest.fn().mockResolvedValue({
             id: "sector-1",
             tenantId: "tenant-1",
@@ -22,7 +27,10 @@ describe("AvailabilityService", () => {
             }),
           findFirst: jest.fn().mockResolvedValue({
             id: "service-1",
+            name: "Taglio",
             sectorId: "sector-1",
+            activityId: "activity-1",
+            sector: { locationId: "location-1" },
             tenantId: "tenant-1",
             durationMinutes: 30,
             bufferBeforeMinutes: 15,

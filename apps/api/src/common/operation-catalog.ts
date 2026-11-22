@@ -1,7 +1,13 @@
-import type { FunctionKey } from "./function-catalog";
+import { PICK_LIST_ACCESS, type FunctionKey } from "./function-catalog";
 /** Ogni handler HTTP deve essere censito esattamente. Il guard nega quelli sconosciuti. */
 export type OperationDefinition =
-  | { kind: "function"; key: FunctionKey; own?: FunctionKey }
+  | {
+      kind: "function";
+      key: FunctionKey;
+      own?: FunctionKey;
+      /** Alternative functions that also allow the operation (pick lists). */
+      anyOf?: readonly FunctionKey[];
+    }
   | { kind: "public" | "session" | "tenant-context" | "platform" | "disabled" };
 export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "WhatsAppController.sessions": { kind: "function", key: "whatsapp.read" },
@@ -13,6 +19,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "WhatsAppController.connect": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.reconnect": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.disconnect": { kind: "function", key: "whatsapp.manage" },
+  "WhatsAppController.remove": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.send": { kind: "function", key: "whatsapp.send" },
   "LocationsController.context": { kind: "session" },
   "LocationsController.totals": {
@@ -47,6 +54,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "locations.manage",
   },
+  // Catalogue metadata used by agenda, till and catalogue forms.
+  "ActivitiesController.list": { kind: "session" },
+  "ActivitiesController.create": { kind: "function", key: "locations.manage" },
+  "ActivitiesController.update": { kind: "function", key: "locations.manage" },
 
   "PersonalAccountController.profile": { kind: "session" },
   "PersonalAccountController.security": { kind: "session" },
@@ -55,6 +66,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "PersonalAccountController.logoutAll": { kind: "session" },
   "PersonalAccountController.logoutSession": { kind: "session" },
   "PersonalAccountController.revokeDevice": { kind: "session" },
+  "PersonalAccountController.updateProfile": { kind: "session" },
+  "PersonalAccountController.setMfaPreference": { kind: "session" },
+  "PersonalAccountController.removeAuthenticator": { kind: "session" },
+  "PersonalAccountController.startAction": { kind: "session" },
   "PersonalDashboardController.overview": {
     kind: "function",
     key: "appointments.read.all",
@@ -84,14 +99,8 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "ConnectAuthController.exchange": { kind: "public" },
   "ConnectAuthController.exchangeTechnical": { kind: "public" },
   "ConnectTechnicalController.start": { kind: "public" },
-  "AppointmentsController.context": {
-    kind: "function",
-    key: "appointments.read.all",
-  },
-  "ServicesController.findAll": {
-    kind: "function",
-    key: "services.read",
-  },
+  "AppointmentsController.context": { kind: "function", key: "appointments.read.all", anyOf: PICK_LIST_ACCESS.agenda },
+  "ServicesController.findAll": { kind: "function", key: "services.read", anyOf: PICK_LIST_ACCESS.services },
   "ServicesController.create": {
     kind: "function",
     key: "services.manage",
@@ -115,25 +124,13 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "InventoryController.balances": { kind: "function", key: "inventory.read" },
   "InventoryController.movements": { kind: "function", key: "inventory.read" },
   "InventoryController.execute": { kind: "function", key: "inventory.manage" },
-  "ProductsController.priceHistory": { kind: "function", key: "products.read" },
-  "ProductsController.byBarcode": { kind: "function", key: "products.read" },
+  "ProductsController.priceHistory": { kind: "function", key: "services.read" },
+  "ProductsController.byBarcode": { kind: "function", key: "services.read", anyOf: PICK_LIST_ACCESS.products },
   "ServicesController.priceHistory": { kind: "function", key: "services.read" },
-  "ProductsController.findAll": {
-    kind: "function",
-    key: "products.read",
-  },
-  "ProductsController.create": {
-    kind: "function",
-    key: "products.manage",
-  },
-  "ProductsController.update": {
-    kind: "function",
-    key: "products.manage",
-  },
-  "ProductsController.remove": {
-    kind: "function",
-    key: "products.manage",
-  },
+  "ProductsController.findAll": { kind: "function", key: "services.read", anyOf: PICK_LIST_ACCESS.products },
+  "ProductsController.create": { kind: "function", key: "services.manage" },
+  "ProductsController.update": { kind: "function", key: "services.manage" },
+  "ProductsController.remove": { kind: "function", key: "services.manage" },
   "CollaboratorsController.findOne": {
     kind: "function",
     key: "collaborators.read",
@@ -142,10 +139,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "collaborators.read",
   },
-  "CollaboratorsController.options": {
-    kind: "function",
-    key: "collaborators.read",
-  },
+  "CollaboratorsController.options": { kind: "function", key: "collaborators.read", anyOf: PICK_LIST_ACCESS.collaborators },
   "CollaboratorsController.create": {
     kind: "function",
     key: "collaborators.manage",
@@ -158,14 +152,8 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "collaborators.manage",
   },
-  "CustomersController.options": {
-    kind: "function",
-    key: "clients.read.full",
-  },
-  "CustomersController.findAll": {
-    kind: "function",
-    key: "clients.read.full",
-  },
+  "CustomersController.options": { kind: "function", key: "clients.read.full", anyOf: PICK_LIST_ACCESS.customers },
+  "CustomersController.findAll": { kind: "function", key: "clients.read.full", anyOf: PICK_LIST_ACCESS.customers },
   "CustomersController.findOne": {
     kind: "function",
     key: "clients.read.full",
@@ -193,6 +181,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     key: "sales.read",
   },
   "SalesController.forAppointment": { kind: "function", key: "sales.manage" },
+  "SalesController.findOpen": { kind: "function", key: "sales.read" },
   "SalesController.findOne": {
     kind: "function",
     key: "sales.read",
@@ -343,10 +332,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "audit.read",
   },
-  "NotificationsController.stream": {
-    kind: "function",
-    key: "confirmations.read",
-  },
+  "NotificationsController.stream": { kind: "function", key: "sales.read" },
   "NotificationsController.preferences": {
     kind: "function",
     key: "notifications.read",

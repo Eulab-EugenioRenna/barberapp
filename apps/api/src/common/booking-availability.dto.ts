@@ -26,4 +26,7 @@ export class BookingAvailabilityDto {
   @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) to?: string;
   @IsOptional() @IsString() @MaxLength(100) appointmentId?: string;
   @IsOptional() @IsString() @MaxLength(64) startsAt?: string;
+  /** Location of the booking: each service is offered by its activity there. */
+  @IsOptional() @IsString() @MaxLength(100) locationId?: string;
+  @IsOptional() @IsString() @MaxLength(100) sectorId?: string;
 }

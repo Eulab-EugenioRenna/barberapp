@@ -146,6 +146,19 @@ select:focus-visible {
   width: 100%;
 }
 
+/*
+ * Tablet+: the date sits next to location/activity. It must not take the whole
+ * row, otherwise the left column shrinks to its minimum (the design system
+ * selects, unlike native ones, have no intrinsic width).
+ */
+@media (min-width: 48rem) {
+  .public-date-field {
+    width: auto;
+    flex: 0 1 20rem;
+    min-width: 16rem;
+  }
+}
+
 .eyebrow {
   font-size: 0.72rem;
   font-weight: 800;

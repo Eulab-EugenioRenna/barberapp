@@ -1,3 +1,4 @@
+import { PICK_LIST_ACCESS } from "@barber/shared/functions";
 import { CreateRecoveryService } from "./create-recovery.service";
 import { defer } from "rxjs";
 import type { PersonalDashboard } from "@barber/shared/personal";
@@ -15,6 +16,7 @@ export class AdminApiService {
 
   bookingAvailability(payload: {
     date: string;
+    locationId?: string;
     lines: Array<{ serviceId: string; collaboratorId?: string }>;
   }): Observable<any> {
     return this.http.post(
@@ -23,12 +25,14 @@ export class AdminApiService {
     );
   }
 
+  /** Loads only when permitted; `key` may list alternatives (pick lists). */
   private allowed<T>(
-    key: string,
+    key: string | readonly string[],
     load: () => Observable<T>,
     fallback: T,
   ): Observable<T> {
-    return this.session.can(key) ? load() : of(fallback);
+    const keys = typeof key === "string" ? [key] : key;
+    return keys.some((entry) => this.session.can(entry)) ? load() : of(fallback);
   }
 
   private loadTenantContext(): Observable<any> {
@@ -39,7 +43,7 @@ export class AdminApiService {
 
   private loadAgendaContext(): Observable<any> {
     return this.allowed(
-      "appointments.read.all",
+      PICK_LIST_ACCESS.agenda,
       () => this.http.get(`${ADMIN_API_URL}/appointments/context`),
       { services: [], collaborators: [] },
     );
@@ -132,7 +136,7 @@ export class AdminApiService {
 
   private loadCustomerOptions(): Observable<any[]> {
     return this.allowed<any[]>(
-      "clients.read.full",
+      PICK_LIST_ACCESS.customers,
       () => this.http.get<any[]>(`${ADMIN_API_URL}/customers/options`),
       [],
     );
@@ -151,7 +155,7 @@ export class AdminApiService {
       query.set("search", search);
     }
     return this.allowed<any>(
-      "clients.read.full",
+      PICK_LIST_ACCESS.customers,
       () =>
         this.http.get<any>(`${ADMIN_API_URL}/customers?${query.toString()}`),
       { items: [], total: 0, hasMore: false },
@@ -171,11 +175,20 @@ export class AdminApiService {
     );
   }
 
+  /** Open accounts of today's till (saved open, or booked and already started). */
+  loadOpenSales(): Observable<any[]> {
+    return this.allowed<any[]>(
+      "sales.read",
+      () => this.http.get<any[]>(`${ADMIN_API_URL}/sales/open`),
+      [],
+    );
+  }
+
   loadServicesPage(
     page: number,
   ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
     return this.allowed<any>(
-      "services.read",
+      PICK_LIST_ACCESS.services,
       () =>
         this.http.get<any>(
           `${ADMIN_API_URL}/services?page=${page}&pageSize=${this.catalogPageSize}`,
@@ -188,7 +201,7 @@ export class AdminApiService {
     page: number,
   ): Observable<{ items: any[]; total: number; hasMore: boolean }> {
     return this.allowed<any>(
-      "products.read",
+      PICK_LIST_ACCESS.products,
       () =>
         this.http.get<any>(
           `${ADMIN_API_URL}/products?page=${page}&pageSize=${this.catalogPageSize}`,
@@ -219,7 +232,7 @@ export class AdminApiService {
   loadCollaboratorOptions(): Observable<Array<{
     id: string; firstName: string; lastName: string; sectors: Array<{ sectorId: string }>;
   }>> {
-    return this.allowed("collaborators.read", () => this.http.get<Array<{
+    return this.allowed(PICK_LIST_ACCESS.collaborators, () => this.http.get<Array<{
       id: string; firstName: string; lastName: string; sectors: Array<{ sectorId: string }>;
     }>>(`${ADMIN_API_URL}/collaborators/options`), []);
   }
@@ -247,7 +260,23 @@ export class AdminApiService {
 
   loadAdminStatsData(
     revenueFilters: Record<string, string> = {},
+    includeLists = true,
   ): Observable<Record<string, unknown>> {
+    if (!includeLists)
+      // Periodic dashboard refresh: report figures only, lists are untouched.
+      return forkJoin({
+        revenue: this.loadRevenueReport(revenueFilters),
+        upcomingAppointments: this.allowed<any>(
+          "dashboard.revenue.read",
+          () => this.http.get(`${ADMIN_API_URL}/dashboard/upcoming-appointments`),
+          null,
+        ),
+        appointmentStats: this.allowed<any>(
+          "dashboard.revenue.read",
+          () => this.http.get(`${ADMIN_API_URL}/dashboard/appointments`),
+          null,
+        ),
+      });
     return forkJoin({
       revenue: this.loadRevenueReport(revenueFilters),
       upcomingAppointments: this.allowed<any>(

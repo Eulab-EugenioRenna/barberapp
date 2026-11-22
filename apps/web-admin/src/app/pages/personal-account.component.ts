@@ -1,55 +1,95 @@
 import { CommonModule, DOCUMENT } from "@angular/common";
 import { Component, inject, OnInit } from "@angular/core";
+import { FormsModule } from "@angular/forms";
 import { Router, RouterLink } from "@angular/router";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
-import { AloraBrandComponent } from "@barber/shared/brand";
+import { UiPageComponent } from "@alora/ui";
+import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { canAccessLocalView, VIEW_FUNCTIONS } from "@barber/shared/functions";
 import { firstValueFrom } from "rxjs";
 import type { PersonalAccount, PersonalNotices, PersonalSecurity, PersonalSessionList } from "@barber/shared/account";
 import { AuthApiService } from "../core/auth-api.service";
 import { SessionRefreshService } from "../core/session-refresh.service";
 import { SessionStore } from "../core/session.store";
+import { TourService } from "../core/onboarding/tour.service";
 
-type AccountAction = { kind: "session" | "all" | "device"; id: string; current?: boolean };
+type AccountAction = { kind: "session" | "all" | "device" | "authenticator"; id: string; current?: boolean };
+type ProviderAction = "UPDATE_PASSWORD" | "CONFIGURE_TOTP" | "VERIFY_EMAIL";
+const REQUIRED_ACTIONS: Record<string, string> = {
+  UPDATE_PASSWORD: "nuova password",
+  CONFIGURE_TOTP: "app di autenticazione",
+  VERIFY_EMAIL: "verifica email",
+  UPDATE_PROFILE: "dati del profilo",
+  TERMS_AND_CONDITIONS: "accettazione dei termini",
+};
 
 @Component({
   standalone: true,
-  imports: [CommonModule, RouterLink, AloraBrandComponent, AutofocusFirstDirective],
-  template: `<main class="mx-auto grid max-w-5xl gap-5 p-4 pb-10 sm:p-7">
-    <header class="panel rounded-[2rem] p-5 sm:p-7">
-      <div class="flex flex-wrap items-center justify-between gap-4"><alora-brand></alora-brand>
-        <nav class="flex flex-wrap gap-2" aria-label="Navigazione personale"><a class="secondary-btn" [routerLink]="workRoute">Torna al lavoro</a><button class="secondary-btn" type="button" (click)="logout()">Esci</button></nav>
-      </div>
-      <p class="eyebrow mt-6 text-[var(--accent)]">Accesso personale</p>
-      <h1 class="mt-1 font-display text-3xl sm:text-4xl">Il mio account</h1>
-      <p class="mt-3 max-w-2xl text-sm text-[var(--muted)]">La tua identità EULAB ti accompagna nelle applicazioni collegate. Qui controlli la sicurezza del tuo accesso.</p>
-      <button type="button" class="secondary-btn mt-4" [disabled]="loading || busy" (click)="load()">{{ loading ? 'Aggiornamento…' : 'Aggiorna stato' }}</button>
-      <p *ngIf="feedback" class="mt-4 text-sm" role="status" aria-live="polite">{{ feedback }}</p>
-    </header>
+  imports: [CommonModule, FormsModule, RouterLink, UiPageComponent, AdminPageHeaderComponent, AutofocusFirstDirective],
+  template: `<ui-page>
+    <alora-page-header navKey="account">
+      <button uiPageActions type="button" class="secondary-btn" data-tour="account-refresh" [disabled]="loading || busy" (click)="load()">{{ loading ? 'Aggiornamento…' : 'Aggiorna stato' }}</button>
+    </alora-page-header>
+    <p *ngIf="feedback" class="panel rounded-2xl px-4 py-3 text-sm" role="status" aria-live="polite">{{ feedback }}</p>
     <section class="grid gap-5 md:grid-cols-2">
-      <article class="panel rounded-[2rem] p-5 sm:p-7">
-        <p class="eyebrow text-[var(--accent)]">Profilo</p><h2 class="mt-1 font-display text-2xl">I tuoi dati in ALORA</h2>
-        <ng-container *ngIf="account as data"><p class="mt-5 text-xl font-semibold">{{ data.profile.firstName }} {{ data.profile.lastName }}</p><p class="mt-1 break-all text-sm text-[var(--muted)]">{{ data.profile.email }}</p>
-          <a class="primary-btn mt-5 inline-flex" [href]="data.accountUrl" target="_blank" rel="noopener noreferrer">Gestisci profilo e sicurezza SSO ↗</a>
-          <p class="mt-3 text-xs text-[var(--muted)]">Si apre l’area account EULAB. Puoi modificare i dati consentiti dal provider, cambiare password e configurare l’autenticatore. Le modifiche al profilo SSO non cambiano automaticamente l’anagrafica operativa del salone.</p>
-        </ng-container>
+      <article class="panel rounded-[2rem] p-5 sm:p-7" data-tour="account-profile">
+        <p class="eyebrow text-[var(--accent)]">Profilo</p><h2 class="mt-1 font-display text-2xl">I tuoi dati</h2>
+        <form *ngIf="account as data" class="mt-5 grid gap-3" (ngSubmit)="saveProfile()">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="field"><span>Nome</span><input name="firstName" [(ngModel)]="profileForm.firstName" autocomplete="given-name" maxlength="100" required /></label>
+            <label class="field"><span>Cognome</span><input name="lastName" [(ngModel)]="profileForm.lastName" autocomplete="family-name" maxlength="100" required /></label>
+          </div>
+          <div class="field"><span>Email di accesso</span><p class="break-all text-sm font-semibold">{{ data.profile.email }}</p>
+            <small class="text-xs text-[var(--muted)]">È l’identità con cui entri in tutte le app EULAB: per cambiarla contatta l’amministratore.</small></div>
+          <div class="flex flex-wrap gap-3">
+            <button class="primary-btn" data-tour="account-profile-save" [disabled]="busy || loading || !profileChanged">{{ busy ? 'Salvataggio…' : 'Salva profilo' }}</button>
+          </div>
+        </form>
         <p *ngIf="errors.profile" class="mt-4 text-sm" role="status">{{ errors.profile }}</p>
-        <p class="mt-5 text-sm text-[var(--muted)]">Password dimenticata? Usa il recupero password nella schermata di accesso SSO. Il link viene gestito dal provider.</p>
       </article>
-      <article class="dark-panel rounded-[2rem] p-5 text-white sm:p-7">
-        <p class="eyebrow text-white/50">Protezione</p><h2 class="mt-1 font-display text-2xl">Password e autenticazione</h2>
-        <dl *ngIf="security as data" class="mt-5 grid gap-4 text-sm">
-          <div><dt class="text-white/60">App autenticatore</dt><dd class="mt-1 font-semibold">{{ data.totp ? 'Configurata' : 'Non configurata' }}</dd></div>
-          <div><dt class="text-white/60">Indirizzo email</dt><dd class="mt-1 font-semibold">{{ data.emailVerified ? 'Verificato dal provider' : 'Da verificare nel provider' }}</dd></div>
-          <div><dt class="text-white/60">Preferenza registrata in Connect</dt><dd class="mt-1">{{ data.preferredMethod === 'auto' ? 'Automatica' : data.preferredMethod === 'totp' ? 'App autenticatore' : 'Codice email' }}</dd></div>
-        </dl>
-        <p *ngIf="security?.requiredActions?.length" class="mt-4 text-sm">Il provider richiede di completare alcune operazioni. Apri l’area account SSO.</p>
+      <article class="dark-panel rounded-[2rem] p-5 text-white sm:p-7" data-tour="account-security">
+        <p class="eyebrow text-white/50">Protezione</p><h2 class="mt-1 font-display text-2xl">Password e verifica</h2>
+        <div class="mt-5 grid gap-4 text-sm">
+          <div class="flex flex-wrap items-center justify-between gap-3" data-tour="account-password">
+            <div><strong>Password</strong><p class="mt-1 text-white/65">Cambiala quando vuoi: si apre la schermata sicura di EULAB e poi torni qui.</p></div>
+            <button type="button" class="secondary-btn" [disabled]="busy || loading" (click)="startAction('UPDATE_PASSWORD')">Cambia password</button>
+          </div>
+          <ng-container *ngIf="security as data">
+            <div class="flex flex-wrap items-center justify-between gap-3" data-tour="account-email">
+              <div><strong>Email</strong><p class="mt-1 text-white/65">{{ data.emailVerified ? 'Verificata' : 'Non ancora verificata: serve per i codici di accesso e il recupero password.' }}</p></div>
+              <button *ngIf="!data.emailVerified" type="button" class="secondary-btn" [disabled]="busy || loading" (click)="startAction('VERIFY_EMAIL')">Verifica email</button>
+            </div>
+            <div data-tour="account-authenticators">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div><strong>App di autenticazione</strong><p class="mt-1 text-white/65">{{ data.totp ? 'Attiva: all’accesso ti chiediamo anche il codice dell’app.' : 'Non configurata. Aggiungila per proteggere l’accesso con un codice dal telefono.' }}</p></div>
+                <button type="button" class="secondary-btn" [disabled]="busy || loading" (click)="startAction('CONFIGURE_TOTP')">{{ data.totp ? 'Aggiungi un’altra app' : 'Configura app' }}</button>
+              </div>
+              <ul *ngIf="data.authenticators.length" class="mt-3 grid gap-2">
+                <li *ngFor="let item of data.authenticators" class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 px-3 py-2">
+                  <span>{{ item.name }}<span *ngIf="item.createdAt" class="text-white/60"> · dal {{ item.createdAt | date: 'dd/MM/yyyy' }}</span></span>
+                  <button type="button" class="text-btn text-white underline" [disabled]="busy || loading" (click)="confirmAction({ kind: 'authenticator', id: item.id })">Rimuovi</button>
+                </li>
+              </ul>
+            </div>
+            <label class="field" data-tour="account-mfa-method">
+              <span class="text-white/80">Metodo di verifica preferito</span>
+              <select name="preferredMethod" [ngModel]="data.preferredMethod" (ngModelChange)="setPreference($event)" [disabled]="busy || loading">
+                <option value="auto">Automatico</option>
+                <option value="totp" [disabled]="!data.totp">App di autenticazione</option>
+                <option value="email">Codice via email</option>
+              </select>
+              <small class="text-xs text-white/60">Vale per tutte le app EULAB. Il codice via email richiede che il servizio sia attivo per la tua organizzazione.</small>
+            </label>
+            <p *ngIf="data.requiredActions.length" class="rounded-2xl border border-white/20 p-3">
+              Al prossimo accesso ti verrà chiesto di completare: {{ requiredActionLabels(data.requiredActions) }}.
+            </p>
+          </ng-container>
+        </div>
         <p *ngIf="errors.security" class="mt-4 text-sm" role="status">{{ errors.security }}</p>
-        <p class="mt-5 text-xs text-white/65">Configura l’app autenticatore nell’area account SSO. Codici email, preferenze MFA e dispositivi attendibili estesi richiedono l’attivazione del flusso di sicurezza EULAB. Una preferenza registrata non prova che il metodo sia attivo.</p>
       </article>
     </section>
-    <section class="panel rounded-[2rem] p-5 sm:p-7" aria-labelledby="account-sessions">
-      <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="eyebrow text-[var(--accent)]">Accessi SSO</p><h2 id="account-sessions" class="mt-1 font-display text-2xl">Le mie sessioni</h2></div><button *ngIf="sessions" type="button" class="danger-btn" [disabled]="busy || loading" (click)="confirmAction({ kind: 'all', id: '' })">Disconnetti tutte</button></div>
+    <section class="panel rounded-[2rem] p-5 sm:p-7" data-tour="account-sessions" aria-labelledby="account-sessions">
+      <div class="flex flex-wrap items-start justify-between gap-3"><div><p class="eyebrow text-[var(--accent)]">Accessi SSO</p><h2 id="account-sessions" class="mt-1 font-display text-2xl">Le mie sessioni</h2></div><button *ngIf="sessions" type="button" class="danger-btn" data-tour="account-logout-all" [disabled]="busy || loading" (click)="confirmAction({ kind: 'all', id: '' })">Disconnetti tutte</button></div>
       <p class="mt-3 text-sm text-[var(--muted)]">Le disconnessioni interessano anche le altre applicazioni EULAB associate alla sessione.</p>
       <p *ngIf="errors.sessions" class="mt-4 text-sm" role="status">{{ errors.sessions }}</p>
       <p *ngIf="sessions && !sessions.sessions.length" class="mt-4 text-sm">Nessuna sessione restituita dal provider.</p>
@@ -59,19 +99,26 @@ type AccountAction = { kind: "session" | "all" | "device"; id: string; current?:
         <button type="button" class="secondary-btn" [disabled]="busy || loading" (click)="confirmAction({ kind: 'session', id: item.id, current: item.current })">Disconnetti</button>
       </article>
     </section>
-    <section class="panel rounded-[2rem] p-5 sm:p-7" aria-labelledby="account-devices"><p class="eyebrow text-[var(--accent)]">Browser riconosciuti</p><h2 id="account-devices" class="mt-1 font-display text-2xl">Dispositivi attendibili</h2>
+    <section class="panel rounded-[2rem] p-5 sm:p-7" data-tour="account-devices" aria-labelledby="account-devices"><p class="eyebrow text-[var(--accent)]">Browser riconosciuti</p><h2 id="account-devices" class="mt-1 font-display text-2xl">Dispositivi attendibili</h2>
       <p *ngIf="security && !security.trustedDevices.length" class="mt-4 text-sm text-[var(--muted)]">Nessun dispositivo attendibile registrato.</p>
       <p *ngIf="errors.security" class="mt-4 text-sm">Lo stato dei dispositivi non è disponibile.</p>
       <article *ngFor="let item of security?.trustedDevices" class="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--line)] pt-4"><div><strong class="text-sm">{{ item.name }}</strong><p *ngIf="item.expiresAt" class="mt-1 text-xs text-[var(--muted)]">Scadenza {{ item.expiresAt | date: 'dd/MM/yyyy HH:mm' }}</p></div><button type="button" class="danger-btn" [disabled]="busy || loading" (click)="confirmAction({ kind: 'device', id: item.id })">Revoca dispositivo</button></article>
     </section>
-    <section class="panel rounded-[2rem] p-5 sm:p-7" aria-labelledby="account-notices"><p class="eyebrow text-[var(--accent)]">EULAB Connect</p><h2 id="account-notices" class="mt-1 font-display text-2xl">Notifiche personali recenti</h2><p class="mt-3 text-xs text-[var(--muted)]">Ultime 10 notifiche disponibili. Qui possono comparire anche gli avvisi di sicurezza generati da Connect.</p>
+    <section class="panel rounded-[2rem] p-5 sm:p-7" data-tour="account-notices" aria-labelledby="account-notices"><p class="eyebrow text-[var(--accent)]">EULAB Connect</p><h2 id="account-notices" class="mt-1 font-display text-2xl">Notifiche personali recenti</h2><p class="mt-3 text-xs text-[var(--muted)]">Ultime 10 notifiche disponibili. Qui possono comparire anche gli avvisi di sicurezza generati da Connect.</p>
       <p *ngIf="errors.notices" class="mt-4 text-sm">{{ errors.notices }}</p><p *ngIf="notices && !notices.items.length" class="mt-4 text-sm text-[var(--muted)]">Nessuna notifica personale.</p>
       <article *ngFor="let item of notices?.items" class="mt-4 border-t border-[var(--line)] pt-4"><h3 class="text-sm font-semibold">{{ item.title }}</h3><p class="mt-1 whitespace-pre-wrap break-words text-sm text-[var(--muted)]">{{ item.body }}</p><p class="mt-2 text-xs text-[var(--muted)]">{{ item.created_at | date: 'dd/MM/yyyy HH:mm' }}</p></article>
     </section>
+    <section class="panel rounded-[2rem] p-5 sm:p-7" aria-labelledby="account-guides" data-tour="account-guides"><p class="eyebrow text-[var(--accent)]">Aiuto</p><h2 id="account-guides" class="mt-1 font-display text-2xl">Guide passo passo</h2>
+      <p class="mt-3 text-sm text-[var(--muted)]">Le guide evidenziano i pulsanti di ogni pagina e spiegano le azioni disponibili per il tuo account.</p>
+      <div class="mt-4 flex flex-wrap items-center gap-4">
+        <button type="button" class="secondary-btn" data-tour="account-guides-replay" (click)="replayGuides()">Rivedi tutte le guide</button>
+        <label class="field checkbox-field" data-tour="account-guides-auto"><input type="checkbox" name="toursAutoStart" [checked]="tours.autoStart()" (change)="setGuidesAutoStart($any($event.target).checked)" /><span>Apri le guide automaticamente</span></label>
+      </div>
+    </section>
     <div *ngIf="pending" barberAutofocusFirst class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="account-confirm-title" (keydown)="dialogKeydown($event)">
-      <article class="panel w-full max-w-lg rounded-[2rem] p-6"><h2 id="account-confirm-title" class="font-display text-2xl">Confermi la disconnessione?</h2><p class="mt-3 text-sm">{{ pending.kind === 'device' ? 'Il dispositivo perderà lo stato attendibile. Verranno richieste anche la chiusura delle sessioni SSO e una nuova autenticazione.' : pending.kind === 'all' ? 'Verranno chiuse tutte le tue sessioni SSO, incluso questo accesso, anche nelle altre applicazioni EULAB.' : 'La sessione selezionata verrà chiusa anche nelle altre applicazioni EULAB collegate.' }}</p><div class="mt-5 flex flex-wrap gap-3"><button type="button" class="danger-btn" [disabled]="busy" (click)="commit()">{{ busy ? 'Operazione in corso…' : 'Conferma' }}</button><button id="account-cancel-action" type="button" class="secondary-btn" [disabled]="busy" (click)="pending = null">Annulla</button></div></article>
+      <article class="panel w-full max-w-lg rounded-[2rem] p-6"><h2 id="account-confirm-title" class="font-display text-2xl">{{ pending.kind === 'authenticator' ? 'Rimuovere l’app di autenticazione?' : 'Confermi la disconnessione?' }}</h2><p class="mt-3 text-sm">{{ pending.kind === 'authenticator' ? 'Non servirà più il codice di questa app. Per sicurezza verranno chiuse tutte le tue sessioni, anche nelle altre app EULAB, e dovrai accedere di nuovo.' : pending.kind === 'device' ? 'Il dispositivo perderà lo stato attendibile. Verranno richieste anche la chiusura delle sessioni SSO e una nuova autenticazione.' : pending.kind === 'all' ? 'Verranno chiuse tutte le tue sessioni SSO, incluso questo accesso, anche nelle altre applicazioni EULAB.' : 'La sessione selezionata verrà chiusa anche nelle altre applicazioni EULAB collegate.' }}</p><div class="mt-5 flex flex-wrap gap-3"><button type="button" class="danger-btn" [disabled]="busy" (click)="commit()">{{ busy ? 'Operazione in corso…' : 'Conferma' }}</button><button id="account-cancel-action" type="button" class="secondary-btn" [disabled]="busy" (click)="pending = null">Annulla</button></div></article>
     </div>
-  </main>`,
+  </ui-page>`,
 })
 export class PersonalAccountComponent implements OnInit {
   private readonly api = inject(AuthApiService);
@@ -79,6 +126,7 @@ export class PersonalAccountComponent implements OnInit {
   private readonly refresh = inject(SessionRefreshService);
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
+  readonly tours = inject(TourService);
   account: PersonalAccount | null = null;
   security: PersonalSecurity | null = null;
   sessions: PersonalSessionList | null = null;
@@ -88,6 +136,56 @@ export class PersonalAccountComponent implements OnInit {
   busy = false;
   feedback = "";
   pending: AccountAction | null = null;
+  profileForm = { firstName: "", lastName: "" };
+  get profileChanged(): boolean {
+    const current = this.account?.profile;
+    const first = this.profileForm.firstName.trim(), last = this.profileForm.lastName.trim();
+    return !!current && !!first && !!last && (first !== current.firstName || last !== current.lastName);
+  }
+  requiredActionLabels(actions: string[]): string {
+    return actions.map((action) => REQUIRED_ACTIONS[action] || action.toLowerCase()).join(", ");
+  }
+  async saveProfile(): Promise<void> {
+    if (!this.profileChanged || this.busy) return;
+    this.busy = true;
+    this.feedback = "";
+    try {
+      const result = await firstValueFrom(this.api.updatePersonalProfile({
+        firstName: this.profileForm.firstName.trim(), lastName: this.profileForm.lastName.trim(),
+      }));
+      if (this.account) this.account = { ...this.account, profile: result.profile };
+      const user = this.store.currentUser();
+      if (user) this.store.setCurrentUser({ ...user, firstName: result.profile.firstName, lastName: result.profile.lastName });
+      this.feedback = "Profilo aggiornato in ALORA e nelle altre app EULAB.";
+    } catch (error: any) {
+      this.feedback = error?.error?.message || "Profilo non aggiornato. Riprova tra poco.";
+    } finally { this.busy = false; }
+  }
+  async setPreference(method: PersonalSecurity["preferredMethod"]): Promise<void> {
+    if (this.busy || !this.security || method === this.security.preferredMethod) return;
+    this.busy = true;
+    this.feedback = "";
+    try {
+      this.security = await firstValueFrom(this.api.setPersonalMfaPreference(method));
+      this.feedback = "Metodo di verifica aggiornato.";
+    } catch (error: any) {
+      this.feedback = error?.error?.message || "Preferenza non salvata: il metodo potrebbe non essere attivo per la tua organizzazione.";
+    } finally { this.busy = false; }
+  }
+  /** Opens only the secure step of the provider, then the login brings the person back here. */
+  async startAction(action: ProviderAction): Promise<void> {
+    if (this.busy) return;
+    this.busy = true;
+    this.feedback = "";
+    try {
+      const { redirectUrl } = await firstValueFrom(this.api.startPersonalAction(action));
+      this.store.rememberRequestedUrl("/account");
+      this.document.location.assign(redirectUrl);
+    } catch (error: any) {
+      this.feedback = error?.error?.message || "Operazione non disponibile ora. Riprova tra poco.";
+      this.busy = false;
+    }
+  }
   get workRoute(): string {
     if (this.store.currentUser()?.collaboratorId && this.store.can("appointments.read.own")) return "/my-agenda";
     return Object.keys(VIEW_FUNCTIONS).map(view => "/" + view).find(path => canAccessLocalView(this.store.currentUser(), path.slice(1))) || "/access-unavailable";
@@ -118,6 +216,7 @@ export class PersonalAccountComponent implements OnInit {
       firstValueFrom(this.api.personalSessions()), firstValueFrom(this.api.personalNotices()),
     ]);
     this.account = profile.status === "fulfilled" ? profile.value : null;
+    if (this.account) this.profileForm = { firstName: this.account.profile.firstName, lastName: this.account.profile.lastName };
     this.security = security.status === "fulfilled" ? security.value : null;
     this.sessions = sessions.status === "fulfilled" ? sessions.value : null;
     this.notices = notices.status === "fulfilled" ? notices.value : null;
@@ -141,7 +240,10 @@ export class PersonalAccountComponent implements OnInit {
     this.busy = true;
     const closesLocal = action.kind !== "session" || action.current;
     try {
-      if (action.kind === "device") {
+      if (action.kind === "authenticator") {
+        await firstValueFrom(this.api.removePersonalAuthenticator(action.id));
+        await this.signedOut("authenticator_removed");
+      } else if (action.kind === "device") {
         const result = await firstValueFrom(this.api.revokePersonalDevice(action.id));
         await this.signedOut(result.sessionsLoggedOut ? "device_revoked" : "device_revoked_sessions_pending");
       } else if (action.kind === "all") {
@@ -154,12 +256,21 @@ export class PersonalAccountComponent implements OnInit {
       }
     } catch (error) {
       const failure = (error || {}) as { status?: number; error?: { code?: string } };
-      if (action.kind === "device" && ([403, 404].includes(failure.status || 0) || failure.error?.code === "account_operation_not_started")) {
+      if (action.kind === "authenticator" && [400, 403, 404].includes(failure.status || 0)) {
+        this.security = null;
+        this.feedback = "App non rimossa: aggiorna lo stato e riprova. L’accesso è conservato.";
+      } else if (action.kind === "device" && ([403, 404].includes(failure.status || 0) || failure.error?.code === "account_operation_not_started")) {
         this.security = null;
         this.feedback = "Operazione non eseguita. Aggiorna lo stato dei dispositivi prima di riprovare; l’accesso è conservato.";
       } else if (closesLocal) await this.signedOut("outcome_unknown");
       else { this.sessions = null; this.feedback = "Esito da verificare. Aggiorna lo stato prima di riprovare; l’operazione non è stata ripetuta."; }
     } finally { this.pending = null; this.busy = false; }
   }
+  /** Re-enables every guide and replays the general tour from the start. */
+  replayGuides(): void {
+    this.tours.resetSeen();
+    this.tours.start(null);
+  }
+  setGuidesAutoStart(enabled: boolean): void { this.tours.setAutoStart(enabled); }
   logout(): void { this.refresh.logout(); void this.router.navigateByUrl("/login"); }
 }

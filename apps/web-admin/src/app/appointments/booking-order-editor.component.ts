@@ -23,7 +23,7 @@ import {
 } from "@barber/shared/utils";
 import { ADMIN_API_URL } from "../core/api-config";
 import { SessionStore } from "../core/session.store";
-import { CustomSelectComponent } from "../custom-select.component";
+import { UiSelectComponent } from "@alora/ui";
 import { AppointmentContactComponent } from "../shared/appointment-contact.component";
 import { appointmentStatusLabel } from "../shared/presentation-copy";
 
@@ -43,7 +43,7 @@ type Action = "revise" | "cancel_all" | "cancel_line";
 @Component({
   selector: "alora-booking-order-editor",
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent, AppointmentContactComponent],
+  imports: [CommonModule, FormsModule, UiSelectComponent, AppointmentContactComponent],
   styles: [
     `
       :host {
@@ -216,15 +216,15 @@ type Action = "revise" | "cancel_all" | "cancel_line";
             >
               <strong>{{ index + 1 }}. {{ serviceName(row.serviceId) }}</strong>
               <div class="fields">
-                <label class="field"
+                <div class="field"
                   ><span>Servizio</span
-                  ><barber-custom-select
+                  ><ui-select
                     [value]="row.serviceId"
                     [options]="optionsFor(row)"
                     [label]="'Servizio ' + (index + 1)"
                     (valueChange)="changeService(row, $event)"
-                  ></barber-custom-select
-                ></label>
+                  ></ui-select
+                ></div>
                 <label class="field"
                   ><span>Inizio</span
                   ><input
@@ -234,15 +234,15 @@ type Action = "revise" | "cancel_all" | "cancel_line";
                     [(ngModel)]="row.startsAt"
                     (ngModelChange)="changed()"
                 /></label>
-                <label class="field"
+                <div class="field"
                   ><span>Professionista</span
-                  ><barber-custom-select
+                  ><ui-select
                     [value]="row.collaboratorId"
                     [options]="peopleFor(row)"
                     [label]="'Professionista servizio ' + (index + 1)"
                     (valueChange)="row.collaboratorId = $event; changed()"
-                  ></barber-custom-select
-                ></label>
+                  ></ui-select
+                ></div>
                 <label *ngIf="row.roomId" class="field"
                   ><span>Risorsa già assegnata</span
                   ><button
@@ -301,15 +301,16 @@ type Action = "revise" | "cancel_all" | "cancel_line";
               </div>
             </article>
           </div>
-          <barber-custom-select
+          <ui-select
             *ngIf="rows.length < 20"
             [disabled]="loading || busy || invalidTime"
             value=""
             label="Aggiungi un servizio alla prenotazione"
             placeholder="Scegli un altro servizio della sede"
             [options]="serviceOptions"
+            [showLabel]="true"
             (valueChange)="addService($event)"
-          ></barber-custom-select>
+          ></ui-select>
           <p *ngIf="invalidTime" role="alert" class="notice">
             Uno degli orari non esiste nel fuso mostrato. Scegli un orario
             valido prima di continuare.

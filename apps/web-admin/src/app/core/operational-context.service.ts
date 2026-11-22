@@ -5,8 +5,10 @@ import { ADMIN_API_URL } from "./api-config";
 import { SessionStore } from "./session.store";
 export interface SectorContext {
   id: string;
+  /** Name of the activity run in this location (Barberia, Estetica…). */
   name: string;
   isActive: boolean;
+  activityId?: string;
 }
 export interface LocationContext {
   id: string;

@@ -10,6 +10,15 @@ import {
   paymentMethodLabel,
   paymentStatusLabel,
 } from "../shared/presentation-copy";
+import {
+  buildHistoryRows,
+  filterHistoryRows,
+  summarizeHistory,
+  type HistoryKindFilter,
+  type HistoryPeriod,
+  type HistoryRow,
+  type HistorySummary,
+} from "./customer-history";
 
 @Component({
   selector: "barber-admin-customers-page",
@@ -21,6 +30,355 @@ import {
     InfiniteScrollDirective,
     AutofocusFirstDirective,
     UiIconComponent,
+  ],
+  styles: [
+    `
+      /* Spacing scale of the card: one value per level, used everywhere. */
+      :host {
+        --cd-pad: 1.5rem;
+        --cd-gap: 1.1rem;
+        --cd-field-gap: 0.9rem;
+      }
+      .customer-dialog {
+        display: flex;
+        flex-direction: column;
+        width: min(34rem, 100%);
+        max-height: min(92dvh, 60rem);
+        padding: 0;
+        overflow: hidden;
+      }
+      .customer-dialog-wide {
+        width: min(78rem, 100%);
+        height: min(92dvh, 60rem);
+      }
+      .customer-dialog-head {
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--cd-gap);
+        padding: calc(var(--cd-pad) * 0.8) var(--cd-pad);
+        border-bottom: 0.0625rem solid var(--line);
+      }
+      .customer-dialog-body {
+        display: grid;
+        flex: 1;
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr);
+      }
+      .customer-dialog-wide .customer-dialog-body {
+        grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);
+      }
+      .customer-col {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+      }
+      .customer-col-title {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      /* Left: full height, fields scroll, actions always at the bottom. */
+      .customer-profile {
+        background: rgba(30, 52, 37, 0.025);
+      }
+      .customer-dialog-wide .customer-profile {
+        border-right: 0.0625rem solid var(--line);
+      }
+      .customer-profile-fields {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: var(--cd-field-gap);
+        min-height: 0;
+        overflow: auto;
+        padding: var(--cd-pad);
+      }
+      .customer-profile-fields textarea {
+        min-height: 7rem;
+        resize: vertical;
+      }
+      .customer-name-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--cd-field-gap);
+      }
+      .customer-profile-actions {
+        display: flex;
+        flex: none;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        padding: calc(var(--cd-pad) * 0.75) var(--cd-pad);
+        border-top: 0.0625rem solid var(--line);
+        background: var(--panel, #fff);
+      }
+      /* Right: summary and filters stay, the list scrolls. */
+      .customer-history {
+        gap: var(--cd-gap);
+        padding: var(--cd-pad);
+      }
+      .customer-history > * {
+        flex: none;
+      }
+      .history-kpis {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.6rem;
+      }
+      .history-kpis div {
+        display: grid;
+        gap: 0.2rem;
+        min-width: 0;
+        border: 0.0625rem solid var(--line);
+        border-radius: 1rem;
+        padding: 0.7rem 0.85rem;
+      }
+      .history-kpis span {
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+      .history-kpis strong {
+        overflow: hidden;
+        font-size: 1.05rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .history-tools {
+        display: grid;
+        gap: 0.7rem;
+      }
+      .history-search input {
+        width: 100%;
+      }
+      .history-filters {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+      }
+      .history-pills {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+      .history-pill {
+        border: 0.0625rem solid var(--line);
+        border-radius: 999rem;
+        background: transparent;
+        color: inherit;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .history-pill em {
+        margin-left: 0.2rem;
+        color: var(--muted);
+        font-style: normal;
+      }
+      .history-pill.on {
+        border-color: var(--alora-forest, #1e3425);
+        background: var(--alora-forest, #1e3425);
+        color: #fff;
+      }
+      .history-pill.on em {
+        color: rgba(255, 255, 255, 0.75);
+      }
+      .customer-history > .history-list {
+        flex: 1;
+      }
+      .history-list {
+        display: grid;
+        align-content: start;
+        gap: 0.5rem;
+        min-height: 0;
+        margin: 0 calc(var(--cd-pad) * -0.25) 0 0;
+        padding: 0 calc(var(--cd-pad) * 0.25) 0 0;
+        list-style: none;
+        overflow: auto;
+      }
+      .history-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.8rem;
+        width: 100%;
+        border: 0.0625rem solid var(--line);
+        border-radius: 1rem;
+        background: var(--panel, #fff);
+        color: inherit;
+        padding: 0.7rem 0.85rem;
+        text-align: left;
+        cursor: pointer;
+      }
+      .history-row:hover {
+        border-color: rgba(30, 52, 37, 0.35);
+      }
+      .history-row-future {
+        border-style: dashed;
+      }
+      .history-icon {
+        display: inline-grid;
+        place-items: center;
+        width: 2.2rem;
+        height: 2.2rem;
+        border-radius: 0.8rem;
+        background: rgba(30, 52, 37, 0.07);
+      }
+      .history-icon.sale {
+        background: rgba(200, 241, 105, 0.45);
+      }
+      .history-main {
+        display: grid;
+        gap: 0.1rem;
+        min-width: 0;
+      }
+      .history-meta {
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+      .history-side {
+        display: grid;
+        justify-items: end;
+        gap: 0.25rem;
+      }
+      .history-detail {
+        display: grid;
+        gap: 0.4rem;
+        margin: 0.3rem 0.4rem 0.5rem 3.8rem;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+      .history-detail p {
+        margin: 0;
+      }
+      .history-empty {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        border: 0.0625rem dashed var(--line);
+        border-radius: 1rem;
+        padding: 1rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .link-btn {
+        border: 0;
+        background: none;
+        color: inherit;
+        font-weight: 700;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .history-more {
+        align-self: center;
+      }
+
+      /* Tablet: narrower profile column, KPIs on two rows. */
+      @media (max-width: 1100px) {
+        :host {
+          --cd-pad: 1.25rem;
+        }
+        .customer-dialog-wide .customer-dialog-body {
+          grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr);
+        }
+        .history-kpis {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      /* Stacked: one scroll for the whole card, profile first. */
+      @media (max-width: 860px) {
+        .customer-dialog-wide {
+          height: min(94dvh, 60rem);
+        }
+        .customer-dialog-body,
+        .customer-dialog-wide .customer-dialog-body {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-rows: none;
+          overflow: auto;
+        }
+        .customer-col {
+          height: auto;
+        }
+        .customer-dialog-wide .customer-profile {
+          border-right: 0;
+          border-bottom: 0.0625rem solid var(--line);
+        }
+        .customer-profile-fields,
+        .history-list {
+          overflow: visible;
+        }
+        .history-list {
+          margin: 0;
+          padding: 0;
+        }
+      }
+
+      /* Phone: full screen sheet, tighter spacing, stacked filters. */
+      @media (max-width: 640px) {
+        :host {
+          --cd-pad: 1rem;
+          --cd-gap: 0.9rem;
+          --cd-field-gap: 0.75rem;
+        }
+        .customer-dialog,
+        .customer-dialog-wide {
+          position: fixed;
+          inset: 0;
+          width: 100%;
+          height: 100dvh;
+          max-height: none;
+          border-radius: 0;
+        }
+        .customer-dialog-head {
+          padding-top: calc(var(--cd-pad) * 0.8 + env(safe-area-inset-top));
+        }
+        .customer-name-row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .customer-profile-actions {
+          position: sticky;
+          bottom: 0;
+          z-index: 1;
+          padding-bottom: calc(var(--cd-pad) * 0.75 + env(safe-area-inset-bottom));
+        }
+        .customer-profile-actions > * {
+          flex: 1;
+          justify-content: center;
+        }
+        .history-filters {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .history-pills {
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .history-row {
+          grid-template-columns: auto minmax(0, 1fr);
+        }
+        .history-side {
+          grid-column: 2;
+          grid-auto-flow: column;
+          justify-content: start;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        .history-detail {
+          margin-left: 0.4rem;
+        }
+      }
+    `,
   ],
   template: `
     <section class="grid gap-4">
@@ -37,6 +395,7 @@ import {
           </div>
           <button
             aloraFunction="clients.manage"
+            data-tour="customers-new"
             type="button"
             class="primary-btn"
             (click)="openNew()"
@@ -44,7 +403,7 @@ import {
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo cliente
           </button>
         </div>
-        <label class="field mt-4">
+        <label class="field mt-4" data-tour="customers-search">
           <span>Cerca cliente</span>
           <input
             [(ngModel)]="customerQuery"
@@ -55,7 +414,7 @@ import {
             placeholder="Nome, email o telefono"
           />
         </label>
-        <div class="mt-4 grid gap-2.5 sm:gap-3">
+        <div class="mt-4 grid gap-2.5 sm:gap-3" data-tour="customers-list">
           <button
             *ngFor="let customer of customers; trackBy: trackById"
             type="button"
@@ -112,66 +471,55 @@ import {
         type="button"
         class="confirm-backdrop"
         (click)="formOpen = false"
-        aria-label="Chiudi modulo cliente"
+        aria-label="Chiudi scheda cliente"
       ></button>
       <article
         barberAutofocusFirst
-        class="confirm-dialog panel max-h-[85vh] overflow-auto"
+        class="confirm-dialog panel customer-dialog"
+        [class.customer-dialog-wide]="customerForm.id"
         role="dialog"
         aria-modal="true"
         aria-labelledby="customer-form-title"
       >
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="eyebrow text-[var(--accent)]">Cliente</p>
-            <h2
-              id="customer-form-title"
-              class="mt-2 font-display text-2xl sm:text-3xl"
-            >
-              {{ customerForm.id ? "Modifica cliente" : "Nuovo cliente" }}
+        <header class="customer-dialog-head">
+          <div class="min-w-0">
+            <p class="eyebrow text-[var(--accent)]">
+              {{ customerForm.id ? "Scheda cliente" : "Nuovo cliente" }}
+            </p>
+            <h2 id="customer-form-title" class="mt-1 truncate font-display text-2xl sm:text-3xl">
+              {{ displayName || "Nuovo cliente" }}
             </h2>
           </div>
           <button type="button" class="pill-btn" (click)="formOpen = false">
-            Chiudi
+            <barber-ui-icon name="close"></barber-ui-icon> Chiudi
           </button>
-        </div>
+        </header>
 
-        <form class="mt-4 grid gap-4" (ngSubmit)="submit()">
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
-              <span
-                >Nome <em class="required-mark" aria-hidden="true">*</em></span
-              >
-              <input
-                [(ngModel)]="customerForm.firstName"
-                name="customerFirstName"
-                autocomplete="given-name"
-                required
-              />
-            </label>
-            <label class="field">
-              <span
-                >Cognome
-                <em class="required-mark" aria-hidden="true">*</em></span
-              >
-              <input
-                [(ngModel)]="customerForm.lastName"
-                name="customerLastName"
-                autocomplete="family-name"
-                required
-              />
-            </label>
-          </div>
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
-              <span>Email</span>
-              <input
-                [(ngModel)]="customerForm.email"
-                name="customerEmail"
-                type="email"
-                autocomplete="email"
-              />
-            </label>
+        <div class="customer-dialog-body">
+          <!-- Left: personal data -->
+          <form class="customer-col customer-profile" data-tour="customer-profile" (ngSubmit)="submit()">
+            <div class="customer-profile-fields">
+            <p class="customer-col-title">Anagrafica</p>
+            <div class="customer-name-row">
+              <label class="field">
+                <span>Nome <em class="required-mark" aria-hidden="true">*</em></span>
+                <input
+                  [(ngModel)]="customerForm.firstName"
+                  name="customerFirstName"
+                  autocomplete="given-name"
+                  required
+                />
+              </label>
+              <label class="field">
+                <span>Cognome <em class="required-mark" aria-hidden="true">*</em></span>
+                <input
+                  [(ngModel)]="customerForm.lastName"
+                  name="customerLastName"
+                  autocomplete="family-name"
+                  required
+                />
+              </label>
+            </div>
             <label class="field">
               <span>Telefono</span>
               <input
@@ -181,195 +529,187 @@ import {
                 autocomplete="tel"
               />
             </label>
-          </div>
-          <label class="field">
-            <span>Tag manuali</span>
-            <input
-              [(ngModel)]="customerForm.tagsText"
-              name="customerTagsText"
-              placeholder="vip, richiamo, preferenze"
-            />
-          </label>
-          <label class="field">
-            <span>Note</span>
-            <textarea
-              [(ngModel)]="customerForm.notes"
-              name="customerNotes"
-              rows="4"
-            ></textarea>
-          </label>
-          <div class="flex flex-wrap gap-3">
-            <button
-              aloraFunction="clients.manage"
-              type="submit"
-              class="primary-btn"
-              [disabled]="loading || !formValid"
-            >
-              <barber-ui-icon name="save"></barber-ui-icon>
-              {{ customerForm.id ? "Salva cliente" : "Crea cliente" }}
-            </button>
-            <button
-              aloraFunction="clients.manage"
-              *ngIf="customerForm.id"
-              type="button"
-              class="pill-btn"
-              [disabled]="loading"
-              (click)="removeCustomer()"
-            >
-              <barber-ui-icon name="trash"></barber-ui-icon> Elimina cliente
-            </button>
-            <button
-              aloraFunction="clients.manage"
-              type="button"
-              class="secondary-btn"
-              [disabled]="loading"
-              (click)="openNew()"
-            >
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo cliente
-            </button>
-          </div>
-        </form>
-
-        <section
-          *ngIf="customerForm.id"
-          class="mt-6 border-t border-[var(--line)] pt-5"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="eyebrow text-[var(--muted)]">Percorso cliente</p>
-              <h4 class="font-display text-2xl">Appuntamenti e acquisti</h4>
+            <label class="field">
+              <span>Email</span>
+              <input
+                [(ngModel)]="customerForm.email"
+                name="customerEmail"
+                type="email"
+                autocomplete="email"
+              />
+            </label>
+            <div *ngIf="customerForm.autoTags?.length" class="flex flex-wrap gap-2">
+              <span *ngFor="let tag of customerForm.autoTags" class="status-pill status-pill-blue">{{ tag }}</span>
             </div>
-            <strong *ngIf="customerHistory"
-              >€{{ customerHistory.salesTotal | number: "1.2-2" }}</strong
-            >
-          </div>
-          <p *ngIf="historyLoading" class="mt-4 text-sm text-[var(--muted)]">
-            Caricamento storico...
-          </p>
-          <div
-            *ngIf="!historyLoading"
-            class="mt-4 grid max-h-[28rem] gap-3 overflow-auto pr-1"
-          >
-            <button
-              *ngFor="let entry of historyTimeline; trackBy: trackByDate"
-              type="button"
-              class="list-card text-left"
-              (click)="openTimelineEntry(entry)"
-            >
-              <div>
-                <strong>{{ formatDay(entry.date) }}</strong>
-                <p class="mt-1 text-sm text-[var(--muted)]">
-                  <span *ngIf="entry.appointments.length"
-                    >{{ entry.appointments.length }} appuntamenti</span
-                  >
-                  <span *ngIf="entry.appointments.length && entry.sales.length">
-                    ·
-                  </span>
-                  <span *ngIf="entry.sales.length"
-                    >{{ entry.sales.length }} vendite</span
-                  >
-                </p>
-              </div>
-              <div class="text-right">
-                <strong *ngIf="entry.sales.length"
-                  >€{{ entry.salesTotal | number: "1.2-2" }}</strong
-                >
-                <p class="text-xs text-[var(--muted)]">Vedi la giornata</p>
-              </div>
-            </button>
-            <p
-              *ngIf="!historyTimeline.length"
-              class="text-sm text-[var(--muted)]"
-            >
-              Nessuna attività registrata.
-            </p>
-          </div>
-        </section>
-      </article>
-    </div>
-
-    <div *ngIf="timelineEntry" class="confirm-overlay">
-      <button
-        type="button"
-        class="confirm-backdrop"
-        (click)="closeTimelineEntry()"
-        aria-label="Chiudi dettaglio storico"
-      ></button>
-      <article
-        class="confirm-dialog panel max-h-[85vh] overflow-auto"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="history-modal-title"
-      >
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="eyebrow text-[var(--accent)]">Storico cliente</p>
-            <h2
-              id="history-modal-title"
-              class="mt-2 font-display text-2xl sm:text-3xl"
-            >
-              {{ formatDay(timelineEntry.date) }}
-            </h2>
-          </div>
-          <button type="button" class="pill-btn" (click)="closeTimelineEntry()">
-            Chiudi
-          </button>
-        </div>
-
-        <section *ngIf="timelineEntry.appointments.length" class="mt-6">
-          <h3 class="font-display text-xl">Prenotazioni</h3>
-          <article
-            *ngFor="let appointment of timelineEntry.appointments"
-            class="mt-3 rounded-2xl border border-[var(--line)] p-4"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <strong>{{ appointment.service?.name || "Servizio" }}</strong>
-              <span class="status-pill status-pill-neutral">{{
-                formatAppointmentStatus(appointment.status)
-              }}</span>
+            <label class="field">
+              <span>Tag</span>
+              <input
+                [(ngModel)]="customerForm.tagsText"
+                name="customerTagsText"
+                placeholder="vip, richiamo, preferenze"
+              />
+            </label>
+            <label class="field">
+              <span>Note</span>
+              <textarea
+                [(ngModel)]="customerForm.notes"
+                name="customerNotes"
+                rows="4"
+                placeholder="Preferenze, allergie, cose da ricordare"
+              ></textarea>
+            </label>
             </div>
-            <p class="mt-1 text-sm text-[var(--muted)]">
-              {{ formatDateTime(appointment.startsAt) }}
-              <span *ngIf="appointment.endsAt">
-                - {{ formatTime(appointment.endsAt) }}</span
+            <div class="customer-profile-actions">
+              <button
+                aloraFunction="clients.manage"
+                type="submit"
+                class="primary-btn"
+                [disabled]="loading || !formValid"
               >
-              ·
-              {{ appointment.collaborator?.firstName || "Non assegnato" }}
-            </p>
-            <p
-              *ngIf="appointment.customerNotes"
-              class="mt-2 text-sm text-[var(--muted)]"
-            >
-              Note: {{ appointment.customerNotes }}
-            </p>
-          </article>
-        </section>
-
-        <section *ngIf="timelineEntry.sales.length" class="mt-6">
-          <h3 class="font-display text-xl">Vendite</h3>
-          <article
-            *ngFor="let sale of timelineEntry.sales"
-            class="mt-3 rounded-2xl border border-[var(--line)] p-4"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <strong>€{{ sale.total | number: "1.2-2" }}</strong>
-              <span class="status-pill status-pill-neutral">{{
-                formatPaymentStatus(sale.paymentStatus)
-              }}</span>
+                <barber-ui-icon name="save"></barber-ui-icon>
+                {{ customerForm.id ? "Salva" : "Crea cliente" }}
+              </button>
+              <button
+                aloraFunction="clients.manage"
+                *ngIf="customerForm.id"
+                type="button"
+                class="pill-btn"
+                [disabled]="loading"
+                (click)="removeCustomer()"
+              >
+                <barber-ui-icon name="trash"></barber-ui-icon> Elimina
+              </button>
             </div>
-            <p class="mt-1 text-sm text-[var(--muted)]">
-              {{ formatDateTime(sale.soldAt) }} ·
-              {{ formatPaymentMethod(sale.paymentMethod) }}
+          </form>
+
+          <!-- Right: history with search and filters -->
+          <section
+            *ngIf="customerForm.id"
+            class="customer-col customer-history"
+            data-tour="customer-history"
+            aria-labelledby="customer-history-title"
+          >
+            <p id="customer-history-title" class="customer-col-title">Storico</p>
+            <div class="history-kpis" *ngIf="!historyLoading && customerHistory">
+              <div><span>Speso</span><strong>€{{ summary.spent | number: "1.2-2" }}</strong></div>
+              <div><span>Visite</span><strong>{{ summary.visits }}</strong></div>
+              <div>
+                <span>Ultima visita</span
+                ><strong>{{ summary.lastVisit ? formatShortDate(summary.lastVisit) : "—" }}</strong>
+              </div>
+              <div>
+                <span>Prossimo</span
+                ><strong>{{ summary.nextAppointment ? formatShortDate(summary.nextAppointment) : "—" }}</strong>
+              </div>
+            </div>
+
+            <div class="history-tools" data-tour="customer-history-filters">
+              <label class="field history-search">
+                <span class="sr-only">Cerca nello storico</span>
+                <input
+                  [(ngModel)]="historyQuery"
+                  name="historyQuery"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="Cerca servizio, prodotto, professionista, note"
+                />
+              </label>
+              <div class="history-filters">
+                <div class="history-pills" role="group" aria-label="Tipo">
+                  <button
+                    *ngFor="let option of kindOptions"
+                    type="button"
+                    class="history-pill"
+                    [class.on]="historyKind === option.value"
+                    [attr.aria-pressed]="historyKind === option.value"
+                    (click)="historyKind = option.value"
+                  >
+                    {{ option.label }} <em>{{ kindCount(option.value) }}</em>
+                  </button>
+                </div>
+                <div class="history-pills" role="group" aria-label="Periodo">
+                  <button
+                    *ngFor="let option of periodOptions"
+                    type="button"
+                    class="history-pill"
+                    [class.on]="historyPeriod === option.value"
+                    [attr.aria-pressed]="historyPeriod === option.value"
+                    (click)="historyPeriod = option.value"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p *ngIf="historyLoading" class="text-sm text-[var(--muted)]" role="status">
+              Caricamento storico…
             </p>
-            <ul class="mt-2 grid gap-1 text-sm text-[var(--muted)]">
-              <li *ngFor="let item of sale.items">
-                {{ item.quantity }} ×
-                {{ item.service?.name || item.product?.name || item.label }}
-                <span>€{{ item.lineTotal | number: "1.2-2" }}</span>
+            <ul *ngIf="!historyLoading" class="history-list" aria-live="polite">
+              <li *ngFor="let row of visibleRows; trackBy: trackByRow">
+                <button
+                  type="button"
+                  class="history-row"
+                  [class.history-row-future]="row.future"
+                  [attr.aria-expanded]="expanded === row.id"
+                  (click)="expanded = expanded === row.id ? null : row.id"
+                >
+                  <span class="history-icon" [class.sale]="row.kind === 'sale'" aria-hidden="true">
+                    <barber-ui-icon [name]="row.kind === 'sale' ? 'receipt' : 'calendar'"></barber-ui-icon>
+                  </span>
+                  <span class="history-main">
+                    <strong class="truncate">{{ row.title }}</strong>
+                    <span class="history-meta">
+                      {{ formatDateTime(row.at) }}
+                      <ng-container *ngIf="row.subtitle"> · {{ row.subtitle }}</ng-container>
+                    </span>
+                  </span>
+                  <span class="history-side">
+                    <strong *ngIf="row.amount !== null">€{{ row.amount | number: "1.2-2" }}</strong>
+                    <span
+                      class="status-pill"
+                      [class.status-pill-blue]="row.future"
+                      [class.status-pill-neutral]="!row.future"
+                      >{{ row.future ? "In programma" : statusLabel(row) }}</span
+                    >
+                  </span>
+                </button>
+                <div *ngIf="expanded === row.id" class="history-detail">
+                  <ul *ngIf="row.lines.length" class="grid gap-1">
+                    <li *ngFor="let line of row.lines" class="flex justify-between gap-3">
+                      <span>{{ line.quantity }} × {{ line.label }}</span>
+                      <span>€{{ line.total | number: "1.2-2" }}</span>
+                    </li>
+                  </ul>
+                  <p *ngIf="row.paymentMethod">Pagamento: {{ formatPaymentMethod(row.paymentMethod) }}</p>
+                  <p *ngIf="row.kind === 'appointment'">
+                    {{ row.settled ? "Conto registrato in cassa." : row.future ? "Appuntamento futuro." : "Nessun conto collegato." }}
+                  </p>
+                  <p *ngIf="row.notes">Note: {{ row.notes }}</p>
+                </div>
+              </li>
+              <li *ngIf="!filteredRows.length" class="history-empty">
+                {{ historyRows.length ? "Nessuna voce con questi filtri." : "Nessuna attività registrata." }}
+                <button
+                  *ngIf="historyRows.length"
+                  type="button"
+                  class="link-btn"
+                  (click)="resetHistoryFilters()"
+                >
+                  Azzera filtri
+                </button>
               </li>
             </ul>
-          </article>
-        </section>
+            <button
+              *ngIf="!historyLoading && filteredRows.length > visibleRows.length"
+              type="button"
+              class="pill-btn history-more"
+              (click)="historyLimit = historyLimit + 30"
+            >
+              Mostra altre {{ filteredRows.length - visibleRows.length }}
+            </button>
+          </section>
+        </div>
       </article>
     </div>
   `,
@@ -383,7 +723,14 @@ export class AdminCustomersPageComponent {
   @Input() loading = false;
   @Input() hasMore = false;
   @Input() historyLoading = false;
-  @Input() customerHistory: any = null;
+  @Input() set customerHistory(value: any) {
+    this.history = value;
+    this.historyRows = buildHistoryRows(value);
+    this.summary = summarizeHistory(value);
+  }
+  get customerHistory(): any {
+    return this.history;
+  }
 
   @Output() edit = new EventEmitter<any>();
   @Output() save = new EventEmitter<void>();
@@ -392,22 +739,73 @@ export class AdminCustomersPageComponent {
   @Output() loadMore = new EventEmitter<void>();
   @Output() searchChange = new EventEmitter<string>();
 
+  readonly kindOptions: Array<{ value: HistoryKindFilter; label: string }> = [
+    { value: "all", label: "Tutto" },
+    { value: "appointment", label: "Appuntamenti" },
+    { value: "sale", label: "Conti" },
+  ];
+  readonly periodOptions: Array<{ value: HistoryPeriod; label: string }> = [
+    { value: "all", label: "Sempre" },
+    { value: "30d", label: "30 giorni" },
+    { value: "6m", label: "6 mesi" },
+    { value: "12m", label: "12 mesi" },
+  ];
+
   customerQuery = "";
   formOpen = false;
-  timelineEntry: any = null;
+  private history: any = null;
+  historyRows: HistoryRow[] = [];
+  summary: HistorySummary = summarizeHistory(null);
+  historyQuery = "";
+  historyKind: HistoryKindFilter = "all";
+  historyPeriod: HistoryPeriod = "all";
+  historyLimit = 30;
+  expanded: string | null = null;
 
-  get historyTimeline(): any[] {
-    return Array.isArray(this.customerHistory?.timeline)
-      ? this.customerHistory.timeline
-      : [];
+  get displayName(): string {
+    return `${this.customerForm.firstName ?? ""} ${this.customerForm.lastName ?? ""}`.trim();
+  }
+
+  get filteredRows(): HistoryRow[] {
+    return filterHistoryRows(this.historyRows, {
+      kind: this.historyKind,
+      period: this.historyPeriod,
+      query: this.historyQuery,
+    });
+  }
+
+  get visibleRows(): HistoryRow[] {
+    return this.filteredRows.slice(0, this.historyLimit);
+  }
+
+  kindCount(kind: HistoryKindFilter): number {
+    return filterHistoryRows(this.historyRows, {
+      kind,
+      period: this.historyPeriod,
+      query: this.historyQuery,
+    }).length;
+  }
+
+  statusLabel(row: HistoryRow): string {
+    return row.kind === "sale"
+      ? this.formatPaymentStatus(row.status)
+      : this.formatAppointmentStatus(row.status);
+  }
+
+  resetHistoryFilters(): void {
+    this.historyQuery = "";
+    this.historyKind = "all";
+    this.historyPeriod = "all";
   }
 
   openEdit(customer: any): void {
+    this.resetHistoryView();
     this.edit.emit(customer);
     this.formOpen = true;
   }
 
   openNew(): void {
+    this.resetHistoryView();
     this.reset.emit();
     this.formOpen = true;
   }
@@ -422,20 +820,18 @@ export class AdminCustomersPageComponent {
     this.remove.emit(this.customerForm);
   }
 
-  openTimelineEntry(entry: any): void {
-    this.timelineEntry = entry;
+  private resetHistoryView(): void {
+    this.resetHistoryFilters();
+    this.historyLimit = 30;
+    this.expanded = null;
   }
 
-  closeTimelineEntry(): void {
-    this.timelineEntry = null;
+  trackByRow(_index: number, row: HistoryRow): string {
+    return row.id;
   }
 
   trackById(_index: number, item: any): string {
     return item.id;
-  }
-
-  trackByDate(_index: number, entry: any): string {
-    return entry.date;
   }
 
   get formValid(): boolean {
@@ -445,12 +841,11 @@ export class AdminCustomersPageComponent {
     );
   }
 
-  formatDay(value: string): string {
-    return new Date(`${value}T00:00:00`).toLocaleDateString("it-IT", {
-      weekday: "long",
+  formatShortDate(value: string): string {
+    return new Date(value).toLocaleDateString("it-IT", {
       day: "2-digit",
-      month: "long",
-      year: "numeric",
+      month: "short",
+      year: "2-digit",
     });
   }
 

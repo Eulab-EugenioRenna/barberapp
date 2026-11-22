@@ -16,7 +16,7 @@ import {
   inject,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { CustomSelectComponent } from "./custom-select.component";
+import { UiSelectComponent } from "@alora/ui";
 
 type CalendarMode = "date" | "datetime";
 
@@ -33,7 +33,7 @@ type CalendarCell = {
 @Component({
   selector: "barber-calendar-input",
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, UiSelectComponent],
   template: `
     <div
       class="calendar-input-shell"
@@ -133,24 +133,26 @@ type CalendarCell = {
           </div>
 
           <div *ngIf="mode === 'datetime'" class="calendar-time-row">
-            <label>
+            <div>
               <span>Ora</span>
-              <barber-custom-select
+              <ui-select
                 [(value)]="selectedHour"
                 (valueChange)="syncSelectedTime()"
                 [options]="hourOptions"
+                label="Ora"
                 placeholder="Ora"
-              ></barber-custom-select>
-            </label>
-            <label>
+              ></ui-select>
+            </div>
+            <div>
               <span>Minuti</span>
-              <barber-custom-select
+              <ui-select
                 [(value)]="selectedMinute"
                 (valueChange)="syncSelectedTime()"
                 [options]="minuteOptions"
+                label="Minuti"
                 placeholder="Minuti"
-              ></barber-custom-select>
-            </label>
+              ></ui-select>
+            </div>
           </div>
 
           <div class="calendar-quick-actions">
@@ -410,7 +412,7 @@ type CalendarCell = {
         margin-top: 0.9rem;
       }
 
-      .calendar-time-row label {
+      .calendar-time-row > div {
         display: grid;
         gap: 0.4rem;
       }

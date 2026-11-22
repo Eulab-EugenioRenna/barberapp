@@ -17,6 +17,8 @@ export class SaleFulfilmentService {
       orderStatus: string;
       items: PreviousServiceRow[];
       rowOrder?: string[];
+      /** "Eseguito alle" chosen at the till: start of the first new service. */
+      servicesStartAt?: Date;
     },
   ) {
     const sale = await tx.sale.findUniqueOrThrow({
@@ -86,13 +88,16 @@ export class SaleFulfilmentService {
     const durations = new Map(
       services.map((row) => [row.id, row.service?.durationMinutes || 0]),
     );
-    let cursor = new Date(
-      (previous.orderStatus === "new" ? sale.soldAt.getTime() : Date.now()) -
-        newExecutions.reduce(
-          (sum, row) => sum + (durations.get(row.id) || 0) * 60000,
-          0,
-        ),
-    );
+    // Default: the new services end now (or at the sale time for a new sale).
+    let cursor = previous.servicesStartAt
+      ? new Date(previous.servicesStartAt.getTime())
+      : new Date(
+          (previous.orderStatus === "new" ? sale.soldAt.getTime() : Date.now()) -
+            newExecutions.reduce(
+              (sum, row) => sum + (durations.get(row.id) || 0) * 60000,
+              0,
+            ),
+        );
     let primary = sale.appointmentId;
     for (const row of services) {
       if (row.booking) {

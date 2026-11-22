@@ -112,7 +112,7 @@ export class LocationsController {
         sectors: {
           where: { id: { in: scope.sectorIds } },
           orderBy: { name: "asc" },
-          select: { id: true, name: true, isActive: true },
+          select: { id: true, name: true, isActive: true, activityId: true },
         },
       },
     });
@@ -191,18 +191,35 @@ export class LocationsController {
               : undefined,
         },
       });
-      const sector = await tx.sector.create({
-        data: {
-          tenantId,
-          locationId: location.id,
-          name: name(body["sectorName"] || "Generale"),
-        },
-      });
-      // Explicit creator assignment: no other site or function is granted.
-      await tx.userSectorAccess.create({
-        data: { userId: requireUser(session).id, sectorId: sector.id },
-      });
-      return { ...location, sectors: [sector] };
+      // The location runs the chosen activities of the account (at least one).
+      const activityIds = Array.isArray(body["activityIds"])
+        ? [...new Set(body["activityIds"].filter((id): id is string => typeof id === "string" && !!id))]
+        : [];
+      if (activityIds.length) {
+        const found = await tx.activity.count({
+          where: { tenantId, id: { in: activityIds } },
+        });
+        if (found !== activityIds.length)
+          throw new BadRequestException("Attività non valida");
+      }
+      const sectors = [];
+      for (const activityId of activityIds.length ? activityIds : [undefined]) {
+        const sector = await tx.sector.create({
+          data: {
+            tenantId,
+            locationId: location.id,
+            ...(activityId
+              ? { activityId, name: "" }
+              : { name: name(body["sectorName"] || "Generale") }),
+          },
+        });
+        // Explicit creator assignment: no other site or function is granted.
+        await tx.userSectorAccess.create({
+          data: { userId: requireUser(session).id, sectorId: sector.id },
+        });
+        sectors.push(sector);
+      }
+      return { ...location, sectors };
     });
     await this.invalidate(tenantId);
     return result;
@@ -247,13 +264,41 @@ export class LocationsController {
   ) {
     const { scope, tenantId, session } = await this.contextFor(request);
     if (!scope.locationIds.includes(locationId)) throw new ForbiddenException();
+    // An activity of the account brought to this location; a new name creates
+    // the activity too (database), so old clients keep working.
+    const activityId =
+      typeof body["activityId"] === "string" && body["activityId"]
+        ? body["activityId"]
+        : undefined;
+    if (activityId) {
+      const activity = await this.prisma.activity.findFirst({
+        where: { id: activityId, tenantId },
+        select: { id: true },
+      });
+      if (!activity) throw new BadRequestException("Attività non valida");
+    }
+    const { name: _sectorName, ...sectorSettings } = settings(
+      activityId ? { ...body, name: undefined } : body,
+    );
+    const exists = await this.prisma.sector.findFirst({
+      where: {
+        tenantId,
+        locationId,
+        ...(activityId
+          ? { activityId }
+          : { name: { equals: name(body["name"]), mode: "insensitive" as const } }),
+      },
+      select: { id: true },
+    });
+    if (exists)
+      throw new BadRequestException("Questa attività è già presente nella sede");
     const result = await this.prisma.$transaction(async (tx) => {
       const sector = await tx.sector.create({
         data: {
           tenantId,
           locationId,
-          ...settings(body),
-          name: name(body["name"]),
+          ...sectorSettings,
+          ...(activityId ? { activityId, name: "" } : { name: name(body["name"]) }),
         },
       });
       await tx.userSectorAccess.create({
@@ -272,9 +317,11 @@ export class LocationsController {
   ) {
     const { scope, tenantId } = await this.contextFor(request);
     await requireSector(this.prisma, scope, id, false);
+    // The name belongs to the activity (renamed from the activities list).
+    const { name: _ignored, ...data } = settings(body);
     const result = await this.prisma.sector.update({
       where: { id, tenantId },
-      data: settings(body),
+      data,
     });
     await this.invalidate(tenantId);
     return result;

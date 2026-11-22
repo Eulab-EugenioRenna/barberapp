@@ -4,6 +4,14 @@ import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
+import {
+  buildAccountRows,
+  KIND_LABELS,
+  personName,
+  type AccountKind,
+  type AccountRow,
+} from "./cash-accounts";
 import {
   appointmentStatusLabel,
   paymentMethodLabel,
@@ -13,90 +21,218 @@ import {
 @Component({
   selector: "barber-admin-sales-page",
   standalone: true,
+  styles: [
+    `
+      .account-row {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .account-row-alert {
+        border-color: #f2c46d;
+      }
+      .account-main {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: inherit;
+        cursor: pointer;
+      }
+      .account-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .label-filter {
+        cursor: pointer;
+        border: 0.0625rem solid transparent;
+      }
+      .label-filter-on {
+        border-color: currentColor;
+        font-weight: 800;
+      }
+    `,
+  ],
   imports: [
     FunctionAccessDirective,
     CommonModule,
     FormsModule,
     InfiniteScrollDirective,
     UiIconComponent,
+    UiSelectComponent,
   ],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-4 sm:p-5">
-        <div class="page-head">
-          <div class="min-w-0">
-            <p class="eyebrow text-[var(--accent)]">Cassa</p>
-            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h3 class="font-display text-2xl sm:text-3xl">
-                Vendite e incassi
-              </h3>
-              <span class="status-pill status-pill-neutral"
-                >{{ sales.length }} vendite</span
-              >
-            </div>
-          </div>
+        <div class="min-w-0">
+          <p class="eyebrow text-[var(--accent)]">Conti</p>
+          <h3 class="mt-1 font-display text-2xl sm:text-3xl">
+            Tutti i conti
+          </h3>
+          <p class="mt-1 text-sm text-[var(--muted)]">
+            Da chiudere, aperti e registrati in un'unica lista: ogni conto
+            mostra la sua etichetta.
+          </p>
+        </div>
+
+        <div
+          class="mt-4 flex flex-wrap gap-2"
+          role="group"
+          aria-label="Mostra conti per etichetta"
+          data-tour="sales-labels"
+        >
           <button
-            aloraFunction="sales.manage"
+            *ngFor="let label of labelFilters"
             type="button"
-            class="primary-btn"
-            (click)="openQuickOrder.emit()"
+            class="status-pill label-filter"
+            [ngClass]="label.key === 'all' ? 'status-pill-neutral' : pillClass(label.key)"
+            [class.label-filter-on]="labelFilter === label.key"
+            [attr.aria-pressed]="labelFilter === label.key"
+            (click)="labelFilter = label.key"
           >
-            <barber-ui-icon name="receipt"></barber-ui-icon> Nuova vendita
+            {{ label.text }} · {{ count(label.key) }}
           </button>
         </div>
-        <label class="field mt-4">
-          <span>Cerca vendita</span>
+
+        <label class="field mt-4" data-tour="sales-search">
+          <span>Cerca conto</span>
           <input
             [(ngModel)]="saleQuery"
             name="saleSearch"
             type="search"
             autocomplete="off"
-            placeholder="Cliente, articolo, pagamento"
+            placeholder="Cliente, servizio, prodotto"
           />
         </label>
-        <div class="mt-4 grid gap-2.5 sm:gap-3">
-          <button
-            *ngFor="let sale of filteredSales; trackBy: trackById"
-            type="button"
-            class="list-card text-left"
-            [attr.data-sale-id]="sale.id"
-            (click)="openSaleDetail(sale)"
-          >
-            <div>
-              <strong>
-                {{ sale.customer?.firstName || "Vendita" }}
-                {{ sale.customer?.lastName || "senza cliente" }}
-              </strong>
-              <p class="text-sm text-[var(--muted)]">
-                {{ formatDateTime(sale.soldAt) }} ·
-                {{ sale.items?.length || 0 }} articoli
-              </p>
-              <p class="mt-1 text-xs text-[var(--muted)]">
-                {{ saleItemLabels(sale) }}
-              </p>
-            </div>
-            <div class="text-right">
-              <strong>€{{ Number(sale.total || 0).toFixed(2) }}</strong>
-              <p class="text-sm text-[var(--muted)]">
-                {{ formatPaymentMethod(sale.paymentMethod) }}
-              </p>
-            </div>
-          </button>
+
+        <div class="mt-4 grid gap-2.5 sm:gap-3" data-tour="sales-list">
           <article
-            *ngIf="!filteredSales.length && !loading"
+            *ngFor="let row of visibleRows; trackBy: trackRow; let first = first"
+            class="list-card account-row"
+            [class.account-row-alert]="row.kind === 'toClose'"
+            [attr.data-sale-id]="row.sale?.id || null"
+            [attr.data-tour]="first ? 'sales-row' : null"
+          >
+            <button
+              type="button"
+              class="account-main text-left"
+              (click)="openRow(row)"
+              [attr.aria-label]="'Apri il conto di ' + row.customer"
+            >
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <strong>{{ row.customer }}</strong>
+                  <span
+                    class="status-pill"
+                    [ngClass]="pillClass(row.kind)"
+                    [attr.data-tour]="first ? 'sales-row-label' : null"
+                    >{{ kindLabel(row.kind) }}</span
+                  >
+                  <span
+                    *ngIf="row.kind === 'registered' && row.sale?.paymentStatus"
+                    class="status-pill"
+                    [ngClass]="row.sale.paymentStatus === 'paid' ? 'status-pill-green' : 'status-pill-neutral'"
+                    >{{ formatPaymentStatus(row.sale.paymentStatus) }}</span
+                  >
+                </div>
+                <p class="mt-1 text-sm text-[var(--muted)]">
+                  {{ formatDateTime(row.when) }}
+                  <ng-container *ngIf="row.who"> · {{ row.who }}</ng-container>
+                </p>
+                <p class="mt-1 text-xs text-[var(--muted)]">{{ row.lines }}</p>
+              </div>
+              <div class="text-right">
+                <strong *ngIf="row.total !== null">€{{ row.total.toFixed(2) }}</strong>
+                <p
+                  *ngIf="row.kind === 'registered'"
+                  class="text-sm text-[var(--muted)]"
+                >
+                  {{ formatPaymentMethod(row.sale?.paymentMethod) }}
+                </p>
+              </div>
+            </button>
+
+            <div
+              *ngIf="row.kind !== 'registered'"
+              class="account-actions"
+            >
+              <button
+                aloraFunction="sales.manage"
+                type="button"
+                class="primary-btn"
+                [attr.data-tour]="first ? 'sales-close' : null"
+                [disabled]="loading"
+                (click)="closeAccount.emit({ appointment: row.appointment, sale: row.sale })"
+              >
+                <barber-ui-icon name="receipt"></barber-ui-icon> Chiudi il conto
+              </button>
+              <button
+                aloraFunction="sales.manage"
+                type="button"
+                class="secondary-btn"
+                *ngIf="row.appointment && unlinkedSales.length"
+                [attr.data-tour]="first ? 'sales-link' : null"
+                (click)="toggleLink(row.key)"
+              >
+                <barber-ui-icon name="link"></barber-ui-icon>
+                {{ linkOpenFor === row.key ? "Chiudi collegamento" : "Collega vendita" }}
+              </button>
+              <button
+                aloraFunction="appointments.update.all"
+                type="button"
+                class="ghost-btn text-red-700"
+                *ngIf="row.appointment"
+                [attr.data-tour]="first ? 'sales-cancel' : null"
+                [disabled]="loading"
+                (click)="cancelAppointment.emit(row.appointment)"
+              >
+                <barber-ui-icon name="ban"></barber-ui-icon> Annulla appuntamento
+              </button>
+            </div>
+
+            <div
+              aloraFunction="sales.manage"
+              *ngIf="linkOpenFor === row.key"
+              class="mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-black/5 p-3"
+            >
+              <ui-select
+                class="min-w-[min(14rem,100%)] flex-1 text-sm"
+                [(ngModel)]="selectedSaleId"
+                [ngModelOptions]="{ standalone: true }"
+                [options]="saleOptions"
+                label="Vendita da collegare"
+                placeholder="Seleziona una vendita senza appuntamento"
+                filterPlaceholder="Cerca cliente"
+              ></ui-select>
+              <button
+                type="button"
+                class="primary-btn"
+                [disabled]="!selectedSaleId || loading"
+                (click)="linkOrder.emit({ appointment: row.appointment, saleId: selectedSaleId })"
+              >
+                Collega
+              </button>
+            </div>
+          </article>
+
+          <article
+            *ngIf="!visibleRows.length && !loading"
             class="rounded-2xl border border-dashed border-[var(--line)] p-5 text-sm text-[var(--muted)]"
           >
-            Nessuna vendita trovata. Usa “+ Nuova vendita” per registrare il
-            primo incasso.
+            {{ emptyText }}
           </article>
           <p
-            *ngIf="hasMore"
+            *ngIf="hasMore && labelFilter !== 'toClose' && labelFilter !== 'open'"
             class="text-center text-xs uppercase tracking-wider text-[var(--muted)]"
           >
-            Scorri per caricare altre vendite
+            Scorri per caricare altri conti registrati
           </p>
           <div
-            *ngIf="hasMore"
+            *ngIf="hasMore && labelFilter !== 'toClose' && labelFilter !== 'open'"
             class="h-px w-full"
             barberInfiniteScroll
             (loadMore)="loadMore.emit()"
@@ -282,42 +418,122 @@ import {
 })
 export class AdminSalesPageComponent {
   @Input() sales: any[] = [];
+  /** Appointments whose time is reached and whose account is not settled. */
+  @Input() toClose: any[] = [];
+  @Input() openSales: any[] = [];
+  @Input() unlinkedSales: any[] = [];
   @Input() loading = false;
   @Input() hasMore = false;
 
   @Output() loadMore = new EventEmitter<void>();
-  @Output() openQuickOrder = new EventEmitter<void>();
   @Output() editOrder = new EventEmitter<any>();
   @Output() deleteOrder = new EventEmitter<any>();
+  /** Settle an account to close or open: opens the till on that account. */
+  @Output() closeAccount = new EventEmitter<{ appointment: any; sale: any }>();
+  @Output() linkOrder = new EventEmitter<{ appointment: any; saleId: string }>();
+  @Output() cancelAppointment = new EventEmitter<any>();
 
   protected readonly Number = Number;
   selectedSale: any = null;
   saleQuery = "";
+  labelFilter: "all" | AccountKind = "all";
+  linkOpenFor = "";
+  selectedSaleId = "";
+
+  readonly labelFilters: Array<{ key: "all" | AccountKind; text: string }> = [
+    { key: "all", text: "Tutti" },
+    { key: "toClose", text: "Da chiudere" },
+    { key: "open", text: "Aperti" },
+    { key: "registered", text: "Registrati" },
+  ];
 
   formatAppointmentStatus = appointmentStatusLabel;
   formatPaymentMethod = paymentMethodLabel;
   formatPaymentStatus = paymentStatusLabel;
 
-  get filteredSales(): any[] {
-    const query = this.saleQuery.trim().toLowerCase();
-    if (!query) {
-      return this.sales;
+  private rowsSource: unknown[] = [];
+  private rowsCache: AccountRow[] = [];
+  get rows(): AccountRow[] {
+    const source = [this.toClose, this.openSales, this.sales];
+    if (source.some((value, index) => value !== this.rowsSource[index])) {
+      this.rowsSource = source;
+      this.rowsCache = buildAccountRows(this.toClose, this.openSales, this.sales);
     }
-    return this.sales.filter((sale) => {
-      const haystack = [
-        sale.customer?.firstName,
-        sale.customer?.lastName,
-        sale.paymentMethod,
-        sale.paymentStatus,
-        ...(sale.items || []).map(
-          (item: any) => item.service?.name || item.product?.name || item.label,
-        ),
-      ]
-        .filter(Boolean)
+    return this.rowsCache;
+  }
+
+  get visibleRows(): AccountRow[] {
+    const query = this.saleQuery.trim().toLowerCase();
+    return this.rows.filter((row) => {
+      if (this.labelFilter !== "all" && row.kind !== this.labelFilter) return false;
+      if (!query) return true;
+      return [row.customer, row.who, row.lines, KIND_LABELS[row.kind]]
         .join(" ")
-        .toLowerCase();
-      return haystack.includes(query);
+        .toLowerCase()
+        .includes(query);
     });
+  }
+
+  count(key: "all" | AccountKind): number {
+    return key === "all"
+      ? this.rows.length
+      : this.rows.filter((row) => row.kind === key).length;
+  }
+
+  get emptyText(): string {
+    if (this.saleQuery.trim()) return "Nessun conto corrisponde alla ricerca.";
+    if (this.labelFilter === "toClose") return "Tutti i conti sono chiusi.";
+    if (this.labelFilter === "open") return "Nessun conto aperto oggi.";
+    return "Nessun conto. Usa «Nuovo» per vendere adesso o prenotare.";
+  }
+
+  kindLabel(kind: AccountKind): string {
+    return KIND_LABELS[kind];
+  }
+
+  pillClass(kind: "all" | AccountKind): string {
+    return kind === "toClose"
+      ? "status-pill-amber"
+      : kind === "open"
+        ? "status-pill-blue"
+        : kind === "registered"
+          ? "status-pill-green"
+          : "status-pill-neutral";
+  }
+
+  trackRow(_index: number, row: AccountRow): string {
+    return row.key;
+  }
+
+  openRow(row: AccountRow): void {
+    if (row.kind === "registered") {
+      this.openSaleDetail(row.sale);
+      return;
+    }
+    this.closeAccount.emit({ appointment: row.appointment, sale: row.sale });
+  }
+
+  toggleLink(key: string): void {
+    this.linkOpenFor = this.linkOpenFor === key ? "" : key;
+    this.selectedSaleId = "";
+  }
+
+  private saleOptionsSource: unknown;
+  private saleOptionsCache: UiOption[] = [];
+  get saleOptions(): UiOption[] {
+    if (this.saleOptionsSource !== this.unlinkedSales) {
+      this.saleOptionsSource = this.unlinkedSales;
+      this.saleOptionsCache = [
+        { value: "", label: "Seleziona una vendita senza appuntamento" },
+        ...uiOptions(
+          this.unlinkedSales,
+          (sale: any) => sale.id as string,
+          (sale: any) =>
+            `${personName(sale.customer) || "Vendita senza cliente"} · EUR ${Number(sale.total || 0).toFixed(2)}`,
+        ),
+      ];
+    }
+    return this.saleOptionsCache;
   }
 
   trackById(_index: number, item: any): string {
@@ -357,6 +573,7 @@ export class AdminSalesPageComponent {
   }
 
   formatDateTime(value: string): string {
+    if (!value) return "";
     return new Date(value).toLocaleString("it-IT", {
       day: "2-digit",
       month: "2-digit",

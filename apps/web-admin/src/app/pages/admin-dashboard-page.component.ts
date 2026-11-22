@@ -4,7 +4,7 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { AdminMetricsGridComponent } from "../shared/admin-metrics-grid.component";
 import { CalendarInputComponent } from "../calendar-input.component";
-import { CustomSelectComponent } from "../custom-select.component";
+import { UiSelectComponent } from "@alora/ui";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
 import {
@@ -23,7 +23,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
     CommonModule,
     AdminMetricsGridComponent,
     CalendarInputComponent,
-    CustomSelectComponent,
+    UiSelectComponent,
     InfiniteScrollDirective,
     UiIconComponent,
   ],
@@ -40,6 +40,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <button
             type="button"
             class="ghost-btn balance-toggle"
+            data-tour="dashboard-balance"
             (click)="toggleBalance()"
             [attr.aria-pressed]="balanceHidden"
             [attr.aria-label]="
@@ -54,16 +55,19 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
             {{ balanceHidden ? "Mostra saldo" : "Nascondi saldo" }}
           </button>
         </div>
-        <div class="mt-4 grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label class="field">
+        <div
+          class="mt-4 grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4"
+          data-tour="dashboard-filters"
+        >
+          <div class="field">
             <span>Periodo</span>
-            <barber-custom-select
+            <ui-select
               [value]="revenueFilters.period"
               (valueChange)="applyPeriod($event)"
               [options]="periodOptions"
               label="Periodo"
-            ></barber-custom-select>
-          </label>
+            ></ui-select>
+          </div>
           <label class="field" *ngIf="revenueFilters.period !== 'all'">
             <span>Data di riferimento</span>
             <barber-calendar-input
@@ -73,31 +77,32 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               placeholder="Seleziona data"
             ></barber-calendar-input>
           </label>
-          <label class="field">
+          <div class="field">
             <span>Cliente</span>
-            <barber-custom-select
+            <ui-select
               [value]="revenueFilters.customerId"
               (valueChange)="applyCustomer($event)"
               [options]="customerFilterOptions"
               label="Cliente"
               placeholder="Tutti i clienti"
-            ></barber-custom-select>
-          </label>
-          <label class="field">
+            ></ui-select>
+          </div>
+          <div class="field">
             <span>Professionista</span>
-            <barber-custom-select
+            <ui-select
               [value]="revenueFilters.collaboratorId"
               (valueChange)="applyCollaborator($event)"
               [options]="collaboratorFilterOptions"
               label="Professionista"
               placeholder="Tutta la squadra"
-            ></barber-custom-select>
-          </label>
+            ></ui-select>
+          </div>
         </div>
         <div class="mt-3 flex justify-end">
           <button
             type="button"
             class="ghost-btn"
+            data-tour="dashboard-reset"
             [disabled]="loading"
             (click)="resetRevenueFilters.emit()"
           >
@@ -111,7 +116,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         *ngIf="revenueReport?.basis?.lineFiltered"
       >
         Il venduto comprende le righe selezionate. Incassi e residui sono
-        registrati sul conto: per consultarli rimuovi i filtri settore e
+        registrati sul conto: per consultarli rimuovi i filtri attività e
         professionista.
       </p>
       <p
@@ -131,16 +136,18 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
       >
         Differenza storica fra totale conti e righe:
         {{ money(revenueReport.sold.unattributedGross) }}. Questo importo non è
-        attribuito a un settore o a un esecutore.
+        attribuito a un’attività o a un esecutore.
       </p>
 
       <barber-admin-metrics-grid
+        data-tour="dashboard-metrics"
         [metrics]="revenueMetrics"
         [masked]="balanceHidden"
       ></barber-admin-metrics-grid>
 
       <alora-financial-values-panel
         *ngIf="revenueReport"
+        data-tour="dashboard-financial"
         [tax]="revenueReport.salesTax"
         [materials]="revenueReport.materials"
         [inventory]="revenueReport.inventory"
@@ -149,7 +156,10 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
       ></alora-financial-values-panel>
 
       <div class="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-        <article class="panel rounded-[2rem] p-4 sm:p-5">
+        <article
+          class="panel rounded-[2rem] p-4 sm:p-5"
+          data-tour="dashboard-activity"
+        >
           <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Attività</p>
             <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -229,7 +239,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           </div>
         </article>
 
-        <div class="grid gap-4">
+        <div class="grid gap-4" data-tour="dashboard-breakdown">
           <article class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Clienti</p>
             <h3 class="font-display text-xl sm:text-2xl">
@@ -280,7 +290,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           *ngFor="
             let group of [
               { title: 'Venduto per sede', rows: revenueReport?.byLocation },
-              { title: 'Venduto per settore', rows: revenueReport?.bySector },
+              { title: 'Venduto per attività', rows: revenueReport?.bySector },
             ]
           "
           class="panel min-w-0 rounded-[2rem] p-4 sm:p-5"
@@ -305,7 +315,10 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
       </div>
 
       <div class="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <article class="panel rounded-[2rem] p-4 sm:p-5">
+        <article
+          class="panel rounded-[2rem] p-4 sm:p-5"
+          data-tour="dashboard-upcoming"
+        >
           <div class="min-w-0">
             <p class="eyebrow text-[var(--accent)]">Agenda</p>
             <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -357,6 +370,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         <article
           class="dark-panel rounded-[2rem] p-4 text-white sm:p-5"
           data-testid="account-reconciliation"
+          data-tour="dashboard-accounts"
         >
           <p class="eyebrow text-white/50">Situazione attuale</p>
           <h3 class="mt-1 font-display text-2xl">Conti del periodo</h3>
@@ -398,7 +412,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <ng-template #noAccountAttribution
             ><p class="mt-4 text-sm text-white/65">
               I pagamenti non sono ripartiti per riga. Consulta i conti completi
-              rimuovendo i filtri settore e professionista.
+              rimuovendo i filtri attività e professionista.
             </p></ng-template
           >
         </article>

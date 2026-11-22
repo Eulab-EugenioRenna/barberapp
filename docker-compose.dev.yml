@@ -1,0 +1,39 @@
+# Development override: Docker serves what you build on the host, no image rebuild.
+#   npm run docker:dev                    (starts the stack with this override)
+#   npm run build:admin / build:public    -> visible at the next page reload
+#   npm run build:api                     -> the API restarts by itself (~5s)
+#   npm run watch:admin                   -> rebuilds the admin app on every save
+# Rebuild the images only for dependency (package.json) or Prisma schema changes.
+services:
+  api:
+    environment:
+      ALORA_DEV_API_DIST: /srv/dist/apps/api
+    command: ["/bin/sh", "/srv/docker/api-dev-entrypoint.sh"]
+    volumes:
+      - ./dist:/srv/dist:ro
+      - ./docker/api-dev-entrypoint.sh:/srv/docker/api-dev-entrypoint.sh:ro
+      # New migrations apply at the next restart.
+      - ./prisma/migrations:/app/prisma/migrations:ro
+
+  # The parent folder is mounted because the Angular build deletes and recreates
+  # its own output folder; the symlink is resolved again on every request.
+  web-admin:
+    command:
+      - /bin/sh
+      - -c
+      - rm -rf /usr/share/nginx/html && ln -s /srv/dist/apps/web-admin/browser /usr/share/nginx/html && exec nginx -g 'daemon off;'
+    volumes:
+      - ./dist:/srv/dist:ro
+
+  web-public-booking:
+    command:
+      - /bin/sh
+      - -c
+      - rm -rf /usr/share/nginx/html && ln -s /srv/dist/apps/web-public-booking/browser /usr/share/nginx/html && exec nginx -g 'daemon off;'
+    volumes:
+      - ./dist:/srv/dist:ro
+
+  # Landing statica: le modifiche in apps/landing sono visibili al reload.
+  landing:
+    volumes:
+      - ./apps/landing:/usr/share/nginx/html:ro

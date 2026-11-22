@@ -281,6 +281,8 @@ export class BookingMutationService {
         excludeAppointmentIds: targets.flatMap((row) =>
           row.old ? [row.old.id] : [],
         ),
+        // An account never changes location: services resolve their activity there.
+        target: { locationId: account.locationId },
       },
     );
     for (const [index, row] of rows.entries()) {

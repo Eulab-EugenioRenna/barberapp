@@ -1,13 +1,13 @@
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { CustomSelectComponent } from "../custom-select.component";
+import { UiSelectComponent } from "@alora/ui";
 import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-platform-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, UiSelectComponent],
   template: `
     <section class="grid gap-4">
       <div class="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
@@ -21,7 +21,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
               >
             </div>
           </div>
-          <div class="mt-4 grid gap-2.5 sm:gap-3">
+          <div class="mt-4 grid gap-2.5 sm:gap-3" data-tour="platform-tenants">
             <button
               *ngFor="let platformTenant of platformTenants"
               type="button"
@@ -45,7 +45,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
           </div>
         </article>
 
-        <article class="dark-panel rounded-[2rem] p-4 sm:p-5 text-white">
+        <article class="dark-panel rounded-[2rem] p-4 sm:p-5 text-white" data-tour="platform-tenant-panel">
           <p class="eyebrow text-white/45">Attività selezionata</p>
           <h3 class="font-display text-2xl sm:text-3xl">
             {{
@@ -105,17 +105,17 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
                 />
                 <span>Prenotazioni online attive</span>
               </label>
-              <label class="field">
+              <div class="field">
                 <span>Modalità di prenotazione</span>
-                <barber-custom-select
+                <ui-select
                   [value]="platformTenantForm.bookingMode"
                   (valueChange)="platformTenantForm.bookingMode = $event"
                   [options]="bookingModeOptions"
                   label="Modalità di prenotazione"
-                ></barber-custom-select>
-              </label>
+                ></ui-select>
+              </div>
             </div>
-            <div class="flex flex-wrap gap-3">
+            <div class="flex flex-wrap gap-3" data-tour="platform-tenant-actions">
               <button
                 type="submit"
                 class="primary-btn"
@@ -175,7 +175,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
               <p class="eyebrow text-[var(--accent)]">Copia di sicurezza</p>
               <h3 class="font-display text-2xl sm:text-3xl">Salva o ripristina i dati</h3>
             </div>
-            <div class="flex gap-3">
+            <div class="flex gap-3" data-tour="platform-backup-actions">
               <button
                 type="button"
                 class="pill-btn"
@@ -252,7 +252,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
           </div>
         </article>
 
-        <article class="dark-panel rounded-[2rem] p-4 sm:p-5 text-white">
+        <article class="dark-panel rounded-[2rem] p-4 sm:p-5 text-white" data-tour="platform-health">
           <p class="eyebrow text-white/45">Controllo dati</p>
           <h3 class="font-display text-2xl sm:text-3xl">Contenuti dell'attività</h3>
           <div
@@ -290,7 +290,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
                 >
               </div>
             </div>
-            <button type="button" class="pill-btn" (click)="resetPlan.emit()">
+            <button type="button" class="pill-btn" data-tour="platform-plan-new" (click)="resetPlan.emit()">
               Nuovo piano
             </button>
           </div>
@@ -312,7 +312,7 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
               >
             </button>
           </div>
-          <form class="mt-4 grid gap-4" (ngSubmit)="savePlan.emit()">
+          <form class="mt-4 grid gap-4" data-tour="platform-plan-form" (ngSubmit)="savePlan.emit()">
             <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
               <label class="field"
                 ><span>Codice piano</span
@@ -335,15 +335,15 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
                   name="platformPlanPrice"
                   type="number"
               /></label>
-              <label class="field">
+              <div class="field">
                 <span>Frequenza</span>
-                <barber-custom-select
+                <ui-select
                   [value]="platformPlanForm.billingInterval"
                   (valueChange)="platformPlanForm.billingInterval = $event"
                   [options]="billingIntervalOptions"
                   label="Frequenza"
-                ></barber-custom-select>
-              </label>
+                ></ui-select>
+              </div>
             </div>
             <button
               type="submit"
@@ -385,25 +385,25 @@ import { billingIntervalLabel, subscriptionStatusLabel } from "../shared/present
               </p>
             </div>
           </div>
-          <form class="mt-4 grid gap-4" (ngSubmit)="saveSubscription.emit()">
-            <label class="field">
+          <form class="mt-4 grid gap-4" data-tour="platform-subscription-form" (ngSubmit)="saveSubscription.emit()">
+            <div class="field">
               <span>Piano da assegnare all'attività selezionata</span>
-              <barber-custom-select
+              <ui-select
                 [value]="platformSubscriptionForm.planId"
                 (valueChange)="platformSubscriptionForm.planId = $event"
                 [options]="platformPlanSelectOptions"
                 label="Piano"
-              ></barber-custom-select>
-            </label>
-            <label class="field">
+              ></ui-select>
+            </div>
+            <div class="field">
               <span>Stato</span>
-              <barber-custom-select
+              <ui-select
                 [value]="platformSubscriptionForm.status"
                 (valueChange)="platformSubscriptionForm.status = $event"
                 [options]="subscriptionStatusSelectOptions"
                 label="Stato"
-              ></barber-custom-select>
-            </label>
+              ></ui-select>
+            </div>
             <button
               type="submit"
               class="primary-btn"

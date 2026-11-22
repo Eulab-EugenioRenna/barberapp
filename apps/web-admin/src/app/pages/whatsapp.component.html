@@ -1,69 +1,163 @@
-<main class="wa-shell">
-  <header class="wa-header">
-    <div><p class="eyebrow">Relazioni · Connect</p><h1>WhatsApp</h1><p>Il numero della tua attività, le conversazioni e lo stato degli invii.</p></div>
-    <a routerLink="/appointments" class="secondary-btn">Torna all’agenda</a>
-  </header>
+<ui-page class="wa-shell">
+  <alora-page-header navKey="whatsapp">
+    <button uiPageActions type="button" class="secondary-btn" data-tour="whatsapp-refresh" [disabled]="refreshing" (click)="refresh()">
+      {{ refreshing ? 'Aggiornamento…' : 'Aggiorna' }}
+    </button>
+  </alora-page-header>
+
   <p *ngIf="feedback" class="wa-feedback" role="status">{{ feedback }}</p>
-  <p *ngIf="loading" role="status">Caricamento di WhatsApp…</p>
-  <section class="wa-connection panel" aria-label="Connessione WhatsApp">
-    <div class="wa-connection-main">
-      <span class="wa-kicker">Numero dell’attività</span>
-      <h2>{{ active?.number || 'Collega il tuo numero' }}</h2>
-      <div class="wa-status-line"><span class="wa-status" [class.online]="active?.state === 'connected' && active?.runnerOnline">{{ active ? stateLabel(active.state) : 'Nessuna connessione attiva' }}</span><span *ngIf="active && !active.runnerOnline" class="wa-muted">Servizio di connessione non raggiungibile</span></div>
-      <p class="wa-muted">Conversazioni condivise con gli utenti autorizzati dell’intera attività.</p>
-      <p *ngIf="active?.archiveId" class="wa-muted">Cronologia: {{ active?.syncCount }} messaggi acquisiti · {{ active?.syncStatus === 'complete' ? 'sincronizzazione completa' : 'sincronizzazione parziale o in corso' }}.</p>
-      <div class="wa-actions">
-        <button type="button" class="secondary-btn" [disabled]="refreshing" (click)="refresh()">{{ refreshing ? 'Aggiornamento…' : 'Aggiorna stato' }}</button>
-        <button *ngIf="canManage && !active" type="button" class="primary-btn" [disabled]="busy || !fresh" (click)="connectionAction('connect')">Collega numero</button>
-        <button *ngIf="canManage && active?.state === 'failed'" type="button" class="primary-btn" [disabled]="busy || !fresh" (click)="connectionAction('reconnect', active!.id)">Riconnetti</button>
-        <button *ngIf="canManage && active && active.state !== 'disconnecting'" type="button" class="secondary-btn" [disabled]="busy || !fresh" (click)="disconnectId = active.id">Disconnetti</button>
+  <p *ngIf="loading" class="wa-muted" role="status">Caricamento di WhatsApp…</p>
+
+  <ui-tabs ariaLabel="Sezioni di WhatsApp" [tabs]="tabs" [active]="section" (activeChange)="section = $any($event)"></ui-tabs>
+
+  <!-- Collegamento: solo quello creato da questo account, QR compreso -->
+  <section
+    *ngIf="section === 'connection'"
+    role="tabpanel" id="ui-tabpanel-connection" aria-labelledby="ui-tab-connection"
+    class="panel wa-card wa-connection"
+  >
+    <div class="wa-connection-main" data-tour="whatsapp-status">
+      <p class="wa-kicker">Il tuo collegamento</p>
+      <h2>{{ active?.number || (active ? 'Numero in attesa di collegamento' : 'Nessun numero collegato') }}</h2>
+      <div class="wa-status-line">
+        <span class="wa-status" [class.online]="active?.state === 'connected' && active?.runnerOnline">
+          {{ active ? stateLabel(active.state) : 'Da collegare' }}
+        </span>
+        <span *ngIf="active && !active.runnerOnline" class="wa-muted">Servizio di connessione non raggiungibile</span>
+      </div>
+      <p class="wa-muted">
+        Questo collegamento appartiene al tuo account: solo tu lo gestisci da ALORA.
+      </p>
+      <p *ngIf="active?.archiveId" class="wa-muted">
+        Cronologia: {{ active?.syncCount }} messaggi acquisiti ·
+        {{ active?.syncStatus === 'complete' ? 'sincronizzazione completa' : 'sincronizzazione in corso' }}.
+      </p>
+
+      <div *ngIf="canManage" class="wa-actions" data-tour="whatsapp-actions">
+        <button *ngIf="!active" type="button" class="primary-btn" [disabled]="busy || !fresh" (click)="connectionAction('connect')">
+          Collega il tuo numero
+        </button>
+        <button *ngIf="active?.state === 'failed' || active?.state === 'disconnected'" type="button" class="primary-btn" [disabled]="busy || !fresh" (click)="connectionAction('reconnect', active!.id)">
+          Riconnetti
+        </button>
+        <button *ngIf="active && active.state !== 'disconnecting' && active.state !== 'disconnected'" type="button" class="secondary-btn" [disabled]="busy || !fresh" (click)="disconnectId = active.id; removeId = ''">
+          Disconnetti
+        </button>
+        <button *ngIf="active" type="button" class="danger-btn" [disabled]="busy || !fresh" (click)="removeId = active.id; disconnectId = ''">
+          Elimina collegamento
+        </button>
+      </div>
+      <p *ngIf="!canManage" class="wa-muted">Per collegare un numero serve il permesso di gestione WhatsApp.</p>
+
+      <div *ngIf="disconnectId" class="wa-confirm" role="alert">
+        <p>Disconnettere il numero? Lo storico resta consultabile; gli invii ancora in coda verranno annullati.</p>
+        <div class="wa-actions">
+          <button type="button" class="primary-btn" [disabled]="busy" (click)="connectionAction('disconnect', disconnectId)">Conferma disconnessione</button>
+          <button type="button" class="secondary-btn" [disabled]="busy" (click)="disconnectId = ''">Annulla</button>
+        </div>
+      </div>
+      <div *ngIf="removeId" class="wa-confirm" role="alert">
+        <p>Eliminare il collegamento? Il numero viene scollegato da ALORA e da Connect; potrai crearne uno nuovo con un altro QR.</p>
+        <div class="wa-actions">
+          <button type="button" class="danger-btn" [disabled]="busy" (click)="connectionAction('remove', removeId)">Elimina definitivamente</button>
+          <button type="button" class="secondary-btn" [disabled]="busy" (click)="removeId = ''">Annulla</button>
+        </div>
       </div>
       <p *ngIf="connectionFeedback" class="wa-feedback" role="status">{{ connectionFeedback }}</p>
-      <p *ngIf="updatedAt" class="wa-updated">Ultimo aggiornamento {{ updatedAt | date:'HH:mm:ss' }}</p>
-      <div *ngIf="disconnectId" class="wa-confirm" role="alert">
-        <p>Disconnettere questo numero? Lo storico resta consultabile; gli invii ancora in coda verranno annullati.</p>
-        <div class="wa-actions"><button type="button" class="primary-btn" [disabled]="busy" (click)="connectionAction('disconnect', disconnectId)">Conferma disconnessione</button><button type="button" class="secondary-btn" [disabled]="busy" (click)="disconnectId = ''">Annulla</button></div>
-      </div>
+      <p *ngIf="updatedAt" class="wa-updated">Ultimo aggiornamento {{ updatedAt | date: 'HH:mm:ss' }}</p>
     </div>
-    <div *ngIf="canManage && active?.state === 'pairing'" class="wa-qr">
-      <img *ngIf="qr; else waitingQr" [src]="qr" alt="QR per collegare il numero WhatsApp" width="240" height="240" />
-      <ng-template #waitingQr><p>Il QR è in preparazione. Aggiorna lo stato tra pochi istanti.</p></ng-template>
-      <p>In WhatsApp apri <strong>Dispositivi collegati</strong> e inquadra il codice.</p>
+
+    <div *ngIf="canManage && active?.state === 'pairing'" class="wa-qr" data-tour="whatsapp-qr" aria-live="polite">
+      <img *ngIf="qr; else waitingQr" [src]="qr" alt="QR per collegare il tuo numero WhatsApp" width="240" height="240" />
+      <ng-template #waitingQr><div class="wa-qr-wait" role="status">Preparazione del QR…</div></ng-template>
+      <ol class="wa-qr-steps">
+        <li>Apri WhatsApp sul telefono</li>
+        <li>Vai in <strong>Dispositivi collegati</strong> › <strong>Collega un dispositivo</strong></li>
+        <li>Inquadra il codice: si aggiorna da solo</li>
+      </ol>
     </div>
   </section>
-  <section class="wa-workspace panel" aria-label="Conversazioni WhatsApp">
+
+  <!-- Conversazioni del proprio numero -->
+  <section
+    *ngIf="section === 'chats'"
+    role="tabpanel" id="ui-tabpanel-chats" aria-labelledby="ui-tab-chats"
+    class="panel wa-workspace" [class.wa-has-chat]="!!chatId"
+  >
     <aside class="wa-chats">
-      <h2>Conversazioni</h2>
-      <label class="wa-label">Archivio del numero<select [(ngModel)]="archiveId" (ngModelChange)="selectArchive()"><option value="">Seleziona un archivio</option><option *ngFor="let archive of archives; trackBy: trackId" [value]="archive.id">{{ archive.number }}</option></select></label>
-      <p *ngIf="!archives.length && !loading" class="wa-empty">La cronologia comparirà dopo il collegamento del numero.</p>
+      <div *ngIf="archives.length > 1" class="wa-label">
+        <span>Numero</span>
+        <ui-select label="Numero" [options]="archiveOptions" [(ngModel)]="archiveId" (ngModelChange)="selectArchive()" placeholder="Scegli un numero"></ui-select>
+      </div>
+      <p *ngIf="!archives.length && !loading" class="wa-empty">Le conversazioni compaiono dopo il collegamento del tuo numero.</p>
       <p *ngIf="archiveId && !conversations.length" class="wa-empty">Nessuna conversazione acquisita.</p>
-      <div class="wa-chat-list"><button *ngFor="let chat of conversations; trackBy: trackChat" type="button" class="wa-chat" [class.selected]="chat.chatId === chatId" [attr.aria-pressed]="chat.chatId === chatId" (click)="selectChat(chat)"><span class="wa-chat-name">{{ chat.name || chat.chatId }}</span><span class="wa-muted wa-preview">{{ chat.preview || 'Messaggio ' + chat.kind }}</span><time>{{ chat.lastMessageAt | date:'dd MMM, HH:mm' }}</time></button></div>
+      <div class="wa-chat-list">
+        <button *ngFor="let chat of conversations; trackBy: trackChat" type="button" class="wa-chat" [class.selected]="chat.chatId === chatId" [attr.aria-pressed]="chat.chatId === chatId" (click)="selectChat(chat)">
+          <span class="wa-chat-name">{{ chat.name || chat.chatId }}</span>
+          <span class="wa-muted wa-preview">{{ chat.preview || 'Messaggio ' + chat.kind }}</span>
+          <time>{{ chat.lastMessageAt | date: 'dd MMM, HH:mm' }}</time>
+        </button>
+      </div>
     </aside>
     <div class="wa-thread">
-      <div class="wa-thread-heading"><h2>{{ chatId ? chatName() : 'Uno spazio per le tue conversazioni' }}</h2><p class="wa-muted">{{ chatId ? chatId : 'Scegli una conversazione per leggere i messaggi acquisiti.' }}</p></div>
+      <div class="wa-thread-heading">
+        <button *ngIf="chatId" type="button" class="secondary-btn wa-back" (click)="chatId = ''">‹ Conversazioni</button>
+        <h2>{{ chatId ? chatName() : 'Scegli una conversazione' }}</h2>
+        <p *ngIf="chatId" class="wa-muted">{{ chatId }}</p>
+      </div>
       <div *ngIf="chatId" class="wa-messages" aria-live="polite">
         <button *ngIf="hasOlder" type="button" class="secondary-btn wa-older" [disabled]="loadingMessages" (click)="olderMessages()">Carica messaggi precedenti</button>
         <p *ngIf="loadingMessages && !messages.length" role="status">Caricamento dei messaggi…</p>
-        <article *ngFor="let item of messages; trackBy: trackId" class="wa-message" [class.outgoing]="item.direction === 'outbound'"><p>{{ item.text || (item.selectedButtonId ? 'Risposta interattiva del cliente' : 'Contenuto ' + item.kind) }}</p><time>{{ item.occurredAt | date:'dd MMM, HH:mm' }}</time></article>
+        <article *ngFor="let item of messages; trackBy: trackId" class="wa-message" [class.outgoing]="item.direction === 'outbound'">
+          <p>{{ item.text || (item.selectedButtonId ? 'Risposta interattiva del cliente' : 'Contenuto ' + item.kind) }}</p>
+          <time>{{ item.occurredAt | date: 'dd MMM, HH:mm' }}</time>
+        </article>
       </div>
-      <div *ngIf="!chatId" class="wa-thread-empty"><span aria-hidden="true">“</span><p>Ogni conversazione ha il suo contesto.</p></div>
+      <p *ngIf="!chatId" class="wa-thread-empty">I messaggi della conversazione scelta compaiono qui.</p>
     </div>
   </section>
-  <section class="wa-bottom">
-    <article class="panel wa-compose">
-      <h2>Nuovo messaggio</h2><p class="wa-muted">L’invio usa il numero connesso. Un messaggio accettato dal canale non conferma la lettura del destinatario.</p>
-      <p *ngIf="!canSend" class="wa-empty">Per inviare messaggi occorre il permesso dedicato.</p>
-      <ng-container *ngIf="canSend">
-        <div *ngIf="pending.kind !== 'empty'" class="wa-feedback" role="status"><p>Un invio precedente è da verificare. I dati restano conservati anche ricaricando la pagina.</p><div *ngIf="pendingPayload as saved"><strong>{{ saved.to }}</strong><p class="wa-pending-text">{{ saved.text }}</p></div><button *ngIf="pending.kind === 'pending'" type="button" class="primary-btn" [disabled]="sending" (click)="send(true)">Verifica la stessa richiesta</button><p *ngIf="pending.kind === 'unreadable'">Richiesta non leggibile: verifica gli invii in Connect prima di procedere.</p></div>
-        <form (ngSubmit)="send()"><fieldset [disabled]="draftLocked"><label class="wa-label">Numero con prefisso internazionale<input name="to" [(ngModel)]="to" maxlength="100" placeholder="+39 333 1234567" required /></label><label class="wa-label">Messaggio<textarea name="message" [(ngModel)]="message" rows="4" maxlength="16000" required></textarea></label><label class="wa-consent"><input type="checkbox" name="consent" [(ngModel)]="recipientAuthorized" />Ho verificato destinatario e autorizzazione a ricevere questo messaggio.</label><button class="primary-btn" [disabled]="!fresh || !connected || !recipientAuthorized || !message.trim() || !to.trim()">{{ sending ? 'Invio in verifica…' : 'Invia messaggio' }}</button></fieldset></form>
-        <p *ngIf="!connected" class="wa-muted">Collega il numero e attendi che il servizio risulti disponibile per inviare.</p>
-      </ng-container>
-      <p *ngIf="sendFeedback" role="status" class="wa-feedback">{{ sendFeedback }}</p>
-    </article>
-    <article class="panel wa-outbox"><h2>Invii recenti</h2><p class="wa-muted">Gli esiti incerti richiedono verifica: nessun reinvio automatico.</p><p *ngIf="!outbox.length" class="wa-empty">Nessun invio registrato.</p><ol><li *ngFor="let item of outbox.slice(0, 20); trackBy: trackId"><div><strong>{{ stateLabel(item.state) }}</strong><time>{{ item.createdAt | date:'dd MMM, HH:mm' }}</time></div><span *ngIf="item.hasError" class="wa-muted">Verifica richiesta in Connect</span></li></ol></article>
+
+  <!-- Nuovo messaggio -->
+  <section
+    *ngIf="section === 'compose'"
+    role="tabpanel" id="ui-tabpanel-compose" aria-labelledby="ui-tab-compose"
+    class="panel wa-card"
+  >
+    <p class="wa-muted">L’invio usa il tuo numero collegato. Un messaggio accettato dal canale non conferma la lettura del destinatario.</p>
+    <p *ngIf="!canSend" class="wa-empty">Per inviare messaggi occorre il permesso dedicato.</p>
+    <ng-container *ngIf="canSend">
+      <div *ngIf="pending.kind !== 'empty'" class="wa-feedback" role="status">
+        <p>Un invio precedente è da verificare. I dati restano conservati anche ricaricando la pagina.</p>
+        <div *ngIf="pendingPayload as saved"><strong>{{ saved.to }}</strong><p class="wa-pending-text">{{ saved.text }}</p></div>
+        <button *ngIf="pending.kind === 'pending'" type="button" class="primary-btn" [disabled]="sending" (click)="send(true)">Verifica la stessa richiesta</button>
+        <p *ngIf="pending.kind === 'unreadable'">Richiesta non leggibile: verifica gli invii in Connect prima di procedere.</p>
+      </div>
+      <form (ngSubmit)="send()">
+        <fieldset [disabled]="draftLocked">
+          <label class="wa-label">Numero con prefisso internazionale<input name="to" [(ngModel)]="to" maxlength="100" placeholder="+39 333 1234567" inputmode="tel" required /></label>
+          <label class="wa-label">Messaggio<textarea name="message" [(ngModel)]="message" rows="5" maxlength="16000" required></textarea></label>
+          <label class="wa-consent"><input type="checkbox" name="consent" [(ngModel)]="recipientAuthorized" />Ho verificato destinatario e autorizzazione a ricevere questo messaggio.</label>
+          <button class="primary-btn" [disabled]="!fresh || !connected || !recipientAuthorized || !message.trim() || !to.trim()">{{ sending ? 'Invio in verifica…' : 'Invia messaggio' }}</button>
+        </fieldset>
+      </form>
+      <p *ngIf="!connected" class="wa-muted">Collega il tuo numero e attendi che risulti connesso per inviare.</p>
+    </ng-container>
+    <p *ngIf="sendFeedback" role="status" class="wa-feedback">{{ sendFeedback }}</p>
   </section>
-  <app-notification-template-editor *ngIf="session.can('notifications.manage')" />
-  <app-appointment-automation-access *ngIf="session.can('notifications.manage')" />
-  <app-appointment-automation-policy *ngIf="session.can('notifications.manage')" />
-  <app-appointment-automation-monitor *ngIf="session.can('notifications.manage')" />
-</main>
+
+  <!-- Invii -->
+  <section
+    *ngIf="section === 'outbox'"
+    role="tabpanel" id="ui-tabpanel-outbox" aria-labelledby="ui-tab-outbox"
+    class="panel wa-card wa-outbox"
+  >
+    <p class="wa-muted">Gli invii dal tuo numero. Gli esiti incerti richiedono verifica: nessun reinvio automatico.</p>
+    <p *ngIf="!outbox.length" class="wa-empty">Nessun invio registrato.</p>
+    <ol>
+      <li *ngFor="let item of outbox.slice(0, 50); trackBy: trackId">
+        <div><strong>{{ stateLabel(item.state) }}</strong><time>{{ item.createdAt | date: 'dd MMM, HH:mm' }}</time></div>
+        <span *ngIf="item.hasError" class="wa-muted">Verifica richiesta in Connect</span>
+      </li>
+    </ol>
+  </section>
+</ui-page>

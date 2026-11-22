@@ -201,7 +201,7 @@ export class PublicBookingController {
     const tenant = await this.resolveTenant(tenantSlug, host);
 
     return this.cacheService.getOrSet(
-      cacheKeys.publicServices(tenant.id) + ":scope9-v1",
+      cacheKeys.publicServices(tenant.id) + ":activities-v1",
       CACHE_TTL_SECONDS.publicServices,
       () =>
         this.prisma.service
@@ -211,10 +211,16 @@ export class PublicBookingController {
               isActive: true,
               isPublic: true,
               isBookableOnline: true,
-              sector: {
+              // Offered where its activity runs publicly, in any location.
+              activity: {
                 isActive: true,
-                isPublic: true,
-                location: { isActive: true, isPublic: true },
+                sectors: {
+                  some: {
+                    isActive: true,
+                    isPublic: true,
+                    location: { isActive: true, isPublic: true },
+                  },
+                },
               },
             },
             orderBy: { name: "asc" },
@@ -236,12 +242,27 @@ export class PublicBookingController {
               isPublic: true,
               isBookableOnline: true,
               sectorId: true,
+              activityId: true,
               sector: {
                 select: {
                   id: true,
                   name: true,
                   locationId: true,
                   location: { select: { id: true, name: true, address: true } },
+                },
+              },
+              activity: {
+                select: {
+                  id: true,
+                  name: true,
+                  sectors: {
+                    where: {
+                      isActive: true,
+                      isPublic: true,
+                      location: { isActive: true, isPublic: true },
+                    },
+                    select: { id: true, name: true, locationId: true },
+                  },
                 },
               },
               serviceProducts: {
@@ -291,16 +312,33 @@ export class PublicBookingController {
                 sectors: { select: { sectorId: true } },
               },
             });
-            return services.map((service) => ({
-              ...service,
-              collaborators: collaborators
-                .filter((person) =>
-                  person.sectors.some(
-                    (membership) => membership.sectorId === service.sectorId,
-                  ),
-                )
-                .map(({ sectors: _sectors, ...person }) => person),
-            }));
+            return services.map(({ activity, ...service }) => {
+              // Where the service can be booked: its activity's public sectors.
+              const offeredAt = activity.sectors.map((sector) => ({
+                sectorId: sector.id,
+                sectorName: sector.name,
+                locationId: sector.locationId,
+              }));
+              const sectorIds = offeredAt.map((row) => row.sectorId);
+              return {
+                ...service,
+                activityName: activity.name,
+                offeredAt,
+                collaborators: collaborators
+                  .filter((person) =>
+                    person.sectors.some((membership) =>
+                      sectorIds.includes(membership.sectorId),
+                    ),
+                  )
+                  .map(({ sectors, ...person }) => ({
+                    ...person,
+                    // The page shows only the professionals of the chosen location.
+                    sectorIds: sectors
+                      .map((membership) => membership.sectorId)
+                      .filter((id) => sectorIds.includes(id)),
+                  })),
+              };
+            });
           }),
     );
   }

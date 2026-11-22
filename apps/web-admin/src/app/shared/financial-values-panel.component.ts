@@ -233,7 +233,7 @@ interface InventoryValues {
         class="px-1 text-sm text-[var(--muted)]"
       >
         Il riepilogo di magazzino richiede la vista completa delle sedi, senza
-        filtri per settore, professionista o cliente.
+        filtri per attività, professionista o cliente.
       </p>
     </section>
   `,

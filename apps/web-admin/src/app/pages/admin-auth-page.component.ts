@@ -27,6 +27,7 @@ export class AdminAuthPageComponent implements OnInit {
       device_revoked: "Dispositivo revocato e sessioni SSO disconnesse. Accedi nuovamente per continuare.",
       device_revoked_sessions_pending: "Dispositivo revocato. Connect non ha confermato la chiusura di tutte le sessioni SSO; verifica gli accessi nell’area account EULAB. L’accesso locale è stato chiuso.",
       sessions_closed: "Tutte le tue sessioni SSO sono state disconnesse. Accedi nuovamente per continuare.",
+      authenticator_removed: "App di autenticazione rimossa: per sicurezza tutte le sessioni sono state chiuse. Accedi di nuovo; se la verifica in due passaggi è obbligatoria ti verrà chiesto di configurarla.",
       session_closed: "Questa sessione è stata disconnessa. Accedi nuovamente per continuare.",
       session_expired: "La sessione personale è scaduta o non è più valida. Accedi nuovamente per continuare.",
       outcome_unknown: "Esito dell’operazione SSO da verificare. L’accesso locale è stato chiuso; accedi e controlla lo stato prima di riprovare. Nessun tentativo automatico eseguito.",

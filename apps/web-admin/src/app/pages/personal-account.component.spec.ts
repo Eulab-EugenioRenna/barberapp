@@ -5,13 +5,17 @@ jest.mock("@angular/common", () => ({ CommonModule: {} }));
 jest.mock("@angular/forms", () => ({ FormsModule: {} }));
 jest.mock("@angular/router", () => ({ Router: class {}, RouterLink: class {} }));
 jest.mock("@barber/shared/brand", () => ({ AloraBrandComponent: class {} }), { virtual: true });
+jest.mock("@alora/ui", () => ({ UiPageComponent: class {}, UiTabsComponent: class {} }));
+jest.mock("../shell/admin-page-header.component", () => ({ AdminPageHeaderComponent: class {} }));
 jest.mock("../core/auth-api.service", () => ({ AuthApiService: class {} }));
 jest.mock("../core/session.store", () => ({ SessionStore: class {} }));
 jest.mock("../core/session-refresh.service", () => ({ SessionRefreshService: class {} }));
 jest.mock("../shared/autofocus-first.directive", () => ({ AutofocusFirstDirective: class {} }));
+jest.mock("../core/onboarding/tour.service", () => ({ TourService: class {} }));
 import { Router } from "@angular/router";
 import { AuthApiService } from "../core/auth-api.service";
 import { SessionStore } from "../core/session.store";
+import { TourService } from "../core/onboarding/tour.service";
 import { PersonalAccountComponent } from "./personal-account.component";
 
 describe("Personal account interactions", () => {
@@ -23,11 +27,13 @@ describe("Personal account interactions", () => {
     personalAccount: jest.fn(), personalSecurity: jest.fn(), personalSessions: jest.fn(), personalNotices: jest.fn(),
     logoutPersonalSession: jest.fn(), logoutAllPersonalSessions: jest.fn(), revokePersonalDevice: jest.fn(),
   };
+  const tours = { resetSeen: jest.fn(), start: jest.fn(), setAutoStart: jest.fn(), autoStart: () => true };
   beforeEach(() => {
     jest.resetAllMocks();
     providers.set(AuthApiService, api);
     providers.set(SessionStore, { clear, currentUser: () => ({ role: "collaborator", permissions: [], permissionsConfigured: true }), can: () => false });
     providers.set(Router, { navigate });
+    providers.set(TourService, tours);
     api.personalAccount.mockReturnValue(of(profile)); api.personalSecurity.mockReturnValue(of(security));
     api.personalSessions.mockReturnValue(of({ sessions: [], truncated: false })); api.personalNotices.mockReturnValue(of({ items: [], unreadCount: 0 }));
     page = new PersonalAccountComponent();
@@ -103,5 +109,13 @@ describe("Personal account interactions", () => {
     expect(page.feedback).toContain("non eseguita");
     expect(clear).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
+  });
+  it("replays every guide from the general tour and stores the auto-start preference", () => {
+    page.replayGuides();
+    expect(tours.resetSeen).toHaveBeenCalledTimes(1);
+    expect(tours.start).toHaveBeenCalledWith(null);
+    expect(tours.resetSeen.mock.invocationCallOrder[0]).toBeLessThan(tours.start.mock.invocationCallOrder[0]);
+    page.setGuidesAutoStart(false);
+    expect(tours.setAutoStart).toHaveBeenCalledWith(false);
   });
 });

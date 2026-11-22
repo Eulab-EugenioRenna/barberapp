@@ -88,6 +88,7 @@ enum BillingInterval {
 }
 
 model Tenant {
+  whatsAppLinks WhatsAppLink[]
   appointmentAutomationRuns AppointmentAutomationRun[]
   notificationAutomationWebhook NotificationAutomationWebhook?
   notificationAutomationWebhookEvents NotificationAutomationWebhookEvent[]
@@ -105,6 +106,7 @@ model Tenant {
   stockMovements StockMovement[]
   locations                     Location[]
   sectors                       Sector[]
+  activities                    Activity[]
   connectBinding ConnectTenantBinding?
   id                            String                         @id @default(uuid())
   name                          String
@@ -166,6 +168,7 @@ model TenantHoliday {
 }
 
 model User {
+  whatsAppLinks WhatsAppLink[]
   orderOperations OrderOperation[]
   paymentOperations PaymentOperation[]
   sectorAccess                UserSectorAccess[]
@@ -300,8 +303,11 @@ model Customer {
 model Service {
   priceMode String @default("legacy")
   priceHistory CatalogPriceHistory[]
+  // Home sector (first location of the activity); bookings resolve the sector of their location.
   sectorId             String           @default(dbgenerated())
   sector               Sector           @relation(fields: [sectorId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  activityId           String           @default(dbgenerated())
+  activity             Activity         @relation(fields: [activityId, tenantId], references: [id, tenantId], onDelete: Restrict)
   id                   String           @id @default(uuid())
   tenantId             String
   tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -327,6 +333,7 @@ model Service {
   @@index([tenantId, isActive])
   @@index([tenantId, isBookableOnline])
   @@index([tenantId, sectorId], map: "Service_tenant_sector_idx")
+  @@index([tenantId, activityId])
 }
 
 model Room {
@@ -412,8 +419,12 @@ model Product {
   isActive        Boolean          @default(true)
   serviceProducts ServiceProduct[]
   saleItems       SaleItem[]
+  // Default «Rivendita» when omitted (set by the database).
+  activityId      String           @default(dbgenerated())
+  activity        Activity         @relation(fields: [activityId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   @@index([tenantId, isActive])
+  @@index([tenantId, activityId])
   @@index([tenantId, sku])
   @@unique([tenantId, barcode], map: "Product_tenantId_barcode_key")
 }
@@ -1083,12 +1094,16 @@ model Location {
   @@unique([id, tenantId])
 }
 
+// An activity run at a location: hours, rooms, professionals and history live here.
 model Sector {
   id            String               @id @default(uuid())
   tenantId      String
   tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   locationId    String
   location      Location             @relation(fields: [locationId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  // Filled by the database from the name when omitted; the name follows the activity.
+  activityId    String               @default(dbgenerated())
+  activity      Activity             @relation(fields: [activityId, tenantId], references: [id, tenantId], onDelete: Restrict)
   legacyKey     String?
   name          String
   isActive      Boolean              @default(true)
@@ -1109,6 +1124,31 @@ model Sector {
   @@unique([id, locationId])
   @@index([tenantId, locationId])
   @@unique([id, tenantId, locationId])
+  @@unique([locationId, activityId], map: "Sector_location_activity_key")
+  @@index([tenantId, activityId])
+}
+
+// What the business does (Barberia, Estetica, Rivendita…): one catalogue for the
+// account, run in one or more locations through Sector.
+model Activity {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Key of the built-in catalogue (barberia, estetica, rivendita…); null for custom ones.
+  preset    String?
+  name      String
+  color     String?
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sectors   Sector[]
+  services  Service[]
+  products  Product[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
 }
 
 model CollaboratorSector {
@@ -1243,4 +1283,23 @@ model OrderOperation {
 
   @@unique([tenantId,idempotencyKey])
   @@index([tenantId,saleId,createdAt])
+}
+
+// WhatsApp connections created from ALORA. Connect does not record which app
+// or person opened a connection: ownership lives here. Rule: a connection is
+// managed only by the account that created it.
+model WhatsAppLink {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Connect WhatsApp session id (wa_sessions.id).
+  sessionId String    @unique
+  createdAt DateTime  @default(now())
+  removedAt DateTime?
+  /// Set when the disconnect was requested from ALORA: only then the
+  /// connection stays reconnectable. A disconnect from the phone removes it.
+  disconnectRequestedAt DateTime?
+  @@index([tenantId, userId])
 }

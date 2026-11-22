@@ -8,6 +8,7 @@ import { zonedDateKey, zonedDateParts } from "../../common/zoned-time";
 import { CollaboratorScheduleService } from "../availability/collaborator-schedule.service";
 import { sectorWorkingWindow } from "../locations/operational-hours";
 import type { OperationalScope } from "../locations/operational-scope";
+import { localizeServices, type SectorTarget } from "../locations/activity-sectors";
 import {
   allocateBookingResources,
   ResourceSearchLimitError,
@@ -47,6 +48,8 @@ export class BookingResourcesService {
       publicOnly?: boolean;
       scope?: OperationalScope;
       excludeAppointmentIds?: string[];
+      /** Location (or sector) of the booking: services resolve their activity there. */
+      target?: SectorTarget;
     } = {},
   ) {
     if (
@@ -62,30 +65,31 @@ export class BookingResourcesService {
     if (options.scope && options.scope.tenantId !== tenantId)
       throw new BadRequestException("Ambito aziendale non valido");
     const ids = [...new Set(lines.map((row) => row.serviceId))];
-    const services = await client.service.findMany({
+    const catalog = await client.service.findMany({
       where: {
         id: { in: ids },
         tenantId,
         isActive: true,
+        activity: { isActive: true },
         ...(options.publicOnly
           ? { isPublic: true, isBookableOnline: true }
           : {}),
-        ...(options.scope
-          ? { sectorId: { in: options.scope.allowedSectorIds } }
-          : {}),
-        sector: {
-          isActive: true,
-          ...(options.publicOnly ? { isPublic: true } : {}),
-          location: {
-            isActive: true,
-            ...(options.publicOnly ? { isPublic: true } : {}),
-            ...(options.scope ? { id: { in: options.scope.locationIds } } : {}),
-          },
-        },
       },
       include: { sector: true },
     });
-    if (services.length !== ids.length)
+    if (catalog.length !== ids.length)
+      throw new BadRequestException(
+        "Uno dei servizi non è disponibile nell'ambito scelto",
+      );
+    // Same service, any location of its activity: the sector is the one here.
+    const services = await localizeServices(client, tenantId, catalog, options.target, {
+      publicOnly: options.publicOnly,
+      scope: options.scope,
+    });
+    if (
+      options.scope &&
+      services.some((row) => !options.scope!.locationIds.includes(row.sector.locationId))
+    )
       throw new BadRequestException(
         "Uno dei servizi non è disponibile nell'ambito scelto",
       );

@@ -16,6 +16,7 @@ import { BookingCreateDto } from "../../common/booking-write.dto";
 import {
   resolveOperationalScope,
   sectorFilter,
+  serviceScopeFilter,
   collaboratorFilter,
 } from "../locations/operational-scope";
 import type { Prisma } from "@prisma/client";
@@ -96,11 +97,12 @@ export class AppointmentsController {
     );
     const [services, collaborators] = await Promise.all([
       this.prisma.service.findMany({
-        where: { tenantId, ...sectorFilter(scope), isActive: true },
+        where: { tenantId, ...serviceScopeFilter(scope), isActive: true },
         select: {
           id: true,
           name: true,
           sectorId: true,
+          activityId: true,
           sector: { select: { id: true, name: true, locationId: true } },
           requiresCollaborator: true,
           requiresRoom: true,
@@ -143,7 +145,21 @@ export class AppointmentsController {
         },
       }),
     ]);
-    return { services, collaborators };
+    // One location in scope: each service is shown in its activity's sector there.
+    if (scope.locationIds.length !== 1) return { services, collaborators };
+    const local = await this.prisma.sector.findMany({
+      where: { tenantId, locationId: scope.locationIds[0], id: { in: scope.allowedSectorIds } },
+      select: { id: true, name: true, locationId: true, activityId: true },
+    });
+    return {
+      services: services.flatMap((service) => {
+        const sector = local.find((row) => row.activityId === service.activityId);
+        if (!sector) return [];
+        const { activityId: _activity, ...placed } = sector;
+        return [{ ...service, sectorId: sector.id, sector: placed }];
+      }),
+      collaborators,
+    };
   }
 
   private async resolveCustomer(

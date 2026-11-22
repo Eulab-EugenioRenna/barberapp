@@ -101,8 +101,9 @@ describe("Operational membership intersection", () => {
         "locations.manage",
       ),
     ).toBe(false);
-    expect(createFunctionMatrix("alora-test").version).toBe(7);
-    expect(createFunctionMatrix("alora-test").functions).toHaveLength(32);
+    expect(createFunctionMatrix("alora-test").version).toBe(9);
+    // v9: products.* and confirmations.read merged into Listino and Cassa.
+    expect(createFunctionMatrix("alora-test").functions).toHaveLength(29);
   });
   it("isolates concurrent cache loads and changes the key on membership revocation", async () => {
     const scopes = await Promise.all([

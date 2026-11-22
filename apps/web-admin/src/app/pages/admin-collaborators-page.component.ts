@@ -47,12 +47,13 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             aloraFunction="collaborators.manage"
             type="button"
             class="primary-btn"
+            data-tour="collaborators-new"
             (click)="openNew()"
           >
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo collaboratore
           </button>
         </div>
-        <label class="field mt-4">
+        <label class="field mt-4" data-tour="collaborators-search">
           <span>Cerca nella squadra</span>
           <input
             [(ngModel)]="collaboratorQuery"
@@ -67,6 +68,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
             *ngFor="let collaborator of filteredCollaborators"
             type="button"
             class="list-card text-left"
+            data-tour="collaborators-card"
             (click)="openEdit(collaborator)"
           >
             <div>
@@ -154,7 +156,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
               *ngIf="collaboratorForm.id"
               routerLink="/locations"
               class="secondary-btn"
-              >Appartenenze a sedi e settori</a
+              >Sedi e attività in cui lavora</a
             >
             <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
               <label class="field">

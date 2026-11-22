@@ -470,6 +470,7 @@ import { buildDayListingEvent } from "./calendar-date";
         </div>
         <div
           class="ml-auto flex w-full flex-col gap-2 sm:w-auto sm:min-w-[16rem]"
+          data-tour="appointments-date-nav"
         >
           <barber-calendar-input
             [value]="calendarDateKey"
@@ -491,7 +492,7 @@ import { buildDayListingEvent } from "./calendar-date";
         </div>
       </div>
 
-      <div class="mt-4 flex flex-wrap gap-2">
+      <div class="mt-4 flex flex-wrap gap-2" data-tour="appointments-views">
         <button
           *ngFor="let option of viewOptions"
           type="button"
@@ -503,7 +504,10 @@ import { buildDayListingEvent } from "./calendar-date";
         </button>
       </div>
 
-      <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
+      <div
+        class="mt-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4"
+        data-tour="appointments-summary"
+      >
         <article
           class="rounded-[1.2rem] border border-[var(--line)]/70 bg-white/75 p-3 md:rounded-[1.4rem] md:p-4"
         >
@@ -557,7 +561,7 @@ import { buildDayListingEvent } from "./calendar-date";
         </article>
       </div>
 
-      <main class="calendar-main">
+      <main class="calendar-main" data-tour="appointments-grid">
         <section
           *ngIf="view === 'day'"
           class="calendar-day-scroll calendar-view-viewport"

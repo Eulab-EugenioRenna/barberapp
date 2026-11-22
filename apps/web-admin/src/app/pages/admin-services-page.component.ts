@@ -1,10 +1,24 @@
 import { PriceSettingsComponent } from "../shared/price-settings.component";
-import { SectorPickerComponent } from "../shared/sector-picker.component";
+import { ActivityPickerComponent } from "../shared/activity-picker.component";
+import { ActivitiesService } from "../core/activities.service";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  inject,
+} from "@angular/core";
+import { ActivatedRoute, Router } from "@angular/router";
+import { firstValueFrom } from "rxjs";
+import { AdminApiService } from "../core/admin-api.service";
+import { BarcodeScannerService } from "../core/barcode-scanner.service";
+import { SessionStore } from "../core/session.store";
 import { FormsModule } from "@angular/forms";
-import { CustomSelectComponent } from "../custom-select.component";
+import { UiSelectComponent } from "@alora/ui";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
@@ -15,11 +29,11 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
   standalone: true,
   imports: [
     PriceSettingsComponent,
-    SectorPickerComponent,
+    ActivityPickerComponent,
     FunctionAccessDirective,
     CommonModule,
     FormsModule,
-    CustomSelectComponent,
+    UiSelectComponent,
     InfiniteScrollDirective,
     AutofocusFirstDirective,
     UiIconComponent,
@@ -28,6 +42,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
     <section class="grid gap-4 xl:grid-cols-2">
       <article
         aloraFunction="services.read"
+        data-tour="services-services"
         class="panel rounded-[2rem] p-4 sm:p-5"
       >
         <div class="page-head">
@@ -44,6 +59,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
           </div>
           <button
             aloraFunction="services.manage"
+            data-tour="services-new-service"
             type="button"
             class="primary-btn"
             (click)="openNewService()"
@@ -51,17 +67,27 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo servizio
           </button>
         </div>
-        <label class="field mt-4">
-          <span>Cerca servizio</span>
-          <input
-            [(ngModel)]="serviceQuery"
-            name="serviceSearch"
-            type="search"
-            autocomplete="off"
-            placeholder="Nome o descrizione"
-          />
-        </label>
-        <div class="mt-4 grid gap-2.5 sm:gap-3">
+        <div class="catalog-filters mt-4">
+          <label class="field" data-tour="services-search-service">
+            <span>Cerca servizio</span>
+            <input
+              [(ngModel)]="serviceQuery"
+              name="serviceSearch"
+              type="search"
+              autocomplete="off"
+              placeholder="Nome o descrizione"
+            />
+          </label>
+          <label class="field" data-tour="services-activity-filter" *ngIf="activityFilterOptions.length > 2">
+            <span>Attività</span>
+            <select [(ngModel)]="serviceActivity" name="serviceActivity">
+              <option *ngFor="let option of activityFilterOptions" [value]="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </div>
+        <div class="mt-4 grid gap-2.5 sm:gap-3" data-tour="services-service-list">
           <button
             *ngFor="let service of filteredServices"
             type="button"
@@ -70,6 +96,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
           >
             <div>
               <strong>{{ service.name }}</strong><span *ngIf="service.isActive===false" class="status-pill">Disattivato</span>
+              <span *ngIf="activityName(service.activityId)" class="status-pill status-pill-neutral ml-1">{{ activityName(service.activityId) }}</span>
               <p class="mt-1 text-sm text-[var(--muted)]">
                 {{
                   service.publicDescription || "Descrizione non ancora inserita"
@@ -99,7 +126,8 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
       </article>
 
       <article
-        aloraFunction="products.read"
+        aloraFunction="services.read"
+        data-tour="services-products"
         class="panel rounded-[2rem] p-4 sm:p-5"
       >
         <div class="page-head">
@@ -113,7 +141,8 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             </div>
           </div>
           <button
-            aloraFunction="products.manage"
+            aloraFunction="services.manage"
+            data-tour="services-new-product"
             type="button"
             class="primary-btn"
             (click)="openNewProduct()"
@@ -121,17 +150,37 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             <barber-ui-icon name="plus"></barber-ui-icon> Nuovo prodotto
           </button>
         </div>
-        <label class="field mt-4">
-          <span>Cerca prodotto</span>
-          <input
-            [(ngModel)]="productQuery"
-            name="productSearch"
-            type="search"
-            autocomplete="off"
-            placeholder="Nome o descrizione"
-          />
-        </label>
-        <div class="mt-4 grid gap-2 sm:grid-cols-2">
+        <div class="catalog-filters mt-4">
+          <label class="field" data-tour="services-search-product">
+            <span>Cerca prodotto</span>
+            <input
+              [(ngModel)]="productQuery"
+              name="productSearch"
+              type="search"
+              autocomplete="off"
+              placeholder="Nome, descrizione o barcode"
+              (keydown.enter)="$event.preventDefault(); findByBarcode(productQuery)"
+            />
+          </label>
+          <label class="field" *ngIf="activityFilterOptions.length > 2">
+            <span>Attività</span>
+            <select [(ngModel)]="productActivity" name="productActivity">
+              <option *ngFor="let option of activityFilterOptions" [value]="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </div>
+        <p
+          *ngIf="scanFeedback"
+          role="status"
+          class="mt-2 text-sm"
+          [class.text-[var(--danger)]]="scanFeedbackKind === 'error'"
+          data-tour="services-scan-feedback"
+        >
+          {{ scanFeedback }}
+        </p>
+        <div class="mt-4 grid gap-2 sm:grid-cols-2" data-tour="services-product-list">
           <button
             *ngFor="let product of filteredProducts"
             type="button"
@@ -139,6 +188,8 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             (click)="openEditProduct(product)"
           >
             <strong>{{ product.name }}</strong><span *ngIf="product.isActive===false" class="status-pill">Disattivato</span>
+            <span *ngIf="product.barcode" class="text-xs text-[var(--muted)]">{{ product.barcode }}</span>
+            <span *ngIf="activityName(product.activityId)" class="text-xs text-[var(--muted)]">{{ activityName(product.activityId) }}</span>
             <span class="text-sm text-[var(--muted)]">
               {{
                 product.price === null || product.price === undefined
@@ -204,9 +255,11 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             <input [(ngModel)]="serviceForm.name" name="serviceName" required />
           </label>
           <alora-price-settings kind="service" [value]="serviceForm"></alora-price-settings>
-          <alora-sector-picker
-            [(value)]="serviceForm.sectorId"
-          ></alora-sector-picker>
+          <alora-activity-picker
+            kind="service"
+            [value]="serviceForm.activityId"
+            (valueChange)="serviceForm.activityId = $event"
+          ></alora-activity-picker>
           <label class="field">
             <span>Risorse richieste</span>
             <span
@@ -215,7 +268,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                 [(ngModel)]="serviceForm.requiresRoom"
                 name="requiresRoom"
               />
-              Richiede una risorsa del settore</span
+              Richiede una stanza o postazione della sede</span
             >
           </label>
           <label class="field">
@@ -317,25 +370,25 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               </p>
             </ng-template>
             <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
-              <label class="field md:col-span-2">
+              <div class="field md:col-span-2">
                 <span>Prodotto</span>
-                <barber-custom-select
+                <ui-select
                   [value]="serviceProductForm.productId"
                   (valueChange)="selectServiceProduct($event)"
                   [options]="productSelectOptions"
                   label="Prodotto"
                   placeholder="Seleziona prodotto"
-                ></barber-custom-select>
-              </label>
-              <label class="field">
+                ></ui-select>
+              </div>
+              <div class="field">
                 <span>Modalità</span>
-                <barber-custom-select
+                <ui-select
                   [value]="serviceProductForm.mode"
                   (valueChange)="serviceProductForm.mode = $event"
                   [options]="serviceProductModeOptions"
                   label="Modalità"
-                ></barber-custom-select>
-              </label>
+                ></ui-select>
+              </div>
               <label class="field">
                 <span>Quantità</span>
                 <input
@@ -457,6 +510,21 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                 placeholder="Puoi definirlo anche al momento della vendita"
             /></label>
           </div>
+          <alora-activity-picker
+            kind="product"
+            [value]="productForm.activityId"
+            (valueChange)="productForm.activityId = $event"
+          ></alora-activity-picker>
+          <label class="field" data-tour="services-product-barcode"
+            ><span>Barcode (EAN/UPC o codice interno)</span
+            ><input
+              [(ngModel)]="productForm.barcode"
+              name="productBarcode"
+              autocomplete="off"
+              inputmode="numeric"
+              placeholder="Scansiona il prodotto o scrivi il codice"
+              (keydown.enter)="$event.preventDefault()"
+          /></label>
           <label class="field"
             ><span>Descrizione</span
             ><input
@@ -465,7 +533,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
           /></label>
           <div class="flex flex-wrap gap-2">
             <button
-              aloraFunction="products.manage"
+              aloraFunction="services.manage"
               type="submit"
               class="primary-btn"
               [disabled]="loading || !productFormValid"
@@ -474,7 +542,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               {{ productForm.id ? "Salva prodotto" : "Crea prodotto" }}
             </button>
             <button
-              aloraFunction="products.manage"
+              aloraFunction="services.manage"
               *ngIf="productForm.id"
               type="button"
               class="pill-btn"
@@ -483,7 +551,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               <barber-ui-icon name="trash"></barber-ui-icon> Elimina prodotto
             </button>
             <button
-              aloraFunction="products.manage"
+              aloraFunction="services.manage"
               type="button"
               class="secondary-btn"
               (click)="openNewProduct()"
@@ -496,7 +564,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
     </div>
   `,
 })
-export class AdminServicesPageComponent {
+export class AdminServicesPageComponent implements OnInit, OnDestroy {
   protected readonly Number = Number;
   formatServiceProductMode = serviceProductModeLabel;
   @Input() services: any[] = [];
@@ -520,17 +588,45 @@ export class AdminServicesPageComponent {
   @Output() editProduct = new EventEmitter<any>();
   @Output() saveProduct = new EventEmitter<void>();
   @Output() removeProduct = new EventEmitter<void>();
-  @Output() resetProduct = new EventEmitter<void>();
+  /** Optional prefill, e.g. the barcode just scanned. */
+  @Output() resetProduct = new EventEmitter<{ barcode?: string } | void>();
   @Output() loadMoreServices = new EventEmitter<void>();
   @Output() loadMoreProducts = new EventEmitter<void>();
+
+  private readonly scanner = inject(BarcodeScannerService);
+  private readonly adminApi = inject(AdminApiService);
+  private readonly session = inject(SessionStore);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private scannerDetach: (() => void) | null = null;
+  scanFeedback = "";
+  scanFeedbackKind: "ok" | "error" | "info" = "ok";
 
   serviceFormOpen = false;
   productFormOpen = false;
   serviceQuery = "";
   productQuery = "";
 
+  readonly activities = inject(ActivitiesService);
+  serviceActivity = "";
+  productActivity = "";
+
+  get activityFilterOptions(): Array<{ value: string; label: string }> {
+    return [
+      { value: "", label: "Tutte le attività" },
+      ...this.activities.activities().map((row) => ({ value: row.id, label: row.name })),
+    ];
+  }
+
+  activityName(id: string | null | undefined): string {
+    return this.activities.byId(id)?.name ?? "";
+  }
+
   get filteredServices(): any[] {
-    return filterByText(this.services, this.serviceQuery, (service) => [
+    return filterByText(
+      this.services.filter((service) => !this.serviceActivity || service.activityId === this.serviceActivity),
+      this.serviceQuery,
+      (service) => [
       service.name,
       service.publicDescription,
       service.category,
@@ -538,11 +634,88 @@ export class AdminServicesPageComponent {
   }
 
   get filteredProducts(): any[] {
-    return filterByText(this.products, this.productQuery, (product) => [
+    return filterByText(
+      this.products.filter((product) => !this.productActivity || product.activityId === this.productActivity),
+      this.productQuery,
+      (product) => [
       product.name,
       product.description,
       product.category,
+      product.barcode,
+      product.sku,
     ]);
+  }
+
+  ngOnInit(): void {
+    void this.activities.load().catch(() => undefined);
+    // A scan anywhere on the catalogue (outside text fields) finds or creates the product.
+    this.scannerDetach = this.scanner.attach((event) => this.findByBarcode(event.barcode, true));
+    // Coming from the warehouse with an unknown code: start the new product with it.
+    const barcode = this.route.snapshot.queryParamMap.get("barcode")?.trim();
+    if (barcode) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { barcode: null },
+        queryParamsHandling: "merge",
+        replaceUrl: true,
+      });
+      if (this.session.can("services.manage")) this.openNewProduct(barcode);
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.scannerDetach?.();
+    this.scannerDetach = null;
+  }
+
+  /**
+   * Scanned (or typed + Enter in the search) code: an open product form takes
+   * it as its barcode; otherwise the product opens, or a new one starts with it.
+   */
+  async findByBarcode(value: string, fromScanner = false): Promise<void> {
+    const barcode = String(value || "").trim().replace(/\s+/g, "");
+    if (!barcode) return;
+    if (this.productFormOpen) {
+      this.productForm.barcode = barcode;
+      this.showScanFeedback("ok", `Barcode ${barcode} inserito nella scheda`);
+      return;
+    }
+    if (this.serviceFormOpen) return;
+    try {
+      const product = await firstValueFrom(this.adminApi.findProductByBarcode(barcode));
+      if (product?.id) {
+        this.productQuery = "";
+        this.showScanFeedback("ok", `Trovato: ${product.name}`);
+        this.openEditProduct(product);
+        return;
+      }
+      this.unknownBarcode(barcode, fromScanner);
+    } catch (error: any) {
+      if (error?.status === 404) return this.unknownBarcode(barcode, fromScanner);
+      this.showScanFeedback(
+        "error",
+        error?.status === 0
+          ? "Rete assente. Riprova quando la connessione è disponibile."
+          : error?.error?.message || "Ricerca del barcode non riuscita",
+      );
+    }
+  }
+
+  private unknownBarcode(barcode: string, fromScanner: boolean): void {
+    // Enter in the search box with a name is a normal search, not a code.
+    if (!fromScanner && this.filteredProducts.length) return;
+    if (!this.session.can("services.manage")) {
+      this.showScanFeedback("info", "Nessun prodotto con questo barcode");
+      return;
+    }
+    this.productQuery = "";
+    this.showScanFeedback("info", `Nuovo prodotto con barcode ${barcode}: completa la scheda`);
+    this.openNewProduct(barcode);
+  }
+
+  private showScanFeedback(kind: "ok" | "error" | "info", message: string): void {
+    this.scanFeedback = message;
+    this.scanFeedbackKind = kind;
   }
 
   openEditService(service: any): void {
@@ -570,8 +743,8 @@ export class AdminServicesPageComponent {
     this.productFormOpen = true;
   }
 
-  openNewProduct(): void {
-    this.resetProduct.emit();
+  openNewProduct(barcode?: string): void {
+    this.resetProduct.emit(barcode ? { barcode } : undefined);
     this.productFormOpen = true;
   }
 

@@ -64,5 +64,9 @@ export class AuthApiService {
   personalNotices() { return this.http.get<PersonalNotices>(`${ADMIN_API_URL}/account/notifications`); }
   logoutPersonalSession(id: string) { return this.http.post<{ loggedOut: boolean; current: boolean }>(`${ADMIN_API_URL}/account/sessions/${encodeURIComponent(id)}/logout`, {}); }
   logoutAllPersonalSessions() { return this.http.post<{ loggedOut: boolean }>(`${ADMIN_API_URL}/account/sessions/logout-all`, {}); }
+  updatePersonalProfile(profile: { firstName: string; lastName: string }) { return this.http.put<{ profile: PersonalAccount["profile"] }>(`${ADMIN_API_URL}/account/profile`, profile); }
+  setPersonalMfaPreference(preferredMethod: PersonalSecurity["preferredMethod"]) { return this.http.put<PersonalSecurity>(`${ADMIN_API_URL}/account/security/preferences`, { preferredMethod }); }
+  removePersonalAuthenticator(id: string) { return this.http.delete<{ removed: boolean }>(`${ADMIN_API_URL}/account/authenticators/${encodeURIComponent(id)}`); }
+  startPersonalAction(action: "UPDATE_PASSWORD" | "CONFIGURE_TOTP" | "VERIFY_EMAIL") { return this.http.post<{ redirectUrl: string }>(`${ADMIN_API_URL}/account/actions`, { action }); }
   revokePersonalDevice(id: string) { return this.http.delete<{ revoked: boolean; sessionsLoggedOut: boolean }>(`${ADMIN_API_URL}/account/devices/${encodeURIComponent(id)}`); }
 }

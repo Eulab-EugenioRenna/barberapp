@@ -83,6 +83,20 @@ services:
       - app
     restart: unless-stopped
 
+  landing:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: landing-runtime
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+    networks:
+      - app
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.27-alpine
     depends_on:
@@ -91,6 +105,8 @@ services:
       web-admin:
         condition: service_healthy
       web-public-booking:
+        condition: service_healthy
+      landing:
         condition: service_healthy
     networks:
       - app

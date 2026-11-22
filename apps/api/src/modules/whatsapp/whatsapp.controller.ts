@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, ParseUUIDPipe, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Post, Query, Req } from "@nestjs/common";
 import { WhatsAppService } from "./whatsapp.service";
 import { SendWhatsAppTextDto, WhatsAppMessageQueryDto } from "./whatsapp.dto";
 import { type ConnectRequest, connectBrowser } from "../../common/connect-http";
@@ -15,6 +15,8 @@ export class WhatsAppController {
   reconnect(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string) { connectBrowser(r); return this.whatsapp.reconnect(r.headers.authorization, id); }
   @Post("sessions/:id/disconnect")
   disconnect(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string) { connectBrowser(r); return this.whatsapp.disconnect(r.headers.authorization, id); }
+  @Delete("sessions/:id")
+  remove(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string) { connectBrowser(r); return this.whatsapp.remove(r.headers.authorization, id); }
   @Get("archives") @Header("Cache-Control", "no-store")
   archives(@Req() r: ConnectRequest) { return this.whatsapp.archives(r.headers.authorization); }
   @Get("archives/:id/conversations") @Header("Cache-Control", "no-store")

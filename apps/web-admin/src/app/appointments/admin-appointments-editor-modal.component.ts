@@ -254,6 +254,8 @@ import { AppointmentsFacade } from "./appointments.facade";
                 appointmentsFacade.appointmentCustomerOptions()
               "
               [serviceSelectOptions]="appointmentsFacade.serviceSelectOptions()"
+              [bookingLocationOptions]="appointmentsFacade.bookingLocationOptions()"
+              [bookingLocationId]="appointmentsFacade.bookingLocationId()"
               [appointmentCollaboratorOptions]="
                 appointmentsFacade.appointmentCollaboratorOptions()
               "

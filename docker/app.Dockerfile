@@ -69,3 +69,11 @@ RUN rm -f /usr/share/nginx/html/50x.html /usr/share/nginx/html/index.html
 COPY docker/static.conf /etc/nginx/conf.d/default.conf
 COPY --from=booking-build /app/dist/apps/web-public-booking/browser /usr/share/nginx/html
 EXPOSE 80
+
+# Landing commerciale: file statici, nessuna build.
+FROM nginx:1.27-alpine AS landing-runtime
+RUN rm -f /usr/share/nginx/html/50x.html /usr/share/nginx/html/index.html
+COPY docker/landing.conf /etc/nginx/conf.d/default.conf
+COPY apps/landing/index.html apps/landing/styles.css apps/landing/main.js /usr/share/nginx/html/
+COPY apps/landing/assets /usr/share/nginx/html/assets
+EXPOSE 80

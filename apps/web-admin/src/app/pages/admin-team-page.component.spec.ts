@@ -12,6 +12,7 @@ jest.mock("@angular/core", () => ({
 }));
 jest.mock("@angular/common", () => ({ CommonModule: {} }));
 jest.mock("@angular/forms", () => ({ FormsModule: {} }));
+jest.mock("@alora/ui", () => ({ UiSelectComponent: class {} }));
 jest.mock("@angular/router", () => ({ RouterLink: class {} }));
 jest.mock("@angular/common/http", () => ({ HttpClient: class {} }));
 jest.mock("../core/session.store", () => ({ SessionStore: class {} }));

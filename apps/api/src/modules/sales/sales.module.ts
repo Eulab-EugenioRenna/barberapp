@@ -6,6 +6,8 @@ import { Module } from "@nestjs/common";
 import { AppCacheModule } from "../../cache/cache.module";
 import { CustomersModule } from "../customers/customers.module";
 import { SalesController } from "./sales.controller";
+import { AvailabilityModule } from "../availability/availability.module";
+import { SaleScheduleWarningsService } from "./sale-schedule";
 
 @Module({
   imports: [
@@ -14,8 +16,9 @@ import { SalesController } from "./sales.controller";
     OrdersModule,
     AppCacheModule,
     CustomersModule,
+    AvailabilityModule,
   ],
   controllers: [SalesController],
-  providers: [SaleFulfilmentService],
+  providers: [SaleFulfilmentService, SaleScheduleWarningsService],
 })
 export class SalesModule {}

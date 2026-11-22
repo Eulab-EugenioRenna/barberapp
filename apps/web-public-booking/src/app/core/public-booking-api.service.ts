@@ -14,6 +14,8 @@ export class PublicBookingApiService {
       date?: string;
       from?: string;
       to?: string;
+      locationId?: string;
+      sectorId?: string;
     },
   ): Observable<any> {
     return this.http.post(`${basePath}/availability`, payload);

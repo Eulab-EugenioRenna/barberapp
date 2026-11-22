@@ -1,12 +1,12 @@
 import { AloraBrandComponent } from "@barber/shared/brand";
 import { CommonModule, DecimalPipe, NgClass } from "@angular/common";
-import { Component, OnInit, inject } from "@angular/core";
+import { Component, OnInit, computed, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
 import { toLocalDateKey } from "@barber/shared/utils";
 import { CalendarInputComponent } from "./calendar-input.component";
 import { PublicBookingFacade } from "./core/public-booking.facade";
-import { CustomSelectComponent } from "./custom-select.component";
+import { UiSelectComponent, type UiOption } from "@alora/ui";
 
 @Component({
   selector: "barber-public-root",
@@ -18,7 +18,7 @@ import { CustomSelectComponent } from "./custom-select.component";
     NgClass,
     DecimalPipe,
     CalendarInputComponent,
-    CustomSelectComponent,
+    UiSelectComponent,
   ],
   template: `
     <main
@@ -128,46 +128,26 @@ import { CustomSelectComponent } from "./custom-select.component";
                     class="mt-4 grid gap-3 sm:grid-cols-2"
                     *ngIf="settings()?.locations?.length"
                   >
-                    <label class="field"
+                    <div class="field"
                       ><span>Sede</span
-                      ><select
-                        class="min-w-0 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3"
-                        aria-label="Sede della prenotazione"
-                        [ngModel]="facade.selectedLocationId()"
-                        (ngModelChange)="facade.selectLocation($event)"
-                      >
-                        <option
-                          *ngFor="let location of settings().locations"
-                          [value]="location.id"
-                        >
-                          {{ location.name
-                          }}{{
-                            location.address ? " · " + location.address : ""
-                          }}
-                        </option>
-                      </select></label
-                    >
-                    <label
+                      ><ui-select
+                        label="Sede della prenotazione"
+                        [value]="facade.selectedLocationId()"
+                        (valueChange)="facade.selectLocation($event)"
+                        [options]="locationOptions()"
+                      ></ui-select
+                    ></div>
+                    <div
                       class="field"
                       *ngIf="facade.selectedLocation()?.sectors?.length > 1"
-                      ><span>Settore</span
-                      ><select
-                        class="min-w-0 w-full rounded-xl border border-[var(--line)] bg-white px-3 py-3"
-                        aria-label="Settore della prenotazione"
-                        [ngModel]="facade.selectedSectorId()"
-                        (ngModelChange)="facade.selectSector($event)"
-                      >
-                        <option value="">Tutti i settori</option>
-                        <option
-                          *ngFor="
-                            let sector of facade.selectedLocation().sectors
-                          "
-                          [value]="sector.id"
-                        >
-                          {{ sector.name }}
-                        </option>
-                      </select></label
-                    >
+                      ><span>Attività</span
+                      ><ui-select
+                        label="Attività della prenotazione"
+                        [value]="facade.selectedSectorId()"
+                        (valueChange)="facade.selectSector($event)"
+                        [options]="sectorOptions()"
+                      ></ui-select
+                    ></div>
                   </div>
                 </div>
                 <label class="field public-date-field">
@@ -333,13 +313,14 @@ import { CustomSelectComponent } from "./custom-select.component";
                     >{{ index + 2 }}. {{ row.service.name }} ·
                     {{ row.service.durationMinutes }} min</strong
                   >
-                  <barber-custom-select
+                  <ui-select
                     *ngIf="row.service.requiresCollaborator"
                     [value]="row.collaboratorId"
                     [options]="facade.professionalOptions(row.service)"
                     [label]="'Professionista per ' + row.service.name"
+                    [showLabel]="true"
                     (valueChange)="facade.setServiceCollaborator(index, $event)"
-                  ></barber-custom-select>
+                  ></ui-select>
                   <div class="flex flex-wrap gap-3 text-sm">
                     <button
                       type="button"
@@ -368,14 +349,15 @@ import { CustomSelectComponent } from "./custom-select.component";
                     </button>
                   </div>
                 </article>
-                <barber-custom-select
+                <ui-select
                   *ngIf="facade.bookingLines().length < 20"
                   value=""
                   label="Aggiungi un servizio"
+                  [showLabel]="true"
                   placeholder="Aggiungi un altro servizio della sede"
                   [options]="facade.additionalServiceOptions()"
                   (valueChange)="facade.addService($event)"
-                ></barber-custom-select>
+                ></ui-select>
                 <p class="text-sm text-[var(--muted)]">
                   I servizi si svolgono in quest'ordine. Gli orari disponibili
                   valgono per tutta la prenotazione.
@@ -386,25 +368,25 @@ import { CustomSelectComponent } from "./custom-select.component";
                 *ngIf="selectedService()"
                 class="mt-6 grid gap-4 md:grid-cols-2"
               >
-                <label
+                <div
                   class="field"
                   *ngIf="selectedService()?.requiresCollaborator"
                 >
                   <span>Professionista</span>
-                  <barber-custom-select
+                  <ui-select
                     [value]="selectedCollaboratorId()"
                     (valueChange)="onSelectedCollaboratorChange($event)"
                     [options]="collaboratorSelectOptions"
                     label="Professionista"
                     placeholder="Scegli chi si prenderà cura di te"
-                  ></barber-custom-select>
-                </label>
-                <label class="field">
+                  ></ui-select>
+                </div>
+                <div class="field">
                   <span
                     >Orari disponibili
                     <em class="required-mark" aria-hidden="true">*</em></span
                   >
-                  <barber-custom-select
+                  <ui-select
                     [value]="selectedSlot()"
                     (valueChange)="onSelectedSlotChange($event)"
                     [disabled]="facade.availabilityLoading() || !slots().length"
@@ -417,8 +399,8 @@ import { CustomSelectComponent } from "./custom-select.component";
                           ? 'Seleziona orario'
                           : 'Nessun orario disponibile'
                     "
-                  ></barber-custom-select>
-                </label>
+                  ></ui-select>
+                </div>
               </div>
 
               <article
@@ -662,6 +644,23 @@ export class PublicBookingAppComponent implements OnInit {
   get publicHeroBackground(): string {
     return this.facade.publicHeroBackground();
   }
+
+  readonly locationOptions = computed<UiOption[]>(() =>
+    (this.settings()?.locations || []).map((location: any) => ({
+      value: location.id,
+      label: location.address
+        ? `${location.name} · ${location.address}`
+        : location.name,
+    })),
+  );
+
+  readonly sectorOptions = computed<UiOption[]>(() => [
+    { value: "", label: "Tutte le attività" },
+    ...(this.facade.selectedLocation()?.sectors || []).map((sector: any) => ({
+      value: sector.id,
+      label: sector.name,
+    })),
+  ]);
 
   get collaboratorSelectOptions(): Array<{ value: string; label: string }> {
     return this.facade.collaboratorSelectOptions();

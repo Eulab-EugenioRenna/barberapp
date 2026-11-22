@@ -7,6 +7,8 @@ import { AdminFacade } from "../core/admin.facade";
 import { toLocalDateKey } from "@barber/shared/utils";
 import { appointmentStatusLabel } from "../shared/presentation-copy";
 import { AppointmentsService } from "./appointments.service";
+import { OperationalContextService } from "../core/operational-context.service";
+import { offeredAt, sectorForActivity } from "../core/activity-placement";
 
 type CalendarView = "day" | "week" | "month";
 
@@ -27,6 +29,7 @@ export class AppointmentsFacade {
   readonly creations = inject(CreateRecoveryService);
   private readonly adminFacade = inject(AdminFacade);
   private readonly appointmentsService = inject(AppointmentsService);
+  private readonly context = inject(OperationalContextService);
 
   private readonly appointmentsState = signal<any[]>([]);
   private readonly collaboratorsState = signal<any[]>([]);
@@ -59,10 +62,14 @@ export class AppointmentsFacade {
     const primary = this.services().find(
       (row) => row.id === this.appointmentForm().serviceId,
     );
+    const locationId = this.bookingLocationId();
     return this.services()
       .filter(
         (row) =>
-          primary && row.sector?.locationId === primary.sector?.locationId,
+          !!primary &&
+          (locationId
+            ? offeredAt(this.context.sectors, row, locationId)
+            : row.sector?.locationId === primary.sector?.locationId),
       )
       .map((row) => ({
         value: row.id,
@@ -79,7 +86,7 @@ export class AppointmentsFacade {
         name: service?.name || "Servizio",
         durationMinutes: service?.durationMinutes,
         requiresCollaborator: service?.requiresCollaborator,
-        options: this.professionalOptions(service?.sectorId),
+        options: this.professionalOptions(this.localSectorId(service)),
       };
     }),
   );
@@ -109,12 +116,40 @@ export class AppointmentsFacade {
   readonly customers = computed(() => this.customersState());
   readonly tenant = computed(() => this.tenantState());
 
-  readonly serviceSelectOptions = computed(() =>
-    this.services().map((service) => ({
-      value: service.id,
-      label: service.name,
-    })),
+  /** Location of the booking: the one of the form, of the scope, or the only one. */
+  readonly bookingLocationId = computed(() => {
+    const form = this.appointmentForm();
+    if (form.locationId) return form.locationId;
+    const locations = this.context.locations();
+    return this.context.selected.locationId || (locations.length === 1 ? locations[0].id : "");
+  });
+
+  /** Locations to choose from when the account has more than one. */
+  readonly bookingLocationOptions = computed(() =>
+    this.context
+      .locations()
+      .filter((location) => location.isActive)
+      .map((location) => ({ value: location.id, label: location.name })),
   );
+
+  /** Only services whose activity runs at the booking location. */
+  readonly serviceSelectOptions = computed(() => {
+    const locationId = this.bookingLocationId();
+    return this.services()
+      .filter((service) => offeredAt(this.context.sectors, service, locationId))
+      .map((service) => ({
+        value: service.id,
+        label: service.name,
+      }));
+  });
+
+  /** Sector of the service's activity at the booking location. */
+  private localSectorId(service: any): string | undefined {
+    return (
+      sectorForActivity(this.context.sectors, service?.activityId, this.bookingLocationId())?.id ||
+      service?.sectorId
+    );
+  }
 
   readonly appointmentCustomerOptions = computed(() =>
     this.customers().map((customer) => ({
@@ -131,10 +166,10 @@ export class AppointmentsFacade {
   );
 
   readonly appointmentCollaboratorOptions = computed(() => {
-    const sectorId = this.services().find(
-      (service) => service.id === this.appointmentForm().serviceId,
-    )?.sectorId;
-    return this.professionalOptions(sectorId);
+    const service = this.services().find(
+      (row) => row.id === this.appointmentForm().serviceId,
+    );
+    return this.professionalOptions(this.localSectorId(service));
   });
   private professionalOptions(sectorId: string | undefined) {
     return [
@@ -632,10 +667,11 @@ export class AppointmentsFacade {
     this.filteredAppointmentCustomers.set([...this.customers()]);
     this.appointmentSelectedDate.set(toLocalDateKey(new Date()));
     this.appointmentSlots.set([]);
-    if (this.services()[0]) {
+    const first = this.serviceSelectOptions()[0];
+    if (first) {
       this.appointmentForm.update((form) => ({
         ...form,
-        serviceId: this.services()[0].id,
+        serviceId: first.value,
       }));
     }
     this.updateAppointmentSlots();
@@ -658,6 +694,7 @@ export class AppointmentsFacade {
       email: appointment.customer.email || "",
       phone: appointment.customer.phone || "",
       serviceId: appointment.serviceId,
+      locationId: appointment.locationId || "",
       collaboratorId: appointment.collaboratorId || "",
       startsAt: this.toLocalDateTimeValue(startsAt),
       status: appointment.status,
@@ -674,6 +711,16 @@ export class AppointmentsFacade {
 
   setAppointmentValue(key: string, value: string): void {
     this.appointmentForm.update((form) => ({ ...form, [key]: value }));
+    if (key === "locationId") {
+      // Another location runs other activities: keep only what it offers.
+      const offered = new Set(this.serviceSelectOptions().map((row) => row.value));
+      if (!offered.has(this.appointmentForm().serviceId))
+        this.appointmentForm.update((form) => ({
+          ...form,
+          serviceId: this.serviceSelectOptions()[0]?.value || "",
+        }));
+      key = "serviceId";
+    }
     if (key === "serviceId") {
       const allowed = new Set(
         this.additionalServiceOptions().map((row) => row.value),
@@ -856,6 +903,7 @@ export class AppointmentsFacade {
       const response = await firstValueFrom(
         this.adminApi.bookingAvailability({
           date,
+          ...(this.bookingLocationId() ? { locationId: this.bookingLocationId() } : {}),
           lines: [
             {
               serviceId: form.serviceId,
@@ -913,7 +961,7 @@ export class AppointmentsFacade {
       )
         throw new Error("Scegli un orario disponibile per tutti i servizi");
       const saved = await this.appointmentsService.saveAppointment(
-        this.appointmentForm(),
+        { ...this.appointmentForm(), locationId: this.bookingLocationId() },
         this.additionalServices().map((row) => ({
           serviceId: row.serviceId,
           collaboratorId: row.collaboratorId || undefined,
@@ -1319,6 +1367,8 @@ export class AppointmentsFacade {
       email: "",
       phone: "",
       serviceId: "",
+      /** Empty: location of the scope (or the only one). */
+      locationId: "",
       collaboratorId: "",
       startsAt: "",
       status: "confirmed",

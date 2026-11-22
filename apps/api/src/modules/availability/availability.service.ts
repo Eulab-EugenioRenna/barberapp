@@ -20,6 +20,7 @@ import { AppCacheService } from "../../cache/cache.service";
 import { resolveZonedDateKey, zonedTimeToUtc } from "../../common/zoned-time";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CollaboratorScheduleService } from "./collaborator-schedule.service";
+import { localizeServices } from "../locations/activity-sectors";
 
 export type AvailabilitySlot = {
   startsAt: string;
@@ -55,6 +56,8 @@ export class AvailabilityService {
     options?: {
       requireExplicitCollaborator?: boolean;
       publicOnly?: boolean;
+      /** Location of the booking; the service's activity is resolved there. */
+      locationId?: string;
     },
   ): Promise<AvailabilitySlot[]> {
     const dateToken = normalizeCacheToken(
@@ -71,7 +74,7 @@ export class AvailabilityService {
         dateToken,
         collaboratorToken,
       ) +
-        `:scope7:${options?.publicOnly ? "public" : "internal"}:${options?.requireExplicitCollaborator ? "explicit" : "auto"}`,
+        `:scope8:${options?.publicOnly ? "public" : "internal"}:${options?.requireExplicitCollaborator ? "explicit" : "auto"}:${normalizeCacheToken(options?.locationId ?? "home")}`,
       CACHE_TTL_SECONDS.publicAvailability,
       () =>
         this.buildAvailability(
@@ -94,31 +97,36 @@ export class AvailabilityService {
       publicOnly?: boolean;
       excludeAppointmentIds?: string[];
       durationMilliseconds?: number;
+      /** Sector already resolved by the caller (activity at the location). */
+      sectorId?: string;
+      locationId?: string;
     },
     client: AvailabilityCalendar = this.prisma,
   ): Promise<AvailabilitySlot[]> {
-    const service = await client.service.findFirst({
+    const found = await client.service.findFirst({
       where: {
         id: serviceId,
         tenantId,
         isActive: true,
+        activity: { isActive: true },
         ...(options?.publicOnly
           ? { isPublic: true, isBookableOnline: true }
           : {}),
-        sector: {
-          isActive: true,
-          location: {
-            isActive: true,
-            ...(options?.publicOnly ? { isPublic: true } : {}),
-          },
-          ...(options?.publicOnly ? { isPublic: true } : {}),
-        },
       },
+      include: { sector: { select: { locationId: true } } },
     });
 
-    if (!service) {
+    if (!found) {
       throw new BadRequestException("Il servizio scelto non è disponibile");
     }
+    // The sector is the one of the service's activity at the booking location.
+    const [service] = await localizeServices(
+      client,
+      tenantId,
+      [found],
+      { sectorId: options?.sectorId, locationId: options?.locationId },
+      { publicOnly: options?.publicOnly },
+    );
     const duration =
       options?.durationMilliseconds ?? service.durationMinutes * 60000;
     if (!Number.isInteger(duration) || duration < 1000 || duration > 86400000)

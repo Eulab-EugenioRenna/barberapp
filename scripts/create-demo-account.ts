@@ -826,7 +826,6 @@ Opzioni:
             "clients.read.full",
             "services.manage",
             "collaborators.manage",
-            "products.manage",
             "dashboard.revenue.read",
             "settings.manage",
             "audit.read",

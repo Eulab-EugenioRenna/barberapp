@@ -37,12 +37,8 @@ export class PublicBookingFacade {
   readonly selectedLocationId = signal("");
   readonly selectedSectorId = signal("");
   readonly visibleServices = computed(() =>
-    this.services().filter(
-      (service) =>
-        (!this.selectedLocationId() ||
-          service.sector?.locationId === this.selectedLocationId()) &&
-        (!this.selectedSectorId() ||
-          service.sectorId === this.selectedSectorId()),
+    this.services().filter((service) =>
+      offeredIn(service, this.selectedLocationId(), this.selectedSectorId()),
     ),
   );
   readonly selectedLocation = computed(() =>
@@ -72,9 +68,7 @@ export class PublicBookingFacade {
   );
   readonly additionalServiceOptions = computed(() =>
     this.services()
-      .filter(
-        (service) => service.sector?.locationId === this.selectedLocationId(),
-      )
+      .filter((service) => offeredIn(service, this.selectedLocationId()))
       .map((service) => ({
         value: service.id,
         label: `${service.name} · ${service.durationMinutes} min`,
@@ -124,6 +118,7 @@ export class PublicBookingFacade {
             .sequenceAvailability(this.publicBasePath(), {
               lines: this.bookingLines(),
               date: this.selectedDate(),
+              ...this.locationPayload(),
             })
             .pipe(
               catchError((error: any) => {
@@ -178,11 +173,12 @@ export class PublicBookingFacade {
                 .slice(0, 10),
             });
           const lines = this.bookingLines(),
-            basePath = this.publicBasePath();
+            basePath = this.publicBasePath(),
+            location = this.locationPayload();
           return rxFrom(chunks).pipe(
             mergeMap(
               (chunk) =>
-                this.api.sequenceAvailability(basePath, { lines, ...chunk }),
+                this.api.sequenceAvailability(basePath, { lines, ...chunk, ...location }),
               2,
             ),
             toArray(),
@@ -256,7 +252,15 @@ export class PublicBookingFacade {
     return this.professionalOptions(this.selectedService());
   });
   professionalOptions(service: any): Array<{ value: string; label: string }> {
+    // Only the professionals working for this activity at the chosen location.
+    const sectorIds = serviceSectorIds(service, this.selectedLocationId());
     const options = [...(service?.collaborators || [])]
+      .filter(
+        (collaborator: any) =>
+          !Array.isArray(collaborator.sectorIds) ||
+          !sectorIds.length ||
+          collaborator.sectorIds.some((id: string) => sectorIds.includes(id)),
+      )
       .sort((left: any, right: any) => {
         return `${left.firstName} ${left.lastName}`.localeCompare(
           `${right.firstName} ${right.lastName}`,
@@ -433,6 +437,17 @@ export class PublicBookingFacade {
     return { from, to: toLocalDateKey(end) };
   }
 
+  /** The booking happens at the chosen location (and activity, when picked). */
+  private locationPayload(): { locationId?: string; sectorId?: string } {
+    const locationId = this.selectedLocationId();
+    if (!locationId) return {};
+    const sectorId =
+      this.selectedSectorId() ||
+      serviceSectorIds(this.selectedService(), locationId)[0] ||
+      "";
+    return { locationId, ...(sectorId ? { sectorId } : {}) };
+  }
+
   selectLocation(id: string): void {
     this.selectedLocationId.set(id);
     this.selectedSectorId.set("");
@@ -458,8 +473,7 @@ export class PublicBookingFacade {
 
   addService(id: string): void {
     const service = this.services().find(
-      (row) =>
-        row.id === id && row.sector?.locationId === this.selectedLocationId(),
+      (row) => row.id === id && offeredIn(row, this.selectedLocationId()),
     );
     if (!service || !this.selectedService() || this.bookingLines().length >= 20)
       return;
@@ -519,6 +533,7 @@ export class PublicBookingFacade {
         attempt = beginPendingCommand(sessionStorage, key, {
           lines: this.bookingLines(),
           startsAt: this.selectedSlot(),
+          ...this.locationPayload(),
           ...this.bookingForm(),
         });
         this.pendingVersion.update((value) => value + 1);
@@ -591,4 +606,21 @@ export class PublicBookingFacade {
 
     return `${red}, ${green}, ${blue}`;
   }
+}
+
+/** Sectors (activity at a location) where the service can be booked. */
+function serviceSectorIds(service: any, locationId = ""): string[] {
+  const offered: any[] = Array.isArray(service?.offeredAt)
+    ? service.offeredAt
+    : service?.sector
+      ? [{ sectorId: service.sectorId, locationId: service.sector.locationId }]
+      : [];
+  return offered
+    .filter((row) => !locationId || row.locationId === locationId)
+    .map((row) => row.sectorId);
+}
+
+function offeredIn(service: any, locationId = "", sectorId = ""): boolean {
+  const ids = serviceSectorIds(service, locationId);
+  return ids.length > 0 && (!sectorId || ids.includes(sectorId));
 }

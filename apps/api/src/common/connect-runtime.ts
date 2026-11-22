@@ -206,6 +206,24 @@ export function openConnect(value: string): string {
     throw new ServiceUnavailableException("Credenziale Connect non leggibile");
   }
 }
+/**
+ * Granted functions per Connect session, kept briefly. Every request still
+ * re-validates the local session row (revocation, expiry, owner); only the
+ * remote permissions call is shared. A function withdrawn in Connect takes
+ * effect within PERMISSIONS_TTL_MS. Concurrent requests share one call.
+ */
+export const PERMISSIONS_TTL_MS = 15_000;
+const permissionsCache = new Map<
+  string,
+  { expires: number; value: Promise<string[]> }
+>();
+
+export function forgetConnectPermissions(sessionId?: string): void {
+  if (!sessionId) return permissionsCache.clear();
+  for (const key of permissionsCache.keys())
+    if (key.startsWith(`${sessionId}|`)) permissionsCache.delete(key);
+}
+
 /** Provider protocol, refresh serialization and revocation belong exclusively to ConnectApplication. */
 export async function resolveConnectPermissions(
   prisma: PrismaClient,
@@ -224,11 +242,33 @@ export async function resolveConnectPermissions(
     session.expiresAt <= new Date()
   )
     throw new UnauthorizedException("Ripeti l’accesso Connect");
+  const key = `${sessionId}|${user.id}|${user.connectSubject}|${session.installationId}`;
+  const cached = permissionsCache.get(key);
+  if (!forceRefresh && cached && cached.expires > Date.now()) return cached.value;
+  const value = fetchConnectPermissions(prisma, session, user, forceRefresh);
+  permissionsCache.set(key, { expires: Date.now() + PERMISSIONS_TTL_MS, value });
+  // Failures are never cached: the next request asks Connect again.
+  value.catch(() => {
+    if (permissionsCache.get(key)?.value === value) permissionsCache.delete(key);
+  });
+  if (permissionsCache.size > 5000) {
+    const now = Date.now();
+    for (const [k, entry] of permissionsCache) if (entry.expires <= now) permissionsCache.delete(k);
+  }
+  return value;
+}
+
+async function fetchConnectPermissions(
+  prisma: PrismaClient,
+  session: { sdkSessionCipher: string | null; installationId: string },
+  user: { id: string; connectSubject: string | null },
+  forceRefresh: boolean,
+): Promise<string[]> {
   const { connectApplication } = await import("./connect-application");
   const { connectHttpError } = await import("./connect-http");
   try {
     const application = await connectApplication(prisma),
-      handle = openConnect(session.sdkSessionCipher);
+      handle = openConnect(session.sdkSessionCipher!);
     if (forceRefresh) await application.auth.refresh(handle);
     const access = await application.services(handle, (server, token) =>
       server.permissions(token),

@@ -84,6 +84,13 @@ export async function resolveOperationalScope(
 export const sectorFilter = (scope: OperationalScope) => ({
   sectorId: { in: scope.sectorIds },
 });
+/**
+ * Services belong to an activity: one is in scope when its activity runs in a
+ * sector of the scope (any location), not only in its home sector.
+ */
+export const serviceScopeFilter = (scope: OperationalScope) => ({
+  activity: { sectors: { some: { id: { in: scope.sectorIds } } } },
+});
 export const collaboratorFilter = (scope: OperationalScope) => ({
   sectors: { some: sectorFilter(scope) },
 });
@@ -137,13 +144,21 @@ export async function requireServiceScope(
     where: {
       id,
       tenantId: scope.tenantId,
-      ...sectorFilter(scope),
       ...(active
         ? {
             isActive: true,
-            sector: { isActive: true, location: { isActive: true } },
+            activity: {
+              isActive: true,
+              sectors: {
+                some: {
+                  id: { in: scope.sectorIds },
+                  isActive: true,
+                  location: { isActive: true },
+                },
+              },
+            },
           }
-        : {}),
+        : serviceScopeFilter(scope)),
     },
     include: { sector: true },
   });

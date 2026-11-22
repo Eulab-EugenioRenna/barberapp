@@ -5,6 +5,7 @@ import {
   ALORA_FUNCTIONS,
   canUseLocalFunction,
   createFunctionMatrix,
+  hasAllLocalFunctions,
 } from "./function-catalog";
 import { OPERATIONS } from "./operation-catalog";
 import { authorizeLocalOperation } from "./local-policy.guard";
@@ -191,5 +192,90 @@ describe("ALORA function catalog", () => {
         "appointments.read.all",
       ),
     ).toBe(false);
+  });
+});
+
+describe("hasAllLocalFunctions (PRO)", () => {
+  const all = ALORA_FUNCTIONS.map((item) => item.key);
+  it("is true only when Connect grants every function to the owner", () => {
+    expect(hasAllLocalFunctions({ role: "owner", connectFunctions: all } as any)).toBe(true);
+    expect(
+      hasAllLocalFunctions({ role: "owner", connectFunctions: all.slice(1) } as any),
+    ).toBe(false);
+  });
+  it("ignores technical access, collaborators and missing users", () => {
+    expect(hasAllLocalFunctions({ role: "owner", technicalAccess: true } as any)).toBe(false);
+    expect(
+      hasAllLocalFunctions({ role: "collaborator", collaboratorId: "c", connectFunctions: all } as any),
+    ).toBe(false);
+    expect(hasAllLocalFunctions(null)).toBe(false);
+  });
+});
+
+describe("Unified permissions (catalogue v9)", () => {
+  const owner = (connectFunctions: string[]) => ({ role: "owner", connectFunctions }) as any;
+  const reception = (permissions: string[]) => ({ role: "reception", permissions }) as any;
+  const published = ALORA_FUNCTIONS.map((item) => item.key) as string[];
+
+  it("lets managing include reading, in Connect and in local roles", () => {
+    for (const [manage, read] of [
+      ["sales.manage", "sales.read"],
+      ["clients.manage", "clients.read.full"],
+      ["services.manage", "services.read"],
+      ["inventory.manage", "inventory.read"],
+      ["locations.manage", "locations.read"],
+      ["collaborators.manage", "collaborators.read"],
+      ["appointments.update.all", "appointments.read.all"],
+      ["whatsapp.send", "whatsapp.read"],
+      ["whatsapp.manage", "whatsapp.read"],
+      ["team.manage", "users.manage"],
+      ["team.password.reset", "users.manage"],
+      ["notifications.manage", "notifications.read"],
+    ]) {
+      expect(canUseLocalFunction(owner([manage]), read)).toBe(true);
+      expect(canUseLocalFunction(reception([manage]), read)).toBe(true);
+      // Never the other way round.
+      expect(canUseLocalFunction(owner([read]), manage)).toBe(false);
+    }
+  });
+
+  it("keeps old merged keys working and no longer publishes them", () => {
+    expect(published).not.toEqual(expect.arrayContaining(["products.read"]));
+    expect(published).not.toContain("products.manage");
+    expect(published).not.toContain("confirmations.read");
+    expect(canUseLocalFunction(owner(["products.read"]), "services.read")).toBe(true);
+    expect(canUseLocalFunction(owner(["confirmations.read"]), "sales.read")).toBe(true);
+    expect(canUseLocalFunction(owner(["services.manage"]), "products.manage")).toBe(true);
+  });
+
+  it("gives whoever sells or books the lists the form needs", () => {
+    const cashier = { tenantId: "t", user: { role: "reception", permissions: ["sales.manage"] } } as any;
+    const booker = { tenantId: "t", user: { role: "reception", permissions: ["appointments.create"] } } as any;
+    for (const operation of [
+      ["ServicesController", "findAll"],
+      ["ProductsController", "findAll"],
+      ["ProductsController", "byBarcode"],
+      ["CustomersController", "findAll"],
+      ["CollaboratorsController", "options"],
+      ["SalesController", "quote"],
+    ])
+      expect(() => authorizeLocalOperation(cashier, operation[0], operation[1])).not.toThrow();
+    for (const operation of [
+      ["AppointmentsController", "context"],
+      ["ServicesController", "findAll"],
+      ["CustomersController", "findAll"],
+      ["CollaboratorsController", "options"],
+    ])
+      expect(() => authorizeLocalOperation(booker, operation[0], operation[1])).not.toThrow();
+    // Pick lists do not open the pages themselves.
+    expect(() => authorizeLocalOperation(cashier, "CustomersController", "history")).toThrow();
+    expect(() => authorizeLocalOperation(booker, "AppointmentsController", "findAll")).toThrow();
+  });
+
+  it("references only functions that exist in every operation", () => {
+    for (const [name, definition] of Object.entries(OPERATIONS))
+      if (definition.kind === "function")
+        for (const key of [definition.key, definition.own, ...(definition.anyOf ?? [])].filter(Boolean))
+          expect([name, published.includes(key as string)]).toEqual([name, true]);
   });
 });

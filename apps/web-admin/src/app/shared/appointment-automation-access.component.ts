@@ -11,11 +11,12 @@ import type { WhatsAppArchiveView } from "@barber/shared/whatsapp";
 import { AppointmentAutomationAccessApiService } from "../core/appointment-automation-access-api.service";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
 import { SessionStore } from "../core/session.store";
+import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
 
 @Component({
   selector: "app-appointment-automation-access",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UiSelectComponent],
   template: ` <section
     class="access"
     aria-label="Autorizzazioni delle automazioni"
@@ -67,32 +68,29 @@ import { SessionStore } from "../core/session.store";
       <form (ngSubmit)="prepare()">
         <fieldset [disabled]="busy || api.pending('grants').kind !== 'empty'">
           <div class="fields">
-            <label
-              >Canale da autorizzare<select
-                aria-label="Canale da autorizzare"
+            <div class="select-field">
+              <span>Canale da autorizzare</span
+              ><ui-select
+                label="Canale da autorizzare"
                 name="automation-channel"
+                [options]="channelOptions"
+                [filterable]="false"
                 [(ngModel)]="channel"
-              >
-                <option *ngIf="canWhatsApp" value="whatsapp">WhatsApp</option>
-                <option value="email">Email</option>
-                <option value="application_notification">
-                  Notifiche nell’app
-                </option>
-              </select></label
-            ><label *ngIf="channel === 'application_notification'"
-              >Finalità<select
-                aria-label="Finalità"
+              ></ui-select>
+            </div
+            ><div
+              *ngIf="channel === 'application_notification'"
+              class="select-field"
+            >
+              <span>Finalità</span
+              ><ui-select
+                label="Finalità"
                 name="automation-purpose"
+                [options]="purposeOptions"
+                [filterable]="false"
                 [(ngModel)]="useCase"
-              >
-                <option value="notifications">Avvisi nell’app</option>
-                <option
-                  *ngIf="session.can('appointments.update.all')"
-                  value="customer_commands"
-                >
-                  Azioni cliente sull’agenda
-                </option>
-              </select></label
+              ></ui-select>
+            </div
             ><label
               >Validità (giorni)<input
                 type="number"
@@ -102,19 +100,17 @@ import { SessionStore } from "../core/session.store";
                 max="365"
                 step="1"
                 required /></label
-            ><label *ngIf="channel === 'whatsapp'"
-              >Archivio del numero<select
-                aria-label="Archivio del numero"
+            ><div *ngIf="channel === 'whatsapp'" class="select-field">
+              <span>Archivio del numero</span
+              ><ui-select
+                label="Archivio del numero"
                 name="automation-archive"
+                placeholder="Seleziona il numero"
+                [options]="archiveOptions"
                 [(ngModel)]="archiveId"
                 required
-              >
-                <option value="">Seleziona il numero</option>
-                <option *ngFor="let archive of archives" [value]="archive.id">
-                  {{ archive.number }}
-                </option>
-              </select></label
-            >
+              ></ui-select>
+            </div>
           </div>
           <p class="muted">
             L’autorizzazione usa il tuo accesso corrente e i permessi che
@@ -286,14 +282,14 @@ import { SessionStore } from "../core/session.store";
         grid-template-columns: 2fr 1fr 2fr;
         gap: 16px;
       }
-      label {
+      label,
+      .select-field {
         display: grid;
         gap: 7px;
         font-size: 0.87rem;
         font-weight: 600;
       }
-      input,
-      select {
+      input {
         min-height: 44px;
         border: 1px solid #b9c9c5;
         border-radius: 10px;
@@ -349,8 +345,7 @@ import { SessionStore } from "../core/session.store";
         white-space: normal;
       }
       button:focus-visible,
-      input:focus-visible,
-      select:focus-visible {
+      input:focus-visible {
         outline: 3px solid #86b6a5;
         outline-offset: 3px;
       }
@@ -388,6 +383,48 @@ export class AppointmentAutomationAccessComponent {
   channel: AppointmentAutomationChannel = "email";
   validDays = 30;
   archiveId = "";
+  private channelOptionsKey: boolean | null = null;
+  private channelOptionsCache: UiOption[] = [];
+  get channelOptions(): UiOption[] {
+    const canWhatsApp = this.canWhatsApp;
+    if (this.channelOptionsKey !== canWhatsApp) {
+      this.channelOptionsKey = canWhatsApp;
+      this.channelOptionsCache = [
+        ...(canWhatsApp ? [{ value: "whatsapp", label: "WhatsApp" }] : []),
+        { value: "email", label: "Email" },
+        { value: "application_notification", label: "Notifiche nell’app" },
+      ];
+    }
+    return this.channelOptionsCache;
+  }
+  private purposeOptionsKey: boolean | null = null;
+  private purposeOptionsCache: UiOption[] = [];
+  get purposeOptions(): UiOption[] {
+    const canCommands = this.session.can("appointments.update.all");
+    if (this.purposeOptionsKey !== canCommands) {
+      this.purposeOptionsKey = canCommands;
+      this.purposeOptionsCache = [
+        { value: "notifications", label: "Avvisi nell’app" },
+        ...(canCommands
+          ? [{ value: "customer_commands", label: "Azioni cliente sull’agenda" }]
+          : []),
+      ];
+    }
+    return this.purposeOptionsCache;
+  }
+  private archiveOptionsSource: WhatsAppArchiveView[] | null = null;
+  private archiveOptionsCache: UiOption[] = [];
+  get archiveOptions(): UiOption[] {
+    if (this.archiveOptionsSource !== this.archives) {
+      this.archiveOptionsSource = this.archives;
+      this.archiveOptionsCache = uiOptions(
+        this.archives,
+        (archive) => archive.id,
+        (archive) => archive.number,
+      );
+    }
+    return this.archiveOptionsCache;
+  }
   get canWhatsApp() {
     return ["whatsapp.read", "whatsapp.manage", "whatsapp.send"].every((key) =>
       this.session.can(key),

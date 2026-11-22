@@ -1,27 +1,47 @@
 import { Component, OnInit, HostListener, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { RouterLink } from "@angular/router";
+import { UiPageComponent, UiTabsComponent, type UiTab } from "@alora/ui";
+import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { HttpClient } from "@angular/common/http";
 import { firstValueFrom } from "rxjs";
 import { ADMIN_API_URL } from "../core/api-config";
 import { SessionStore } from "../core/session.store";
 import { OperationalContextService } from "../core/operational-context.service";
+import { ActivitiesService } from "../core/activities.service";
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
-  template: ` <main class="locations-shell">
-    <header>
-      <div>
-        <p class="eyebrow">Organizzazione</p>
-        <h1>Sedi e settori</h1>
-        <p>Spazi, aperture e professionisti della tua attività.</p>
-      </div>
-      <a routerLink="/appointments" class="secondary-btn">Torna all’agenda</a>
-    </header>
+  imports: [CommonModule, FormsModule, UiPageComponent, UiTabsComponent, AdminPageHeaderComponent],
+  template: ` <ui-page class="locations-shell">
+    <alora-page-header navKey="locations">
+      <button
+        uiPageActions
+        *ngIf="canEdit && section === 'structure'"
+        type="button"
+        class="primary-btn"
+        data-tour="locations-create"
+        [attr.aria-expanded]="createOpen"
+        aria-controls="location-create"
+        (click)="createOpen = !createOpen"
+      >
+        {{ createOpen ? "Chiudi" : "Nuova sede" }}
+      </button>
+    </alora-page-header>
+    <ui-tabs
+      *ngIf="tabs.length > 1"
+      ariaLabel="Sezioni di sedi e attività"
+      [tabs]="tabs"
+      [active]="section"
+      (activeChange)="section = $any($event)"
+    ></ui-tabs>
     <p *ngIf="feedback" role="status" class="feedback">{{ feedback }}</p>
     <p *ngIf="loading" role="status">Caricamento delle sedi…</p>
-    <section *ngIf="canEdit" class="panel create-panel">
+    <ng-container *ngIf="section === 'structure'">
+    <section
+      *ngIf="canEdit && (createOpen || (!loading && !locations.length))"
+      id="location-create"
+      class="panel create-panel"
+    >
       <h2>Nuova sede</h2>
       <form (ngSubmit)="create()">
         <label
@@ -35,15 +55,23 @@ import { OperationalContextService } from "../core/operational-context.service";
             [(ngModel)]="newAddress"
             name="newAddress"
             maxlength="500" /></label
-        ><label
-          >Primo settore<input
-            [(ngModel)]="newSector"
-            name="newSector"
-            maxlength="120"
-            required /></label
-        ><button
+        >
+        <fieldset class="activity-checks" data-tour="locations-create-activities">
+          <legend>Attività svolte in questa sede (facoltativo)</legend>
+          <label *ngFor="let activity of activities.active(); trackBy: trackById"
+            ><input
+              type="checkbox"
+              [checked]="newActivityIds.includes(activity.id)"
+              (change)="toggleNewActivity(activity.id)"
+            />{{ activity.name }}</label
+          >
+          <button type="button" class="text-btn" (click)="section = 'activities'">
+            + Aggiungi un’attività al catalogo
+          </button>
+        </fieldset>
+        <button
           class="primary-btn"
-          [disabled]="busy || !newName.trim() || !newSector.trim()"
+          [disabled]="busy || !newName.trim()"
         >
           Crea sede
         </button>
@@ -53,6 +81,7 @@ import { OperationalContextService } from "../core/operational-context.service";
       <article
         *ngFor="let location of locations; trackBy: trackById"
         class="panel location-card"
+        data-tour="locations-card"
       >
         <div class="card-heading">
           <div>
@@ -65,6 +94,7 @@ import { OperationalContextService } from "../core/operational-context.service";
           <button
             *ngIf="canEdit"
             class="secondary-btn"
+            data-tour="locations-configure"
             (click)="edit(location)"
           >
             Configura sede
@@ -85,15 +115,16 @@ import { OperationalContextService } from "../core/operational-context.service";
             <div>
               <h3>{{ sector.name }}</h3>
               <span class="status" [class.inactive]="!sector.isActive">{{
-                sector.isActive ? "Attivo" : "Disattivato"
+                sector.isActive ? "Attiva" : "Disattivata"
               }}</span>
             </div>
             <button
               *ngIf="canEdit"
               class="secondary-btn"
+              data-tour="locations-sector-configure"
               (click)="edit(sector, true)"
             >
-              Configura settore
+              Configura attività
             </button>
           </div>
           <p class="professionals">
@@ -117,7 +148,7 @@ import { OperationalContextService } from "../core/operational-context.service";
                   : "disattivata"
               }}</span
             >
-            <div *ngIf="canEdit" class="capacity-control">
+            <div *ngIf="canEdit" class="capacity-control" data-tour="locations-resource-controls">
               <label
                 >Capienza<input
                   type="number"
@@ -160,6 +191,7 @@ import { OperationalContextService } from "../core/operational-context.service";
             *ngIf="canEdit"
             (ngSubmit)="createRoom(sector)"
             class="inline-form"
+            data-tour="locations-resource-add"
           >
             <label class="grow"
               >Nome della risorsa<input
@@ -186,35 +218,124 @@ import { OperationalContextService } from "../core/operational-context.service";
           </form>
         </div>
         <form
-          *ngIf="canEdit"
+          *ngIf="canEdit && missingActivities(location).length"
           (ngSubmit)="createSector(location)"
           class="inline-form"
+          data-tour="locations-sector-add"
         >
           <label class="grow"
-            >Nuovo settore<input
-              [(ngModel)]="location.newSectorName"
+            >Aggiungi un’attività a questa sede<select
+              [(ngModel)]="location.newActivityId"
               [name]="'sector-' + location.id"
-              maxlength="120"
-              placeholder="Nome del settore"
-              required /></label
+              required
+            >
+              <option value="">Scegli dal catalogo</option>
+              <option
+                *ngFor="let activity of missingActivities(location); trackBy: trackById"
+                [value]="activity.id"
+              >
+                {{ activity.name }}
+              </option>
+            </select></label
           ><button
             class="secondary-btn"
-            [disabled]="busy || !location.newSectorName?.trim()"
+            [disabled]="busy || !location.newActivityId"
           >
             Aggiungi
           </button>
         </form>
       </article>
     </section>
-    <section *ngIf="canEdit && professionals.length" class="panel assignments">
+    </ng-container>
+    <section
+      *ngIf="section === 'activities'"
+      class="panel assignments"
+      data-tour="locations-activities"
+    >
+      <h2>Catalogo attività</h2>
+      <p>
+        Le attività sono ciò che fai (Barberia, Estetica, Rivendita…). Ogni servizio e
+        prodotto appartiene a un’attività; una sede svolge una o più attività e un’attività
+        può essere svolta in più sedi. In agenda e in cassa, in ogni sede compaiono solo i
+        servizi delle attività presenti lì.
+      </p>
+      <div *ngIf="canEdit && activities.presets().length" class="preset-row" data-tour="locations-activity-presets">
+        <span class="muted">Aggiungi dal catalogo:</span>
+        <button
+          *ngFor="let preset of activities.presets()"
+          type="button"
+          class="pill-btn"
+          [disabled]="busy"
+          (click)="addPreset(preset.preset)"
+        >
+          + {{ preset.name }}
+        </button>
+      </div>
+      <form
+        *ngIf="canEdit"
+        (ngSubmit)="addCustomActivity()"
+        class="inline-form"
+        data-tour="locations-activity-custom"
+      >
+        <label class="grow"
+          >Attività personalizzata<input
+            [(ngModel)]="newActivityName"
+            name="newActivityName"
+            maxlength="80"
+            placeholder="Es. Tatuaggi"
+        /></label>
+        <button class="secondary-btn" [disabled]="busy || !newActivityName.trim()">
+          Crea attività
+        </button>
+      </form>
+      <div class="activity-list" data-tour="locations-activity-list">
+        <article
+          *ngFor="let activity of activities.activities(); trackBy: trackById"
+          class="activity-row"
+          [class.inactive]="!activity.isActive"
+        >
+          <div class="activity-main">
+            <input
+              *ngIf="canEdit; else plainName"
+              class="activity-name"
+              [ngModel]="activity.name"
+              (change)="renameActivity(activity, $any($event.target).value)"
+              [name]="'activity-name-' + activity.id"
+              [ngModelOptions]="{ standalone: true }"
+              maxlength="80"
+              [attr.aria-label]="'Nome attività ' + activity.name"
+            />
+            <ng-template #plainName><strong>{{ activity.name }}</strong></ng-template>
+            <span class="muted">
+              {{ activity.sectors.length ? "Sedi: " + sectorLocations(activity) : "Non ancora in nessuna sede" }}
+              · {{ activity.servicesCount }} servizi · {{ activity.productsCount }} prodotti
+            </span>
+          </div>
+          <button
+            *ngIf="canEdit"
+            type="button"
+            class="text-btn"
+            [disabled]="busy"
+            (click)="toggleActivity(activity)"
+          >
+            {{ activity.isActive ? "Disattiva" : "Riattiva" }}
+          </button>
+        </article>
+      </div>
+    </section>
+    <section
+      *ngIf="section === 'people' && canEdit && professionals.length"
+      class="panel assignments"
+    >
       <h2>Professionisti e appartenenze</h2>
       <p>
-        Una persona può lavorare in più sedi e settori. Gli orari personali si
+        Una persona può lavorare in più sedi e attività. Gli orari personali si
         incrociano con le aperture dei luoghi selezionati.
       </p>
       <div
         *ngFor="let person of professionals; trackBy: trackById"
         class="professional-row"
+        data-tour="locations-people-row"
       >
         <h3>{{ person.firstName }} {{ person.lastName }}</h3>
         <div class="checks">
@@ -236,18 +357,19 @@ import { OperationalContextService } from "../core/operational-context.service";
       </div>
     </section>
     <section
-      *ngIf="canManageVisibility && visibilityUsers.length"
+      *ngIf="section === 'visibility' && canManageVisibility && visibilityUsers.length"
       class="panel assignments"
     >
       <h2>Visibilità operativa</h2>
       <p>
-        Indica i settori consultabili da manager e reception. Le funzioni
+        Indica le attività consultabili da manager e reception. Le funzioni
         abilitate restano quelle già concesse. I professionisti consultano la
         propria agenda nelle sedi assegnate.
       </p>
       <div
         *ngFor="let person of visibilityUsers; trackBy: trackById"
         class="professional-row visibility-row"
+        data-tour="locations-visibility-row"
       >
         <h3>{{ person.firstName }} {{ person.lastName }}</h3>
         <div class="checks">
@@ -278,7 +400,7 @@ import { OperationalContextService } from "../core/operational-context.service";
       <form class="panel editor" (ngSubmit)="save()">
         <div class="card-heading">
           <h2 id="location-editor-title">
-            {{ editor.isSector ? "Configura settore" : "Configura sede" }}
+            {{ editor.isSector ? "Configura attività" : "Configura sede" }}
           </h2>
           <button
             type="button"
@@ -289,13 +411,16 @@ import { OperationalContextService } from "../core/operational-context.service";
             Chiudi
           </button>
         </div>
-        <label
+        <label *ngIf="!editor.isSector"
           >Nome<input
             [(ngModel)]="editor.name"
             name="editName"
             maxlength="120"
             required /></label
-        ><label *ngIf="!editor.isSector"
+        ><p *ngIf="editor.isSector" class="muted">
+          <strong>{{ editor.name }}</strong> · il nome dell’attività vale per tutte le sedi e
+          si cambia dal Catalogo attività.
+        </p><label *ngIf="!editor.isSector"
           >Indirizzo<input
             [(ngModel)]="editor.address"
             name="editAddress"
@@ -362,40 +487,27 @@ import { OperationalContextService } from "../core/operational-context.service";
             rows="3"
             placeholder="Una data per riga, es. 2026-12-25"
           ></textarea></label
-        ><button class="primary-btn" [disabled]="busy || !editor.name.trim()">
+        ><button class="primary-btn" [disabled]="busy || (!editor.isSector && !editor.name.trim())">
           {{ busy ? "Salvataggio…" : "Salva configurazione" }}
         </button>
         <p *ngIf="feedback" role="status">{{ feedback }}</p>
       </form>
     </div>
-  </main>`,
+  </ui-page>`,
   styles: [
     `
       .locations-shell {
-        max-width: 1240px;
-        margin: auto;
-        padding: clamp(1rem, 4vw, 3rem);
-        color: var(--ink, #183322);
+        color: var(--ink);
       }
-      header,
       .card-heading {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 1rem;
       }
-      header {
-        margin-bottom: 2rem;
-      }
-      h1 {
-        font-family: Georgia, serif;
-        font-size: clamp(2rem, 4vw, 3rem);
-        line-height: 1.1;
-        margin: 0.4rem 0 0.8rem;
-      }
       h2 {
-        font-family: Georgia, serif;
-        font-size: 1.6rem;
+        font-family: var(--font-display);
+        font-size: 1.35rem;
         margin: 0.6rem 0;
       }
       h3 {
@@ -406,25 +518,77 @@ import { OperationalContextService } from "../core/operational-context.service";
       h4 {
         font-size: 0.8rem;
         margin: 1rem 0 0.5rem;
-        color: #667768;
+        color: var(--muted);
       }
       .eyebrow {
         text-transform: uppercase;
         font-size: 0.72rem;
         letter-spacing: 0.18em;
-        color: #9c6832;
+        color: var(--accent);
       }
       p {
         line-height: 1.6;
       }
       .panel {
-        background: #fffdf8;
-        border: 1px solid #dce1d4;
+        background: var(--panel);
+        border: 1px solid var(--line);
         border-radius: 1.3rem;
         padding: 1.4rem;
       }
       .create-panel {
         margin-bottom: 1.4rem;
+      }
+      .activity-checks {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        padding: 0.7rem 0.9rem;
+        min-width: min(100%, 22rem);
+      }
+      .activity-checks legend {
+        font-size: 0.85rem;
+        padding: 0 0.3rem;
+      }
+      .activity-checks label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      .preset-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        margin: 1rem 0;
+      }
+      .activity-list {
+        display: grid;
+        gap: 0.6rem;
+        margin-top: 1.2rem;
+      }
+      .activity-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        padding: 0.75rem 1rem;
+      }
+      .activity-row.inactive {
+        opacity: 0.6;
+      }
+      .activity-main {
+        display: grid;
+        gap: 0.25rem;
+        min-width: 0;
+      }
+      .activity-name {
+        font-weight: 700;
+        max-width: 18rem;
       }
       .create-panel form {
         display: flex;
@@ -471,10 +635,10 @@ import { OperationalContextService } from "../core/operational-context.service";
       .muted,
       .professionals {
         font-size: 0.82rem;
-        color: #667768;
+        color: var(--muted);
       }
       .sector-card {
-        border-top: 1px solid #dce1d4;
+        border-top: 1px solid var(--line);
         margin-top: 1.2rem;
         padding-top: 1rem;
       }
@@ -520,7 +684,7 @@ import { OperationalContextService } from "../core/operational-context.service";
         margin-top: 1.5rem;
       }
       .professional-row {
-        border-top: 1px solid #dce1d4;
+        border-top: 1px solid var(--line);
         margin-top: 1rem;
         padding-top: 1rem;
       }
@@ -566,7 +730,7 @@ import { OperationalContextService } from "../core/operational-context.service";
         gap: 0.4rem;
       }
       fieldset {
-        border-top: 1px solid #dce1d4;
+        border-top: 1px solid var(--line);
       }
       .feedback {
         background: #e8efdf;
@@ -628,6 +792,22 @@ export class LocationsComponent implements OnInit {
     }
   }
   locations: any[] = [];
+  createOpen = false;
+  section: "structure" | "activities" | "people" | "visibility" = "structure";
+  readonly activities = inject(ActivitiesService);
+  newActivityIds: string[] = [];
+  newActivityName = "";
+  get tabs(): UiTab[] {
+    const tabs: UiTab[] = [
+      { key: "structure", label: "Sedi" },
+      { key: "activities", label: "Catalogo attività" },
+    ];
+    if (this.canEdit && this.professionals.length)
+      tabs.push({ key: "people", label: "Chi lavora dove" });
+    if (this.canManageVisibility && this.visibilityUsers.length)
+      tabs.push({ key: "visibility", label: "Visibilità per ruolo" });
+    return tabs;
+  }
   professionals: any[] = [];
   visibilityUsers: any[] = [];
   get canManageVisibility() {
@@ -646,7 +826,6 @@ export class LocationsComponent implements OnInit {
   loading = false;
   newName = "";
   newAddress = "";
-  newSector = "Generale";
   weekdays = [
     "Domenica",
     "Lunedì",
@@ -700,7 +879,7 @@ export class LocationsComponent implements OnInit {
           sectorIds: user.sectorAccess.map((access: any) => access.sectorId),
         }));
       }
-      await this.context.load();
+      await Promise.all([this.context.load(), this.activities.load(true)]);
     } catch (error: any) {
       this.feedback = error?.error?.message || "Impossibile caricare le sedi.";
     } finally {
@@ -740,17 +919,75 @@ export class LocationsComponent implements OnInit {
       await this.change("", {
         name: this.newName,
         address: this.newAddress,
-        sectorName: this.newSector,
+        activityIds: this.newActivityIds,
       })
     ) {
       this.newName = "";
       this.newAddress = "";
+      this.newActivityIds = [];
+      this.createOpen = false;
+      await this.activities.load(true);
     }
   }
-  createSector(location: any) {
-    return this.change("/" + location.id + "/sectors", {
-      name: location.newSectorName,
+  toggleNewActivity(id: string) {
+    this.newActivityIds = this.newActivityIds.includes(id)
+      ? this.newActivityIds.filter((entry) => entry !== id)
+      : [...this.newActivityIds, id];
+  }
+  /** Active activities of the account not yet run at this location. */
+  missingActivities(location: any) {
+    const present = new Set((location.sectors || []).map((sector: any) => sector.activityId));
+    return this.activities.active().filter((activity) => !present.has(activity.id));
+  }
+  async createSector(location: any) {
+    const ok = await this.change("/" + location.id + "/sectors", {
+      activityId: location.newActivityId,
     });
+    if (ok) await this.activities.load(true);
+    return ok;
+  }
+  sectorLocations(activity: any): string {
+    return activity.sectors
+      .map((sector: any) => sector.location.name + (sector.isActive ? "" : " (disattivata)"))
+      .join(", ");
+  }
+  private async activityChange(run: () => Promise<unknown>, done: string) {
+    this.busy = true;
+    this.feedback = "";
+    try {
+      await run();
+      await this.load();
+      this.feedback = done;
+    } catch (error: any) {
+      this.feedback = error?.error?.message || "Salvataggio non riuscito.";
+    } finally {
+      this.busy = false;
+    }
+  }
+  addPreset(preset: string) {
+    return this.activityChange(() => this.activities.create({ preset }), "Attività aggiunta al catalogo.");
+  }
+  async addCustomActivity() {
+    const name = this.newActivityName.trim();
+    if (!name) return;
+    await this.activityChange(() => this.activities.create({ name }), "Attività creata.");
+    this.newActivityName = "";
+  }
+  renameActivity(activity: any, value: string) {
+    const name = String(value || "").trim();
+    if (!name || name === activity.name) return;
+    return this.activityChange(
+      () => this.activities.update(activity.id, { name }),
+      "Nome aggiornato in tutte le sedi.",
+    );
+  }
+  toggleActivity(activity: any) {
+    return this.activityChange(
+      () => this.activities.update(activity.id, { isActive: !activity.isActive }),
+      activity.isActive
+        ? "Attività disattivata: i suoi servizi non si possono più prenotare o vendere."
+        : "Attività riattivata.",
+    );
   }
   createRoom(sector: any) {
     return this.change("/rooms", {
@@ -805,8 +1042,7 @@ export class LocationsComponent implements OnInit {
     return this.change(
       (row.isSector ? "/sectors/" : "/") + row.id,
       {
-        name: row.name,
-        ...(row.isSector ? {} : { address: row.address }),
+        ...(row.isSector ? {} : { name: row.name, address: row.address }),
         isActive: row.isActive,
         isPublic: row.isPublic,
         weeklyHours: row.inherit ? null : row.hours,

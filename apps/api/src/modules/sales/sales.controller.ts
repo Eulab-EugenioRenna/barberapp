@@ -14,6 +14,7 @@ import {
   resolveOperationalScope,
   saleFilter,
   sectorFilter,
+  serviceScopeFilter,
   collaboratorFilter,
 } from "../locations/operational-scope";
 import {
@@ -43,6 +44,7 @@ import {
 import { buildPaginatedResult, parsePagination } from "../../common/pagination";
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
 import { normalizeOrderItems, resolveSaleLabels } from "./sales.logic";
+import { parseServicesStartAt, SaleScheduleWarningsService } from "./sale-schedule";
 
 @Controller("sales")
 export class SalesController {
@@ -56,6 +58,7 @@ export class SalesController {
     private readonly cacheService: AppCacheService,
     private readonly cacheInvalidationService: CacheInvalidationService,
     private readonly customersAlignmentService: CustomersAlignmentService,
+    private readonly scheduleWarnings: SaleScheduleWarningsService,
   ) {}
 
   private totals(items: Parameters<typeof sumPricedLines>[0]) {
@@ -117,7 +120,7 @@ export class SalesController {
         where: {
           tenantId,
           OR: [
-            { ...sectorFilter(scope), isActive: true },
+            { ...serviceScopeFilter(scope), isActive: true },
             {
               id: {
                 in:
@@ -138,7 +141,48 @@ export class SalesController {
         existing: sale?.items,
         orderDiscount: body["orderDiscount"] ?? sale?.orderDiscount ?? 0,
       });
-      return { items, ...sumPricedLines(items) };
+      const totals = sumPricedLines(items);
+      const startAt = parseServicesStartAt(body["servicesStartAt"]);
+      // Checks use the sector of each service's activity at the account's location.
+      const quoteLocation =
+        sale?.locationId ||
+        (typeof body["locationId"] === "string" ? body["locationId"] : "");
+      const localSectors = quoteLocation
+        ? await this.prisma.sector.findMany({
+            where: { tenantId, locationId: quoteLocation },
+            select: { id: true, activityId: true },
+          })
+        : [];
+      const booked = new Set(
+        (sale?.items ?? []).filter((row) => row.serviceId).map((row) => row.id),
+      );
+      const warnings = startAt
+        ? await this.scheduleWarnings.warnings(
+            tenantId,
+            startAt,
+            items.map((row: any, index) => {
+              const service = services.find((entry) => entry.id === row.serviceId);
+              const raw = input[index] ?? {};
+              return {
+                serviceId: row.serviceId ?? null,
+                sectorId:
+                  row.sectorId ??
+                  localSectors.find((sector) => sector.activityId === service?.activityId)?.id ??
+                  service?.sectorId ??
+                  null,
+                collaboratorId:
+                  row.collaboratorId ??
+                  (typeof raw["collaboratorId"] === "string" ? raw["collaboratorId"] : null),
+                durationMinutes: service?.durationMinutes ?? 0,
+                label: service?.name ?? "Servizio",
+                // Lines already in the agenda keep their slot.
+                booked: typeof raw["id"] === "string" && booked.has(raw["id"]),
+              };
+            }),
+            sale?.id,
+          ).catch(() => [])
+        : [];
+      return { items, ...totals, warnings };
     } catch (error) {
       throw new BadRequestException(
         error instanceof Error ? error.message : "Conto non valido",
@@ -210,6 +254,62 @@ export class SalesController {
         );
       },
     );
+  }
+
+  /**
+   * Open accounts that belong to the till today: saved open at the counter or
+   * booked for a time already reached. Future bookings stay in the agenda.
+   */
+  @Get("open")
+  async findOpen(
+    @Req() request: { headers: { authorization?: string } },
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    const items = await this.prisma.sale.findMany({
+      where: {
+        tenantId,
+        orderStatus: "open",
+        ...saleFilter(scope),
+        OR: [{ orderOrigin: "cashier" }, { soldAt: { lte: endOfToday } }],
+      },
+      orderBy: { soldAt: "asc" },
+      take: 100,
+      include: {
+        items: {
+          include: {
+            product: true,
+            service: true,
+            collaborator: true,
+            booking: {
+              select: {
+                id: true,
+                status: true,
+                startsAt: true,
+                endsAt: true,
+                collaboratorId: true,
+              },
+            },
+          },
+        },
+        customer: true,
+        collaborator: true,
+        appointment: {
+          include: { customer: true, service: true, collaborator: true },
+        },
+      },
+    });
+    return items.map((sale) => resolveSaleLabels(sale));
   }
 
   @Get("for-appointment/:appointmentId")
@@ -383,7 +483,7 @@ export class SalesController {
               where: { tenantId, isActive: true },
             }),
             transaction.service.findMany({
-              where: { tenantId, ...sectorFilter(scope), isActive: true },
+              where: { tenantId, ...serviceScopeFilter(scope), isActive: true },
             }),
             customerId
               ? transaction.customer.findFirst({
@@ -499,6 +599,8 @@ export class SalesController {
         if (Number.isNaN(soldAt.getTime())) {
           throw new BadRequestException("Data vendita non valida");
         }
+        // "Eseguito alle": services go in the agenda from that time, even in the past.
+        const servicesStartAt = parseServicesStartAt(body["servicesStartAt"]);
         const serviceItems = normalizedItems.filter((row) => row.serviceId);
         const primaryCollaboratorId = serviceItems.length
           ? (serviceItems[0].collaboratorId ?? null)
@@ -552,6 +654,7 @@ export class SalesController {
           orderStatus: "new",
           items: [],
           rowOrder: rowInputs.map((row) => row.id),
+          servicesStartAt,
         });
 
         await this.inventory.postOrder(transaction, createdSale.id, user.id);
@@ -669,7 +772,7 @@ export class SalesController {
             where: {
               tenantId,
               OR: [
-                sectorFilter(scope),
+                serviceScopeFilter(scope),
                 {
                   id: {
                     in: sale.items.flatMap((item) =>
@@ -915,7 +1018,12 @@ export class SalesController {
           transaction,
           updatedSale.id,
           requireUser(session).id,
-          { orderStatus: sale.orderStatus, items: sale.items, rowOrder },
+          {
+            orderStatus: sale.orderStatus,
+            items: sale.items,
+            rowOrder,
+            servicesStartAt: parseServicesStartAt(body["servicesStartAt"]),
+          },
         );
         await this.inventory.postOrder(
           transaction,

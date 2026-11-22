@@ -1,5 +1,6 @@
-import { Component, inject } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, LOCALE_ID, inject } from "@angular/core";
+import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
+import { CommonModule, formatDate } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import type {
   AppointmentAutomationPolicyView,
@@ -13,7 +14,7 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
 @Component({
   selector: "app-appointment-automation-policy",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UiSelectComponent],
   template: ` <section class="policy" aria-label="Policy dei promemoria">
     <header>
       <div>
@@ -23,13 +24,14 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
       <button
         type="button"
         class="secondary-btn"
+        data-tour="notifications-load"
         [disabled]="busy"
         (click)="load()"
       >
         {{ policy ? "Ricarica policy salvata" : "Configura promemoria" }}
       </button>
     </header>
-    <p class="notice">
+    <p class="notice" data-tour="notifications-status">
       <strong
         >{{
           policy?.status === "active"
@@ -45,7 +47,7 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
     <ng-container *ngIf="draft && policy">
       <form (ngSubmit)="save()">
         <fieldset [disabled]="busy">
-          <div class="options">
+          <div class="options" data-tour="notifications-options">
             <label
               ><input
                 type="checkbox"
@@ -92,7 +94,7 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
               />Avvisa subito dopo una riprogrammazione</label
             >
           </div>
-          <div class="fields">
+          <div class="fields" data-tour="notifications-timing">
             <label
               >Anticipo del primo promemoria (minuti)<input
                 type="number"
@@ -154,29 +156,27 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
                 (ngModelChange)="edited()"
                 required
             /></label>
-            <label class="wide"
-              >In caso di mancata risposta<select
+            <div class="wide select-field">
+              <span>In caso di mancata risposta</span
+              ><ui-select
                 name="noResponse"
-                aria-label="In caso di mancata risposta"
+                label="In caso di mancata risposta"
+                [options]="noResponseOptions"
+                [filterable]="false"
                 [(ngModel)]="draft.noResponseAction"
                 (ngModelChange)="edited()"
                 [disabled]="!draft.requestResponse"
-              >
-                <option value="notify_staff">
-                  Segnala allo staff, mantenendo la prenotazione
-                </option>
-                <option value="keep_booking">Mantieni la prenotazione</option>
-              </select></label
-            >
+              ></ui-select>
+            </div>
           </div>
           <p class="muted">
             Imposta 0 per disattivare i promemoria e mantenere solo gli eventi
             selezionati. 1440 minuti corrispondono a 24 ore effettive, anche al
             cambio dell’ora. La fascia scelta si interseca con le aperture di
-            sede e settore e con le festività. Fuori apertura si anticipa al
+            sede e attività e con le festività. Fuori apertura si anticipa al
             minuto utile precedente; gli invii già passati vengono omessi.
           </p>
-          <div class="fields">
+          <div class="fields" data-tour="notifications-texts">
             <label class="wide"
               >Messaggio iniziale<textarea
                 name="initial-text"
@@ -241,12 +241,12 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
             Salvare una nuova bozza ferma i promemoria di questa policy ancora
             da inviare. Dovrai riattivarla per le prenotazioni future.
           </p>
-          <button type="submit" class="primary-btn">
+          <button type="submit" class="primary-btn" data-tour="notifications-save">
             Salva bozza della policy
           </button>
         </fieldset>
       </form>
-      <div class="simulation" aria-label="Attivazione promemoria">
+      <div class="simulation" aria-label="Attivazione promemoria" data-tour="notifications-activate">
         <h3>Attiva per le nuove prenotazioni</h3>
         <p class="muted">
           Configura prima le autorizzazioni qui sotto, poi ricarica la policy.
@@ -256,61 +256,44 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
           prenotazione.
         </p>
         <div class="fields">
-          <label
-            >Invio WhatsApp<select
-              aria-label="Autorizzazione WhatsApp"
+          <div class="select-field">
+            <span>Invio WhatsApp</span
+            ><ui-select
+              label="Autorizzazione WhatsApp"
+              placeholder="Seleziona autorizzazione"
+              [options]="grantOptions('whatsapp')"
               [(ngModel)]="selected.whatsapp"
               [disabled]="busy"
-            >
-              <option value="">Seleziona autorizzazione</option>
-              <option *ngFor="let g of choices('whatsapp')" [value]="g.id">
-                WhatsApp · scade {{ g.expiresAt | date: "dd/MM/yyyy HH:mm" }}
-              </option>
-            </select></label
-          >
-          <label *ngIf="draft.requestResponse"
-            >Azioni cliente sull’agenda<select
-              aria-label="Autorizzazione azioni cliente"
+            ></ui-select>
+          </div>
+          <div *ngIf="draft.requestResponse" class="select-field">
+            <span>Azioni cliente sull’agenda</span
+            ><ui-select
+              label="Autorizzazione azioni cliente"
+              placeholder="Seleziona autorizzazione"
+              [options]="grantOptions('customer_commands')"
               [(ngModel)]="selected.customerCommands"
               [disabled]="busy"
-            >
-              <option value="">Seleziona autorizzazione</option>
-              <option
-                *ngFor="let g of choices('customer_commands')"
-                [value]="g.id"
-              >
-                Azioni cliente · scade
-                {{ g.expiresAt | date: "dd/MM/yyyy HH:mm" }}
-              </option>
-            </select></label
-          >
-          <label
-            >Avvisi nell’app allo staff<select
-              aria-label="Autorizzazione avvisi staff"
+            ></ui-select>
+          </div>
+          <div class="select-field">
+            <span>Avvisi nell’app allo staff</span
+            ><ui-select
+              label="Autorizzazione avvisi staff"
+              [options]="grantOptions('application_notification')"
               [(ngModel)]="selected.staff"
               [disabled]="busy"
-            >
-              <option value="">Nessun avviso nell’app</option>
-              <option
-                *ngFor="let g of choices('application_notification')"
-                [value]="g.id"
-              >
-                Notifiche · scade {{ g.expiresAt | date: "dd/MM/yyyy HH:mm" }}
-              </option>
-            </select></label
-          >
-          <label
-            >Notifiche email derivanti dalle risposte<select
-              aria-label="Autorizzazione email"
+            ></ui-select>
+          </div>
+          <div class="select-field">
+            <span>Notifiche email derivanti dalle risposte</span
+            ><ui-select
+              label="Autorizzazione email"
+              [options]="grantOptions('email')"
               [(ngModel)]="selected.email"
               [disabled]="busy"
-            >
-              <option value="">Email non autorizzate</option>
-              <option *ngFor="let g of choices('email')" [value]="g.id">
-                Email · scade {{ g.expiresAt | date: "dd/MM/yyyy HH:mm" }}
-              </option>
-            </select></label
-          >
+            ></ui-select>
+          </div>
         </div>
         <p *ngIf="dirty" class="notice">
           Salva le modifiche prima di attivare.
@@ -341,25 +324,24 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
           Ferma i promemoria da inviare
         </button>
       </div>
-      <div class="simulation">
+      <div class="simulation" data-tour="notifications-simulate">
         <h3>Prova gli orari</h3>
         <p class="muted">
           Esempio senza clienti, prenotazioni o invii. Fuso dell’attività:
           {{ policy.timezone }}.
         </p>
         <div class="fields">
-          <label
-            >Settore dell’esempio<select
-              aria-label="Settore dell’esempio"
+          <div class="select-field">
+            <span>Attività dell’esempio</span
+            ><ui-select
+              label="Attività dell’esempio"
+              placeholder="Seleziona un’attività attiva"
+              [options]="sectorOptions"
               [(ngModel)]="sectorId"
               [disabled]="busy"
               (ngModelChange)="edited()"
-            >
-              <option value="">Seleziona un settore attivo</option>
-              <option *ngFor="let sector of sectors" [value]="sector.id">
-                {{ sector.label }}
-              </option>
-            </select></label
+            ></ui-select>
+          </div
           ><label
             >Data e ora dell’appuntamento di esempio<input
               type="datetime-local"
@@ -501,7 +483,8 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
         gap: 16px;
         margin: 20px 0;
       }
-      .fields label {
+      .fields label,
+      .fields .select-field {
         display: grid;
         gap: 8px;
         font-size: 12px;
@@ -509,8 +492,7 @@ import { AppointmentAutomationPolicyApiService } from "../core/appointment-autom
         min-width: 0;
       }
       .fields textarea,
-      .fields input,
-      .fields select {
+      .fields input {
         font: inherit;
         font-weight: 400;
         color: inherit;
@@ -584,6 +566,60 @@ export class AppointmentAutomationPolicyComponent {
       (JSON.stringify(this.draft) !== JSON.stringify(this.policy.settings) ||
         JSON.stringify(this.texts) !== JSON.stringify(this.policy.texts))
     );
+  }
+  private readonly locale = inject(LOCALE_ID);
+  readonly noResponseOptions: UiOption[] = [
+    {
+      value: "notify_staff",
+      label: "Segnala allo staff, mantenendo la prenotazione",
+    },
+    { value: "keep_booking", label: "Mantieni la prenotazione" },
+  ];
+  private readonly grantOptionsCache = new Map<
+    string,
+    { key: string; options: UiOption[] }
+  >();
+  /** Options for an authorization select; rebuilt only when the eligible grants change. */
+  grantOptions(kind: string): UiOption[] {
+    const choices = this.choices(kind);
+    const key = choices.map((g) => `${g.id}|${g.expiresAt}`).join(",");
+    const cached = this.grantOptionsCache.get(kind);
+    if (cached && cached.key === key) return cached.options;
+    const meta: Record<string, { prefix: string; empty?: string }> = {
+      whatsapp: { prefix: "WhatsApp" },
+      customer_commands: { prefix: "Azioni cliente" },
+      application_notification: {
+        prefix: "Notifiche",
+        empty: "Nessun avviso nell’app",
+      },
+      email: { prefix: "Email", empty: "Email non autorizzate" },
+    };
+    const { prefix, empty } = meta[kind] ?? { prefix: kind };
+    const options: UiOption[] = [
+      ...(empty ? [{ value: "", label: empty }] : []),
+      ...uiOptions(
+        choices,
+        (g) => g.id,
+        (g) =>
+          `${prefix} · scade ${formatDate(g.expiresAt, "dd/MM/yyyy HH:mm", this.locale)}`,
+      ),
+    ];
+    this.grantOptionsCache.set(kind, { key, options });
+    return options;
+  }
+  private sectorOptionsSource: Array<{ id: string; label: string }> | null =
+    null;
+  private sectorOptionsCache: UiOption[] = [];
+  get sectorOptions(): UiOption[] {
+    if (this.sectorOptionsSource !== this.sectors) {
+      this.sectorOptionsSource = this.sectors;
+      this.sectorOptionsCache = uiOptions(
+        this.sectors,
+        (sector) => sector.id,
+        (sector) => sector.label,
+      );
+    }
+    return this.sectorOptionsCache;
   }
   choices(kind: string) {
     return this.grants.filter(

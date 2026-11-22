@@ -3,11 +3,13 @@ import {
   EventEmitter,
   Input,
   OnInit,
+  LOCALE_ID,
   Output,
   inject,
 } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { CommonModule, formatDate } from "@angular/common";
 import { FormsModule } from "@angular/forms";
+import { UiSelectComponent, type UiOption } from "@alora/ui";
 import { HttpClient, HttpErrorResponse } from "@angular/common/http";
 import { firstValueFrom } from "rxjs";
 import { ADMIN_API_URL } from "../core/api-config";
@@ -26,7 +28,7 @@ type Attempt = {
 @Component({
   selector: "alora-account-payments",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UiSelectComponent],
   template: `<details class="account-payments" (toggle)="onToggle($event)">
     <summary>Incassi del conto</summary>
     <p class="hint">
@@ -73,18 +75,16 @@ type Attempt = {
       </dl>
       <div *ngIf="session.can('sales.manage')" class="payment-form">
         <fieldset [disabled]="busy || !!attempt">
-          <label *ngIf="data.summary.basis === 'ledger'"
-            >Operazione<select
-              aria-label="Operazione incasso"
+          <div *ngIf="data.summary.basis === 'ledger'" class="select-field"
+            >Operazione<ui-select
+              ariaLabel="Operazione incasso"
+              label="Operazione"
               [(ngModel)]="kind"
               [ngModelOptions]="{ standalone: true }"
               (ngModelChange)="resetLines()"
-            >
-              <option *ngIf="data.orderStatus !== 'cancelled'" value="receive">
-                Registra acconto o saldo
-              </option>
-              <option value="refund">Registra rimborso</option>
-            </select></label
+              [options]="kindOptions"
+              [filterable]="false"
+            ></ui-select></div
           >
           <p *ngIf="data.summary.basis === 'legacy_unknown'" class="hint">
             Indica il totale già incassato prima di iniziare il registro, anche
@@ -107,33 +107,27 @@ type Attempt = {
                 [ngModelOptions]="{ standalone: true }"
                 placeholder="0.00"
             /></label>
-            <label *ngIf="data.summary.basis === 'ledger'"
-              >Metodo<select
-                [attr.aria-label]="'Metodo incasso ' + (index + 1)"
+            <div *ngIf="data.summary.basis === 'ledger'" class="select-field"
+              >Metodo<ui-select
+                [ariaLabel]="'Metodo incasso ' + (index + 1)"
+                label="Metodo"
                 [(ngModel)]="line.method"
                 [ngModelOptions]="{ standalone: true }"
-              >
-                <option value="cash">Contanti</option>
-                <option value="card">Carta ricevuta</option>
-                <option value="bank">Bonifico ricevuto</option>
-                <option value="other">Altro</option>
-              </select></label
+                [options]="methodOptions"
+                [filterable]="false"
+              ></ui-select></div
             >
-            <label
+            <div
               *ngIf="kind === 'refund' && data.summary.basis === 'ledger'"
-              class="full"
-              >Incasso originale<select
-                [attr.aria-label]="'Incasso originale ' + (index + 1)"
+              class="select-field full"
+              >Incasso originale<ui-select
+                [ariaLabel]="'Incasso originale ' + (index + 1)"
+                label="Incasso originale"
                 [(ngModel)]="line.refundOfId"
                 [ngModelOptions]="{ standalone: true }"
-              >
-                <option value="">Seleziona il movimento</option>
-                <option *ngFor="let row of refundable" [value]="row.id">
-                  {{ label(row.kind) }} ·
-                  {{ row.createdAt | date: "dd/MM/yy HH:mm" }} · €
-                  {{ row.refundableAmount }}
-                </option>
-              </select></label
+                [options]="refundOptions"
+                placeholder="Seleziona il movimento"
+              ></ui-select></div
             >
             <button
               *ngIf="lines.length > 1"
@@ -293,7 +287,8 @@ type Attempt = {
       fieldset:disabled {
         opacity: 0.65;
       }
-      label {
+      label,
+      .select-field {
         display: grid;
         font-size: 0.75rem;
         gap: 0.35rem;
@@ -464,6 +459,42 @@ export class AccountPaymentsComponent implements OnInit {
     } finally {
       this.loading = false;
     }
+  }
+  readonly methodOptions: UiOption[] = [
+    { value: "cash", label: "Contanti" },
+    { value: "card", label: "Carta ricevuta" },
+    { value: "bank", label: "Bonifico ricevuto" },
+    { value: "other", label: "Altro" },
+  ];
+  private readonly locale = inject(LOCALE_ID);
+  private optionsSource: unknown;
+  private kindOptionsCache: UiOption[] = [];
+  private refundOptionsCache: UiOption[] = [];
+  /** Options follow `data`, which is replaced on every load. */
+  private syncOptions() {
+    if (this.optionsSource === this.data) return;
+    this.optionsSource = this.data;
+    this.kindOptionsCache = [
+      ...(this.data?.orderStatus !== "cancelled"
+        ? [{ value: "receive", label: "Registra acconto o saldo" }]
+        : []),
+      { value: "refund", label: "Registra rimborso" },
+    ];
+    this.refundOptionsCache = [
+      { value: "", label: "Seleziona il movimento" },
+      ...this.refundable.map((row: any) => ({
+        value: row.id,
+        label: `${this.label(row.kind)} · ${formatDate(row.createdAt, "dd/MM/yy HH:mm", this.locale)} · € ${row.refundableAmount}`,
+      })),
+    ];
+  }
+  get kindOptions(): UiOption[] {
+    this.syncOptions();
+    return this.kindOptionsCache;
+  }
+  get refundOptions(): UiOption[] {
+    this.syncOptions();
+    return this.refundOptionsCache;
   }
   get refundable() {
     return (this.data?.items || []).filter(

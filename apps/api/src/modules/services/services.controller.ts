@@ -3,8 +3,7 @@ import { canUseLocalFunction } from "../../common/function-catalog";
 import { PricingService } from "../pricing/pricing.service";
 import {
   resolveOperationalScope,
-  sectorFilter,
-  requireSector,
+  serviceScopeFilter,
 } from "../locations/operational-scope";
 import { LegacyWriteDto } from "../../common/legacy-write.dto";
 import { assertTenantReferences } from "../../common/tenant-references";
@@ -24,6 +23,7 @@ import {
 import { CacheInvalidationService } from "../../cache/cache-invalidation.service";
 import { CACHE_TTL_SECONDS, cacheKeys } from "../../cache/cache.constants";
 import { AppCacheService } from "../../cache/cache.service";
+import { resolveServiceActivity } from "../locations/activity-sectors";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   requireTenantId,
@@ -62,17 +62,18 @@ export class ServicesController {
     });
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.servicesList(tenantId)}:p${page}:s${pageSize}`,
+      `${cacheKeys.servicesList(tenantId)}:activity-v1:p${page}:s${pageSize}`,
       CACHE_TTL_SECONDS.lists,
       async () => {
         const [items, total] = await Promise.all([
           this.prisma.service.findMany({
-            where: { tenantId, ...sectorFilter(scope) },
+            where: { tenantId, ...serviceScopeFilter(scope) },
             orderBy: [{ isActive: "desc" }, { name: "asc" }],
             skip,
             take,
             include: {
               sector: { include: { location: true } },
+              activity: { select: { id: true, name: true, isActive: true } },
               serviceProducts: {
                 include: {
                   product: {
@@ -90,7 +91,7 @@ export class ServicesController {
             },
           }),
           this.prisma.service.count({
-            where: { tenantId, ...sectorFilter(scope) },
+            where: { tenantId, ...serviceScopeFilter(scope) },
           }),
         ]);
 
@@ -139,7 +140,8 @@ export class ServicesController {
       session,
       request.headers,
     );
-    const sector = await requireSector(this.prisma, scope, body["sectorId"]);
+    // A service belongs to an activity; it is offered wherever that activity runs.
+    const placement = await resolveServiceActivity(this.prisma, scope, body);
     const created = await this.pricing.write(
       tenantId,
       requireUser(session).id,
@@ -148,7 +150,8 @@ export class ServicesController {
         tx.service.create({
           data: {
             tenantId,
-            sectorId: sector.id,
+            sectorId: placement.sectorId,
+            activityId: placement.activityId,
             name: String(body["name"] ?? ""),
             publicDescription:
               typeof body["publicDescription"] === "string"
@@ -206,15 +209,10 @@ export class ServicesController {
       request.headers,
     );
     const current = await this.prisma.service.findFirst({
-      where: { id, tenantId, ...sectorFilter(scope) },
+      where: { id, tenantId, ...serviceScopeFilter(scope) },
     });
     if (!current) throw new BadRequestException("Servizio non disponibile");
-    const sector = await requireSector(
-      this.prisma,
-      scope,
-      body["sectorId"] || current.sectorId,
-      false,
-    );
+    const placement = await resolveServiceActivity(this.prisma, scope, body, current);
     const updated = await this.pricing.write(
       tenantId,
       requireUser(session).id,
@@ -227,7 +225,8 @@ export class ServicesController {
         return tx.service.update({
           where: { id, tenantId },
           data: {
-            sectorId: sector.id,
+            sectorId: placement.sectorId,
+            activityId: placement.activityId,
             name: typeof body["name"] === "string" ? body["name"] : undefined,
             publicDescription:
               typeof body["publicDescription"] === "string"
@@ -421,7 +420,7 @@ export class ServicesController {
     );
 
     await this.prisma.service.update({
-      where: { id, tenantId, ...sectorFilter(scope) },
+      where: { id, tenantId, ...serviceScopeFilter(scope) },
       data: { isActive: false },
     });
 

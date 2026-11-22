@@ -1,6 +1,7 @@
 import {
   resolveOperationalScope,
   sectorFilter,
+  serviceScopeFilter,
   collaboratorFilter,
   saleFilter,
 } from "../modules/locations/operational-scope";
@@ -62,6 +63,11 @@ export function authorizeLocalOperation(
       canUseLocalFunction(user, definition.own)
     )
       return;
+    if (
+      user.role !== "collaborator" &&
+      definition.anyOf?.some((alternative) => canUseLocalFunction(user, alternative))
+    )
+      return;
   }
   throw new ForbiddenException("Permesso esplicito richiesto");
 }
@@ -121,7 +127,7 @@ export class LocalPolicyGuard implements CanActivate {
                   where: {
                     id,
                     tenantId: scope.tenantId,
-                    ...sectorFilter(scope),
+                    ...serviceScopeFilter(scope),
                   },
                 })
               : controller === "CollaboratorsController"

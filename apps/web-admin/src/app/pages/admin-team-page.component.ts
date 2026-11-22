@@ -13,6 +13,7 @@ import {
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
+import { UiSelectComponent, type UiOption } from "@alora/ui";
 import { firstValueFrom } from "rxjs";
 import type { TeamOverview, TeamRole, TeamUser } from "@eulab/connect/server";
 import { ADMIN_API_URL } from "../core/api-config";
@@ -70,7 +71,13 @@ interface Pending extends AccountDraft {
 @Component({
   selector: "alora-admin-team-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, AutofocusFirstDirective],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    AutofocusFirstDirective,
+    UiSelectComponent,
+  ],
   templateUrl: "./admin-team-page.component.html",
 })
 export class AdminTeamPageComponent implements OnInit, OnChanges {
@@ -159,6 +166,74 @@ export class AdminTeamPageComponent implements OnInit, OnChanges {
         (pro) => !known.some((item) => item.id === pro.id),
       ),
     ];
+  }
+  /** Role choices shared by the access and the new-account selects. */
+  get roleOptions(): UiOption[] {
+    return this.cachedOptions("role", [
+      {
+        value: "preset:collaborator",
+        label: "Collaboratore",
+        disabled: !this.choiceAvailable("preset:collaborator"),
+      },
+      {
+        value: "preset:owner",
+        label: "Titolare",
+        disabled: !this.choiceAvailable("preset:owner"),
+      },
+      ...this.customRoles.map((role) => ({
+        value: role.id,
+        label: role.name,
+        disabled: !this.canEditRole(role),
+      })),
+    ]);
+  }
+  get personProfileOptions(): UiOption[] {
+    const localId = this.selected?.local?.id;
+    return this.cachedOptions("personProfile", [
+      { value: null, label: "Nessuno" },
+      ...this.profileChoices.map((pro) => {
+        const linked = !!pro.userId && pro.userId !== localId;
+        return {
+          value: pro.id,
+          label: `${pro.firstName} ${pro.lastName}${linked ? " · già associato" : ""}`,
+          disabled: pro.isActive === false || linked,
+        };
+      }),
+    ]);
+  }
+  get selfProfileOptions(): UiOption[] {
+    const localId = this.selected?.local?.id;
+    return this.cachedOptions("selfProfile", [
+      { value: null, label: "Nessun profilo" },
+      ...this.profileChoices.map((pro) => ({
+        value: pro.id,
+        label: `${pro.firstName} ${pro.lastName}`,
+        disabled:
+          pro.isActive === false || (!!pro.userId && pro.userId !== localId),
+      })),
+    ]);
+  }
+  get accountProfileOptions(): UiOption[] {
+    return this.cachedOptions("accountProfile", [
+      { value: null, label: "Nessuno" },
+      ...this.profileChoices.map((pro) => ({
+        value: pro.id,
+        label: `${pro.firstName} ${pro.lastName}`,
+        disabled: pro.isActive === false || !!pro.userId,
+      })),
+    ]);
+  }
+  private readonly optionCache = new Map<
+    string,
+    { key: string; options: UiOption[] }
+  >();
+  /** Keeps the same array while the content is unchanged (stable input). */
+  private cachedOptions(name: string, options: UiOption[]): UiOption[] {
+    const key = JSON.stringify(options);
+    const hit = this.optionCache.get(name);
+    if (hit?.key === key) return hit.options;
+    this.optionCache.set(name, { key, options });
+    return options;
   }
   isPending(person: Person): boolean {
     return this.pending.some((draft) => draft.id === person.local?.id);

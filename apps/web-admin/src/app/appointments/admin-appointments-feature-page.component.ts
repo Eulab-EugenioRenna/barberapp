@@ -13,7 +13,7 @@ import { AdminAppointmentsDrawerComponent } from "./admin-appointments-drawer.co
 import { AdminAppointmentsQuickRescheduleModalComponent } from "./admin-appointments-quick-reschedule-modal.component";
 import { AdminAppointmentsPageComponent } from "../pages/admin-appointments-page.component";
 import { AdminAppointmentsCalendarComponent } from "./admin-appointments-calendar.component";
-import { AppointmentsCollaboratorMultiSelectComponent } from "./appointments-collaborator-multi-select.component";
+import { UiMultiSelectComponent } from "@alora/ui";
 import { AppointmentsFacade } from "./appointments.facade";
 import {
   QuickCreateDialogComponent,
@@ -29,7 +29,7 @@ import {
     AdminAppointmentsQuickRescheduleModalComponent,
     AdminAppointmentsPageComponent,
     AdminAppointmentsCalendarComponent,
-    AppointmentsCollaboratorMultiSelectComponent,
+    UiMultiSelectComponent,
     QuickCreateDialogComponent,
   ],
   template: `
@@ -57,7 +57,7 @@ import {
     <section class="appointments-shell">
       <div class="appointments-header panel rounded-[2rem] p-4 md:p-5">
         <div class="appointments-toolbar">
-          <div class="appointments-tabs">
+          <div class="appointments-tabs" data-tour="appointments-tabs">
             <button
               type="button"
               class="pill-btn"
@@ -76,13 +76,20 @@ import {
             </button>
           </div>
 
-          <barber-appointments-collaborator-multi-select
+          <ui-multi-select
+            class="appointments-team-filter"
+            data-tour="appointments-team"
             [options]="appointmentsFacade.collaboratorFilterOptions()"
             [values]="appointmentsFacade.selectedCollaboratorIds()"
             (valuesChange)="
               appointmentsFacade.setSelectedCollaboratorIds($event)
             "
-          ></barber-appointments-collaborator-multi-select>
+            label="Squadra"
+            [showLabel]="true"
+            placeholder="Tutta la squadra"
+            filterPlaceholder="Cerca professionisti"
+            emptyText="Nessun risultato"
+          ></ui-multi-select>
         </div>
       </div>
 
@@ -254,6 +261,11 @@ import {
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
+      }
+
+      .appointments-team-filter {
+        flex: 0 1 18rem;
+        min-width: min(16rem, 100%);
       }
 
       .appointments-tabs {

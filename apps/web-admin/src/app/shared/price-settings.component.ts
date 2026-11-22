@@ -5,11 +5,12 @@ import { HttpClient } from "@angular/common/http";
 import { firstValueFrom } from "rxjs";
 import { SessionStore } from "../core/session.store";
 import { ADMIN_API_URL } from "../core/api-config";
+import { UiSelectComponent, type UiOption } from "@alora/ui";
 
 @Component({
   selector: "alora-price-settings",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UiSelectComponent],
   template: ` <fieldset class="price-settings">
     <legend>Prezzi e imposte</legend>
     <label class="tracking"
@@ -21,17 +22,16 @@ import { ADMIN_API_URL } from "../core/api-config";
       Attivo per nuove operazioni</label
     >
     <div class="price-grid">
-      <label
-        >Modalità prezzo<select
-          aria-label="Modalità prezzo"
+      <div class="select-field">
+        <span>Modalità prezzo</span
+        ><ui-select
+          label="Modalità prezzo"
+          [options]="priceModeOptions"
+          [filterable]="false"
           [(ngModel)]="value.priceMode"
           [ngModelOptions]="{ standalone: true }"
-        >
-          <option value="legacy">Valore storico · IVA non definita</option>
-          <option value="net">Prezzo IVA esclusa</option>
-          <option value="gross">Prezzo IVA inclusa</option>
-        </select></label
-      >
+        ></ui-select>
+      </div>
       <label
         >IVA vendita (%)<input
           type="number"
@@ -53,17 +53,16 @@ import { ADMIN_API_URL } from "../core/api-config";
             [ngModelOptions]="{ standalone: true }"
             placeholder="Non registrato"
         /></label>
-        <label
-          >Modalità costo<select
-            aria-label="Modalità costo"
+        <div class="select-field">
+          <span>Modalità costo</span
+          ><ui-select
+            label="Modalità costo"
+            [options]="costModeOptions"
+            [filterable]="false"
             [(ngModel)]="value.costMode"
             [ngModelOptions]="{ standalone: true }"
-          >
-            <option value="legacy">Valore storico · IVA non definita</option>
-            <option value="net">Costo IVA esclusa</option>
-            <option value="gross">Costo IVA inclusa</option>
-          </select></label
-        >
+          ></ui-select>
+        </div>
         <label
           >IVA acquisto (%)<input
             type="number"
@@ -97,7 +96,7 @@ import { ADMIN_API_URL } from "../core/api-config";
     <button
       *ngIf="
         value.id &&
-        session.can(kind === 'product' ? 'products.read' : 'services.read')
+        session.can(kind === 'product' ? 'services.read' : 'services.read')
       "
       type="button"
       class="pill-btn"
@@ -153,14 +152,17 @@ import { ADMIN_API_URL } from "../core/api-config";
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.8rem;
       }
-      label {
+      label,
+      .select-field {
         display: grid;
         gap: 0.35rem;
         font-size: 0.82rem;
         font-weight: 650;
       }
-      input,
-      select {
+      ui-select {
+        font-weight: 400;
+      }
+      input {
         width: 100%;
         min-width: 0;
         border: 1px solid var(--line);
@@ -208,6 +210,16 @@ export class PriceSettingsComponent implements OnChanges {
   @Input() value: any = {};
   @Input() kind: "product" | "service" = "product";
   readonly session = inject(SessionStore);
+  readonly priceModeOptions: UiOption[] = [
+    { value: "legacy", label: "Valore storico · IVA non definita" },
+    { value: "net", label: "Prezzo IVA esclusa" },
+    { value: "gross", label: "Prezzo IVA inclusa" },
+  ];
+  readonly costModeOptions: UiOption[] = [
+    { value: "legacy", label: "Valore storico · IVA non definita" },
+    { value: "net", label: "Costo IVA esclusa" },
+    { value: "gross", label: "Costo IVA inclusa" },
+  ];
   private readonly http = inject(HttpClient);
   history: any[] = [];
   feedback = "";

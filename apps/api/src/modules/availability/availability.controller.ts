@@ -50,6 +50,8 @@ export class AvailabilityController {
         serviceId,
         date,
         collaboratorId,
+        // With one location in scope, the service is offered by its activity there.
+        scope.locationIds.length === 1 ? { locationId: scope.locationIds[0] } : undefined,
       ),
       conflictChecks: ["collaborator", "room", "buffers"],
     };

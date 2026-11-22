@@ -50,6 +50,7 @@ function controllerWith(prisma: Record<string, unknown>) {
       {} as never,
       cacheInvalidation as never,
       {} as never,
+      { warnings: jest.fn().mockResolvedValue([]) } as never,
     ),
   };
 }

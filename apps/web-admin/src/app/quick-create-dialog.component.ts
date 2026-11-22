@@ -1,7 +1,8 @@
-import { SectorPickerComponent } from "./shared/sector-picker.component";
+import { ActivityPickerComponent } from "./shared/activity-picker.component";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
+import { UiSelectComponent, type UiOption } from "@alora/ui";
 import { firstValueFrom } from "rxjs";
 import { AdminApiService } from "./core/admin-api.service";
 import { AutofocusFirstDirective } from "./shared/autofocus-first.directive";
@@ -16,10 +17,11 @@ export interface QuickCreatePrefill {
   selector: "barber-quick-create-dialog",
   standalone: true,
   imports: [
-    SectorPickerComponent,
+    ActivityPickerComponent,
     CommonModule,
     FormsModule,
     AutofocusFirstDirective,
+    UiSelectComponent,
   ],
   template: `
     <div
@@ -44,21 +46,16 @@ export interface QuickCreatePrefill {
         <p class="mt-2 text-sm text-[var(--muted)]">
           Potrai completare i dettagli in seguito.
         </p>
-        <label *ngIf="kind === 'product' && barcode" class="field mt-4">
+        <div *ngIf="kind === 'product' && barcode" class="field mt-4">
           <span>Associa a un prodotto del catalogo</span>
-          <select
+          <ui-select
             [(ngModel)]="existingProductId"
             name="quickCreateExistingProduct"
-          >
-            <option value="">Crea un nuovo prodotto</option>
-            <option
-              *ngFor="let product of associableProducts"
-              [value]="product.id"
-            >
-              {{ product.name }}
-            </option>
-          </select>
-        </label>
+            [options]="associableProductOptions"
+            label="Associa a un prodotto del catalogo"
+            filterPlaceholder="Cerca prodotto"
+          ></ui-select>
+        </div>
         <label *ngIf="!existingProductId" class="field mt-4">
           <span
             >{{ kind === "customer" ? "Nome cliente" : "Nome" }}
@@ -98,10 +95,14 @@ export interface QuickCreatePrefill {
             placeholder="8051234567890"
           />
         </label>
-        <alora-sector-picker
-          *ngIf="kind === 'service'"
-          [(value)]="sectorId"
-        ></alora-sector-picker>
+        <alora-activity-picker
+          *ngIf="kind === 'service' || (kind === 'product' && !existingProductId)"
+          class="mt-4 block"
+          [kind]="kind === 'service' ? 'service' : 'product'"
+          [locationId]="locationId"
+          [value]="activityId"
+          (valueChange)="activityId = $event"
+        ></alora-activity-picker>
         <p
           *ngIf="error"
           role="alert"
@@ -170,6 +171,20 @@ export class QuickCreateDialogComponent {
     this.barcode = value?.barcode || "";
   }
   existingProductId = "";
+  private productOptionsKey = "";
+  private productOptionsCache: UiOption[] = [];
+  get associableProductOptions(): UiOption[] {
+    const products = this.associableProducts;
+    const key = products.map((product) => `${product.id}:${product.name}`).join("|");
+    if (key !== this.productOptionsKey || !this.productOptionsCache.length) {
+      this.productOptionsKey = key;
+      this.productOptionsCache = [
+        { value: "", label: "Crea un nuovo prodotto" },
+        ...products.map((product) => ({ value: product.id, label: product.name })),
+      ];
+    }
+    return this.productOptionsCache;
+  }
   get associableProducts(): any[] {
     return this.products.filter(
       (product) =>
@@ -183,7 +198,9 @@ export class QuickCreateDialogComponent {
     entity: any;
   }>();
   name = "";
-  sectorId = "";
+  activityId = "";
+  /** Location of the account being built: the service's activity must run there. */
+  @Input() locationId = "";
   price: number | "" = "";
   barcode = "";
   saving = false;
@@ -233,7 +250,7 @@ export class QuickCreateDialogComponent {
         entity = await firstValueFrom(
           this.adminApi.createOrUpdateService("", {
             name,
-            sectorId: this.sectorId,
+            activityId: this.activityId || undefined,
             basePrice: Number(this.price),
             durationMinutes: 30,
             requiresCollaborator: true,
@@ -247,6 +264,7 @@ export class QuickCreateDialogComponent {
             name,
             price: Number(this.price),
             barcode: this.barcode.trim() || undefined,
+            ...(this.activityId ? { activityId: this.activityId } : {}),
           }),
         );
       }

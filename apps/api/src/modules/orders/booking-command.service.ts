@@ -236,7 +236,11 @@ export class BookingCommandService {
           context.tenantId,
           tenant.timezone || "Europe/Rome",
           requests,
-          { publicOnly: context.source === "public", scope: context.scope },
+          {
+            publicOnly: context.source === "public",
+            scope: context.scope,
+            target: { locationId: input.locationId, sectorId: input.sectorId },
+          },
         );
         if (
           input.locationId &&
@@ -245,7 +249,7 @@ export class BookingCommandService {
           throw new BadRequestException("La sede non coincide con i servizi");
         if (input.sectorId && planned[0].service.sectorId !== input.sectorId)
           throw new BadRequestException(
-            "Il settore non coincide con il primo servizio",
+            "Il primo servizio non appartiene all'attività scelta in questa sede",
           );
         const customer = input.customerId
           ? await tx.customer.findFirst({

@@ -7,11 +7,12 @@ import {
   TemplateDraft,
   TemplatePreview,
 } from "../core/notification-templates-api.service";
+import { UiSelectComponent, type UiOption } from "@alora/ui";
 
 @Component({
   selector: "app-notification-template-editor",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UiSelectComponent],
   template: ` <section class="templates" aria-label="Template delle notifiche">
     <div class="heading">
       <div>
@@ -37,18 +38,16 @@ import {
     </p>
     <p *ngIf="feedback" role="status" class="feedback">{{ feedback }}</p>
     <ng-container *ngIf="templates.length">
-      <label class="field"
-        >Evento e canale<select
+      <div class="field">
+        <span>Evento e canale</span
+        ><ui-select
+          label="Evento e canale"
+          [options]="templateOptions"
           [ngModel]="selectedId"
           (ngModelChange)="select($event)"
           [disabled]="busy"
-        >
-          <option *ngFor="let item of templates" [value]="item.id">
-            {{ eventLabel(item.eventType) }} ·
-            {{ item.channel === "email" ? "Email" : "Nell’app" }}
-          </option>
-        </select></label
-      >
+        ></ui-select>
+      </div>
       <div *ngIf="selected as item" class="editor-grid">
         <form (ngSubmit)="showPreview()">
           <fieldset [disabled]="busy">
@@ -176,8 +175,10 @@ import {
         font-weight: 600;
         margin: 16px 0;
       }
+      .field ui-select {
+        font-weight: 400;
+      }
       .field input,
-      .field select,
       .field textarea {
         font: inherit;
         font-weight: 400;
@@ -282,6 +283,18 @@ export class NotificationTemplateEditorComponent {
     "collaborator.lastName",
     "tenant.name",
   ];
+  private templateOptionsSource: NotificationTemplateView[] | null = null;
+  private templateOptionsCache: UiOption[] = [];
+  get templateOptions(): UiOption[] {
+    if (this.templateOptionsSource !== this.templates) {
+      this.templateOptionsSource = this.templates;
+      this.templateOptionsCache = this.templates.map((item) => ({
+        value: item.id,
+        label: `${this.eventLabel(item.eventType)} · ${item.channel === "email" ? "Email" : "Nell’app"}`,
+      }));
+    }
+    return this.templateOptionsCache;
+  }
   get selected() {
     return this.templates.find((t) => t.id === this.selectedId);
   }

@@ -27,6 +27,26 @@ import { Component, Input } from "@angular/core";
         line-height: 1.15;
         letter-spacing: -0.035em;
       }
+      .name-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .pro {
+        display: inline-block;
+        border-radius: 0.4rem;
+        background: #c8f169;
+        color: #1e3425;
+        font-size: 0.68rem;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0.08em;
+        padding: 0.28rem 0.4rem;
+      }
+      :host(:not(.on-dark)) .pro {
+        background: #1e3425;
+        color: #c8f169;
+      }
       .signature {
         display: block;
         color: #58635a;
@@ -41,10 +61,15 @@ import { Component, Input } from "@angular/core";
       }
     `,
   ],
-  template: `<span class="identity" aria-label="alora by EULAB">
-    <span class="name">alora</span><span class="signature">by EULAB</span>
+  template: `<span class="identity" [attr.aria-label]="pro ? 'alora PRO by EULAB' : 'alora by EULAB'">
+    <span class="name-row"
+      ><span class="name">alora</span
+      >@if (pro) {<span class="pro" aria-hidden="true">PRO</span>}</span
+    ><span class="signature">by EULAB</span>
   </span>`,
 })
 export class AloraBrandComponent {
   @Input() onDark = false;
+  /** Every ALORA function is active for the signed-in profile. */
+  @Input() pro = false;
 }

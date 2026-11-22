@@ -48,19 +48,14 @@ export const ROLE_OPTIONS = [
   {
     id: "cash",
     name: "Cassa",
-    description: "Gestire conti, vendite e conti da chiudere.",
-    keys: ["sales.read", "sales.manage", "confirmations.read"],
+    description: "Vendere, chiudere i conti e registrare i pagamenti.",
+    keys: ["sales.read", "sales.manage"],
   },
   {
     id: "catalog",
     name: "Servizi e prodotti",
     description: "Consultare e modificare il catalogo del salone.",
-    keys: [
-      "services.read",
-      "services.manage",
-      "products.read",
-      "products.manage",
-    ],
+    keys: ["services.read", "services.manage"],
   },
   {
     id: "team",

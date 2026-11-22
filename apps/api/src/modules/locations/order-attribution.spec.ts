@@ -8,10 +8,11 @@ const scope: OperationalScope = {
   locationIds: ["location-a", "location-b"],
   cacheKey: "test",
 };
+// Activities: Barberia at both locations' first sector, Estetica only in A.
 const sectors = [
-  { id: "sector-a", locationId: "location-a" },
-  { id: "sector-other", locationId: "location-a" },
-  { id: "sector-b", locationId: "location-b" },
+  { id: "sector-a", locationId: "location-a", activityId: "barberia" },
+  { id: "sector-other", locationId: "location-a", activityId: "estetica" },
+  { id: "sector-b", locationId: "location-b", activityId: "colore" },
 ].map((sector) => ({
   ...sector,
   isActive: true,
@@ -21,10 +22,11 @@ const prisma = {
   sector: { findMany: async () => sectors },
   service: {
     findMany: async () => [
-      { id: "service-a", sectorId: "sector-a" },
-      { id: "service-b", sectorId: "sector-b" },
+      { id: "service-a", name: "Taglio", sectorId: "sector-a", activityId: "barberia" },
+      { id: "service-b", name: "Colore", sectorId: "sector-b", activityId: "colore" },
     ],
   },
+  product: { findMany: async () => [{ id: "product-a", activityId: "rivendita" }] },
   collaboratorSector: { count: async () => 1 },
 };
 const row: NormalizedOrderItem = {
@@ -46,7 +48,7 @@ describe("Order location and immutable row attribution", () => {
         [row, { ...row, serviceId: "service-b" }],
         [{}, {}],
       ),
-    ).rejects.toThrow("stessa sede");
+    ).rejects.toThrow("«Colore» non è disponibile in questa sede");
   });
   it("requires an explicit sector for an ambiguous product-only sale", async () => {
     const product = { ...row, serviceId: undefined, productId: "product-a" };
@@ -120,5 +122,36 @@ describe("Order location and immutable row attribution", () => {
     expect(result.locationId).toBe("location-a");
     expect(result.items[0].sectorId).toBe("sector-a");
     expect(result.items[0].lineTotal).toBe("0.10");
+  });
+});
+
+describe("Order attribution by activity", () => {
+  it("puts a service in its activity's sector at the account's location", async () => {
+    const result = await attributeOrder(
+      prisma as never,
+      scope,
+      [row],
+      [{}],
+      { locationId: "location-a" },
+    );
+    expect(result.items[0].sectorId).toBe("sector-a");
+  });
+
+  it("refuses a service whose activity does not run at the account's location", async () => {
+    await expect(
+      attributeOrder(prisma as never, scope, [row], [{}], { locationId: "location-b" }),
+    ).rejects.toThrow("«Taglio» non è disponibile in questa sede");
+  });
+
+  it("puts an unassigned product next to the account's service", async () => {
+    const product = { ...row, serviceId: undefined, productId: "product-a" };
+    const result = await attributeOrder(
+      prisma as never,
+      scope,
+      [row, product],
+      [{}, {}],
+      { locationId: "location-a" },
+    );
+    expect(result.items.map((item) => item.sectorId)).toEqual(["sector-a", "sector-a"]);
   });
 });

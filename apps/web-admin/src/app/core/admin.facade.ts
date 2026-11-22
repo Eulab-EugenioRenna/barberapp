@@ -56,7 +56,15 @@ export class AdminFacade {
     collaboratorStats: this.collaboratorStats(),
   }));
 
-  async refreshAll(revenueFilters: Record<string, string> = {}): Promise<{
+  /**
+   * With `onLateStats` (first load of a page) the call resolves as soon as the
+   * operational data is in; reports and the sales list follow and the callback
+   * runs when they land, so the screen is not held by the slowest report.
+   */
+  async refreshAll(
+    revenueFilters: Record<string, string> = {},
+    onLateStats?: () => void,
+  ): Promise<{
     mode: "platform" | "tenant" | "unauthenticated";
   }> {
     if (!this.sessionStore.isAuthenticated()) {
@@ -67,8 +75,11 @@ export class AdminFacade {
     this.feedback.set("");
 
     try {
-      const currentUser = await firstValueFrom(this.authApi.me());
-      this.sessionStore.setCurrentUser(currentUser);
+      let currentUser = this.sessionStore.freshUser();
+      if (!currentUser) {
+        currentUser = await firstValueFrom(this.authApi.me());
+        this.sessionStore.setCurrentUser(currentUser);
+      }
 
       if (currentUser?.role === "platform_admin") {
         const { tenants, plans, subscriptions }: any = await firstValueFrom(
@@ -81,6 +92,18 @@ export class AdminFacade {
       }
 
       const statsRequestId = ++this.statsRequestId;
+      if (onLateStats) {
+        const stats = firstValueFrom(
+          this.adminApi.loadAdminStatsData(revenueFilters).pipe(catchError(() => of(null))),
+        );
+        this.setCoreData(await firstValueFrom(this.adminApi.loadAdminCoreData()));
+        void stats.then((statsResponse) => {
+          if (!statsResponse || statsRequestId !== this.statsRequestId) return;
+          this.setStatsData(statsResponse);
+          onLateStats();
+        });
+        return { mode: "tenant" };
+      }
       const { coreResponse, statsResponse }: any = await firstValueFrom(
         forkJoin({
           coreResponse: this.adminApi.loadAdminCoreData(),
@@ -113,8 +136,11 @@ export class AdminFacade {
     this.feedback.set("");
 
     try {
-      const currentUser = await firstValueFrom(this.authApi.me());
-      this.sessionStore.setCurrentUser(currentUser);
+      let currentUser = this.sessionStore.freshUser();
+      if (!currentUser) {
+        currentUser = await firstValueFrom(this.authApi.me());
+        this.sessionStore.setCurrentUser(currentUser);
+      }
 
       if (currentUser?.role === "platform_admin") {
         const { tenants, plans, subscriptions }: any = await firstValueFrom(
@@ -176,10 +202,11 @@ export class AdminFacade {
 
   async refreshStatsData(
     revenueFilters: Record<string, string> = {},
+    includeLists = true,
   ): Promise<void> {
     const requestId = ++this.statsRequestId;
     const statsResponse: any = await firstValueFrom(
-      this.adminApi.loadAdminStatsData(revenueFilters),
+      this.adminApi.loadAdminStatsData(revenueFilters, includeLists),
     );
     if (requestId === this.statsRequestId) {
       this.setStatsData(statsResponse);
@@ -194,6 +221,7 @@ export class AdminFacade {
     this.collaboratorStats.set((statsResponse.revenue?.byCollaborator || []).map((row: any) => ({ collaboratorName: row.label, revenue: row.revenue })));
     this.serviceStats.set((statsResponse.revenue?.byService || []).map((row: any) => ({ serviceName: row.label, revenue: row.revenue, quantity: row.quantity })));
 
+    if (!("sales" in statsResponse)) return;
     const sales = unwrapPage(statsResponse.sales);
     this.sales.set(sales.items);
     this.salesHasMore.set(sales.hasMore);

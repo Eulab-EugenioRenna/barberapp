@@ -1,16 +1,16 @@
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { CustomSelectComponent } from "../custom-select.component";
+import { UiSelectComponent } from "@alora/ui";
 import { bookingModeLabel } from "../shared/presentation-copy";
 
 @Component({
   selector: "barber-admin-settings-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, CustomSelectComponent],
+  imports: [CommonModule, FormsModule, UiSelectComponent],
   template: `
     <section class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-      <article class="dark-panel rounded-[2rem] p-4 text-white sm:p-5">
+      <article class="dark-panel rounded-[2rem] p-4 text-white sm:p-5" data-tour="settings-preview">
         <p class="eyebrow text-white/45">Vetrina online</p>
         <h3 class="font-display text-2xl sm:text-3xl">Anteprima per i clienti</h3>
         <p class="mt-2 text-sm text-white/70 sm:mt-3">
@@ -163,14 +163,14 @@ import { bookingModeLabel } from "../shared/presentation-copy";
         <p class="eyebrow text-[var(--accent)]">Identità del salone</p>
         <h3 class="font-display text-2xl sm:text-3xl">Immagine e prenotazioni</h3>
         <form class="mt-4 grid gap-3 sm:mt-4 sm:gap-4" (ngSubmit)="save.emit()">
-          <label class="field"
+          <label class="field" data-tour="settings-name"
             ><span>Nome del salone o boutique <em class="required-mark" aria-hidden="true">*</em></span
             ><input
               [(ngModel)]="settingsForm.name"
               name="settingsName"
               required
           /></label>
-          <label class="field">
+          <label class="field" data-tour="settings-domain">
             <span>Indirizzo web per le prenotazioni</span>
             <input
               [(ngModel)]="settingsForm.publicDomain"
@@ -186,7 +186,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               >Apri la pagina clienti: {{ computedPublicUrl }}</a
             >
           </label>
-          <div class="field">
+          <div class="field" data-tour="settings-logo">
             <span>Logo</span>
             <input
               #logoInput
@@ -246,7 +246,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               {{ uploadFeedback?.message }}
             </div>
           </div>
-          <div class="field">
+          <div class="field" data-tour="settings-cover">
             <span>Immagine di copertina</span>
             <input
               #coverInput
@@ -308,7 +308,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               {{ uploadFeedback?.message }}
             </div>
           </div>
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2" data-tour="settings-colors">
             <label class="field"
               ><span>Colore principale</span
               ><input
@@ -324,16 +324,17 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 type="color"
             /></label>
           </div>
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
+          <div class="grid gap-3 sm:gap-4 md:grid-cols-2" data-tour="settings-booking-mode">
+            <div class="field">
               <span>Come accetti le prenotazioni</span>
-              <barber-custom-select
+              <ui-select
                 [value]="settingsForm.bookingMode"
                 (valueChange)="settingsForm.bookingMode = $event"
                 [options]="bookingModeOptions"
-              ></barber-custom-select>
+                label="Come accetti le prenotazioni"
+              ></ui-select>
               <small class="field-hint">Scegli se ricevere richieste online, inserirle dal salone o usare entrambe le modalità.</small>
-            </label>
+            </div>
             <label class="field"
               ><span>Titolo della pagina clienti</span
               ><input
@@ -342,7 +343,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 placeholder="Prenota online"
             /></label>
           </div>
-          <label class="field"
+          <label class="field" data-tour="settings-public-texts"
             ><span>Messaggio di benvenuto</span
             ><textarea
               [(ngModel)]="settingsForm.publicDescription"
@@ -362,7 +363,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               >Una riga per passaggio, nel formato Titolo|Descrizione</small
             >
           </label>
-          <div class="rounded-[1.4rem] border border-[var(--line)]/80 p-4">
+          <div class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-holidays">
             <div class="flex items-center justify-between gap-3">
               <div>
                 <p class="text-sm font-semibold">Chiusure del salone</p>
@@ -405,7 +406,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               </p>
             </div>
           </div>
-          <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4">
+          <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-ui-scale">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-sm font-semibold">Interfaccia</p>
@@ -432,7 +433,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               >
             </label>
           </section>
-          <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4">
+          <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-public-enabled">
             <p class="text-sm font-semibold">Prenotazioni online</p>
             <p class="mt-1 text-xs text-[var(--muted)]">
               Controlla se i clienti possono inviare prenotazioni dal link pubblico.
@@ -450,6 +451,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
           <button
             type="submit"
             class="primary-btn"
+            data-tour="settings-save"
             [disabled]="loading || !formValid"
           >
             Salva impostazioni
@@ -457,6 +459,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
           <button
             type="button"
             class="secondary-btn"
+            data-tour="settings-reset"
             [disabled]="loading"
             (click)="resetDefaults.emit()"
           >

@@ -12,7 +12,7 @@ type ExistingRow = {
 export async function attributeOrder(
   prisma: Pick<
     Prisma.TransactionClient,
-    "sector" | "service" | "appointment" | "collaboratorSector"
+    "sector" | "service" | "product" | "appointment" | "collaboratorSector"
   >,
   scope: OperationalScope,
   items: NormalizedOrderItem[],
@@ -34,6 +34,7 @@ export async function attributeOrder(
     select: {
       id: true,
       locationId: true,
+      activityId: true,
       isActive: true,
       location: { select: { isActive: true } },
     },
@@ -72,7 +73,16 @@ export async function attributeOrder(
         in: items.flatMap((item) => (item.serviceId ? [item.serviceId] : [])),
       },
     },
-    select: { id: true, sectorId: true },
+    select: { id: true, name: true, sectorId: true, activityId: true },
+  });
+  const products = await prisma.product.findMany({
+    where: {
+      tenantId: scope.tenantId,
+      id: {
+        in: items.flatMap((item) => (item.productId ? [item.productId] : [])),
+      },
+    },
+    select: { id: true, activityId: true },
   });
   if (!locationId) {
     const first = items.find((item) => item.serviceId);
@@ -84,7 +94,7 @@ export async function attributeOrder(
   if (!locationId || !scope.locationIds.includes(locationId))
     throw new BadRequestException("Seleziona la sede del conto");
   const used = new Set<string>();
-  const attributed = [];
+  const attributed: Array<NormalizedOrderItem & { id?: string; sectorId: string }> = [];
   for (const [index, item] of items.entries()) {
     const rowInput = input[index];
     let old =
@@ -120,15 +130,30 @@ export async function attributeOrder(
       booked && item.serviceId === booked.serviceId
         ? booked.sectorId
         : undefined;
-    const sectorId = retained
+    // A service is performed by its activity at the account's location.
+    const serviceSector = service
+      ? available.find((sector) => sector.activityId === service.activityId)
+      : undefined;
+    if (service && !retained && !bookedSectorId && !serviceSector)
+      throw new BadRequestException(
+        `«${service.name}» non è disponibile in questa sede: la sua attività non è attiva qui`,
+      );
+    // A product goes to its activity here if it runs here, otherwise to the
+    // activity chosen for the line, or to the only one of the location.
+    const product = products.find((row) => row.id === item.productId);
+    const productSector = product
+      ? available.find((sector) => sector.activityId === product.activityId)
+      : undefined;
+    const sectorId: string = retained
       ? old!.sectorId
       : bookedSectorId ||
-        service?.sectorId ||
-        (typeof rowInput["sectorId"] === "string"
+        serviceSector?.id ||
+        (typeof rowInput["sectorId"] === "string" && rowInput["sectorId"]
           ? rowInput["sectorId"]
-          : available.length === 1
-            ? available[0].id
-            : "");
+          : productSector?.id ||
+            (available.length === 1 ? available[0].id : "") ||
+            attributed.find((row) => row.serviceId)?.sectorId ||
+            "");
     const sector = available.find((sector) => sector.id === sectorId);
     if (
       !sector ||
@@ -143,7 +168,7 @@ export async function attributeOrder(
       service &&
       !retained &&
       rowInput["sectorId"] &&
-      rowInput["sectorId"] !== (bookedSectorId || service.sectorId)
+      rowInput["sectorId"] !== (bookedSectorId || serviceSector?.id)
     )
       throw new BadRequestException("Il settore del servizio non coincide");
     if (

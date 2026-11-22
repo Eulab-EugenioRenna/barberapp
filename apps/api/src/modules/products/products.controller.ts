@@ -28,6 +28,7 @@ import {
 } from "../../common/request-session";
 import { buildPaginatedResult, parsePagination } from "../../common/pagination";
 import { normalizeBarcode } from "../../common/barcode-validation";
+import { resolveProductActivity } from "../locations/activity-sectors";
 
 @Controller("products")
 export class ProductsController {
@@ -54,7 +55,7 @@ export class ProductsController {
     });
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.productsList(tenantId)}:p${page}:s${pageSize}`,
+      `${cacheKeys.productsList(tenantId)}:activity-v1:p${page}:s${pageSize}`,
       CACHE_TTL_SECONDS.lists,
       async () => {
         const [items, total] = await Promise.all([
@@ -63,6 +64,7 @@ export class ProductsController {
             orderBy: [{ isActive: "desc" }, { name: "asc" }],
             skip,
             take,
+            include: { activity: { select: { id: true, name: true } } },
           }),
           this.prisma.product.count({ where: { tenantId } }),
         ]);
@@ -104,6 +106,8 @@ export class ProductsController {
         "Serve la gestione magazzino per configurare il tracciamento",
       );
     const tenantId = requireTenantId(session);
+    // Default «Rivendita» (database) when no activity is chosen.
+    const activityId = await resolveProductActivity(this.prisma, tenantId, body["activityId"]);
     let created;
     try {
       created = await this.pricing.write(
@@ -114,6 +118,7 @@ export class ProductsController {
           tx.product.create({
             data: {
               tenantId,
+              ...(activityId ? { activityId } : {}),
               isActive:
                 typeof body["isActive"] === "boolean"
                   ? body["isActive"]
@@ -202,6 +207,7 @@ export class ProductsController {
         "Serve la gestione magazzino per configurare il tracciamento",
       );
     const tenantId = requireTenantId(session);
+    const activityId = await resolveProductActivity(this.prisma, tenantId, body["activityId"]);
     let updated;
     try {
       updated = await this.pricing.write(
@@ -216,6 +222,7 @@ export class ProductsController {
           return tx.product.update({
             where: { id, tenantId },
             data: {
+              ...(activityId ? { activityId } : {}),
               name: typeof body["name"] === "string" ? body["name"] : undefined,
               description:
                 typeof body["description"] === "string"

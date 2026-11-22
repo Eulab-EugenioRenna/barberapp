@@ -224,7 +224,8 @@
 .cart-line-fields .cart-nonperformance {
   grid-column: 1 / -1;
 }
-.cart-line-fields label {
+.cart-line-fields label,
+.cart-line-fields .cart-field {
   display: grid;
   min-width: 0;
   gap: 0.35rem;
@@ -464,4 +465,34 @@
   font-weight: 600;
   margin-bottom: var(--space-md);
   font-size: 0.85rem;
+}
+
+.performed-at small {
+  display: block;
+  margin-top: 0.25rem;
+}
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+.schedule-warnings {
+  margin: 0;
+  padding: 0.6rem 0.8rem 0.6rem 1.6rem;
+  border: 0.0625rem solid #f2c46d;
+  border-radius: 0.9rem;
+  background: #fff8e6;
+  color: #7a4b00;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.schedule-warnings-note {
+  list-style: none;
+  margin-left: -0.8rem;
+  margin-top: 0.25rem;
+  font-weight: 600;
 }

@@ -47,6 +47,8 @@ export class AppointmentsService {
     return firstValueFrom(
       this.adminApi.createAppointment({
         ...common,
+        // Services are performed by their activity at this location.
+        ...(form.locationId ? { locationId: form.locationId } : {}),
         lines: [{ serviceId, collaboratorId }, ...additionalLines],
       }),
     );

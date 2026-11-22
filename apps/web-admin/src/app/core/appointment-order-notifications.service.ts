@@ -16,9 +16,11 @@ export class AppointmentOrderNotificationsService {
   private controller: AbortController | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private activeToken = "";
+  /** Consecutive failures, for exponential backoff (3s, 6s, … 60s). */
+  private failures = 0;
 
   connect(token: string): void {
-    if (!token || !this.store.can("confirmations.read")) {
+    if (!token || !this.store.can("sales.read")) {
       this.stop();
       return;
     }
@@ -73,10 +75,16 @@ export class AppointmentOrderNotificationsService {
         },
         signal: controller.signal,
       });
+      if (response.status === 401 || response.status === 403) {
+        // Expired or revoked session: renew once, never loop on rejected credentials.
+        await this.handleRejected(controller, response.status);
+        return;
+      }
       if (!response.ok || !response.body) {
         throw new Error(`SSE connection failed (${response.status})`);
       }
 
+      this.failures = 0;
       this.connected.set(true);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -104,13 +112,34 @@ export class AppointmentOrderNotificationsService {
       }
       this.controller = null;
       this.connected.set(false);
-      if (!controller.signal.aborted && this.activeToken === token) {
-        this.reconnectTimer = setTimeout(
-          () => this.connect(this.store.token()),
-          3_000,
-        );
+      if (!controller.signal.aborted && this.activeToken === token && this.store.token()) {
+        const delay = Math.min(60_000, 3_000 * 2 ** this.failures);
+        this.failures++;
+        this.reconnectTimer = setTimeout(() => this.connect(this.store.token()), delay);
       }
     }
+  }
+
+  private async handleRejected(controller: AbortController, status: number): Promise<void> {
+    const previous = this.store.token();
+    if (status === 401 && this.store.refreshToken()) {
+      try {
+        await firstValueFrom(this.refresh.refresh(true));
+      } catch {
+        // refresh() clears the session on definitive failures.
+      }
+    }
+    if (controller.signal.aborted || this.controller !== controller) return;
+    const renewed = this.store.token();
+    this.controller = null;
+    if (status === 401 && renewed && renewed !== previous) {
+      // New credentials: reconnect once, immediately.
+      this.activeToken = "";
+      this.connect(renewed);
+      return;
+    }
+    // Still rejected: stop. The shell sends the user to login when the session is gone.
+    this.stop(false);
   }
 
   private applyFrame(frame: string): void {

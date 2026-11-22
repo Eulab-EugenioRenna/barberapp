@@ -10,6 +10,8 @@ import {
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
+import { UiPageComponent, UiSelectComponent, type UiOption } from "@alora/ui";
+import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { HttpClient } from "@angular/common/http";
 import { firstValueFrom } from "rxjs";
 import { SessionStore } from "../core/session.store";
@@ -20,24 +22,30 @@ import { AdminApiService } from "../core/admin-api.service";
 
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
-  template: ` <main class="inventory-shell">
-    <header class="page-heading">
-      <div>
-        <p class="eyebrow">Prodotti e risorse</p>
-        <h1>Magazzino</h1>
-        <p>Quantità e valore, una sede alla volta.</p>
-      </div>
-      <nav>
-        <a
-          *ngIf="session.can('products.read') || session.can('services.read')"
-          routerLink="/services"
-          class="pill-btn"
-          >Listino e prezzi</a
-        ><a routerLink="/appointments" class="pill-btn">Agenda</a>
-      </nav>
-    </header>
-    <label *ngIf="session.can('inventory.read')" class="field">
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    UiPageComponent,
+    UiSelectComponent,
+    AdminPageHeaderComponent,
+  ],
+  template: ` <ui-page class="inventory-shell">
+    <alora-page-header navKey="inventory">
+      <a
+        uiPageActions
+        *ngIf="session.can('services.read')"
+        routerLink="/services"
+        data-tour="inventory-catalog-link"
+        class="secondary-btn"
+        >Anagrafica prodotti nel Listino</a
+      >
+    </alora-page-header>
+    <label
+      *ngIf="session.can('inventory.read')"
+      class="field"
+      data-tour="inventory-barcode"
+    >
       <span>Scansiona o inserisci un barcode e premi Invio</span>
       <input
         #barcodeInput
@@ -53,25 +61,29 @@ import { AdminApiService } from "../core/admin-api.service";
     </label>
     <p *ngIf="scanFeedback" role="status" [class]="scanFeedbackKind">
       {{ scanFeedback }}
+      <a
+        *ngIf="unknownBarcode && session.can('services.manage')"
+        routerLink="/services"
+        [queryParams]="{ barcode: unknownBarcode }"
+        class="scan-create"
+        >Crea il prodotto con questo barcode</a
+      >
     </p>
     <p *ngIf="!session.can('inventory.read')" class="notice">
       La consultazione del magazzino non è abilitata.
     </p>
     <ng-container *ngIf="session.can('inventory.read')">
       <section class="panel context-panel">
-        <label
-          >Sede<select
-            aria-label="Sede"
+        <div class="select-field" data-tour="inventory-location">
+          Sede<ui-select
+            label="Sede"
+            placeholder="Scegli una sede"
+            [options]="locationOptions"
             [(ngModel)]="locationId"
             (ngModelChange)="changeLocation()"
             [disabled]="busy || attempted"
-          >
-            <option value="">Scegli una sede</option>
-            <option *ngFor="let loc of context.locations()" [value]="loc.id">
-              {{ loc.name }}
-            </option>
-          </select></label
-        >
+          ></ui-select>
+        </div>
         <div>
           <strong>{{ rows.length }}</strong
           ><span>prodotti tracciati</span>
@@ -82,6 +94,7 @@ import { AdminApiService } from "../core/admin-api.service";
         </div>
         <button
           class="pill-btn"
+          data-tour="inventory-refresh"
           (click)="load()"
           [disabled]="busy || !locationId"
         >
@@ -94,7 +107,7 @@ import { AdminApiService } from "../core/admin-api.service";
         <section class="panel balances">
           <div class="section-heading">
             <h2>Giacenze</h2>
-            <label class="search"
+            <label class="search" data-tour="inventory-search"
               >Cerca prodotto<input
                 [(ngModel)]="query"
                 type="search"
@@ -105,7 +118,7 @@ import { AdminApiService } from "../core/admin-api.service";
             Nessun prodotto tracciato. Abilita il tracciamento dal listino; poi
             registra l'inventario iniziale.
           </p>
-          <div class="stock-list" #stockList>
+          <div class="stock-list" #stockList data-tour="inventory-stock-list">
             <button
               *ngFor="let row of filteredRows"
               type="button"
@@ -136,6 +149,7 @@ import { AdminApiService } from "../core/admin-api.service";
         </section>
         <section
           class="panel operation-panel"
+          data-tour="inventory-operation"
           *ngIf="session.can('inventory.manage') && selectedProduct"
         >
           <div class="section-heading">
@@ -146,25 +160,16 @@ import { AdminApiService } from "../core/admin-api.service";
           </div>
           <form (ngSubmit)="submit()">
             <fieldset [disabled]="busy || attempted">
-              <label
-                >Operazione<select
-                  aria-label="Operazione"
+              <div class="select-field">
+                <span>Operazione</span
+                ><ui-select
+                  label="Operazione"
+                  [options]="kindOptions"
+                  [filterable]="false"
                   [(ngModel)]="form.kind"
                   name="kind"
-                >
-                  <option
-                    value="opening"
-                    [disabled]="selectedProduct.initialized"
-                  >
-                    Inventario iniziale
-                  </option>
-                  <option value="receipt">Carico acquisto</option>
-                  <option value="issue">Scarico interno</option>
-                  <option value="adjust">Rettifica inventario</option>
-                  <option value="transfer">Trasferimento</option>
-                  <option value="return">Reso da scarico</option>
-                </select></label
-              >
+                ></ui-select>
+              </div>
               <p class="hint" *ngIf="form.kind === 'opening'">
                 Inserisci la quantità contata e il costo unitario netto. Non
                 vengono ricostruiti acquisti o IVA passati.
@@ -202,15 +207,16 @@ import { AdminApiService } from "../core/admin-api.service";
                   [(ngModel)]="form.unitCost"
               /></label>
               <div class="two-fields" *ngIf="form.kind === 'receipt'">
-                <label
-                  >Modalità costo<select
-                    aria-label="Modalità costo"
+                <div class="select-field">
+                  <span>Modalità costo</span
+                  ><ui-select
+                    label="Modalità costo"
                     name="costMode"
+                    [options]="costModeOptions"
+                    [filterable]="false"
                     [(ngModel)]="form.costMode"
-                  >
-                    <option value="net">IVA esclusa</option>
-                    <option value="gross">IVA inclusa</option>
-                  </select></label
+                  ></ui-select>
+                </div
                 ><label
                   >IVA acquisto (%)<input
                     name="purchaseVatRate"
@@ -222,34 +228,28 @@ import { AdminApiService } from "../core/admin-api.service";
                     required
                 /></label>
               </div>
-              <label *ngIf="form.kind === 'transfer'"
-                >Sede di destinazione<select
-                  aria-label="Sede di destinazione"
+              <div *ngIf="form.kind === 'transfer'" class="select-field">
+                <span>Sede di destinazione</span
+                ><ui-select
+                  label="Sede di destinazione"
+                  placeholder="Scegli la sede"
                   name="toLocation"
+                  [options]="destinationOptions"
                   [(ngModel)]="form.toLocationId"
                   required
-                >
-                  <option value="">Scegli la sede</option>
-                  <option *ngFor="let loc of destinations" [value]="loc.id">
-                    {{ loc.name }}
-                  </option>
-                </select></label
-              >
-              <label *ngIf="form.kind === 'return'"
-                >Scarico da restituire<select
-                  aria-label="Scarico da restituire"
+                ></ui-select>
+              </div>
+              <div *ngIf="form.kind === 'return'" class="select-field">
+                <span>Scarico da restituire</span
+                ><ui-select
+                  label="Scarico da restituire"
+                  placeholder="Scegli il movimento"
                   name="returnOf"
+                  [options]="returnableOptions"
                   [(ngModel)]="form.returnOfId"
                   required
-                >
-                  <option value="">Scegli il movimento</option>
-                  <option *ngFor="let row of returnable" [value]="row.id">
-                    {{ row.createdAt | date: "dd/MM/yyyy HH:mm" }} ·
-                    {{ label(row.kind) }} ·
-                    {{ number(row.returnableQuantity, 3) }}
-                  </option>
-                </select></label
-              >
+                ></ui-select>
+              </div>
               <label
                 >Motivo<textarea
                   [(ngModel)]="form.reason"
@@ -286,7 +286,11 @@ import { AdminApiService } from "../core/admin-api.service";
           </form>
         </section>
       </div>
-      <section class="panel movements" *ngIf="selectedProduct">
+      <section
+        class="panel movements"
+        *ngIf="selectedProduct"
+        data-tour="inventory-movements"
+      >
         <div class="section-heading">
           <div>
             <p class="eyebrow">Registro movimenti</p>
@@ -303,7 +307,7 @@ import { AdminApiService } from "../core/admin-api.service";
         </div>
         <p class="hint">
           La giacenza è dell’intera sede. Il registro mostra i movimenti
-          generali e quelli dei settori autorizzati nel contesto scelto.
+          generali e quelli delle attività autorizzate nel contesto scelto.
         </p>
         <p *ngIf="!movements.length" class="empty">
           Nessun movimento registrato per questo prodotto nella sede.
@@ -344,25 +348,14 @@ import { AdminApiService } from "../core/admin-api.service";
         </button>
       </section>
     </ng-container>
-  </main>`,
+  </ui-page>`,
   styles: [
     `
       :host {
         display: block;
-        background: var(--page);
-        min-height: 100vh;
       }
       .inventory-shell {
-        max-width: 1380px;
-        margin: auto;
-        padding: clamp(var(--space-xs), 3vw, var(--space-3xl));
         color: var(--ink);
-      }
-      h1 {
-        font-family: var(--font-display, serif);
-        font-size: clamp(2.5rem, 4vw, 4rem);
-        line-height: 1.1;
-        margin: var(--space-2xs) 0 var(--space-xs);
       }
       h2 {
         font-size: 1.2rem;
@@ -372,7 +365,6 @@ import { AdminApiService } from "../core/admin-api.service";
         color: var(--muted);
         font-size: 0.9rem;
       }
-      .page-heading,
       .section-heading,
       nav,
       .form-actions {
@@ -381,9 +373,6 @@ import { AdminApiService } from "../core/admin-api.service";
         justify-content: space-between;
         gap: var(--space-md);
         flex-wrap: wrap;
-      }
-      .page-heading {
-        margin-bottom: var(--space-xl);
       }
       nav {
         justify-content: flex-end;
@@ -401,7 +390,7 @@ import { AdminApiService } from "../core/admin-api.service";
         flex-wrap: wrap;
         margin-bottom: var(--space-md);
       }
-      .context-panel label {
+      .context-panel .select-field {
         min-width: 16rem;
       }
       .context-panel > div {
@@ -478,7 +467,6 @@ import { AdminApiService } from "../core/admin-api.service";
         color: #c0dc7c;
       }
       .operation-panel input,
-      .operation-panel select,
       .operation-panel textarea {
         background: #fff;
         color: #24392b;
@@ -496,14 +484,17 @@ import { AdminApiService } from "../core/admin-api.service";
         border: 0;
         min-width: 0;
       }
-      label {
+      label,
+      .select-field {
         display: grid;
         gap: var(--space-2xs);
         font-size: 0.8rem;
         font-weight: 650;
       }
+      ui-select {
+        font-weight: 400;
+      }
       input,
-      select,
       textarea {
         min-width: 0;
         width: 100%;
@@ -561,6 +552,11 @@ import { AdminApiService } from "../core/admin-api.service";
         font-weight: 600;
         margin-bottom: var(--space-md);
       }
+      .scan-create {
+        margin-left: 0.5rem;
+        font-weight: 700;
+        text-decoration: underline;
+      }
       .movements {
         margin-top: var(--space-lg);
       }
@@ -617,7 +613,7 @@ import { AdminApiService } from "../core/admin-api.service";
         .context-panel {
           gap: 1rem;
         }
-        .context-panel label {
+        .context-panel .select-field {
           min-width: 0;
           width: 100%;
         }
@@ -669,6 +665,8 @@ export class InventoryComponent implements OnInit, OnDestroy {
   hasMore = false;
   scanFeedback = "";
   scanFeedbackKind: "ok" | "error" | "info" = "ok";
+  /** Last scanned code with no product: offered for creation in the catalogue. */
+  unknownBarcode = "";
   private page = 1;
   private generation = 0;
   private snapshot: any = null;
@@ -691,7 +689,8 @@ export class InventoryComponent implements OnInit, OnDestroy {
   get filteredRows() {
     const q = this.query.trim().toLowerCase();
     return this.rows.filter(
-      (row) => !q || `${row.name} ${row.sku ?? ""}`.toLowerCase().includes(q),
+      (row) =>
+        !q || `${row.name} ${row.sku ?? ""} ${row.barcode ?? ""}`.toLowerCase().includes(q),
     );
   }
   get selectedProduct() {
@@ -710,6 +709,72 @@ export class InventoryComponent implements OnInit, OnDestroy {
       (row) =>
         Number(row.returnableQuantity) > 0 && row.kind !== "transfer_out",
     );
+  }
+  readonly costModeOptions: UiOption[] = [
+    { value: "net", label: "IVA esclusa" },
+    { value: "gross", label: "IVA inclusa" },
+  ];
+  private readonly optionCache = new Map<
+    string,
+    { deps: unknown[]; options: UiOption[] }
+  >();
+  /** Rebuilds an option list only when one of its inputs changes identity. */
+  private cachedOptions(
+    slot: string,
+    deps: unknown[],
+    build: () => UiOption[],
+  ): UiOption[] {
+    const cached = this.optionCache.get(slot);
+    if (
+      cached &&
+      cached.deps.length === deps.length &&
+      cached.deps.every((dep, index) => dep === deps[index])
+    )
+      return cached.options;
+    const options = build();
+    this.optionCache.set(slot, { deps, options });
+    return options;
+  }
+  get locationOptions(): UiOption[] {
+    const locations = this.context.locations();
+    return this.cachedOptions("locations", [locations], () =>
+      locations.map((loc) => ({ value: loc.id, label: loc.name })),
+    );
+  }
+  get kindOptions(): UiOption[] {
+    const initialized = !!this.selectedProduct?.initialized;
+    return this.cachedOptions("kinds", [initialized], () => [
+      { value: "opening", label: "Inventario iniziale", disabled: initialized },
+      { value: "receipt", label: "Carico acquisto" },
+      { value: "issue", label: "Scarico interno" },
+      { value: "adjust", label: "Rettifica inventario" },
+      { value: "transfer", label: "Trasferimento" },
+      { value: "return", label: "Reso da scarico" },
+    ]);
+  }
+  get destinationOptions(): UiOption[] {
+    return this.cachedOptions(
+      "destinations",
+      [this.context.locations(), this.locationId],
+      () =>
+        this.destinations.map((loc) => ({ value: loc.id, label: loc.name })),
+    );
+  }
+  get returnableOptions(): UiOption[] {
+    return this.cachedOptions("returnable", [this.movements], () =>
+      this.returnable.map((row) => ({
+        value: row.id,
+        label: `${this.dateTime(row.createdAt)} · ${this.label(row.kind)} · ${this.number(row.returnableQuantity, 3)}`,
+      })),
+    );
+  }
+  /** Same output as the `date: "dd/MM/yyyy HH:mm"` pipe (local time). */
+  private dateTime(value: string | Date | null | undefined): string {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
   number(value: unknown, digits: number) {
     return Number(value).toLocaleString("it-IT", {
@@ -791,6 +856,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
   private async handleScannedBarcode(barcode: string): Promise<void> {
     if (this.destroyed || this.busy || this.attempted || this.loading) return;
     this.scanFeedback = "";
+    this.unknownBarcode = "";
     if (!this.locationId) {
       this.showScanFeedback("error", "Seleziona una sede prima di scansionare");
       return;
@@ -808,20 +874,36 @@ export class InventoryComponent implements OnInit, OnDestroy {
       )
         return;
       if (!product?.id) {
+        this.unknownBarcode = barcode;
         this.showScanFeedback(
           "info",
-          "Prodotto non trovato per questo barcode",
+          "Prodotto non trovato per questo barcode.",
         );
         return;
       }
       if (!this.rows.some((row) => row.id === product.id)) {
         this.showScanFeedback(
           "info",
-          "Prodotto non disponibile nel magazzino della sede selezionata",
+          product.stockTracked === false
+            ? `${product.name} non è tracciato a magazzino: attiva «Traccia le giacenze per sede» nella sua scheda del Listino.`
+            : "Prodotto non disponibile nel magazzino della sede selezionata",
         );
         return;
       }
+      // Loading goods: scanning the same item again counts one more piece.
+      if (
+        this.productId === product.id &&
+        this.form.kind !== "adjust" &&
+        this.form.quantity !== ""
+      ) {
+        const next = Number(this.form.quantity || 0) + 1;
+        this.form.quantity = String(next);
+        this.showScanFeedback("ok", `${product.name}: quantità ${next}`);
+        this.changeDetector.detectChanges();
+        return;
+      }
       await this.selectProduct(product.id);
+      if (this.form.kind !== "adjust") this.form.quantity = "1";
       if (
         this.destroyed ||
         locationId !== this.locationId ||
@@ -833,10 +915,11 @@ export class InventoryComponent implements OnInit, OnDestroy {
       this.movementQuantity?.nativeElement.focus();
     } catch (error: any) {
       if (this.destroyed || locationId !== this.locationId) return;
+      if (error?.status === 404) this.unknownBarcode = barcode;
       this.showScanFeedback(
         error?.status === 404 ? "info" : "error",
         error?.status === 404
-          ? "Prodotto non trovato per questo barcode"
+          ? "Prodotto non trovato per questo barcode."
           : error?.status === 0
             ? "Rete assente. Riprova la scansione quando la connessione è disponibile."
             : error?.error?.message || "Scansione non riuscita. Riprova.",

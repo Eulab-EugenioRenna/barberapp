@@ -6,6 +6,7 @@ import { ADMIN_API_URL } from "../core/api-config";
 import { AdminApiService } from "../core/admin-api.service";
 import { OperationalContextService } from "../core/operational-context.service";
 import { SectorPickerComponent } from "../shared/sector-picker.component";
+import { offeredAt, sectorForActivity } from "../core/activity-placement";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { SessionStore } from "../core/session.store";
 import { CommonModule } from "@angular/common";
@@ -23,7 +24,7 @@ import {
   ElementRef,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { CustomSelectComponent } from "../custom-select.component";
+import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
 import {
   QuickCreateDialogComponent,
   QuickCreateKind,
@@ -40,7 +41,7 @@ import { BarcodeScannerService } from "../core/barcode-scanner.service";
     SectorPickerComponent,
     CommonModule,
     FormsModule,
-    CustomSelectComponent,
+    UiSelectComponent,
     QuickCreateDialogComponent,
     AutofocusFirstDirective,
   ],
@@ -92,6 +93,8 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
 
   customerId = "";
   appointmentId = "";
+  /** "Eseguito il / alle" (datetime-local); empty = the services end now. */
+  performedAt = "";
   paymentPending = false;
   paymentMethod = "cash";
   paymentStatus = "paid";
@@ -177,6 +180,37 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     this.online = false;
   }
 
+  readonly priceModeOptions: UiOption[] = [
+    { value: "legacy", label: "Valore storico" },
+    { value: "net", label: "IVA esclusa" },
+    { value: "gross", label: "IVA inclusa" },
+  ];
+  readonly paymentMethodOptions: UiOption[] = [
+    { value: "cash", label: "Contanti" },
+    { value: "card", label: "Carta" },
+    { value: "bank", label: "Bonifico ricevuto" },
+    { value: "other", label: "Altro" },
+  ];
+  readonly paymentStatusOptions: UiOption[] = [
+    { value: "paid", label: "Pagato" },
+    { value: "unpaid", label: "Da pagare" },
+  ];
+  private locationOptionsSource: unknown;
+  private locationOptionsCache: UiOption[] = [];
+  /** Rebuilt only when the operational context publishes a new list. */
+  get locationOptions(): UiOption[] {
+    const locations = this.context.locations();
+    if (locations !== this.locationOptionsSource) {
+      this.locationOptionsSource = locations;
+      this.locationOptionsCache = uiOptions(
+        locations,
+        (location) => location.id,
+        (location) => location.name,
+      );
+    }
+    return this.locationOptionsCache;
+  }
+
   get customerOptions() {
     const selectedCustomer = this.sale?.customer || this.appointment?.customer;
     return this.uniqueEntities([
@@ -189,11 +223,54 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     }));
   }
 
+  /** Sector of the service's activity at the account's location. */
+  private serviceSectorId(service: any): string {
+    return (
+      sectorForActivity(this.context.sectors, service?.activityId, this.locationId)?.id ||
+      service?.sectorId ||
+      ""
+    );
+  }
+
+  /**
+   * Another location runs other activities: new lines move to its sectors and
+   * services it does not offer leave the account (with a notice).
+   */
+  changeLocation(locationId: string): void {
+    if (locationId === this.locationId) return;
+    this.locationId = locationId;
+    const removed: string[] = [];
+    this.items = this.items.filter((item) => {
+      if (item.id) return true;
+      if (item.kind === "service") {
+        const service = this.catalogServices.find((row) => row.id === item.serviceId) ||
+          this.services.find((row) => row.id === item.serviceId);
+        if (service && !offeredAt(this.context.sectors, service, locationId)) {
+          removed.push(item.label);
+          return false;
+        }
+        item.sectorId = this.serviceSectorId(service);
+        return true;
+      }
+      const product = this.catalogProducts.find((row) => row.id === item.productId);
+      item.sectorId =
+        sectorForActivity(this.context.sectors, product?.activityId, locationId)?.id || "";
+      return true;
+    });
+    if (removed.length)
+      this.showScanFeedback(
+        "info",
+        `Tolti dal conto perché non previsti in questa sede: ${removed.join(", ")}`,
+      );
+    this.queueQuote();
+  }
+
   collaboratorOptionsFor(item: any) {
     const sectorId =
       item.sectorId ||
-      this.catalogServices.find((service) => service.id === item.serviceId)
-        ?.sectorId;
+      this.serviceSectorId(
+        this.catalogServices.find((service) => service.id === item.serviceId),
+      );
     const eligible = new Set(
       this.collaborators
         .filter(
@@ -255,11 +332,8 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     ]).filter(
       (service) =>
         service.isActive !== false &&
-        (!this.locationId ||
-          (service.sector?.locationId ||
-            this.context.sectors.find(
-              (sector) => sector.id === service.sectorId,
-            )?.locationId) === this.locationId),
+        // Only services whose activity runs at this location can be chosen.
+        offeredAt(this.context.sectors, service, this.locationId),
     );
   }
   get catalogProducts(): any[] {
@@ -390,6 +464,10 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
             saleId: this.sale?.id,
             items: this.itemPayload(),
             orderDiscount: String(this.orderDiscount || 0),
+            // Warnings (overlaps, hours) are computed on the actual slot.
+            servicesStartAt: this.hasNewServices
+              ? this.servicesStartAt().toISOString()
+              : undefined,
           }),
         );
         if (generation === this.quoteGeneration) this.quote = result;
@@ -420,19 +498,64 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
    * inizia indietro della durata totale dei servizi, cosi il calendario
    * racconta una storia realistica invece di un blocco a orario fisso.
    */
+  /** Service lines not yet in the agenda: confirming creates their appointment. */
+  get newServiceItems(): any[] {
+    return this.items.filter((item) => item.kind === "service" && !item.booking);
+  }
+
+  get hasNewServices(): boolean {
+    return this.newServiceItems.length > 0;
+  }
+
+  get newServiceDurationMinutes(): number {
+    return this.newServiceItems.reduce((sum, item) => {
+      const service =
+        this.services.find((entry) => entry.id === item.serviceId) ??
+        this.createdServices.find((entry) => entry.id === item.serviceId);
+      return sum + Number(service?.durationMinutes || 0);
+    }, 0);
+  }
+
+  /** Start of the first new service: the chosen time, or "ending now". */
+  servicesStartAt(): Date {
+    if (this.performedAt) return new Date(this.performedAt);
+    return new Date(Date.now() - this.newServiceDurationMinutes * 60_000);
+  }
+
+  get performedAtMax(): string {
+    return toLocalInput(new Date());
+  }
+
+  get performedAtError(): string {
+    if (!this.performedAt) return "";
+    const value = new Date(this.performedAt);
+    if (Number.isNaN(value.getTime())) return "Orario non valido";
+    if (value.getTime() > Date.now() + 5 * 60_000)
+      return "La cassa registra servizi già eseguiti: per un orario futuro usa «Prenota».";
+    return "";
+  }
+
+  get scheduleWarnings(): string[] {
+    return (this.quote?.warnings ?? []).map((warning: any) => warning.message);
+  }
+
+  setPerformedAt(value: string): void {
+    this.performedAt = value;
+    this.queueQuote();
+  }
+
   get appointmentWindowLabel(): string {
-    const durationMinutes = this.totalServiceDurationMinutes;
+    const durationMinutes = this.newServiceDurationMinutes;
     if (!durationMinutes) return "";
-
-    const endsAt = new Date();
-    const startsAt = new Date(endsAt.getTime() - durationMinutes * 60_000);
-    const format = (value: Date) =>
-      value.toLocaleTimeString("it-IT", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-    return `${format(startsAt)} – ${format(endsAt)}`;
+    const startsAt = this.servicesStartAt();
+    const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
+    const time = (value: Date) =>
+      value.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+    const sameDay = startsAt.toDateString() === new Date().toDateString();
+    const day = sameDay
+      ? "oggi"
+      : startsAt.toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "2-digit" });
+    return `${day}, ${time(startsAt)} – ${time(endsAt)}`;
   }
 
   get isLinkedToAppointment(): boolean {
@@ -455,7 +578,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       serviceId: service.id,
       label: service.name,
       quantity: 1,
-      sectorId: service.sectorId,
+      sectorId: this.serviceSectorId(service),
       unitPrice: Number(service.basePrice || 0),
       priceMode: service.priceMode || "legacy",
       vatRate: service.vatRate ?? "",
@@ -475,6 +598,9 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       productId: product.id,
       label: product.name,
       quantity: 1,
+      // Its own activity here if it runs here; otherwise chosen on the line.
+      sectorId:
+        sectorForActivity(this.context.sectors, product.activityId, this.locationId)?.id || "",
       unitPrice: requiresPrice ? "" : Number(product.price),
       priceMode: product.priceMode || "legacy",
       vatRate: product.vatRate ?? "",
@@ -500,7 +626,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   }
 
   private async unknownBarcode(barcode: string): Promise<void> {
-    if (!this.session.can("products.manage")) {
+    if (!this.session.can("services.manage")) {
       this.showScanFeedback(
         "info",
         "Prodotto non trovato. Chiedi a chi gestisce il listino di associarlo.",
@@ -682,6 +808,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   canSubmit(keepOpen = false): boolean {
     return Boolean(
       this.sale?.orderStatus !== "cancelled" &&
+      !this.performedAtError &&
       !this.paymentPending &&
       this.writeState.kind === "empty" &&
       this.quote &&
@@ -733,6 +860,14 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
           }),
       orderDiscount: String(this.orderDiscount || 0),
       items: this.itemPayload(),
+      ...(this.hasNewServices && this.performedAt
+        ? { servicesStartAt: new Date(this.performedAt).toISOString() }
+        : {}),
     });
   }
+}
+
+function toLocalInput(value: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }

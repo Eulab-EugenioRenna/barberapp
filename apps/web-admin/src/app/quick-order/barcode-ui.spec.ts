@@ -19,6 +19,14 @@ jest.mock("@angular/common", () => ({ CommonModule: {} }));
 jest.mock("@angular/common/http", () => ({ HttpClient: class {} }));
 jest.mock("@angular/forms", () => ({ FormsModule: {} }));
 jest.mock("@angular/router", () => ({ RouterLink: class {} }));
+jest.mock("@alora/ui", () => ({
+  UiPageComponent: class {},
+  UiTabsComponent: class {},
+  UiSelectComponent: class {},
+  uiOptions: (items: any[] | null | undefined, value: (item: any) => unknown, label: (item: any) => string) =>
+    (items ?? []).map((item) => ({ value: value(item), label: label(item) })),
+}));
+jest.mock("../shell/admin-page-header.component", () => ({ AdminPageHeaderComponent: class {} }));
 jest.mock("../core/admin-api.service", () => ({ AdminApiService: class {} }));
 jest.mock("../core/operational-context.service", () => ({
   OperationalContextService: class {},

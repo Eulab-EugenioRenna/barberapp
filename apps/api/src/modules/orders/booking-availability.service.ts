@@ -13,6 +13,7 @@ import { resolveBookingTimes } from "./booking-times";
 import { saleFilter, sectorFilter } from "../locations/operational-scope";
 import type { CommandContext } from "./order-command.service";
 import { priceLine, type PriceMode, sumPricedLines } from "../pricing/money";
+import { localizeServices } from "../locations/activity-sectors";
 import { parseZonedDateTime, zonedDateKey } from "../../common/zoned-time";
 
 /** Only for the lifetime of one repeatable-read preview, never across actors or requests. */
@@ -132,35 +133,43 @@ export class BookingAvailabilityService {
             "Il salone non accetta prenotazioni online",
           );
         const ids = [...new Set(body.lines.map((row) => row.serviceId))];
-        const services = await client.service.findMany({
+        const catalog = await client.service.findMany({
           where: {
             tenantId: context.tenantId,
             id: { in: ids },
             isActive: true,
+            activity: { isActive: true },
             ...(publicOnly ? { isPublic: true, isBookableOnline: true } : {}),
-            ...(context.scope
-              ? { sectorId: { in: context.scope.allowedSectorIds } }
-              : {}),
-            sector: {
-              isActive: true,
-              ...(publicOnly ? { isPublic: true } : {}),
-              location: {
-                isActive: true,
-                ...(publicOnly ? { isPublic: true } : {}),
-                ...(context.scope
-                  ? { id: { in: context.scope.locationIds } }
-                  : {}),
-              },
-            },
           },
           include: { sector: true },
         });
-        if (services.length !== ids.length)
+        if (catalog.length !== ids.length)
           throw new BadRequestException(
             "Servizi non disponibili nell'ambito scelto",
           );
-        if (new Set(services.map((row) => row.sector.locationId)).size !== 1)
-          throw new BadRequestException("Scegli servizi della stessa sede");
+        // Moving an existing appointment keeps its location.
+        const existingLocation = body.appointmentId
+          ? (
+              await tx.appointment.findFirst({
+                where: { id: body.appointmentId, tenantId: context.tenantId },
+                select: { locationId: true },
+              })
+            )?.locationId
+          : undefined;
+        const target = existingLocation
+          ? { locationId: existingLocation }
+          : { locationId: body.locationId, sectorId: body.sectorId };
+        const services = await localizeServices(client, context.tenantId, catalog, target, {
+          publicOnly,
+          scope: context.scope,
+        });
+        if (
+          context.scope &&
+          !context.scope.locationIds.includes(services[0].sector.locationId)
+        )
+          throw new BadRequestException(
+            "Servizi non disponibili nell'ambito scelto",
+          );
         let excludeAppointmentIds: string[] = [];
         let orderRevision: number | undefined;
         let orderId: string | undefined;
@@ -262,6 +271,7 @@ export class BookingAvailabilityService {
               publicOnly,
               excludeAppointmentIds,
               durationMilliseconds: heldDuration,
+              sectorId: services.find((row) => row.id === first.serviceId)?.sectorId,
             },
             client,
           );
@@ -311,7 +321,12 @@ export class BookingAvailabilityService {
                 context.tenantId,
                 tenant.timezone || "Europe/Rome",
                 requests,
-                { publicOnly, scope: context.scope, excludeAppointmentIds },
+                {
+                  publicOnly,
+                  scope: context.scope,
+                  excludeAppointmentIds,
+                  target: { locationId: services[0].sector.locationId },
+                },
               );
               hasSlots = true;
               if (!body.date) break;
