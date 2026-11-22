@@ -5,7 +5,6 @@ FROM node:22.23.4-alpine3.24 AS deps
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY package.json package-lock.json ./
-COPY vendor/eulab-connect-0.12.0-rc.2.tgz ./vendor/eulab-connect-0.12.0-rc.2.tgz
 RUN --mount=type=cache,id=barber-npm,target=/root/.npm,sharing=locked npm ci --no-audit --no-fund
 
 FROM deps AS source
