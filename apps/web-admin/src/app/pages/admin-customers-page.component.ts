@@ -6,6 +6,10 @@ import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
 import {
+  WhatsAppSendDialogComponent,
+  type WhatsAppRecipient,
+} from "../shared/whatsapp-send-dialog.component";
+import {
   appointmentStatusLabel,
   paymentMethodLabel,
   paymentStatusLabel,
@@ -30,6 +34,7 @@ import {
     InfiniteScrollDirective,
     AutofocusFirstDirective,
     UiIconComponent,
+    WhatsAppSendDialogComponent,
   ],
   styles: [
     `
@@ -393,15 +398,26 @@ import {
               >
             </div>
           </div>
-          <button
-            aloraFunction="clients.manage"
-            data-tour="customers-new"
-            type="button"
-            class="primary-btn"
-            (click)="openNew()"
-          >
-            <barber-ui-icon name="plus"></barber-ui-icon> Nuovo cliente
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button
+              aloraFunction="whatsapp.send"
+              data-tour="customers-whatsapp-all"
+              type="button"
+              class="secondary-btn"
+              (click)="whatsappTo = null"
+            >
+              Messaggio a tutti
+            </button>
+            <button
+              aloraFunction="clients.manage"
+              data-tour="customers-new"
+              type="button"
+              class="primary-btn"
+              (click)="openNew()"
+            >
+              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo cliente
+            </button>
+          </div>
         </div>
         <label class="field mt-4" data-tour="customers-search">
           <span>Cerca cliente</span>
@@ -490,9 +506,21 @@ import {
               {{ displayName || "Nuovo cliente" }}
             </h2>
           </div>
-          <button type="button" class="pill-btn" (click)="formOpen = false">
-            <barber-ui-icon name="close"></barber-ui-icon> Chiudi
-          </button>
+          <div class="flex flex-none flex-wrap justify-end gap-2">
+            <button
+              *ngIf="customerForm.id"
+              aloraFunction="whatsapp.send"
+              data-tour="customer-whatsapp"
+              type="button"
+              class="secondary-btn"
+              (click)="whatsappTo = customerForm"
+            >
+              Invia messaggio
+            </button>
+            <button type="button" class="pill-btn" (click)="formOpen = false">
+              <barber-ui-icon name="close"></barber-ui-icon> Chiudi
+            </button>
+          </div>
         </header>
 
         <div class="customer-dialog-body">
@@ -712,6 +740,12 @@ import {
         </div>
       </article>
     </div>
+
+    <alora-whatsapp-send-dialog
+      *ngIf="whatsappTo !== undefined"
+      [customer]="whatsappTo"
+      (closed)="whatsappTo = undefined"
+    ></alora-whatsapp-send-dialog>
   `,
 })
 export class AdminCustomersPageComponent {
@@ -719,6 +753,8 @@ export class AdminCustomersPageComponent {
   formatPaymentMethod = paymentMethodLabel;
   formatPaymentStatus = paymentStatusLabel;
   @Input() customers: any[] = [];
+  /** WhatsApp dialog: a customer, null for everyone, undefined when closed. */
+  whatsappTo: WhatsAppRecipient | null | undefined = undefined;
   @Input() customerForm: any = {};
   @Input() loading = false;
   @Input() hasMore = false;

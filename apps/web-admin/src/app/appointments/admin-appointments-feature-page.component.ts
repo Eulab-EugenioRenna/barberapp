@@ -61,6 +61,8 @@ import {
             <button
               type="button"
               class="pill-btn"
+              data-tour="tab-calendar"
+              [attr.aria-selected]="activeTab === 'calendar'"
               [class.appointments-tab-active]="activeTab === 'calendar'"
               (click)="activeTab = 'calendar'"
             >
@@ -69,6 +71,8 @@ import {
             <button
               type="button"
               class="pill-btn"
+              data-tour="tab-list"
+              [attr.aria-selected]="activeTab === 'list'"
               [class.appointments-tab-active]="activeTab === 'list'"
               (click)="activeTab = 'list'"
             >

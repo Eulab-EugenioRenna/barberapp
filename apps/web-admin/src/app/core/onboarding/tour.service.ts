@@ -93,12 +93,18 @@ export class TourService {
     const steps = definition
       .steps(ctx)
       .filter((step) => !step.when || step.when(ctx))
-      .map<ResolvedTourStep>((step) => ({
-        targets: step.target ? ([] as string[]).concat(step.target as string | string[]) : [],
-        title: resolveDynamic(step.title, ctx) ?? "",
-        body: resolveDynamic(step.body, ctx) ?? "",
-        fallback: resolveDynamic(step.fallback, ctx) ?? "",
-      }));
+      .map<ResolvedTourStep>((step) => {
+        const targets = step.target ? ([] as string[]).concat(step.target as string | string[]) : [];
+        // A step on a tab button opens that tab, so its content shows below.
+        const tabTarget = targets.find((target) => target.startsWith("tab-"));
+        return {
+          targets,
+          tab: step.tab ?? (tabTarget ? tabTarget.slice(4) : null),
+          title: resolveDynamic(step.title, ctx) ?? "",
+          body: resolveDynamic(step.body, ctx) ?? "",
+          fallback: resolveDynamic(step.fallback, ctx) ?? "",
+        };
+      });
     if (!steps.length) return;
     this.activeState.set({ definition, steps });
     void this.goTo(0, 1);
@@ -179,6 +185,8 @@ export class TourService {
     let cursor = index;
     while (cursor >= 0 && cursor < active.steps.length) {
       const step = active.steps[cursor];
+      if (step.tab) await this.openTab(step.tab, token);
+      if (token !== this.resolveToken) return;
       const element = step.targets.length ? await this.findTarget(step.targets, token) : null;
       if (token !== this.resolveToken) return;
       // Missing element and nothing to say about it: this account cannot use it.
@@ -197,8 +205,21 @@ export class TourService {
     if (direction === 1) this.finish();
   }
 
-  private async findTarget(targets: readonly string[], token: number): Promise<HTMLElement | null> {
-    const deadline = Date.now() + TARGET_WAIT_MS;
+  /** Switches the page to the tab a step lives in, as if the user clicked it. */
+  private async openTab(key: string, token: number): Promise<void> {
+    const button = await this.findTarget([`tab-${key}`], token, 600);
+    if (!button || button.getAttribute("aria-selected") === "true") return;
+    button.click();
+    // Let the page render the panel before its elements are measured.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+
+  private async findTarget(
+    targets: readonly string[],
+    token: number,
+    waitMs = TARGET_WAIT_MS,
+  ): Promise<HTMLElement | null> {
+    const deadline = Date.now() + waitMs;
     while (token === this.resolveToken) {
       for (const target of targets) {
         const element = this.visibleElement(target);

@@ -134,10 +134,20 @@
       </div>
       <form (ngSubmit)="send()">
         <fieldset [disabled]="draftLocked">
-          <label class="wa-label">Numero con prefisso internazionale<input name="to" [(ngModel)]="to" maxlength="100" placeholder="+39 333 1234567" inputmode="tel" required /></label>
+          <div *ngIf="hasRecipient; else pickCustomer" class="wa-recipient">
+            <span>A: <strong>{{ customerId ? customerName : 'conversazione ' + to }}</strong></span>
+            <button type="button" class="pill-btn" (click)="clearRecipient()">Cambia</button>
+          </div>
+          <ng-template #pickCustomer>
+            <label class="wa-label">Cliente<input name="customerQuery" [(ngModel)]="customerQuery" type="search" autocomplete="off" placeholder="Cerca per nome" /></label>
+            <div *ngIf="customerMatches.length" class="wa-recipient-list" role="listbox" aria-label="Clienti con telefono">
+              <button *ngFor="let c of customerMatches; trackBy: trackId" type="button" role="option" (click)="chooseCustomer(c.id)">{{ c.firstName }} {{ c.lastName }}</button>
+            </div>
+            <p *ngIf="customerQuery.trim() && !customerMatches.length" class="wa-muted">Nessun cliente con telefono trovato. Il numero si aggiunge nella scheda cliente.</p>
+          </ng-template>
           <label class="wa-label">Messaggio<textarea name="message" [(ngModel)]="message" rows="5" maxlength="16000" required></textarea></label>
           <label class="wa-consent"><input type="checkbox" name="consent" [(ngModel)]="recipientAuthorized" />Ho verificato destinatario e autorizzazione a ricevere questo messaggio.</label>
-          <button class="primary-btn" [disabled]="!fresh || !connected || !recipientAuthorized || !message.trim() || !to.trim()">{{ sending ? 'Invio in verifica…' : 'Invia messaggio' }}</button>
+          <button class="primary-btn" [disabled]="!fresh || !connected || !recipientAuthorized || !message.trim() || !hasRecipient">{{ sending ? 'Invio in verifica…' : 'Invia messaggio' }}</button>
         </fieldset>
       </form>
       <p *ngIf="!connected" class="wa-muted">Collega il tuo numero e attendi che risulti connesso per inviare.</p>

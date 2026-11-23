@@ -81,3 +81,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
   .wa-chat { transition: background 0.16s ease; }
   .wa-chat:hover { background: #edf1e8; }
 }
+.wa-recipient { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; border-radius: 0.9rem; background: var(--surface); padding: 0.6rem 0.9rem; font-size: 0.9rem; }
+.wa-recipient-list { display: grid; gap: 0.25rem; max-height: 16rem; overflow-y: auto; border: 1px solid var(--line); border-radius: 0.9rem; padding: 0.3rem; }
+.wa-recipient-list button { border: 0; border-radius: 0.6rem; background: transparent; padding: 0.55rem 0.75rem; text-align: left; font: inherit; cursor: pointer; }
+.wa-recipient-list button:hover, .wa-recipient-list button:focus-visible { background: var(--surface); }

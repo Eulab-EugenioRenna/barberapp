@@ -103,11 +103,13 @@ export class CustomersController {
     );
     const tenantId = requireTenantId(session);
 
-    return this.prisma.customer.findMany({
+    const rows = await this.prisma.customer.findMany({
       where: { tenantId },
-      select: { id: true, firstName: true, lastName: true },
+      select: { id: true, firstName: true, lastName: true, phone: true },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }, { id: "asc" }],
     });
+    // Pick lists only need to know a number exists (WhatsApp recipient), not the number.
+    return rows.map(({ phone, ...row }) => ({ ...row, hasPhone: !!phone?.trim() }));
   }
 
   @Post()

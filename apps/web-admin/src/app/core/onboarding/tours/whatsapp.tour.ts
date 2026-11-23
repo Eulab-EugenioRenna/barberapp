@@ -5,7 +5,7 @@ export const WHATSAPP_TOUR: TourDefinition = {
   id: "whatsapp",
   navKey: "whatsapp",
   title: "Messaggi WhatsApp",
-  version: 1,
+  version: 2,
   when: (ctx) => ctx.canView("whatsapp"),
   steps: (ctx) => [
     {
@@ -17,11 +17,13 @@ export const WHATSAPP_TOUR: TourDefinition = {
     },
     {
       target: "whatsapp-status",
+      tab: "connection",
       title: "Stato del collegamento",
       body: "Qui vedi il numero collegato e il suo stato (Connesso, Da collegare, Interrotto…), con i messaggi già acquisiti nella cronologia.",
     },
     {
       target: "whatsapp-actions",
+      tab: "connection",
       title: "Collega e gestisci il numero",
       body:
         "«Collega il tuo numero» mostra un QR da inquadrare dal telefono in Dispositivi collegati. " +
@@ -30,6 +32,7 @@ export const WHATSAPP_TOUR: TourDefinition = {
     },
     {
       target: "whatsapp-qr",
+      tab: "connection",
       title: "Inquadra il QR",
       body: "Apri WhatsApp sul telefono, vai in Dispositivi collegati › Collega un dispositivo e inquadra il codice: si rinnova da solo finché il numero non è collegato.",
       when: (c) => c.can("whatsapp.manage"),
@@ -39,12 +42,12 @@ export const WHATSAPP_TOUR: TourDefinition = {
       title: "Conversazioni",
       body:
         "Scegli una chat per leggerne i messaggi e caricare quelli precedenti." +
-        (ctx.can("whatsapp.send") ? " La chat scelta diventa il destinatario di «Nuovo messaggio»." : ""),
+        (ctx.can("whatsapp.send") ? " Scegliendo una chat puoi risponderle da «Nuovo messaggio»." : ""),
     },
     {
       target: "tab-compose",
       title: "Nuovo messaggio",
-      body: "Inserisci il numero con prefisso internazionale e il testo, poi conferma di aver verificato destinatario e consenso. Si invia solo con il numero connesso.",
+      body: "Cerca il cliente per nome (compaiono solo quelli con telefono) oppure rispondi alla conversazione scelta, scrivi il testo e conferma il consenso. Si invia solo con il numero connesso. Per scrivere a tutti usa «Messaggio a tutti» in Clienti.",
       when: (c) => c.can("whatsapp.send"),
     },
     {

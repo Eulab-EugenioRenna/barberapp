@@ -28,6 +28,12 @@ export interface TourStep {
    * wins. Without a target the step is shown centred (intro / outro).
    */
   target?: string | readonly string[];
+  /**
+   * Key of the page tab (`data-tour="tab-{key}"`) the target lives in: the
+   * tour switches to it before looking for the element. Inferred when the
+   * target is the tab button itself.
+   */
+  tab?: string;
   title: Dynamic<string>;
   body: Dynamic<string>;
   /** Only shown when true for the current account (role, functions, tenant state). */
@@ -55,6 +61,7 @@ export interface TourDefinition {
 /** A step resolved for the current account, ready to render. */
 export interface ResolvedTourStep {
   targets: readonly string[];
+  tab: string | null;
   title: string;
   body: string;
   fallback: string;

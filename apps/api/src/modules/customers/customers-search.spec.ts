@@ -56,12 +56,21 @@ describe("customer lookup", () => {
   });
 
   it("loads all names for the tenant's filter without pagination or contact details", async () => {
-    await controller.options(request);
+    prisma.customer.findMany.mockResolvedValueOnce([
+      { id: "c1", firstName: "Anna", lastName: "Rossi", phone: "333 1234567" },
+      { id: "c2", firstName: "Luca", lastName: "Bianchi", phone: null },
+    ]);
+    const result = await controller.options(request);
 
     expect(prisma.customer.findMany).toHaveBeenLastCalledWith({
       where: { tenantId: "tenant-1" },
-      select: { id: true, firstName: true, lastName: true },
+      select: { id: true, firstName: true, lastName: true, phone: true },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }, { id: "asc" }],
     });
+    // Only whether a number exists (WhatsApp picker), never the number itself.
+    expect(result).toEqual([
+      { id: "c1", firstName: "Anna", lastName: "Rossi", hasPhone: true },
+      { id: "c2", firstName: "Luca", lastName: "Bianchi", hasPhone: false },
+    ]);
   });
 });

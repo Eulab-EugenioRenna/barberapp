@@ -8,7 +8,7 @@ export const NOTIFICATIONS_TOUR: TourDefinition = {
   id: "notifications",
   navKey: "notifications",
   title: "Promemoria e notifiche",
-  version: 1,
+  version: 2,
   // Same rule as the menu entry (companyFunction("notifications.manage")).
   when: (ctx) => ctx.can("notifications.manage"),
   steps: () => [
@@ -23,41 +23,49 @@ export const NOTIFICATIONS_TOUR: TourDefinition = {
     },
     {
       target: "notifications-load",
+      tab: "rules",
       title: "2. Configura i promemoria",
       body: "Carica la policy salvata dei promemoria: si aprono le opzioni, gli orari di invio, i testi WhatsApp e l'attivazione.",
     },
     {
       target: "notifications-status",
+      tab: "rules",
       title: "Stato degli invii",
       body: "Ti dice se i promemoria sono attivi o in bozza. Valgono solo per le nuove prenotazioni con consenso WhatsApp: quelle già presenti non ricevono invii retroattivi.",
     },
     {
       target: "notifications-options",
+      tab: "rules",
       title: "Conferma e risposta",
       body: "Scegli se mandare un messaggio iniziale alla prenotazione e se chiedere al cliente di rispondere (confermo, richiedo modifica, annullo). Sotto decidi se avvisarlo anche quando l'appuntamento viene confermato, annullato o riprogrammato.",
     },
     {
       target: "notifications-timing",
+      tab: "rules",
       title: "Quando inviare",
       body: "Anticipo del primo promemoria, quanti inviarne e ogni quanto, scadenza della risposta e fascia oraria degli invii. Con 0 promemoria restano solo gli avvisi sugli eventi.",
     },
     {
       target: "notifications-texts",
+      tab: "rules",
       title: "Testi WhatsApp",
       body: "Scrivi i messaggi usando i segnaposto (nome cliente, servizio, orario…). Non inserire dati sensibili.",
     },
     {
       target: "notifications-save",
+      tab: "rules",
       title: "Salva la bozza",
       body: "Salva le regole come bozza: gli invii non partono ancora. Se la policy era attiva, salvare una nuova bozza ferma i promemoria in attesa e dovrai riattivarla.",
     },
     {
       target: "notifications-activate",
+      tab: "rules",
       title: "3. Attiva",
       body: "Scegli le autorizzazioni create in Collegamento Connect e premi «Attiva per le nuove prenotazioni». Da qui puoi anche fermare i promemoria ancora da inviare.",
     },
     {
       target: "notifications-simulate",
+      tab: "rules",
       title: "Prova gli orari",
       body: "Scegli un'attività e un appuntamento di esempio per vedere quando partirebbero i messaggi e come appaiono. Non invia nulla.",
     },

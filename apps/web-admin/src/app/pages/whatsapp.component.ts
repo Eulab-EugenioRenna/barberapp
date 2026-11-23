@@ -22,6 +22,23 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   outbox: WhatsAppOutboxView[] = [];
   archiveId = ""; chatId = ""; qr: string | null = null;
   to = ""; message = ""; recipientAuthorized = false;
+  /** Recipient: a customer of the salon, or the conversation chosen in «Conversazioni» (`to`). */
+  customers: Array<{ id: string; firstName: string; lastName: string; hasPhone: boolean }> = [];
+  customerId = ""; customerQuery = "";
+  get customerName() {
+    const c = this.customers.find(item => item.id === this.customerId);
+    return c ? `${c.firstName} ${c.lastName}`.trim() : "";
+  }
+  get customerMatches() {
+    const terms = this.customerQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    return this.customers
+      .filter(c => c.hasPhone && terms.every(t => `${c.firstName} ${c.lastName}`.toLowerCase().includes(t)))
+      .slice(0, 8);
+  }
+  chooseCustomer(id: string) { this.customerId = id; this.customerQuery = ""; this.to = ""; }
+  clearRecipient() { this.customerId = ""; this.to = ""; }
+  get hasRecipient() { return !!this.customerId || !!this.to.trim(); }
   feedback = ""; connectionFeedback = ""; sendFeedback = ""; updatedAt: Date | null = null;
   loading = true; refreshing = false; busy = false; sending = false; loadingMessages = false;
   fresh = false; hasOlder = false; disconnectId = ""; removeId = "";
@@ -51,10 +68,13 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   get pendingPayload() {
     const state = this.pending;
     if (state.kind !== "pending") return null;
-    return { to: String(state.command.body["to"] || ""), text: String(state.command.body["text"] || "") };
+    const customerId = String(state.command.body["customerId"] || "");
+    const customer = this.customers.find(c => c.id === customerId);
+    return { to: customer ? `${customer.firstName} ${customer.lastName}` : customerId ? "Cliente" : String(state.command.body["to"] || ""), text: String(state.command.body["text"] || "") };
   }
   get draftLocked() { return this.sending || this.pending.kind !== "empty"; }
   async ngOnInit() {
+    if (this.canSend) void this.api.customers().then(list => { this.customers = list; }).catch(() => { this.customers = []; });
     await this.refresh();
     if (!this.destroyed) this.timer = setInterval(() => { if (!document.hidden) void this.refresh(); }, 8000);
   }
@@ -118,7 +138,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   }
   async selectChat(chat: WhatsAppConversationView) {
     this.selection++; this.chatId = chat.chatId; this.messages = []; this.hasOlder = false;
-    if (!this.draftLocked) this.to = chat.chatId;
+    if (!this.draftLocked) { this.to = chat.chatId; this.customerId = ""; }
     try { await this.loadMessages(); } catch (error) { this.feedback = this.error(error); }
   }
   async loadMessages(older = false) {
@@ -159,7 +179,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     if (this.sending || !this.canSend || (!retry && (!this.connected || !this.recipientAuthorized || !this.message.trim()))) return;
     this.sending = true; this.sendFeedback = "";
     try {
-      const ack = retry ? await this.api.retry() : await this.api.send(this.connected!.id, { to: this.to, text: this.message, recipientAuthorized: true });
+      const ack = retry ? await this.api.retry() : await this.api.send(this.connected!.id, { ...(this.customerId ? { customerId: this.customerId } : { to: this.to }), text: this.message, recipientAuthorized: true });
       this.sendFeedback = `Richiesta registrata: ${this.stateLabel(ack.state)}. Controlla gli invii recenti.`;
       this.message = ""; this.recipientAuthorized = false;
       await this.refresh();

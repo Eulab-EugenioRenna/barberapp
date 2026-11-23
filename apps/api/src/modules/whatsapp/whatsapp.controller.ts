@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Post, Query, Req } from "@nestjs/common";
 import { WhatsAppService } from "./whatsapp.service";
-import { SendWhatsAppTextDto, WhatsAppMessageQueryDto } from "./whatsapp.dto";
+import { BroadcastWhatsAppTextDto, SendWhatsAppTextDto, WhatsAppMessageQueryDto } from "./whatsapp.dto";
 import { type ConnectRequest, connectBrowser } from "../../common/connect-http";
 @Controller("whatsapp")
 export class WhatsAppController {
@@ -30,5 +30,11 @@ export class WhatsAppController {
   @Post("sessions/:id/messages")
   send(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() body: SendWhatsAppTextDto) {
     connectBrowser(r); return this.whatsapp.send(r.headers.authorization, id, body);
+  }
+  @Get("audience") @Header("Cache-Control", "no-store")
+  audience(@Req() r: ConnectRequest) { return this.whatsapp.audience(r.headers.authorization); }
+  @Post("sessions/:id/broadcast")
+  broadcast(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() body: BroadcastWhatsAppTextDto) {
+    connectBrowser(r); return this.whatsapp.broadcast(r.headers.authorization, id, body);
   }
 }

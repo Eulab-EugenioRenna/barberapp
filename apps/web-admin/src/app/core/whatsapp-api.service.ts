@@ -7,6 +7,7 @@ import {
 import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView,
   WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
+  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastResult,
 } from "@barber/shared/whatsapp";
 import { ADMIN_API_URL } from "./api-config";
 import { SessionStore } from "./session.store";
@@ -38,6 +39,15 @@ export class WhatsAppApiService {
   conversations(id: string) { return firstValueFrom(this.http.get<WhatsAppConversationView[]>(`${this.root}/archives/${encodeURIComponent(id)}/conversations`)); }
   messages(id: string, chat: string, before?: string) {
     return firstValueFrom(this.http.get<WhatsAppMessageView[]>(`${this.root}/archives/${encodeURIComponent(id)}/messages`, { params: { chat, ...(before ? { before } : {}) } }));
+  }
+  /** Customers of the tenant for the recipient picker (no phone numbers, only whether one exists). */
+  customers() {
+    return firstValueFrom(this.http.get<Array<{ id: string; firstName: string; lastName: string; hasPhone: boolean }>>(`${ADMIN_API_URL}/customers/options`));
+  }
+  audience() { return firstValueFrom(this.http.get<WhatsAppAudienceView>(this.root + "/audience")); }
+  /** Same key for a repeated request: customers already reached are not messaged again. */
+  broadcast(sessionId: string, input: WhatsAppBroadcastInput) {
+    return firstValueFrom(this.http.post<WhatsAppBroadcastResult>(`${this.root}/sessions/${encodeURIComponent(sessionId)}/broadcast`, input));
   }
   async send(sessionId: string, input: Omit<WhatsAppSendInput, "idempotencyKey">) {
     const key = this.key(), command = beginPendingCommand(sessionStorage, key, { sessionId, ...input });

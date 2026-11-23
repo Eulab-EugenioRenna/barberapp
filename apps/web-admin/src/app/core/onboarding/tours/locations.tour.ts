@@ -10,7 +10,7 @@ export const LOCATIONS_TOUR: TourDefinition = {
   id: "locations",
   navKey: "locations",
   title: "Sedi e attività",
-  version: 2,
+  version: 3,
   when: (ctx) => ctx.canView("locations"),
   steps: (ctx) => [
     {
@@ -27,42 +27,49 @@ export const LOCATIONS_TOUR: TourDefinition = {
     },
     {
       target: "locations-create",
+      tab: "structure",
       title: "Nuova sede",
       body: "Apre il modulo per creare una sede: inserisci nome e indirizzo e spunta le attività che vi si svolgono.",
       when: canEdit,
     },
     {
       target: "locations-card",
+      tab: "structure",
       title: "La scheda della sede",
       body: "Ogni scheda mostra se la sede è attiva, se è visibile nelle prenotazioni online e, sotto, le sue attività con i professionisti assegnati e le risorse.",
       fallback: "Non ci sono ancora sedi: crea la prima con il modulo «Nuova sede».",
     },
     {
       target: "locations-configure",
+      tab: "structure",
       title: "Configura sede",
       body: "Apre la configurazione: nome, indirizzo, sede attiva o disattivata, visibilità online, orari di apertura settimanali e giorni di chiusura. Disattivando una sede impedisci nuove prenotazioni, lo storico resta.",
       when: canEdit,
     },
     {
       target: "locations-sector-configure",
+      tab: "structure",
       title: "Configura attività",
       body: "Impostazioni dell'attività in questa sede: può usare gli orari della sede oppure averne di propri, ed essere visibile online o solo interna. Il nome si cambia dal catalogo.",
       when: canEdit,
     },
     {
       target: "locations-resource-add",
+      tab: "structure",
       title: "Aggiungi una risorsa",
       body: "Crea una postazione, poltrona o cabina dell'attività indicando nome e capienza (quante persone serve in contemporanea, 1 se non indicata).",
       when: canEdit,
     },
     {
       target: "locations-resource-controls",
+      tab: "structure",
       title: "Gestisci le risorse",
       body: "Per ogni risorsa puoi cambiare la capienza e salvarla, disattivarla o riattivarla, e scegliere se è prenotabile online o solo internamente.",
       when: canEdit,
     },
     {
       target: "locations-sector-add",
+      tab: "structure",
       title: "Aggiungi un'attività alla sede",
       body: "Scegli dal catalogo un'attività che questa sede non svolge ancora, per esempio «Estetica» accanto a «Barberia»: i suoi servizi diventano prenotabili e vendibili anche qui.",
       when: canEdit,

@@ -13,7 +13,27 @@ import { requireTenantId, requireUser, resolveRequestSession } from "../../commo
 import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection,
   WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
+  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastResult,
 } from "../../common/whatsapp-contract";
+import { appointmentPhone } from "../notifications/appointment-automation-state";
+
+/** Most recipients per «Invia a tutti»: larger lists risk the number being blocked. */
+export const BROADCAST_LIMIT = 500;
+/**
+ * Customer phone in international form. Numbers saved without prefix are
+ * Italian (the salon's country), e.g. «333 1234567» → +393331234567.
+ */
+export function customerWhatsAppNumber(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const compact = phone.trim().replace(/[\s().-]/g, "");
+  const international = compact.startsWith("+") || compact.startsWith("00") ? compact : `+39${compact}`;
+  const digits = appointmentPhone(international);
+  return digits ? `+${digits}` : null;
+}
+function actorKey(parts: unknown[]) {
+  const hash = createHash("sha256").update(JSON.stringify(parts)).digest("hex");
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}` as const;
+}
 
 type Client = ReturnType<ConnectServer["whatsapp"]>;
 const uuid = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i;
@@ -242,10 +262,73 @@ export class WhatsAppService {
   send(auth: string | undefined, sessionId: string, input: WhatsAppSendInput) {
     return this.run(auth, "whatsapp.send", async (wa, actor) => {
       await this.ownedSession(wa, actor, sessionId);
+      if (!!input.customerId === !!input.to) throw new BadRequestException("Scegli un cliente o un numero");
+      let to = input.to!;
+      if (input.customerId) {
+        const customer = await this.prisma.customer.findFirst({
+          where: { id: input.customerId, tenantId: actor.tenantId, isActive: true },
+          select: { phone: true },
+        });
+        if (!customer) throw new NotFoundException("Cliente non trovato");
+        const number = customerWhatsAppNumber(customer.phone);
+        if (!number) throw new BadRequestException("Il cliente non ha un numero di telefono valido");
+        to = number;
+      }
       // Connect's installation-wide key is namespaced by the authenticated local actor.
-      const hash = createHash("sha256").update(JSON.stringify([actor.tenantId, actor.userId, input.idempotencyKey])).digest("hex");
-      const key = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}` as const;
-      return ack(await wa.sendText(sessionId, input.to, input.text, key));
+      const key = actorKey([actor.tenantId, actor.userId, input.idempotencyKey]);
+      return ack(await wa.sendText(sessionId, to, input.text, key));
+    });
+  }
+  private broadcastCustomers(tenantId: string) {
+    return this.prisma.customer.findMany({
+      where: { tenantId, isActive: true, phone: { not: null } },
+      select: { id: true, phone: true, marketingConsent: true },
+      orderBy: { id: "asc" },
+    });
+  }
+  async audience(auth?: string): Promise<WhatsAppAudienceView> {
+    const session = await resolveRequestSession(this.prisma, auth);
+    const user = requireUser(session), tenantId = requireTenantId(session);
+    if (user.technicalAccess || user.role === "platform_admin" || !canUseLocalFunction(user, "whatsapp.send"))
+      throw new ForbiddenException("Permesso WhatsApp esplicito richiesto");
+    const [customers, rows] = await Promise.all([
+      this.prisma.customer.count({ where: { tenantId, isActive: true } }),
+      this.broadcastCustomers(tenantId),
+    ]);
+    const reachable = rows.filter((row) => customerWhatsAppNumber(row.phone));
+    return { customers, withPhone: reachable.length, eligible: reachable.filter((row) => row.marketingConsent).length };
+  }
+  /**
+   * One message per customer, each with its own key derived from the request
+   * key: repeating the same request never sends a customer the text twice.
+   */
+  broadcast(auth: string | undefined, sessionId: string, input: WhatsAppBroadcastInput): Promise<WhatsAppBroadcastResult> {
+    return this.run(auth, "whatsapp.send", async (wa, actor) => {
+      await this.ownedSession(wa, actor, sessionId);
+      const rows = await this.broadcastCustomers(actor.tenantId);
+      const seen = new Set<string>();
+      const targets: Array<{ id: string; to: string }> = [];
+      let skipped = 0;
+      for (const row of rows) {
+        const to = row.marketingConsent ? customerWhatsAppNumber(row.phone) : null;
+        // Same number on two customer cards: one message only.
+        if (!to || seen.has(to)) { skipped++; continue; }
+        seen.add(to);
+        targets.push({ id: row.id, to });
+      }
+      if (!targets.length) throw new BadRequestException("Nessun cliente con telefono e consenso marketing");
+      if (targets.length > BROADCAST_LIMIT)
+        throw new BadRequestException(`Troppi destinatari (${targets.length}): il massimo per invio è ${BROADCAST_LIMIT}`);
+      let sent = 0, failed = 0;
+      for (let index = 0; index < targets.length; index += 5) {
+        const results = await Promise.allSettled(targets.slice(index, index + 5).map((target) =>
+          wa.sendText(sessionId, target.to, input.text, actorKey([actor.tenantId, actor.userId, input.idempotencyKey, target.id]))));
+        for (const result of results) {
+          if (result.status === "fulfilled") sent++;
+          else failed++;
+        }
+      }
+      return { sent, failed, skipped };
     });
   }
 }

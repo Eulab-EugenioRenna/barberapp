@@ -16,7 +16,21 @@ export interface WhatsAppMessageView {
 export interface WhatsAppOutboxView {
   id: string; sessionId: string; state: string; createdAt: string; hasError: boolean;
 }
+/** Exactly one recipient: a customer of the tenant (preferred) or a number. */
 export interface WhatsAppSendInput {
-  to: string; text: string; idempotencyKey: string; recipientAuthorized: true;
+  to?: string; customerId?: string; text: string; idempotencyKey: string; recipientAuthorized: true;
+}
+/** Sends the same text to every active customer with a phone and marketing consent. */
+export interface WhatsAppBroadcastInput {
+  text: string; idempotencyKey: string; recipientAuthorized: true;
+}
+export interface WhatsAppBroadcastResult { sent: number; failed: number; skipped: number }
+export interface WhatsAppAudienceView {
+  /** Active customers. */
+  customers: number;
+  /** Active customers with a usable phone number. */
+  withPhone: number;
+  /** With phone and marketing consent: who «Invia a tutti» reaches. */
+  eligible: number;
 }
 export interface WhatsAppAcknowledgement { id: string; state: string }

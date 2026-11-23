@@ -5,7 +5,7 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
   id: "appointments",
   navKey: "appointments",
   title: "Agenda",
-  version: 3,
+  version: 4,
   when: (ctx) => ctx.canView("appointments"),
   steps: () => [
     {
@@ -40,11 +40,13 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
     },
     {
       target: "appointments-date-nav",
+      tab: "calendar",
       title: "Muoviti nel tempo",
       body: "Vai a una data precisa dal calendario, torna a «Oggi» o scorri con «Indietro» e «Avanti».",
     },
     {
       target: "appointments-views",
+      tab: "calendar",
       title: "Giorno, settimana, mese",
       body:
         "Cambia l'ampiezza del calendario. In settimana e mese fai doppio clic su un giorno per aprirlo, " +
@@ -52,11 +54,13 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
     },
     {
       target: "appointments-summary",
+      tab: "calendar",
       title: "Riepilogo del periodo",
       body: "Quanti appuntamenti ci sono, quanti confermati e completati e il valore previsto, per il periodo visualizzato.",
     },
     {
       target: "appointments-grid",
+      tab: "calendar",
       title: "Gli appuntamenti",
       body: (c) =>
         c.can("sales.manage")
@@ -65,6 +69,7 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
     },
     {
       target: "appointments-grid",
+      tab: "calendar",
       title: "Spostare un appuntamento",
       body:
         "Trascina un appuntamento: nella vista giorno lo sposti direttamente su un altro orario o professionista; " +
@@ -73,6 +78,7 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
     },
     {
       target: "appointments-list",
+      tab: "list",
       title: "Lista appuntamenti",
       body: (c) =>
         c.can("appointments.update.all")
