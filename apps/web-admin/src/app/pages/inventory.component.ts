@@ -103,7 +103,13 @@ import { AdminApiService } from "../core/admin-api.service";
       </section>
       <p *ngIf="feedback" role="status" class="notice">{{ feedback }}</p>
       <p *ngIf="loading" role="status">Caricamento magazzino…</p>
-      <div class="inventory-layout" *ngIf="locationId">
+      <div
+        class="inventory-layout"
+        *ngIf="locationId"
+        [class.with-operation]="
+          session.can('inventory.manage') && !!selectedProduct
+        "
+      >
         <section class="panel balances">
           <div class="section-heading">
             <h2>Giacenze</h2>
@@ -403,11 +409,19 @@ import { AdminApiService } from "../core/admin-api.service";
         font-size: 0.75rem;
         color: var(--muted);
       }
+      /* Stock list uses the full width; the movement panel opens beside it
+         only when a product is selected. */
       .inventory-layout {
         display: grid;
-        grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
+        grid-template-columns: minmax(0, 1fr);
         gap: var(--space-lg);
         align-items: start;
+      }
+      .inventory-layout.with-operation {
+        grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
+      }
+      .inventory-layout:not(.with-operation) .stock-list {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
       }
       .section-heading {
         margin-bottom: var(--space-md);
@@ -607,7 +621,8 @@ import { AdminApiService } from "../core/admin-api.service";
         }
       }
       @media (max-width: 850px) {
-        .inventory-layout {
+        .inventory-layout,
+        .inventory-layout.with-operation {
           grid-template-columns: 1fr;
         }
         .context-panel {

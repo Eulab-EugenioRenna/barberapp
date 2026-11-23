@@ -121,14 +121,6 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
       </p>
       <p
         class="px-1 text-sm text-[var(--muted)]"
-        *ngIf="revenueReport && !revenueReport.basis?.lineFiltered"
-      >
-        Il venduto segue la data registrata del conto confermato. Incassi e
-        rimborsi seguono la data del movimento, anche quando riguardano conti di
-        un altro periodo. Sono inclusi solo conti interamente accessibili.
-      </p>
-      <p
-        class="px-1 text-sm text-[var(--muted)]"
         *ngIf="
           revenueReport?.sold?.unattributedGross !== '0.00' &&
           revenueReport?.sold
@@ -151,6 +143,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         [tax]="revenueReport.salesTax"
         [materials]="revenueReport.materials"
         [inventory]="revenueReport.inventory"
+        [catalog]="revenueReport.catalog ?? null"
         [currency]="revenueReport.currency"
         [masked]="balanceHidden"
       ></alora-financial-values-panel>

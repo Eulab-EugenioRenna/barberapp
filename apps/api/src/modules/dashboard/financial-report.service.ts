@@ -64,6 +64,29 @@ export class FinancialReportService {
       where: { id: scope.tenantId },
       select: { timezone: true, currency: true },
     });
+    // What the active catalogue actually uses: the dashboard hides VAT and stock
+    // sections that do not apply to this business.
+    const tenantId = scope.tenantId;
+    const [vatServices, vatProducts, purchaseVatProducts, trackedProducts] =
+      await Promise.all([
+        this.prisma.service.count({
+          where: { tenantId, isActive: true, vatRate: { gt: 0 } },
+        }),
+        this.prisma.product.count({
+          where: { tenantId, isActive: true, vatRate: { gt: 0 } },
+        }),
+        this.prisma.product.count({
+          where: { tenantId, isActive: true, purchaseVatRate: { gt: 0 } },
+        }),
+        this.prisma.product.count({
+          where: { tenantId, isActive: true, stockTracked: true },
+        }),
+      ]);
+    const catalog = {
+      salesVat: vatServices + vatProducts > 0,
+      purchaseVat: purchaseVatProducts > 0,
+      trackedProducts,
+    };
     if (filters.month && !/^(\d{4})-(0[1-9]|1[0-2])$/.test(filters.month))
       throw new BadRequestException("Mese non valido");
     const period = filters.period ?? "month";
@@ -209,6 +232,7 @@ export class FinancialReportService {
     };
     return {
       ...report,
+      catalog,
       period,
       currency: tenant.currency,
       timezone: tenant.timezone,
