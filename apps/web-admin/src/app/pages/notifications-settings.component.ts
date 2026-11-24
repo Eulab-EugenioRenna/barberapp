@@ -11,9 +11,9 @@ import { NotificationTemplateEditorComponent } from "../shared/notification-temp
 type Section = "rules" | "activity" | "templates" | "connection";
 
 /**
- * Automatic appointment messages, ordered by how often they are used:
- * rules first, then what was sent and answered, then texts and the Connect
- * authorization that is set up once.
+ * Automatic appointment messages. «Promemoria automatici» is a guided
+ * sequence that also creates the permissions it needs; «Permessi» is only
+ * for reviewing or revoking them later.
  */
 @Component({
   standalone: true,
@@ -52,8 +52,8 @@ export class NotificationsSettingsComponent {
   readonly tabs: UiTab[] = [
     { key: "rules", label: "Promemoria automatici" },
     { key: "activity", label: "Risposte e prossimi invii" },
-    { key: "templates", label: "Testi dei messaggi" },
-    { key: "connection", label: "Collegamento Connect" },
+    { key: "templates", label: "Avvisi email e app" },
+    { key: "connection", label: "Permessi" },
   ];
   section: Section = this.readSection();
 

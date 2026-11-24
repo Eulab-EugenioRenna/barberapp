@@ -23,8 +23,8 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
   >
     <header>
       <div>
-        <p class="eyebrow">Collegamento Connect</p>
-        <h2>Autorizzazioni delle automazioni</h2>
+        <p class="eyebrow">Permessi</p>
+        <h2>Cosa può fare ALORA da solo</h2>
       </div>
       <button
         type="button"
@@ -32,13 +32,13 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
         [disabled]="busy"
         (click)="load()"
       >
-        {{ loaded ? "Aggiorna autorizzazioni" : "Gestisci autorizzazioni" }}
+        {{ loaded ? "Aggiorna" : "Mostra i permessi" }}
       </button>
     </header>
     <p class="notice">
-      Ogni canale richiede un’autorizzazione distinta, revocabile e con
-      scadenza. Le azioni cliente sull’agenda richiedono un’autorizzazione
-      propria. Attiva poi i promemoria nella policy.
+      I permessi si creano da soli quando configuri «Promemoria automatici».
+      Qui li vedi, ne controlli la scadenza e puoi revocarli: un permesso
+      revocato ferma subito i messaggi che lo usano.
     </p>
     <p *ngIf="feedback" role="status" class="feedback">{{ feedback }}</p>
     <ng-container *ngIf="loaded">
@@ -61,8 +61,8 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
           Recupera la stessa autorizzazione
         </button>
         <p *ngIf="api.pending('grants').kind === 'unreadable'">
-          Dati della richiesta non leggibili. Verifica le autorizzazioni in
-          Connect.
+          Dati della richiesta non leggibili. Premi «Aggiorna» per vedere lo
+          stato attuale dei permessi.
         </p>
       </div>
       <form (ngSubmit)="prepare()">
@@ -82,7 +82,7 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
               *ngIf="channel === 'application_notification'"
               class="select-field"
             >
-              <span>Finalità</span
+              <span>A cosa serve</span
               ><ui-select
                 label="Finalità"
                 name="automation-purpose"
@@ -92,7 +92,7 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
               ></ui-select>
             </div
             ><label
-              >Validità (giorni)<input
+              >Per quanti giorni vale<input
                 type="number"
                 name="automation-days"
                 [(ngModel)]="validDays"
@@ -101,7 +101,7 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
                 step="1"
                 required /></label
             ><div *ngIf="channel === 'whatsapp'" class="select-field">
-              <span>Archivio del numero</span
+              <span>Numero WhatsApp</span
               ><ui-select
                 label="Archivio del numero"
                 name="automation-archive"
@@ -113,12 +113,12 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
             </div>
           </div>
           <p class="muted">
-            L’autorizzazione usa il tuo accesso corrente e i permessi che
-            possiedi adesso. Per WhatsApp occorre un numero connesso. La
-            scadenza viene fissata alla prima richiesta.
+            Il permesso vale con i diritti che il tuo account ha adesso. Per
+            WhatsApp serve un numero connesso. Alla scadenza i messaggi si
+            fermano: rinnovalo da «Promemoria automatici».
           </p>
           <button class="primary-btn" [disabled]="!validInput">
-            Registra autorizzazione
+            Crea permesso
           </button>
         </fieldset>
       </form>
@@ -127,7 +127,7 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
           <div>
             <strong>{{
               grant.useCase === "customer_commands"
-                ? "Azioni cliente sull’agenda"
+                ? "Risposte dei clienti in agenda"
                 : channelLabel(grant.channel)
             }}</strong
             ><span class="state">{{ stateLabel(grant) }}</span
@@ -143,7 +143,7 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
               [disabled]="busy"
               (click)="recover(grant)"
             >
-              Verifica stato</button
+              Controlla</button
             ><button
               *ngIf="grant.status !== 'revoked'"
               type="button"
@@ -160,10 +160,10 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
           </div>
           <div *ngIf="revokeId === grant.id" class="pending">
             <p>
-              Revocare l’autorizzazione
+              Revocare il permesso
               {{
                 grant.useCase === "customer_commands"
-                  ? "Azioni cliente sull’agenda"
+                  ? "Risposte dei clienti in agenda"
                   : channelLabel(grant.channel)
               }}? I nuovi invii che la usano si fermano; un messaggio già
               acquisito richiede verifica.
@@ -182,7 +182,7 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
                 [disabled]="busy"
                 (click)="revokeId = ''"
               >
-                Mantieni autorizzazione
+                Mantieni il permesso
               </button>
             </div>
           </div>
@@ -192,10 +192,9 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
         ><p class="muted">Nessuna autorizzazione registrata.</p></ng-template
       >
       <div class="replies" *ngIf="canWhatsApp">
-        <h3>Ricezione delle risposte</h3>
+        <h3>Ricezione delle risposte dei clienti</h3>
         <p class="muted">
-          {{ hookLabel }} L’indirizzo pubblico HTTPS deve essere raggiungibile
-          da Connect.
+          {{ hookLabel }}
         </p>
         <p *ngIf="hook?.lastReceivedAt" class="muted">
           Ultimo evento ricevuto:
@@ -219,7 +218,7 @@ import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
             api.pending("webhooks").kind === "pending"
               ? "Recupera la stessa ricezione"
               : hook?.id
-                ? "Verifica ricezione in Connect"
+                ? "Controlla di nuovo"
                 : "Configura ricezione delle risposte"
           }}
         </button>
@@ -406,7 +405,7 @@ export class AppointmentAutomationAccessComponent {
       this.purposeOptionsCache = [
         { value: "notifications", label: "Avvisi nell’app" },
         ...(canCommands
-          ? [{ value: "customer_commands", label: "Azioni cliente sull’agenda" }]
+          ? [{ value: "customer_commands", label: "Risposte dei clienti in agenda" }]
           : []),
       ];
     }
@@ -440,12 +439,12 @@ export class AppointmentAutomationAccessComponent {
   }
   get hookLabel() {
     return this.hook?.status === "ready"
-      ? "Ricezione registrata. La consegna pubblica va verificata separatamente."
+      ? "Attiva: ALORA riceve i tocchi dei clienti sui pulsanti."
       : this.hook?.status === "disabled"
-        ? "Ricezione disabilitata in Connect: non viene riattivata automaticamente."
+        ? "Disattivata dal servizio messaggi: scrivi all’assistenza EULAB."
         : this.hook?.status === "preparing"
           ? "Configurazione da recuperare."
-          : "Ricezione non configurata.";
+          : "Non attiva: senza, le risposte dei clienti non arrivano in agenda.";
   }
   channelLabel(channel: AppointmentAutomationChannel) {
     return channel === "whatsapp"
@@ -458,9 +457,9 @@ export class AppointmentAutomationAccessComponent {
     if (row.status === "ready" && Date.parse(row.expiresAt) <= Date.now())
       return "Scaduta";
     return {
-      ready: "Registrata · verifica corrente prima di ogni invio",
-      preparing: "Preparazione da recuperare",
-      revocation_pending: "Revoca da completare · nuovi invii fermati",
+      ready: "Attivo",
+      preparing: "In preparazione: premi «Controlla»",
+      revocation_pending: "Revoca in corso · i messaggi sono già fermi",
       revoked: "Revocata",
     }[row.status];
   }
@@ -512,7 +511,7 @@ export class AppointmentAutomationAccessComponent {
     }
   }
   load() {
-    return this.run(() => Promise.resolve(), "Autorizzazioni aggiornate.");
+    return this.run(() => Promise.resolve(), "Permessi aggiornati.");
   }
   prepare() {
     if (!this.validInput) return;
@@ -526,7 +525,7 @@ export class AppointmentAutomationAccessComponent {
             ? this.useCase
             : "notifications",
         ),
-      "Autorizzazione registrata. Ricarica la policy per selezionarla.",
+      "Permesso creato.",
     );
   }
   resume(kind: "grants" | "webhooks") {
@@ -538,7 +537,7 @@ export class AppointmentAutomationAccessComponent {
   recover(row: AppointmentAutomationGrantView) {
     return this.run(
       () => this.api.action(row.id, "recover"),
-      "Stato dell’autorizzazione verificato in Connect.",
+      "Stato del permesso aggiornato.",
     );
   }
   revoke(row: AppointmentAutomationGrantView) {
