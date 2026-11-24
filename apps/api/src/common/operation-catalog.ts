@@ -299,6 +299,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "dashboard.revenue.read",
   },
+  "SetupStatusController.read": {
+    kind: "function",
+    key: "settings.manage",
+  },
   "TenantController.getSettings": {
     kind: "function",
     key: "settings.manage",

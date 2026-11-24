@@ -170,13 +170,41 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               name="settingsName"
               required
           /></label>
+          <div class="field" data-tour="settings-booking-mode">
+              <span>Come accetti le prenotazioni</span>
+              <ui-select
+                [value]="settingsForm.bookingMode"
+                (valueChange)="settingsForm.bookingMode = $event"
+                [options]="bookingModeOptions"
+                label="Come accetti le prenotazioni"
+              ></ui-select>
+              <small class="field-hint">Decide se i clienti possono prenotare da soli dalla tua pagina. Le altre impostazioni delle prenotazioni online compaiono solo se le usi.</small>
+            </div>
+          <section *ngIf="settingsForm.bookingMode !== 'closed'" class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-public-enabled">
+            <p class="text-sm font-semibold">Prenotazioni online</p>
+            <p class="mt-1 text-xs text-[var(--muted)]">
+              Interruttore rapido: spegnilo per sospendere le prenotazioni online senza cambiare le altre impostazioni.
+            </p>
+            <div class="mt-4">
+            <label class="field checkbox-field"
+              ><input
+                [(ngModel)]="settingsForm.publicEnabled"
+                name="settingsPublicEnabled"
+                type="checkbox"
+              /><span>Permetti ai clienti di prenotare online</span></label
+            >
+            </div>
+          </section>
+          <ng-container *ngIf="settingsForm.bookingMode !== 'closed' && settingsForm.publicEnabled">
+          <p class="eyebrow text-[var(--accent)] mt-2">La tua pagina di prenotazione</p>
           <label class="field" data-tour="settings-domain">
-            <span>Indirizzo web per le prenotazioni</span>
+            <span>Il tuo dominio (facoltativo)</span>
             <input
               [(ngModel)]="settingsForm.publicDomain"
               name="settingsPublicDomain"
               placeholder="booking.miodominio.it"
             />
+            <small class="field-hint">Lascia vuoto per usare l’indirizzo ALORA.</small>
             <a
               *ngIf="computedPublicUrl"
               class="mt-2 inline-flex text-sm text-[var(--accent)] underline"
@@ -186,6 +214,35 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               >Apri la pagina clienti: {{ computedPublicUrl }}</a
             >
           </label>
+          <label class="field"
+              ><span>Titolo della pagina clienti</span
+              ><input
+                [(ngModel)]="settingsForm.publicTitle"
+                name="settingsPublicTitle"
+                placeholder="Prenota online"
+            /></label>
+          <label class="field" data-tour="settings-public-texts"
+            ><span>Messaggio di benvenuto</span
+            ><textarea
+              [(ngModel)]="settingsForm.publicDescription"
+              name="settingsPublicDescription"
+              rows="3"
+            ></textarea>
+          </label>
+          <label class="field">
+            <span>Come funziona la prenotazione</span>
+            <textarea
+              [(ngModel)]="settingsForm.publicStepsText"
+              name="settingsPublicStepsText"
+              rows="4"
+              placeholder="Scegli|Trova il servizio che desideri&#10;Prenota|Scegli professionista, giorno e orario&#10;Conferma|Invia la richiesta al salone"
+            ></textarea>
+            <small class="field-hint"
+              >Facoltativo. Una riga per passaggio: titolo, poi «|», poi la spiegazione. Esempio: Scegli|Trova il servizio che desideri</small
+            >
+          </label>
+          </ng-container>
+          <p class="eyebrow text-[var(--accent)] mt-2">Immagine del salone</p>
           <div class="field" data-tour="settings-logo">
             <span>Logo</span>
             <input
@@ -324,51 +381,12 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 type="color"
             /></label>
           </div>
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2" data-tour="settings-booking-mode">
-            <div class="field">
-              <span>Come accetti le prenotazioni</span>
-              <ui-select
-                [value]="settingsForm.bookingMode"
-                (valueChange)="settingsForm.bookingMode = $event"
-                [options]="bookingModeOptions"
-                label="Come accetti le prenotazioni"
-              ></ui-select>
-              <small class="field-hint">Scegli se ricevere richieste online, inserirle dal salone o usare entrambe le modalità.</small>
-            </div>
-            <label class="field"
-              ><span>Titolo della pagina clienti</span
-              ><input
-                [(ngModel)]="settingsForm.publicTitle"
-                name="settingsPublicTitle"
-                placeholder="Prenota online"
-            /></label>
-          </div>
-          <label class="field" data-tour="settings-public-texts"
-            ><span>Messaggio di benvenuto</span
-            ><textarea
-              [(ngModel)]="settingsForm.publicDescription"
-              name="settingsPublicDescription"
-              rows="3"
-            ></textarea>
-          </label>
-          <label class="field">
-            <span>Come funziona la prenotazione</span>
-            <textarea
-              [(ngModel)]="settingsForm.publicStepsText"
-              name="settingsPublicStepsText"
-              rows="4"
-              placeholder="Scegli|Trova il servizio che desideri&#10;Prenota|Scegli professionista, giorno e orario&#10;Conferma|Invia la richiesta al salone"
-            ></textarea>
-            <small class="field-hint"
-              >Una riga per passaggio, nel formato Titolo|Descrizione</small
-            >
-          </label>
           <div class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-holidays">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <p class="text-sm font-semibold">Chiusure del salone</p>
+                <p class="text-sm font-semibold">Chiusure di tutte le sedi</p>
                 <p class="mt-1 text-xs text-[var(--muted)]">
-                  In questi giorni nessun professionista risulterà disponibile.
+                  In questi giorni nessuno è prenotabile in nessuna sede. Le chiusure di una sola sede si impostano in Sedi.
                 </p>
               </div>
               <button type="button" class="pill-btn" (click)="addHoliday()">
@@ -406,7 +424,8 @@ import { bookingModeLabel } from "../shared/presentation-copy";
               </p>
             </div>
           </div>
-          <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-ui-scale">
+          <details class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-ui-scale">
+            <summary class="cursor-pointer text-sm font-semibold">Preferenze di questo dispositivo</summary>
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-sm font-semibold">Interfaccia</p>
@@ -432,22 +451,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
                 consigliato.</small
               >
             </label>
-          </section>
-          <section class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-public-enabled">
-            <p class="text-sm font-semibold">Prenotazioni online</p>
-            <p class="mt-1 text-xs text-[var(--muted)]">
-              Controlla se i clienti possono inviare prenotazioni dal link pubblico.
-            </p>
-            <div class="mt-4">
-            <label class="field checkbox-field"
-              ><input
-                [(ngModel)]="settingsForm.publicEnabled"
-                name="settingsPublicEnabled"
-                type="checkbox"
-              /><span>Permetti ai clienti di prenotare online</span></label
-            >
-            </div>
-          </section>
+          </details>
           <button
             type="submit"
             class="primary-btn"

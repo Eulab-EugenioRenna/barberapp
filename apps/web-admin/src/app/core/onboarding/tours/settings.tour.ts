@@ -8,75 +8,64 @@ export const SETTINGS_TOUR: TourDefinition = {
   id: "settings",
   navKey: "settings",
   title: "Profilo e prenotazioni",
-  version: 1,
+  version: 2,
   when: (ctx) => ctx.canView("settings"),
   steps: () => [
     {
       title: "Profilo e prenotazioni",
-      body: "Qui definisci come si presenta la tua attività ai clienti: nome, logo, colori, testi e regole della pagina di prenotazione online.",
+      body: "Qui decidi come si presenta il salone e se i clienti possono prenotare da soli. Le impostazioni compaiono in ordine: quelle della pagina online solo se le prenotazioni online sono attive.",
     },
     {
       target: "settings-preview",
       title: "Anteprima per i clienti",
-      body: "Mostra in tempo reale come apparirà la pagina di prenotazione mentre modifichi i campi. È solo un'anteprima: nulla cambia finché non salvi.",
+      body: "Mostra come apparirà la pagina di prenotazione mentre modifichi. Nulla cambia finché non salvi.",
     },
     {
       target: "settings-name",
-      title: "Nome dell'attività",
-      body: "Il nome del salone è obbligatorio: senza non puoi salvare.",
+      title: "1. Nome del salone",
+      body: "Obbligatorio: lo vedono i clienti nella pagina e nei messaggi.",
+    },
+    {
+      target: "settings-booking-mode",
+      title: "2. Come accetti le prenotazioni",
+      body: "La scelta più importante. «Solo dal salone» nasconde tutto ciò che riguarda la pagina online; le altre due mostrano le impostazioni della pagina.",
+    },
+    {
+      target: "settings-public-enabled",
+      title: "Sospendere le prenotazioni online",
+      body: (c) =>
+        (c.tenant?.publicEnabled === false ? "Ora le prenotazioni online sono sospese. " : "") +
+        "Un interruttore per fermarle e riaprirle al volo, senza perdere le altre impostazioni.",
     },
     {
       target: "settings-domain",
-      title: "Indirizzo della pagina clienti",
-      body: "Se hai un tuo dominio (es. booking.miodominio.it) inseriscilo qui; altrimenti la pagina usa l'indirizzo standard dell'attività. Il link sotto apre la pagina clienti.",
+      title: "3. La tua pagina",
+      body: "Facoltativo: se hai un tuo dominio inseriscilo, altrimenti si usa l'indirizzo ALORA. Sotto, titolo, benvenuto e passaggi che i clienti leggono.",
     },
     {
       target: ["settings-logo", "settings-cover"],
-      title: "Logo e copertina",
-      body: "Scegli un'immagine e premi «Carica» per pubblicarla subito; con «Rimuovi» la togli. Se salvi le impostazioni con un file scelto ma non caricato, viene caricato in automatico.",
+      title: "4. Logo e copertina",
+      body: "Scegli un'immagine e premi «Carica». Se salvi con un file scelto ma non caricato, viene caricato in automatico.",
     },
     {
       target: "settings-colors",
       title: "Colori",
-      body: "Il colore principale e quello in evidenza personalizzano la pagina di prenotazione.",
-    },
-    {
-      target: "settings-booking-mode",
-      title: "Come accetti le prenotazioni",
-      body: "Scegli solo online, online e dal salone, oppure solo dal salone, e il titolo che i clienti vedono in cima alla pagina.",
-    },
-    {
-      target: "settings-public-texts",
-      title: "Testi della pagina",
-      body: "Il messaggio di benvenuto e, sotto, i passaggi della prenotazione: una riga per passaggio nel formato Titolo|Descrizione.",
+      body: "Personalizzano la pagina di prenotazione.",
     },
     {
       target: "settings-holidays",
-      title: "Chiusure del salone",
-      body: "Aggiungi i giorni di chiusura con data e nome: in quei giorni nessun professionista risulta disponibile.",
-    },
-    {
-      target: "settings-public-enabled",
-      title: "Prenotazioni online",
-      body: (c) =>
-        (c.tenant?.publicEnabled === false
-          ? "Ora i clienti non possono prenotare dal link pubblico. "
-          : "") + "Con questa opzione decidi se i clienti possono inviare prenotazioni dal link pubblico.",
-    },
-    {
-      target: "settings-ui-scale",
-      title: "Scala dell'interfaccia",
-      body: "Ingrandisce o riduce testi e controlli del gestionale solo su questo dispositivo e si applica subito, senza salvare.",
+      title: "5. Chiusure di tutte le sedi",
+      body: "Giorni in cui nessuno è prenotabile in nessuna sede. Le chiusure di una sola sede si impostano in Sedi.",
     },
     {
       target: "settings-save",
-      title: "Salva impostazioni",
-      body: "Pubblica tutte le modifiche: nome, indirizzo, colori, testi, chiusure e prenotazioni online.",
+      title: "Salva",
+      body: "Pubblica tutte le modifiche.",
     },
     {
-      target: "settings-reset",
-      title: "Ripristina i valori consigliati",
-      body: "Riporta colori, modalità di prenotazione e testi ai valori consigliati e svuota logo, copertina e chiusure nel modulo. Diventa definitivo solo quando premi «Salva impostazioni».",
+      target: "settings-ui-scale",
+      title: "Preferenze di questo dispositivo",
+      body: "In fondo, chiuse: la dimensione dei testi vale solo su questo dispositivo e si applica subito.",
     },
   ],
 };

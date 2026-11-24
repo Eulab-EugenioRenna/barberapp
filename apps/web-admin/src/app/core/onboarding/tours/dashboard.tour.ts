@@ -5,7 +5,7 @@ export const DASHBOARD_TOUR: TourDefinition = {
   id: "dashboard",
   navKey: "dashboard",
   title: "Panoramica",
-  version: 2,
+  version: 3,
   when: (ctx) => ctx.canView("dashboard"),
   steps: () => [
     {
@@ -15,6 +15,11 @@ export const DASHBOARD_TOUR: TourDefinition = {
         (c.role === "owner"
           ? " Come titolare vedi i numeri di tutte le sedi."
           : " Vedi solo i conti interamente compresi nelle sedi e attività che ti sono assegnate."),
+    },
+    {
+      target: "dashboard-setup",
+      title: "Primi passi",
+      body: "L'elenco di cosa preparare, nell'ordine giusto: sede, servizi, collaboratori, poi WhatsApp, promemoria e prenotazioni online. Un passo che dipende da un altro ti dice quale fare prima. Sparisce quando hai finito.",
     },
     {
       target: "dashboard-filters",

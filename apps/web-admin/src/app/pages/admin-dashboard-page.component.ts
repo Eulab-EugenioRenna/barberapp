@@ -1,5 +1,6 @@
 import { FinancialValuesPanelComponent } from "../shared/financial-values-panel.component";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
+import { SetupChecklistComponent } from "../shared/setup-checklist.component";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { AdminMetricsGridComponent } from "../shared/admin-metrics-grid.component";
@@ -20,6 +21,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
   imports: [
     FinancialValuesPanelComponent,
     FunctionAccessDirective,
+    SetupChecklistComponent,
     CommonModule,
     AdminMetricsGridComponent,
     CalendarInputComponent,
@@ -29,6 +31,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
   ],
   template: `
     <section class="grid gap-4">
+      <alora-setup-checklist aloraFunction="settings.manage"></alora-setup-checklist>
       <article class="panel rounded-[2rem] p-4 sm:p-5">
         <div class="page-head">
           <div class="min-w-0">

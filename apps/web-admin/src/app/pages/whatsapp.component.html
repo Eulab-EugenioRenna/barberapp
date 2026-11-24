@@ -89,7 +89,10 @@
         <span>Numero</span>
         <ui-select label="Numero" [options]="archiveOptions" [(ngModel)]="archiveId" (ngModelChange)="selectArchive()" placeholder="Scegli un numero"></ui-select>
       </div>
-      <p *ngIf="!archives.length && !loading" class="wa-empty">Le conversazioni compaiono dopo il collegamento del tuo numero.</p>
+      <div *ngIf="!archives.length && !loading" class="wa-empty">
+        <p>Per vedere le conversazioni serve prima collegare il tuo numero.</p>
+        <button type="button" class="secondary-btn" (click)="section = 'connection'">Vai al collegamento</button>
+      </div>
       <p *ngIf="archiveId && !conversations.length" class="wa-empty">Nessuna conversazione acquisita.</p>
       <div class="wa-chat-list">
         <button *ngFor="let chat of conversations; trackBy: trackChat" type="button" class="wa-chat" [class.selected]="chat.chatId === chatId" [attr.aria-pressed]="chat.chatId === chatId" (click)="selectChat(chat)">
@@ -161,7 +164,11 @@
   >
     <p class="wa-muted">L’invio usa il tuo numero collegato. Un messaggio accettato dal canale non conferma la lettura del destinatario.</p>
     <p *ngIf="!canSend" class="wa-empty">Per inviare messaggi occorre il permesso dedicato.</p>
-    <ng-container *ngIf="canSend">
+    <div *ngIf="canSend && !connected && pending.kind === 'empty'" class="wa-confirm">
+      <p>Per attivarlo serve prima: il tuo numero collegato e connesso.</p>
+      <button type="button" class="primary-btn" (click)="section = 'connection'">Vai al collegamento</button>
+    </div>
+    <ng-container *ngIf="canSend && (connected || pending.kind !== 'empty')">
       <div *ngIf="pending.kind !== 'empty'" class="wa-feedback" role="status">
         <p>Un invio precedente è da verificare. I dati restano conservati anche ricaricando la pagina.</p>
         <div *ngIf="pendingPayload as saved"><strong>{{ saved.to }}</strong><p class="wa-pending-text">{{ saved.text }}</p></div>
@@ -193,7 +200,6 @@
           <button class="primary-btn" [disabled]="!fresh || !connected || !recipientAuthorized || (!message.trim() && !image) || !hasRecipient">{{ sending ? 'Invio in verifica…' : 'Invia messaggio' }}</button>
         </fieldset>
       </form>
-      <p *ngIf="!connected" class="wa-muted">Collega il tuo numero e attendi che risulti connesso per inviare.</p>
     </ng-container>
     <p *ngIf="sendFeedback" role="status" class="wa-feedback">{{ sendFeedback }}</p>
   </section>
