@@ -158,7 +158,14 @@ describe("Personal activity projection", () => {
     expect(aggregate).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          booking: { tenantId: "company-a", status: "completed" },
+          // Completed own booking, or a migrated line whose account appointment is completed.
+          OR: [
+            { booking: { tenantId: "company-a", status: "completed" } },
+            {
+              booking: null,
+              sale: { appointment: { tenantId: "company-a", status: "completed" } },
+            },
+          ],
           sale: {
             tenantId: "company-a",
             soldAt: expect.anything(),

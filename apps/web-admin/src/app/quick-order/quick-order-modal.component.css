@@ -124,9 +124,13 @@
   display: grid;
   flex: 1 1 auto;
   align-content: start;
-  min-height: 0;
-  gap: var(--space-lg);
+  /* Always room for at least one whole line above the checkout bar. */
+  min-height: 16rem;
+  gap: var(--space-md);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y proximity;
+  scroll-padding-block: var(--space-sm);
   padding-right: var(--space-2xs);
 }
 .quick-order-step {
@@ -188,6 +192,7 @@
 .cart-line {
   display: grid;
   gap: var(--space-sm);
+  scroll-snap-align: start;
   padding: var(--space-md);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 1.25rem;
@@ -215,8 +220,25 @@
 }
 .cart-line-fields {
   display: grid;
-  grid-template-columns: 90px minmax(0, 1fr);
-  gap: 0.75rem;
+  /* Quantity, price and discount on one row; the rest spans the line. */
+  grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.6rem;
+}
+.cart-line-fields > .cart-more,
+.cart-line-fields > alora-sector-picker {
+  grid-column: 1 / -1;
+}
+.cart-more summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+}
+.cart-more-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.6rem;
+  margin-top: 0.5rem;
 }
 .cart-line-fields .cart-collaborator {
   grid-column: 1 / -1;
@@ -271,7 +293,7 @@
   bottom: 0;
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-sm);
   margin-top: auto;
   padding-top: var(--space-md);
@@ -284,6 +306,9 @@
   color: #fff;
   background: rgba(255, 255, 255, 0.08);
 }
+.checkout-bar > button {
+  grid-column: 1 / -1;
+}
 .checkout-total {
   grid-column: 1 / -1;
   padding-top: var(--space-sm);
@@ -291,7 +316,7 @@
 }
 .checkout-total strong {
   font-family: var(--font-display, sans-serif);
-  font-size: 2rem;
+  font-size: 1.6rem;
 }
 .checkout-bar .primary-btn {
   min-height: 3.2rem;
@@ -496,3 +521,9 @@
   margin-top: 0.25rem;
   font-weight: 600;
 }
+
+/* Line layout: quantity · price · discount first, then the wide fields. */
+.cart-line-fields > alora-sector-picker { order: 5; }
+.cart-line-fields > .cart-nonperformance { order: 6; }
+.cart-line-fields > .cart-more { order: 7; }
+.cart-line-fields > .cart-collaborator { order: 8; }

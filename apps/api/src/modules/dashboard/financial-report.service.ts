@@ -110,7 +110,10 @@ export class FinancialReportService {
     const selectedSector = inSet(Prisma.sql`i."sectorId"`, scope.sectorIds);
     // Only a completed row with its own declared performer is attributed.
     // Never fall back to the sale's primary or the planned collaborator.
-    const performer = Prisma.sql`CASE WHEN a.status='completed' THEN i."collaboratorId" ELSE NULL END`;
+    // Migrated accounts link only their first service to the appointment: the
+    // other lines have no appointment of their own and count as performed when
+    // the account's appointment was completed (the line's collaborator is kept).
+    const performer = Prisma.sql`CASE WHEN a.status='completed' OR (a.id IS NULL AND sa.status='completed') THEN i."collaboratorId" ELSE NULL END`;
     const selectedLine = Prisma.sql`${selectedSector} ${
       filters.collaboratorId
         ? Prisma.sql`AND ${performer}=${filters.collaboratorId}`
@@ -149,6 +152,7 @@ export class FinancialReportService {
           (${selectedLine}) AS selected
         FROM visible s JOIN "SaleItem" i ON i."saleId"=s.id
         LEFT JOIN "Appointment" a ON a."orderItemId"=i.id AND a."tenantId"=${scope.tenantId}
+        LEFT JOIN "Appointment" sa ON sa.id=s."appointmentId" AND sa."tenantId"=${scope.tenantId}
       ), scoped AS MATERIALIZED (
         SELECT s.* FROM visible s WHERE EXISTS(SELECT 1 FROM lines i WHERE i."saleId"=s.id AND i.selected)
         ${lineFiltered ? Prisma.empty : Prisma.sql`OR NOT EXISTS(SELECT 1 FROM "SaleItem" i WHERE i."saleId"=s.id)`}

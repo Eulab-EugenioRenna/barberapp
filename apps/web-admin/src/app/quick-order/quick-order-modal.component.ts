@@ -1,3 +1,4 @@
+import { wholeQuantity } from "./quick-order-quantity";
 import { CreateRecoveryService } from "../core/create-recovery.service";
 import { AccountPaymentsComponent } from "../shared/account-payments.component";
 import { HttpClient } from "@angular/common/http";
@@ -445,7 +446,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         item.kind === "service"
           ? item.nonPerformanceChargeReason?.trim() || null
           : undefined,
-      quantity: Number(item.quantity || 1),
+      quantity: wholeQuantity(item.quantity),
       unitPrice: String(item.unitPrice),
       discount: String(item.discount ?? 0),
       taxTotal: String(item.taxTotal ?? 0),
@@ -454,6 +455,24 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       priceOverrideReason: item.priceOverrideReason || undefined,
     }));
   }
+  /** The line being edited stays whole in view instead of half under the bar. */
+  revealLine(event: FocusEvent): void {
+    const line = event.currentTarget as HTMLElement | null;
+    line?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+    /** Quantity typed in the cart: whole number, at least 1, written back on blur. */
+  fixQuantity(item: any): void {
+    const quantity = wholeQuantity(item.quantity);
+    if (item.quantity !== quantity) {
+      item.quantity = quantity;
+      this.queueQuote();
+    }
+  }
+  /** A service is one performance per line; legacy lines with more stay editable. */
+  quantityEditable(item: any): boolean {
+    return item.kind !== "service" || Number(item.quantity) !== 1;
+  }
+
   queueQuote() {
     if (this.quoteTimer) clearTimeout(this.quoteTimer);
     const generation = ++this.quoteGeneration;
@@ -878,3 +897,4 @@ function toLocalInput(value: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
+

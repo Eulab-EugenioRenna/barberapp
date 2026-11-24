@@ -153,7 +153,12 @@ export class PersonalDashboardController {
       collaborator: profileScope,
       serviceId: { not: null },
       service: { tenantId },
-      booking: { tenantId, status: "completed" },
+      // Own completed booking, or (migrated accounts) no booking of its own and
+      // the account's appointment completed: same rule as the overview.
+      OR: [
+        { booking: { tenantId, status: "completed" } },
+        { booking: null, sale: { appointment: { tenantId, status: "completed" } } },
+      ],
       sale: {
         tenantId,
         soldAt: { gte: range.start!, lte: range.end! },
