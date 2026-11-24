@@ -211,16 +211,23 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     return this.locationOptionsCache;
   }
 
-  get customerOptions() {
+  private customerOptionsKey: unknown[] = [];
+  private customerOptionsCache: UiOption[] = [];
+  /** Rebuilt only when its sources change: a new array per check re-renders the open list. */
+  get customerOptions(): UiOption[] {
     const selectedCustomer = this.sale?.customer || this.appointment?.customer;
-    return this.uniqueEntities([
+    const key = [this.customers, selectedCustomer, this.createdCustomers.length, this.createdCustomers[0]];
+    if (key.length === this.customerOptionsKey.length && key.every((part, i) => part === this.customerOptionsKey[i]))
+      return this.customerOptionsCache;
+    this.customerOptionsKey = key;
+    return (this.customerOptionsCache = this.uniqueEntities([
       ...this.createdCustomers,
       ...(selectedCustomer ? [selectedCustomer] : []),
       ...this.customers,
     ]).map((customer) => ({
       value: customer.id,
       label: `${customer.firstName} ${customer.lastName}`.trim(),
-    }));
+    })));
   }
 
   /** Sector of the service's activity at the account's location. */

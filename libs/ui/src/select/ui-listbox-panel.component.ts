@@ -6,8 +6,10 @@ import {
   ElementRef,
   EventEmitter,
   Input,
+  NgZone,
   OnChanges,
   Output,
+  SimpleChanges,
   inject,
 } from "@angular/core";
 import type { UiOption } from "./ui-option";
@@ -243,6 +245,7 @@ import type { UiOption } from "./ui-option";
 })
 export class UiListboxPanelComponent implements OnChanges, AfterViewInit {
   private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly zone = inject(NgZone);
 
   @Input() options: UiOption[] = [];
   @Input() listboxId = "";
@@ -278,14 +281,17 @@ export class UiListboxPanelComponent implements OnChanges, AfterViewInit {
     }
   }
 
-  ngOnChanges(): void {
-    // Keep the keyboard-active option in view.
-    queueMicrotask(() => {
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes["activeIndex"] && !changes["options"]) return;
+    // Keep the keyboard-active option in view. Outside Angular: a microtask in
+    // the zone triggers change detection again, and a parent that passes a
+    // freshly built options array would loop forever and freeze the page.
+    this.zone.runOutsideAngular(() => queueMicrotask(() => {
       const el = (this.host.nativeElement as HTMLElement).querySelector<HTMLElement>(
         ".ui-lb-option.ui-active",
       );
       el?.scrollIntoView?.({ block: "nearest" });
-    });
+    }));
   }
 
   track = (index: number, option: UiOption) => `${index}:${String(option.value)}`;
