@@ -59,9 +59,9 @@ export const ALORA_FUNCTIONS = [
   },
   {
     key: "appointments.update.own",
-    name: "La mia agenda · Aggiornare lo stato",
+    name: "La mia agenda · Prenotare e aggiornare",
     description:
-      "Segnare i propri appuntamenti come arrivati, iniziati o completati. Include «La mia agenda · Vedere».",
+      "Prenotare nella propria agenda (cliente, servizio e orario libero) e segnare i propri appuntamenti come arrivati, iniziati o completati. Include «La mia agenda · Vedere» e l’elenco dei clienti necessario alla prenotazione.",
     legacy: true,
     implies: ["appointments.read.own"],
   },
@@ -250,7 +250,7 @@ export const MERGED_FUNCTIONS = {
 
 export type PublishedFunctionKey = (typeof ALORA_FUNCTIONS)[number]["key"];
 export type FunctionKey = PublishedFunctionKey | keyof typeof MERGED_FUNCTIONS;
-export const FUNCTION_MATRIX_VERSION = 9;
+export const FUNCTION_MATRIX_VERSION = 10;
 
 /**
  * Lists needed to sell or book (catalogue, customers, professionals): whoever

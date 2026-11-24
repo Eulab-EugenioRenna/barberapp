@@ -8,7 +8,7 @@ export const MY_AGENDA_TOUR: TourDefinition = {
   id: "my-agenda",
   navKey: "my-agenda",
   title: "La mia agenda",
-  version: 1,
+  version: 2,
   when: (ctx) =>
     ctx.role !== "platform_admin" &&
     !!ctx.user?.collaboratorId &&
@@ -19,6 +19,14 @@ export const MY_AGENDA_TOUR: TourDefinition = {
       body:
         "Qui trovi solo il tuo lavoro: gli appuntamenti assegnati a te, i tuoi turni e il riepilogo del periodo. " +
         "Ti mostro come leggerla e cosa puoi fare.",
+    },
+    {
+      target: "my-agenda-new",
+      when: canUpdateStatus,
+      title: "Segna un tuo appuntamento",
+      body:
+        "Con «Nuovo appuntamento» prenoti nella tua agenda: scegli il cliente (o inseriscilo se è nuovo), " +
+        "il servizio e il giorno, poi uno degli orari liberi che ALORA ti propone.",
     },
     {
       target: "my-agenda-back",

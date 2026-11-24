@@ -18,7 +18,7 @@ export const ROLE_OPTIONS = [
   {
     id: "personal",
     name: "Le proprie attività",
-    description: "Agenda personale e stato dei servizi assegnati.",
+    description: "Agenda personale: prenotare i propri appuntamenti e aggiornarne lo stato.",
     keys: COLLABORATOR_FUNCTIONS,
   },
   {

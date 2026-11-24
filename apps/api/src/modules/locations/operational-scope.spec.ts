@@ -101,7 +101,8 @@ describe("Operational membership intersection", () => {
         "locations.manage",
       ),
     ).toBe(false);
-    expect(createFunctionMatrix("alora-test").version).toBe(9);
+    // v10: «La mia agenda · Prenotare e aggiornare» also books in one's own agenda.
+    expect(createFunctionMatrix("alora-test").version).toBe(10);
     // v9: products.* and confirmations.read merged into Listino and Cassa.
     expect(createFunctionMatrix("alora-test").functions).toHaveLength(29);
   });

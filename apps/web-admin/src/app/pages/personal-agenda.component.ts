@@ -10,16 +10,19 @@ import type { PersonalAppointment, PersonalDashboard } from "@barber/shared/pers
 import { AdminApiService } from "../core/admin-api.service";
 import { SessionRefreshService } from "../core/session-refresh.service";
 import { SessionStore } from "../core/session.store";
+import { PersonalBookingComponent } from "./personal-booking.component";
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, UiPageComponent, UiSelectComponent, AdminPageHeaderComponent],
+  imports: [CommonModule, FormsModule, RouterLink, PersonalBookingComponent, UiPageComponent, UiSelectComponent, AdminPageHeaderComponent],
   template: `<ui-page>
     <alora-page-header
       navKey="my-agenda"
       [titleOverride]="collaboratorId ? (data ? 'Agenda di ' + data.professional.firstName + ' ' + data.professional.lastName : 'Agenda del profilo') : ''"
     >
       <a uiPageActions *ngIf="collaboratorId && canOpenCompany" class="secondary-btn" data-tour="my-agenda-back" [routerLink]="companyRoute">Torna alla squadra</a>
+      <button uiPageActions *ngIf="canBook && !booking" type="button" class="primary-btn" data-tour="my-agenda-new" (click)="booking = true; feedback = ''">Nuovo appuntamento</button>
     </alora-page-header>
+    <alora-personal-booking *ngIf="booking && canBook" [collaboratorId]="ownCollaboratorId" (closed)="booking = false" (booked)="onBooked()"></alora-personal-booking>
     <section class="panel rounded-[2rem] p-5 sm:p-6" aria-label="Periodo">
       <p *ngIf="data" class="text-sm opacity-75">{{ data.professional.firstName }} {{ data.professional.lastName }} · Orari {{ data.timezone }}</p>
       <form class="mt-3 flex flex-wrap items-end gap-3" data-tour="my-agenda-period" (ngSubmit)="load(false, true)">
@@ -94,6 +97,14 @@ export class PersonalAgendaComponent implements OnInit {
   get canOpenInventory(): boolean { return this.store.can("inventory.read"); }
   get canOpenCompany(): boolean { return this.store.can("appointments.read.all") || this.store.can("users.manage"); }
   get canUpdate(): boolean { return this.store.can("appointments.update.all") || ((!this.collaboratorId || this.collaboratorId === this.store.currentUser()?.collaboratorId) && this.store.can("appointments.update.own")); }
+  /** Booking in «La mia agenda»: only in one's own agenda. */
+  get ownCollaboratorId(): string { return this.store.currentUser()?.collaboratorId || ""; }
+  get canBook(): boolean {
+    if (!this.ownCollaboratorId || (this.collaboratorId && this.collaboratorId !== this.ownCollaboratorId)) return false;
+    return this.store.can("appointments.update.own") || this.store.can("appointments.create");
+  }
+  booking = false;
+  onBooked(): void { this.booking = false; this.feedback = "Appuntamento prenotato."; void this.load(true); }
   ngOnInit(): void { void this.load(); }
   async load(preserveFeedback = false, resetPage = false): Promise<void> {
     if (resetPage) this.page = 1;

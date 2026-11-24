@@ -71,9 +71,13 @@ describe("transitional local authorization", () => {
     },
   );
   it("requires full client access for customer filter names", () => {
-    for (const role of ["manager", "reception", "collaborator"]) {
+    for (const role of ["manager", "reception"]) {
       expect(() => authorizeLocalOperation(session(role, ["appointments.read.all"]), "CustomersController", "options")).toThrow();
     }
+    // A professional reads the names only to book in their own agenda.
+    const restricted = { ...session("collaborator", ["appointments.read.own"]) };
+    restricted.user = { ...restricted.user!, permissionsConfigured: true };
+    expect(() => authorizeLocalOperation(restricted, "CustomersController", "options")).toThrow();
     expect(() => authorizeLocalOperation(session("manager", ["clients.read.full"]), "CustomersController", "options")).not.toThrow();
     expect(() => authorizeLocalOperation(session("platform_admin"), "CustomersController", "options")).toThrow();
   });

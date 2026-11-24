@@ -102,7 +102,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "ConnectAuthController.exchange": { kind: "public" },
   "ConnectAuthController.exchangeTechnical": { kind: "public" },
   "ConnectTechnicalController.start": { kind: "public" },
-  "AppointmentsController.context": { kind: "function", key: "appointments.read.all", anyOf: PICK_LIST_ACCESS.agenda },
+  "AppointmentsController.context": { kind: "function", key: "appointments.read.all", own: "appointments.update.own", anyOf: PICK_LIST_ACCESS.agenda },
   "ServicesController.findAll": { kind: "function", key: "services.read", anyOf: PICK_LIST_ACCESS.services },
   "ServicesController.create": {
     kind: "function",
@@ -159,7 +159,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "collaborators.manage",
   },
-  "CustomersController.options": { kind: "function", key: "clients.read.full", anyOf: PICK_LIST_ACCESS.customers },
+  "CustomersController.options": { kind: "function", key: "clients.read.full", own: "appointments.update.own", anyOf: PICK_LIST_ACCESS.customers },
   "CustomersController.findAll": { kind: "function", key: "clients.read.full", anyOf: PICK_LIST_ACCESS.customers },
   "CustomersController.findOne": {
     kind: "function",
@@ -249,13 +249,16 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "appointments.update.all",
   },
+  // «La mia agenda»: a professional books only for themselves (personalBookingInput).
   "AppointmentsController.create": {
     kind: "function",
     key: "appointments.create",
+    own: "appointments.update.own",
   },
   "AppointmentsController.previewAvailability": {
     kind: "function",
     key: "appointments.create",
+    own: "appointments.update.own",
   },
   "PublicBookingController.previewAvailability": { kind: "public" },
   "PublicBookingController.previewHostAvailability": { kind: "public" },

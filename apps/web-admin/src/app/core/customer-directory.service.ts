@@ -29,7 +29,8 @@ export class CustomerDirectoryService {
   load(force = false): Promise<void> {
     if (this.pending && !force) return this.pending;
     if (this.loaded() && !force) return Promise.resolve();
-    if (!PICK_LIST_ACCESS.customers.some((key) => this.session.can(key))) {
+    // «La mia agenda · Prenotare e aggiornare» also reads the list, to book.
+    if (![...PICK_LIST_ACCESS.customers, "appointments.update.own"].some((key) => this.session.can(key))) {
       this.loaded.set(true);
       return Promise.resolve();
     }

@@ -33,6 +33,7 @@ import {
   AppointmentStatusDto,
 } from "../../common/legacy-write.dto";
 import { assertTenantReferences } from "../../common/tenant-references";
+import { personalBookingInput } from "../../common/personal-booking";
 import {
   BadRequestException,
   ForbiddenException,
@@ -115,7 +116,15 @@ export class AppointmentsController {
         },
       }),
       this.prisma.collaborator.findMany({
-        where: { tenantId, ...collaboratorFilter(scope), isActive: true },
+        where: {
+          tenantId,
+          ...collaboratorFilter(scope),
+          isActive: true,
+          // «La mia agenda»: whoever books only for themselves sees only themselves.
+          ...(requiresOwnAppointmentScope(session.user, "appointments.create")
+            ? { id: session.user?.collaboratorId || "" }
+            : {}),
+        },
         select: {
           id: true,
           firstName: true,
@@ -333,7 +342,7 @@ export class AppointmentsController {
         source: "internal",
         scope,
       },
-      body,
+      personalBookingInput(requireUser(session), body),
     );
   }
 
@@ -368,7 +377,7 @@ export class AppointmentsController {
     );
     const outcome = await this.bookings.execute(
       { tenantId, actorId: user.id, source: "internal", scope },
-      body,
+      personalBookingInput(user, body),
     );
     if (!outcome.replayed) {
       await this.customersAlignmentService.queueCustomerRefresh(

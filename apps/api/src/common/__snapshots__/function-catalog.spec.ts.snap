@@ -30,9 +30,9 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
       "name": "La mia agenda · Vedere",
     },
     {
-      "description": "Segnare i propri appuntamenti come arrivati, iniziati o completati. Include «La mia agenda · Vedere».",
+      "description": "Prenotare nella propria agenda (cliente, servizio e orario libero) e segnare i propri appuntamenti come arrivati, iniziati o completati. Include «La mia agenda · Vedere» e l’elenco dei clienti necessario alla prenotazione.",
       "key": "appointments.update.own",
-      "name": "La mia agenda · Aggiornare lo stato",
+      "name": "La mia agenda · Prenotare e aggiornare",
     },
     {
       "description": "Il professionista vede il valore registrato dei servizi che ha eseguito; esclusi incassi e compensi.",
@@ -151,6 +151,6 @@ exports[`ALORA function catalog projects only Connect contract fields, with a st
     },
   ],
   "schemaVersion": 1,
-  "version": 9,
+  "version": 10,
 }
 `;
