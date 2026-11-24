@@ -31,6 +31,11 @@ export class FinancialReportDto {
   @IsOptional()
   @IsUUID()
   collaboratorId?: string;
+
+  /** Panoramica switch: every line, only services or only products. */
+  @IsOptional()
+  @IsIn(["all", "services", "products"])
+  kind?: "all" | "services" | "products";
 }
 
 export class FinancialActivityDto extends FinancialReportDto {

@@ -42,6 +42,18 @@ interface FinancialTotals {
   byCollaborator: ValueRow[];
   byService: Array<ValueRow & { quantity: number }>;
   byProduct: Array<ValueRow & { quantity: number }>;
+  byBrand: Array<ValueRow & { quantity: number }>;
+  counts: {
+    serviceLines: number;
+    productLines: number;
+    customers: number;
+  };
+  appointments: {
+    total: number;
+    completed: number;
+    cancelled: number;
+    noShow: number;
+  };
   bySector: ValueRow[];
   byLocation: ValueRow[];
   collaboratorOptions: Array<{ value: string; label: string }>;
@@ -114,12 +126,20 @@ export class FinancialReportService {
     // other lines have no appointment of their own and count as performed when
     // the account's appointment was completed (the line's collaborator is kept).
     const performer = Prisma.sql`CASE WHEN a.status='completed' OR (a.id IS NULL AND sa.status='completed') THEN i."collaboratorId" ELSE NULL END`;
+    const kind = filters.kind ?? "all";
     const selectedLine = Prisma.sql`${selectedSector} ${
       filters.collaboratorId
         ? Prisma.sql`AND ${performer}=${filters.collaboratorId}`
         : Prisma.empty
+    } ${
+      kind === "services"
+        ? Prisma.sql`AND i."serviceId" IS NOT NULL`
+        : kind === "products"
+          ? Prisma.sql`AND i."productId" IS NOT NULL`
+          : Prisma.empty
     }`;
-    const lineFiltered = sectorSelected || !!filters.collaboratorId;
+    const lineFiltered =
+      sectorSelected || !!filters.collaboratorId || kind !== "all";
     const accountValuesAvailable = !lineFiltered;
     const valuation = financialValuationSql({
       scope,
@@ -217,6 +237,26 @@ export class FinancialReportService {
           SELECT i."productId" AS id,c.name AS label,SUM(i.quantity)::int AS quantity,SUM(i.gross)::numeric(30,2)::text AS revenue
           FROM sold_lines i JOIN "Product" c ON c.id=i."productId" AND c."tenantId"=${scope.tenantId}
           GROUP BY i."productId",c.name)r),'[]'::json),
+        'byBrand',COALESCE((SELECT json_agg(r ORDER BY r.revenue::numeric DESC,r.label,r.id) FROM (
+          SELECT b.id AS id,COALESCE(b.name,'Senza brand') AS label,SUM(i.quantity)::int AS quantity,SUM(i.gross)::numeric(30,2)::text AS revenue
+          FROM sold_lines i JOIN "Product" c ON c.id=i."productId" AND c."tenantId"=${scope.tenantId}
+          LEFT JOIN "ProductBrand" b ON b.id=c."brandId" AND b."tenantId"=${scope.tenantId}
+          GROUP BY b.id,b.name)r),'[]'::json),
+        'counts',(SELECT json_build_object(
+          'serviceLines',COALESCE((SELECT SUM(quantity) FROM sold_lines WHERE "serviceId" IS NOT NULL),0)::int,
+          'productLines',COALESCE((SELECT SUM(quantity) FROM sold_lines WHERE "productId" IS NOT NULL),0)::int,
+          'customers',(SELECT COUNT(DISTINCT "customerId") FROM sold WHERE "customerId" IS NOT NULL)::int)),
+        'appointments',(SELECT json_build_object('total',COUNT(*)::int,
+          'completed',COUNT(*) FILTER(WHERE p.status='completed')::int,
+          'cancelled',COUNT(*) FILTER(WHERE p.status='cancelled')::int,
+          'noShow',COUNT(*) FILTER(WHERE p.status='no_show')::int)
+          FROM "Appointment" p WHERE p."tenantId"=${scope.tenantId}
+          AND p.status<>'draft'
+          AND ${inSet(Prisma.sql`p."locationId"`, scope.locationIds)}
+          AND ${inSet(Prisma.sql`p."sectorId"`, scope.sectorIds)}
+          AND ${inPeriod(Prisma.sql`p."startsAt"`)}
+          ${filters.customerId ? Prisma.sql`AND p."customerId"=${filters.customerId}` : Prisma.empty}
+          ${filters.collaboratorId ? Prisma.sql`AND p."collaboratorId"=${filters.collaboratorId}` : Prisma.empty}),
         'bySector',COALESCE((SELECT json_agg(r ORDER BY r.revenue::numeric DESC,r.label,r.id) FROM (
           SELECT i."sectorId" AS id,c.name AS label,SUM(i.gross)::numeric(30,2)::text AS revenue FROM sold_lines i
           JOIN "Sector" c ON c.id=i."sectorId" AND c."tenantId"=${scope.tenantId}
@@ -259,43 +299,118 @@ export class FinancialReportService {
         inventoryCurrent: "current-ledger-and-initialized-balances",
         marginIncludesLaborOrOverheads: false,
       },
-      metrics: [
-        {
-          label: "Venduto nel periodo",
-          value: `${tenant.currency} ${report.sold.gross}`,
-          trend: `${report.sold.accounts} conti confermati`,
-        },
-        {
-          label: "Incassi nel periodo",
-          value: report.cash
-            ? `${tenant.currency} ${report.cash.receipts}`
-            : "Non attribuiti",
-          trend: "Movimenti registrati, senza saldi iniziali",
-        },
-        {
-          label: "Rimborsi nel periodo",
-          value: report.cash
-            ? `${tenant.currency} ${report.cash.refunds}`
-            : "Non attribuiti",
-          trend: "Data effettiva del movimento",
-        },
-        {
-          label: "Flusso netto nel periodo",
-          value: report.cash
-            ? `${tenant.currency} ${report.cash.net}`
-            : "Non attribuito",
-          trend: "Incassi meno rimborsi del periodo",
-        },
-        {
-          label: "Residuo attuale dei conti del periodo",
-          value: report.accounts
-            ? `${tenant.currency} ${report.accounts.remaining}`
-            : "Non attribuito",
-          trend: report.accounts
-            ? `${report.accounts.unknownCount} conti storici da riconciliare esclusi`
-            : "Pagamenti registrati sul conto completo",
-        },
-      ],
+      metrics: buildMetrics(kind, tenant.currency, report),
     };
   }
+}
+
+type Metric = { label: string; value: string; trend: string };
+
+const plural = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+/**
+ * The Panoramica cards for the chosen switch. Every number comes from the same
+ * snapshot as the rest of the report; nothing is estimated.
+ */
+export function buildMetrics(
+  kind: "all" | "services" | "products",
+  currency: string,
+  report: Pick<FinancialTotals, "sold" | "cash" | "accounts" | "counts" | "appointments" | "byService" | "byProduct" | "byBrand">,
+): Metric[] {
+  const money = (value: string | number) =>
+    `${currency} ${typeof value === "number" ? value.toFixed(2) : value}`;
+  const gross = Number(report.sold.gross);
+  const accounts = report.sold.accounts;
+  const average = accounts ? gross / accounts : 0;
+  const { serviceLines, productLines, customers } = report.counts;
+  const appointments = report.appointments;
+  const appointmentCard: Metric = {
+    label: "Appuntamenti",
+    value: String(appointments.total),
+    trend: [
+      plural(appointments.completed, "completato", "completati"),
+      appointments.cancelled + appointments.noShow
+        ? `${appointments.cancelled} annullati · ${appointments.noShow} non presentati`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  };
+  const averageCard: Metric = {
+    label: "Spesa media per conto",
+    value: money(average),
+    trend: `${plural(accounts, "conto", "conti")} · ${plural(customers, "cliente", "clienti")}`,
+  };
+  const top = (rows: Array<{ label: string; revenue: string; quantity: number }>, label: string, unit: [string, string]): Metric | null =>
+    rows[0]
+      ? {
+          label,
+          value: rows[0].label,
+          trend: `${plural(rows[0].quantity, unit[0], unit[1])} · ${money(rows[0].revenue)}`,
+        }
+      : null;
+
+  if (kind === "services")
+    return [
+      {
+        label: "Venduto in servizi",
+        value: money(report.sold.gross),
+        trend: `${plural(serviceLines, "servizio", "servizi")} in ${plural(accounts, "conto", "conti")}`,
+      },
+      averageCard,
+      appointmentCard,
+      top(report.byService, "Servizio più venduto", ["volta", "volte"]),
+    ].filter((card): card is Metric => !!card);
+
+  if (kind === "products") {
+    const branded = report.byBrand.filter((row) => row.id);
+    return [
+      {
+        label: "Venduto in prodotti",
+        value: money(report.sold.gross),
+        trend: `${plural(productLines, "pezzo", "pezzi")} in ${plural(accounts, "conto", "conti")}`,
+      },
+      {
+        label: "Prezzo medio per pezzo",
+        value: money(productLines ? gross / productLines : 0),
+        trend: plural(customers, "cliente", "clienti"),
+      },
+      top(report.byProduct, "Prodotto più venduto", ["pezzo", "pezzi"]),
+      branded.length ? top(branded, "Brand più venduto", ["pezzo", "pezzi"]) : null,
+    ].filter((card): card is Metric => !!card);
+  }
+
+  return [
+    {
+      label: "Venduto",
+      value: money(report.sold.gross),
+      trend: `${plural(accounts, "conto", "conti")} · ${plural(serviceLines, "servizio", "servizi")} · ${plural(productLines, "prodotto", "prodotti")}`,
+    },
+    {
+      label: "Incassato",
+      value: report.cash ? money(report.cash.net) : "Non attribuito",
+      trend: report.cash
+        ? Number(report.cash.refunds)
+          ? `Incassi ${money(report.cash.receipts)} · rimborsi ${money(report.cash.refunds)}`
+          : "Pagamenti registrati nel periodo"
+        : "I pagamenti sono sul conto intero",
+    },
+    {
+      label: "Da incassare",
+      value: report.accounts ? money(report.accounts.remaining) : "Non attribuito",
+      trend: report.accounts
+        ? [
+            `Sui conti del periodo (${report.accounts.knownCount})`,
+            report.accounts.unknownCount
+              ? `${report.accounts.unknownCount} storici da verificare`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : "I pagamenti sono sul conto intero",
+    },
+    averageCard,
+    appointmentCard,
+  ];
 }

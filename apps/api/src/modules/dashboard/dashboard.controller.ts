@@ -78,8 +78,14 @@ export class DashboardController {
     );
     const page = filters.page ?? 1,
       pageSize = filters.pageSize ?? 20;
+    const kind = filters.kind ?? "all";
     const lineWhere = {
       ...sectorFilter(scope),
+      ...(kind === "services"
+        ? { serviceId: { not: null } }
+        : kind === "products"
+          ? { productId: { not: null } }
+          : {}),
       ...(filters.collaboratorId
         ? {
             collaboratorId: filters.collaboratorId,
@@ -111,7 +117,7 @@ export class DashboardController {
             ? { gte: range.start, lte: range.end }
             : undefined,
         customerId: filters.customerId,
-        ...(filters.collaboratorId
+        ...(filters.collaboratorId || kind !== "all"
           ? {
               items: {
                 every: { sectorId: { in: scope.allowedSectorIds } },
@@ -142,7 +148,11 @@ export class DashboardController {
       },
     });
     const lineFiltered =
-      !!request.headers["x-alora-sector"] || !!filters.collaboratorId;
+      !!request.headers["x-alora-sector"] ||
+      !!filters.collaboratorId ||
+      kind !== "all";
+    const lineNoun =
+      kind === "services" ? ["servizio", "servizi"] : kind === "products" ? ["prodotto", "prodotti"] : ["riga del conto", "righe del conto"];
     return {
       page,
       pageSize,
@@ -157,7 +167,7 @@ export class DashboardController {
           ? `${row.customer.firstName} ${row.customer.lastName}`.trim()
           : "Senza cliente",
         collaboratorName: "",
-        detail: `${row.items.length} righe del conto`,
+        detail: `${row.items.length} ${row.items.length === 1 ? lineNoun[0] : lineNoun[1]}`,
         amount: lineFiltered
           ? row.items
               .reduce(

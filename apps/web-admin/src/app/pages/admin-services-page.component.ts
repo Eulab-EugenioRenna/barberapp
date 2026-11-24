@@ -7,9 +7,11 @@ import {
   Component,
   EventEmitter,
   Input,
+  OnChanges,
   OnDestroy,
   OnInit,
   Output,
+  SimpleChanges,
   inject,
 } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
@@ -24,6 +26,7 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
 import { serviceProductModeLabel } from "../shared/presentation-copy";
 
+import { ProductBrandsService } from "../core/product-brands.service";
 @Component({
   selector: "barber-admin-services-page",
   standalone: true,
@@ -162,6 +165,14 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               (keydown.enter)="$event.preventDefault(); findByBarcode(productQuery)"
             />
           </label>
+          <label class="field" *ngIf="brands.brands().length">
+            <span>Brand</span>
+            <select [(ngModel)]="productBrand" name="productBrand">
+              <option *ngFor="let option of brandFilterOptions" [value]="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
           <label class="field" *ngIf="activityFilterOptions.length > 2">
             <span>Attività</span>
             <select [(ngModel)]="productActivity" name="productActivity">
@@ -188,6 +199,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             (click)="openEditProduct(product)"
           >
             <strong>{{ product.name }}</strong><span *ngIf="product.isActive===false" class="status-pill">Disattivato</span>
+            <span *ngIf="brands.name(product.brandId)" class="text-xs font-semibold text-[var(--accent)]">{{ brands.name(product.brandId) }}</span>
             <span *ngIf="product.barcode" class="text-xs text-[var(--muted)]">{{ product.barcode }}</span>
             <span *ngIf="activityName(product.activityId)" class="text-xs text-[var(--muted)]">{{ activityName(product.activityId) }}</span>
             <span class="text-sm text-[var(--muted)]">
@@ -211,6 +223,27 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             (loadMore)="loadMoreProducts.emit()"
           ></div>
         </div>
+        <details *ngIf="brands.brands().length" class="mt-4" aloraFunction="services.manage">
+          <summary class="cursor-pointer text-sm font-semibold">Brand ({{ brands.brands().length }})</summary>
+          <ul class="mt-3 grid gap-2">
+            <li *ngFor="let brand of brands.brands()" class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] py-2">
+              <ng-container *ngIf="renamingBrandId === brand.id; else brandRow">
+                <input class="min-w-0 flex-1" [(ngModel)]="renamingBrandName" [name]="'brand-' + brand.id" maxlength="80" (keydown.enter)="$event.preventDefault(); saveBrandName()" />
+                <span class="flex gap-2">
+                  <button type="button" class="secondary-btn" (click)="saveBrandName()">Salva</button>
+                  <button type="button" class="pill-btn" (click)="renamingBrandId = ''">Annulla</button>
+                </span>
+              </ng-container>
+              <ng-template #brandRow>
+                <span><strong>{{ brand.name }}</strong> <small class="text-[var(--muted)]">· {{ brand.products }} prodotti</small></span>
+                <span class="flex gap-2">
+                  <button type="button" class="pill-btn" (click)="renamingBrandId = brand.id; renamingBrandName = brand.name">Rinomina</button>
+                  <button type="button" class="pill-btn" (click)="removeBrand(brand)">Elimina</button>
+                </span>
+              </ng-template>
+            </li>
+          </ul>
+        </details>
       </article>
     </section>
 
@@ -515,6 +548,25 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                 placeholder="Puoi definirlo anche al momento della vendita"
             /></label>
           </div>
+          <div class="field" data-tour="services-product-brand">
+            <span>Brand (facoltativo)</span>
+            <select [(ngModel)]="productForm.brandId" name="productBrandId" *ngIf="brands.brands().length">
+              <option *ngFor="let option of brandSelectOptions" [value]="option.value">{{ option.label }}</option>
+            </select>
+            <div class="flex flex-wrap gap-2">
+              <input
+                class="min-w-0 flex-1"
+                [(ngModel)]="newBrandName"
+                name="productNewBrand"
+                maxlength="80"
+                [placeholder]="brands.brands().length ? 'Oppure scrivi un nuovo brand' : 'Es. Davines, Proraso'"
+                (keydown.enter)="$event.preventDefault(); addBrand()"
+              />
+              <button type="button" class="secondary-btn" [disabled]="!newBrandName.trim()" (click)="addBrand()">Aggiungi brand</button>
+            </div>
+            <small class="field-hint">Raggruppa i prodotti: in Panoramica › Prodotti vedi il venduto per brand.</small>
+            <small *ngIf="brandFeedback" role="status">{{ brandFeedback }}</small>
+          </div>
           <alora-activity-picker
             kind="product"
             [value]="productForm.activityId"
@@ -569,7 +621,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
     </div>
   `,
 })
-export class AdminServicesPageComponent implements OnInit, OnDestroy {
+export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges {
   protected readonly Number = Number;
   formatServiceProductMode = serviceProductModeLabel;
   @Input() services: any[] = [];
@@ -602,6 +654,8 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy {
   @Output() resetProduct = new EventEmitter<{ barcode?: string } | void>();
   @Output() loadMoreServices = new EventEmitter<void>();
   @Output() loadMoreProducts = new EventEmitter<void>();
+  /** Products changed outside the form (e.g. a brand removed). */
+  @Output() reloadProducts = new EventEmitter<void>();
 
   private readonly scanner = inject(BarcodeScannerService);
   private readonly adminApi = inject(AdminApiService);
@@ -618,8 +672,61 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy {
   productQuery = "";
 
   readonly activities = inject(ActivitiesService);
+  readonly brands = inject(ProductBrandsService);
   serviceActivity = "";
   productActivity = "";
+  productBrand = "";
+  newBrandName = "";
+  brandFeedback = "";
+  renamingBrandId = "";
+  renamingBrandName = "";
+
+  get brandFilterOptions(): Array<{ value: string; label: string }> {
+    return [
+      { value: "", label: "Tutti i brand" },
+      ...this.brands.brands().map((row) => ({ value: row.id, label: row.name })),
+      { value: "none", label: "Senza brand" },
+    ];
+  }
+  get brandSelectOptions(): Array<{ value: string; label: string }> {
+    return [{ value: "", label: "Nessun brand" }, ...this.brands.brands().map((row) => ({ value: row.id, label: row.name }))];
+  }
+  /** Typed in the product form: creates the brand (or reuses one with that name) and selects it. */
+  async addBrand(): Promise<void> {
+    const name = this.newBrandName.trim();
+    if (!name) return;
+    try {
+      const brand = await this.brands.create(name);
+      this.productForm.brandId = brand.id;
+      this.newBrandName = "";
+      this.brandFeedback = "";
+    } catch (error: any) {
+      this.brandFeedback = error?.error?.message || "Brand non creato";
+    }
+  }
+  async saveBrandName(): Promise<void> {
+    const name = this.renamingBrandName.trim();
+    if (!this.renamingBrandId || !name) return;
+    try {
+      await this.brands.rename(this.renamingBrandId, name);
+      this.renamingBrandId = "";
+      this.brandFeedback = "Brand rinominato";
+    } catch (error: any) {
+      this.brandFeedback = error?.error?.message || "Brand non rinominato";
+    }
+  }
+  async removeBrand(brand: { id: string; name: string; products: number }): Promise<void> {
+    const note = brand.products ? ` I suoi ${brand.products} prodotti restano, senza brand.` : "";
+    if (!window.confirm(`Eliminare il brand «${brand.name}»?${note}`)) return;
+    try {
+      await this.brands.remove(brand.id);
+      if (this.productBrand === brand.id) this.productBrand = "";
+      this.brandFeedback = "Brand eliminato";
+      this.reloadProducts.emit();
+    } catch (error: any) {
+      this.brandFeedback = error?.error?.message || "Brand non eliminato";
+    }
+  }
 
   get activityFilterOptions(): Array<{ value: string; label: string }> {
     return [
@@ -645,10 +752,16 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy {
 
   get filteredProducts(): any[] {
     return filterByText(
-      this.products.filter((product) => !this.productActivity || product.activityId === this.productActivity),
+      this.products.filter(
+        (product) =>
+          (!this.productActivity || product.activityId === this.productActivity) &&
+          (!this.productBrand ||
+            (this.productBrand === "none" ? !product.brandId : product.brandId === this.productBrand)),
+      ),
       this.productQuery,
       (product) => [
       product.name,
+      product.brand?.name,
       product.description,
       product.category,
       product.barcode,
@@ -658,6 +771,7 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     void this.activities.load().catch(() => undefined);
+    void this.brands.load();
     // A scan anywhere on the catalogue (outside text fields) finds or creates the product.
     this.scannerDetach = this.scanner.attach((event) => this.findByBarcode(event.barcode, true));
     // Coming from the warehouse with an unknown code: start the new product with it.
@@ -671,6 +785,11 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy {
       });
       if (this.session.can("services.manage")) this.openNewProduct(barcode);
     }
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Product counts per brand follow the saved products.
+    if (changes["products"] && !changes["products"].firstChange) void this.brands.load();
   }
 
   ngOnDestroy(): void {

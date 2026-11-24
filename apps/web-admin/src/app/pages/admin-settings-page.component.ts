@@ -4,10 +4,11 @@ import { FormsModule } from "@angular/forms";
 import { UiSelectComponent } from "@alora/ui";
 import { bookingModeLabel } from "../shared/presentation-copy";
 
+import { AmountsPrivacyToggleComponent } from "../shared/amounts-privacy-toggle.component";
 @Component({
   selector: "barber-admin-settings-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, UiSelectComponent],
+  imports: [CommonModule, FormsModule, UiSelectComponent, AmountsPrivacyToggleComponent],
   template: `
     <section class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
       <article class="dark-panel rounded-[2rem] p-4 text-white sm:p-5" data-tour="settings-preview">
@@ -426,6 +427,7 @@ import { bookingModeLabel } from "../shared/presentation-copy";
           </div>
           <details class="rounded-[1.4rem] border border-[var(--line)]/80 p-4" data-tour="settings-ui-scale">
             <summary class="cursor-pointer text-sm font-semibold">Preferenze di questo dispositivo</summary>
+            <div class="mb-4 mt-3"><alora-amounts-privacy-toggle></alora-amounts-privacy-toggle></div>
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-sm font-semibold">Interfaccia</p>

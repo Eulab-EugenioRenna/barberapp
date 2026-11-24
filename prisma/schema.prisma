@@ -156,6 +156,7 @@ model Tenant {
 
   @@index([createdAt])
   @@index([isActive, isSuspended])
+  productBrands ProductBrand[]
 }
 
 model TenantHoliday {
@@ -425,11 +426,26 @@ model Product {
   // Default «Rivendita» when omitted (set by the database).
   activityId      String           @default(dbgenerated())
   activity        Activity         @relation(fields: [activityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  /// Optional brand: groups products in the catalogue and in Panoramica.
+  brandId         String?
+  brand           ProductBrand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, isActive])
   @@index([tenantId, activityId])
+  @@index([tenantId, brandId])
   @@index([tenantId, sku])
   @@unique([tenantId, barcode], map: "Product_tenantId_barcode_key")
+}
+
+model ProductBrand {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime  @default(now())
+  products  Product[]
+
+  @@unique([tenantId, name])
 }
 
 model ServiceProduct {

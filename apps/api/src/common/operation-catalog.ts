@@ -132,6 +132,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "ServicesController.priceHistory": { kind: "function", key: "services.read" },
   "ProductsController.findAll": { kind: "function", key: "services.read", anyOf: PICK_LIST_ACCESS.products },
   "ProductsController.create": { kind: "function", key: "services.manage" },
+  "ProductBrandsController.list": { kind: "function", key: "services.read", anyOf: PICK_LIST_ACCESS.products },
+  "ProductBrandsController.create": { kind: "function", key: "services.manage" },
+  "ProductBrandsController.rename": { kind: "function", key: "services.manage" },
+  "ProductBrandsController.remove": { kind: "function", key: "services.manage" },
   "ProductsController.update": { kind: "function", key: "services.manage" },
   "ProductsController.remove": { kind: "function", key: "services.manage" },
   "CollaboratorsController.findOne": {

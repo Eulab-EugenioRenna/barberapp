@@ -5,7 +5,7 @@ export const DASHBOARD_TOUR: TourDefinition = {
   id: "dashboard",
   navKey: "dashboard",
   title: "Panoramica",
-  version: 3,
+  version: 4,
   when: (ctx) => ctx.canView("dashboard"),
   steps: () => [
     {
@@ -34,18 +34,19 @@ export const DASHBOARD_TOUR: TourDefinition = {
       body: "Riporta la panoramica alla giornata di oggi, per tutti i clienti e tutta la squadra.",
     },
     {
-      target: "dashboard-balance",
-      title: "Nascondi gli importi",
+      target: "dashboard-kind",
+      title: "Tutto, servizi o prodotti",
       body:
-        "Copre tutti gli importi con asterischi, utile se lo schermo è visibile ai clienti. " +
-        "La scelta resta memorizzata su questo dispositivo.",
+        "Con «Servizi» vedi solo i servizi venduti, l'agenda e il servizio più richiesto; con «Prodotti» pezzi venduti, " +
+        "prodotti e brand più venduti. «Tutto» mostra anche incassi e saldi dei conti. " +
+        "Per coprire gli importi con asterischi vai in Profilo › Preferenze di questo dispositivo.",
     },
     {
       target: "dashboard-metrics",
       title: "I numeri del periodo",
       body:
-        "Venduto, incassi e residui del periodo scelto. Il venduto segue la data del conto confermato, " +
-        "gli incassi la data del pagamento.",
+        "Ogni card ha sotto il dettaglio che la spiega: quanti conti, servizi e prodotti, clienti, appuntamenti completati. " +
+        "Il venduto segue la data del conto confermato, gli incassi la data del pagamento.",
     },
     {
       target: "dashboard-activity",

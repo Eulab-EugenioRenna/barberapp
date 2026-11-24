@@ -55,7 +55,7 @@ export class ProductsController {
     });
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.productsList(tenantId)}:activity-v1:p${page}:s${pageSize}`,
+      `${cacheKeys.productsList(tenantId)}:activity-v1:brand-v1:p${page}:s${pageSize}`,
       CACHE_TTL_SECONDS.lists,
       async () => {
         const [items, total] = await Promise.all([
@@ -64,7 +64,10 @@ export class ProductsController {
             orderBy: [{ isActive: "desc" }, { name: "asc" }],
             skip,
             take,
-            include: { activity: { select: { id: true, name: true } } },
+            include: {
+              activity: { select: { id: true, name: true } },
+              brand: { select: { id: true, name: true } },
+            },
           }),
           this.prisma.product.count({ where: { tenantId } }),
         ]);
@@ -108,6 +111,7 @@ export class ProductsController {
     const tenantId = requireTenantId(session);
     // Default «Rivendita» (database) when no activity is chosen.
     const activityId = await resolveProductActivity(this.prisma, tenantId, body["activityId"]);
+    const brandId = await resolveBrand(this.prisma, tenantId, body["brandId"]);
     let created;
     try {
       created = await this.pricing.write(
@@ -119,6 +123,7 @@ export class ProductsController {
             data: {
               tenantId,
               ...(activityId ? { activityId } : {}),
+              ...(brandId !== undefined ? { brandId } : {}),
               isActive:
                 typeof body["isActive"] === "boolean"
                   ? body["isActive"]
@@ -208,6 +213,7 @@ export class ProductsController {
       );
     const tenantId = requireTenantId(session);
     const activityId = await resolveProductActivity(this.prisma, tenantId, body["activityId"]);
+    const brandId = await resolveBrand(this.prisma, tenantId, body["brandId"]);
     let updated;
     try {
       updated = await this.pricing.write(
@@ -223,6 +229,7 @@ export class ProductsController {
             where: { id, tenantId },
             data: {
               ...(activityId ? { activityId } : {}),
+              ...(brandId !== undefined ? { brandId } : {}),
               name: typeof body["name"] === "string" ? body["name"] : undefined,
               description:
                 typeof body["description"] === "string"
@@ -310,4 +317,21 @@ function normalizeWriteBarcode(value: unknown): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null) return null;
   return normalizeBarcode(value) || null;
+}
+
+/** undefined = leave as is; null/"" = no brand; otherwise a brand of this account. */
+async function resolveBrand(
+  prisma: PrismaService,
+  tenantId: string,
+  value: unknown,
+): Promise<string | null | undefined> {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value !== "string") throw new BadRequestException("Brand non valido");
+  const brand = await prisma.productBrand.findFirst({
+    where: { id: value, tenantId },
+    select: { id: true },
+  });
+  if (!brand) throw new BadRequestException("Brand non trovato");
+  return brand.id;
 }

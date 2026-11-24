@@ -340,6 +340,7 @@ type ViewKey =
               (reset)="resetServiceForm()"
               (editProduct)="editProduct($event)"
               (saveProduct)="saveProduct()"
+              (reloadProducts)="refreshAll()"
               (removeProduct)="removeProduct()"
               (resetProduct)="resetProductForm($event)"
               (loadMoreServices)="loadMoreServices()"
@@ -515,6 +516,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     date: toLocalDateKey(new Date()),
     customerId: "",
     collaboratorId: "",
+    kind: "all",
   };
   // Tracks the auto-managed reference date so it rolls over at midnight
   // without clobbering a date the user picked on purpose.
@@ -1012,6 +1014,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       description: "",
       barcode: "",
       activityId: "",
+      brandId: "",
       price: null as number | null,
     };
   }
@@ -1744,6 +1747,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       description: product.description || "",
       barcode: product.barcode || "",
       activityId: product.activityId || "",
+      brandId: product.brandId || "",
       price:
         product.price === null || product.price === undefined
           ? null
@@ -2402,11 +2406,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   resetRevenueFilters(): void {
+    // The Tutto / Servizi / Prodotti switch is a view, not a filter: it stays.
     this.revenueFilters = {
       period: "day",
       date: toLocalDateKey(new Date()),
       customerId: "",
       collaboratorId: "",
+      kind: this.revenueFilters.kind,
     };
     this.autoRevenueDate = this.revenueFilters.date;
     void this.loadRevenueReport();
@@ -2814,6 +2820,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           barcode: String(this.productForm.barcode || "").trim() || null,
           // Empty keeps «Rivendita» (default of the account).
           ...(this.productForm.activityId ? { activityId: this.productForm.activityId } : {}),
+          brandId: this.productForm.brandId || null,
           isActive:this.productForm.isActive,
           priceMode:this.productForm.priceMode,vatRate:this.productForm.vatRate===""?null:String(this.productForm.vatRate),cost:this.productForm.cost,costMode:this.productForm.costMode,purchaseVatRate:this.productForm.purchaseVatRate===""?null:String(this.productForm.purchaseVatRate),priceChangeReason:this.productForm.priceChangeReason,
           ...(this.can("inventory.manage")?{stockTracked:this.productForm.stockTracked}:{}),

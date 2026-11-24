@@ -23,9 +23,10 @@ const REQUIRED_ACTIONS: Record<string, string> = {
   TERMS_AND_CONDITIONS: "accettazione dei termini",
 };
 
+import { AmountsPrivacyToggleComponent } from "../shared/amounts-privacy-toggle.component";
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, UiPageComponent, AdminPageHeaderComponent, AutofocusFirstDirective],
+  imports: [CommonModule, FormsModule, RouterLink, UiPageComponent, AdminPageHeaderComponent, AutofocusFirstDirective, AmountsPrivacyToggleComponent],
   template: `<ui-page>
     <alora-page-header navKey="account">
       <button uiPageActions type="button" class="secondary-btn" data-tour="account-refresh" [disabled]="loading || busy" (click)="load()">{{ loading ? 'Aggiornamento…' : 'Aggiorna stato' }}</button>
@@ -46,6 +47,10 @@ const REQUIRED_ACTIONS: Record<string, string> = {
           </div>
         </form>
         <p *ngIf="errors.profile" class="mt-4 text-sm" role="status">{{ errors.profile }}</p>
+        <div *ngIf="store.can('dashboard.revenue.read')" class="mt-5 border-t border-[var(--line)] pt-4">
+          <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Questo dispositivo</p>
+          <alora-amounts-privacy-toggle></alora-amounts-privacy-toggle>
+        </div>
       </article>
       <article class="dark-panel rounded-[2rem] p-5 text-white sm:p-7" data-tour="account-security">
         <p class="eyebrow text-white/50">Protezione</p><h2 class="mt-1 font-display text-2xl">Password e verifica</h2>
@@ -122,7 +127,7 @@ const REQUIRED_ACTIONS: Record<string, string> = {
 })
 export class PersonalAccountComponent implements OnInit {
   private readonly api = inject(AuthApiService);
-  private readonly store = inject(SessionStore);
+  readonly store = inject(SessionStore);
   private readonly refresh = inject(SessionRefreshService);
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);

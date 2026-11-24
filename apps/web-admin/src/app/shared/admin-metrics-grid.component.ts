@@ -6,7 +6,14 @@ import { Component, Input } from "@angular/core";
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-5">
+    <div
+      class="grid grid-cols-2 gap-2.5 sm:gap-3"
+      [ngClass]="{
+        'xl:grid-cols-5': metrics.length >= 5,
+        'xl:grid-cols-4': metrics.length === 4,
+        'xl:grid-cols-3': metrics.length === 3
+      }"
+    >
       <article
         *ngFor="let metric of metrics"
         class="metric-card min-w-0 panel rounded-[1.2rem] p-3 sm:rounded-[1.7rem] sm:p-4"
@@ -19,7 +26,7 @@ import { Component, Input } from "@angular/core";
           >{{ displayValue(metric) }}</strong
         >
         <span class="mt-2 block text-xs text-[var(--muted)]">{{
-          metric.trend
+          displayTrend(metric)
         }}</span>
       </article>
     </div>
@@ -35,5 +42,12 @@ export class AdminMetricsGridComponent {
     }
 
     return metric.value;
+  }
+
+  /** Amounts inside the explanation line are hidden too. */
+  displayTrend(metric: { trend: string }): string {
+    return this.masked
+      ? metric.trend.replace(/(?:[A-Z]{3}\s|€)-?[\d.,]+/g, "**,**")
+      : metric.trend;
   }
 }

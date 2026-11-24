@@ -3,18 +3,16 @@ import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { SetupChecklistComponent } from "../shared/setup-checklist.component";
 import { CustomerSelectComponent } from "../shared/customer-select.component";
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
+import { AmountsPrivacyService } from "../core/amounts-privacy.service";
 import { AdminMetricsGridComponent } from "../shared/admin-metrics-grid.component";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { UiSelectComponent } from "@alora/ui";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
-import { UiIconComponent } from "../shared/ui-icon.component";
 import {
   activityStatusLabel,
   appointmentStatusLabel,
 } from "../shared/presentation-copy";
-
-const BALANCE_STORAGE_KEY = "barber.balance-hidden";
 
 @Component({
   selector: "barber-admin-dashboard-page",
@@ -29,7 +27,37 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
     CalendarInputComponent,
     UiSelectComponent,
     InfiniteScrollDirective,
-    UiIconComponent,
+  ],
+  styles: [
+    `
+      .kind-switch {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        padding: 0.25rem;
+        border: 0.0625rem solid var(--line);
+        border-radius: 999rem;
+        background: var(--surface, #fff);
+      }
+      .kind-switch button {
+        border: 0;
+        border-radius: 999rem;
+        background: transparent;
+        padding: 0.55rem 1rem;
+        min-height: 2.5rem;
+        font-weight: 700;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .kind-switch button.active {
+        background: var(--accent, #1e3425);
+        color: #fff;
+      }
+      .kind-switch button:focus-visible {
+        outline: 0.125rem solid var(--accent, #1e3425);
+        outline-offset: 0.125rem;
+      }
+    `,
   ],
   template: `
     <section class="grid gap-4">
@@ -42,23 +70,23 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               Venduto e incassi
             </h3>
           </div>
-          <button
-            type="button"
-            class="ghost-btn balance-toggle"
-            data-tour="dashboard-balance"
-            (click)="toggleBalance()"
-            [attr.aria-pressed]="balanceHidden"
-            [attr.aria-label]="
-              balanceHidden ? 'Mostra saldo' : 'Nascondi saldo'
-            "
-            [title]="balanceHidden ? 'Mostra saldo' : 'Nascondi saldo'"
+          <div
+            class="kind-switch"
+            role="radiogroup"
+            aria-label="Cosa mostrare"
+            data-tour="dashboard-kind"
           >
-            <barber-ui-icon
-              [name]="balanceHidden ? 'eye-off' : 'eye'"
-              [animated]="!balanceHidden"
-            ></barber-ui-icon>
-            {{ balanceHidden ? "Mostra saldo" : "Nascondi saldo" }}
-          </button>
+            <button
+              *ngFor="let option of kindOptions"
+              type="button"
+              role="radio"
+              [attr.aria-checked]="kind === option.value"
+              [class.active]="kind === option.value"
+              (click)="applyKind(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
         </div>
         <div
           class="mt-4 grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4"
@@ -92,7 +120,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               placeholder="Tutti i clienti"
             ></alora-customer-select>
           </div>
-          <div class="field">
+          <div class="field" *ngIf="kind !== 'products'">
             <span>Professionista</span>
             <ui-select
               [value]="revenueFilters.collaboratorId"
@@ -120,9 +148,15 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         class="px-1 text-sm text-[var(--muted)]"
         *ngIf="revenueReport?.basis?.lineFiltered"
       >
-        Il venduto comprende le righe selezionate. Incassi e residui sono
-        registrati sul conto: per consultarli rimuovi i filtri attività e
-        professionista.
+        {{
+          kind === "services"
+            ? "Vedi solo i servizi venduti."
+            : kind === "products"
+              ? "Vedi solo i prodotti venduti."
+              : "Il venduto comprende le righe selezionate."
+        }}
+        Incassi e saldi sono registrati sul conto intero: li trovi in «Tutto»,
+        senza filtri per attività o professionista.
       </p>
       <p
         class="px-1 text-sm text-[var(--muted)]"
@@ -147,7 +181,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         data-tour="dashboard-financial"
         [tax]="revenueReport.salesTax"
         [materials]="revenueReport.materials"
-        [inventory]="revenueReport.inventory"
+        [inventory]="kind === 'services' ? null : revenueReport.inventory"
         [catalog]="revenueReport.catalog ?? null"
         [currency]="revenueReport.currency"
         [masked]="balanceHidden"
@@ -259,7 +293,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
               </p>
             </div>
           </article>
-          <article class="panel rounded-[2rem] p-4 sm:p-5">
+          <article *ngIf="kind !== 'products'" class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Squadra</p>
             <h3 class="font-display text-xl sm:text-2xl">
               Servizi per collaboratore
@@ -285,21 +319,21 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
 
       <div class="grid gap-4 md:grid-cols-2">
         <article
-          *ngFor="
-            let group of [
-              { title: 'Venduto per sede', rows: revenueReport?.byLocation },
-              { title: 'Venduto per attività', rows: revenueReport?.bySector },
-            ]
-          "
+          *ngFor="let group of breakdownGroups"
           class="panel min-w-0 rounded-[2rem] p-4 sm:p-5"
         >
           <h3 class="font-display text-xl">{{ group.title }}</h3>
-          <dl class="mt-3 grid gap-2">
+          <dl class="mt-3 grid max-h-[18rem] gap-2 overflow-y-auto pr-1">
             <div
               *ngFor="let row of group.rows"
               class="flex min-w-0 flex-wrap justify-between gap-2 border-b border-[var(--line)] py-2"
             >
-              <dt class="min-w-0 break-words">{{ row.label }}</dt>
+              <dt class="min-w-0 break-words">
+                {{ row.label }}
+                <small *ngIf="row.quantity !== undefined" class="text-[var(--muted)]">
+                  · {{ row.quantity }} {{ group.unit }}</small
+                >
+              </dt>
               <dd>{{ money(row.revenue) }}</dd>
             </div>
           </dl>
@@ -307,7 +341,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
             *ngIf="!group.rows?.length"
             class="mt-3 text-sm text-[var(--muted)]"
           >
-            Nessuna vendita nel periodo.
+            {{ group.empty }}
           </p>
         </article>
       </div>
@@ -366,6 +400,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
         </article>
 
         <article
+          *ngIf="kind === 'all'"
           class="dark-panel rounded-[2rem] p-4 text-white sm:p-5"
           data-testid="account-reconciliation"
           data-tour="dashboard-accounts"
@@ -432,6 +467,7 @@ export class AdminDashboardPageComponent {
     date: "",
     customerId: "",
     collaboratorId: "",
+    kind: "all",
   };
   @Input() customerOptions: Array<{ value: string; label: string }> = [];
   @Input() loading = false;
@@ -441,18 +477,48 @@ export class AdminDashboardPageComponent {
   @Output() loadMoreActivity = new EventEmitter<void>();
   @Output() openQuickOrder = new EventEmitter<void>();
 
-  balanceHidden = readStoredBalanceHidden();
+  private readonly privacy = inject(AmountsPrivacyService);
+  /** Set in Profilo › Preferenze di questo dispositivo. */
+  get balanceHidden(): boolean {
+    return this.privacy.hidden();
+  }
 
-  toggleBalance(): void {
-    this.balanceHidden = !this.balanceHidden;
-    try {
-      window.localStorage.setItem(
-        BALANCE_STORAGE_KEY,
-        this.balanceHidden ? "1" : "0",
-      );
-    } catch {
-      // Storage can be unavailable (private mode); the toggle still works.
+  readonly kindOptions = [
+    { value: "all", label: "Tutto" },
+    { value: "services", label: "Servizi" },
+    { value: "products", label: "Prodotti" },
+  ];
+  get kind(): "all" | "services" | "products" {
+    return this.revenueFilters?.kind || "all";
+  }
+  applyKind(kind: string): void {
+    if (kind === this.kind) return;
+    this.revenueFilters.kind = kind;
+    // Products have no performer: a collaborator filter would empty the view.
+    if (kind === "products") this.revenueFilters.collaboratorId = "";
+    this.applyRevenueFilters.emit();
+  }
+
+  get breakdownGroups(): Array<{ title: string; rows: any[]; unit: string; empty: string }> {
+    const report = this.revenueReport;
+    const empty = "Nessuna vendita nel periodo.";
+    if (this.kind === "services")
+      return [
+        { title: "Servizi più venduti", rows: report?.byService, unit: "volte", empty },
+        { title: "Venduto per attività", rows: report?.bySector, unit: "", empty },
+      ];
+    if (this.kind === "products") {
+      const groups = [{ title: "Prodotti più venduti", rows: report?.byProduct, unit: "pezzi", empty }];
+      // Brands appear once at least one product has one.
+      if ((report?.byBrand || []).some((row: any) => row.id))
+        groups.push({ title: "Venduto per brand", rows: report?.byBrand, unit: "pezzi", empty });
+      else groups.push({ title: "Venduto per sede", rows: report?.byLocation, unit: "", empty });
+      return groups;
     }
+    return [
+      { title: "Venduto per sede", rows: report?.byLocation, unit: "", empty },
+      { title: "Venduto per attività", rows: report?.bySector, unit: "", empty },
+    ];
   }
 
   money(value: number | string | null | undefined): string {
@@ -563,13 +629,5 @@ export class AdminDashboardPageComponent {
       default:
         return "status-pill-neutral";
     }
-  }
-}
-
-function readStoredBalanceHidden(): boolean {
-  try {
-    return window.localStorage.getItem(BALANCE_STORAGE_KEY) === "1";
-  } catch {
-    return false;
   }
 }
