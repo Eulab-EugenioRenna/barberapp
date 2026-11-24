@@ -15,6 +15,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "WhatsAppController.conversations": { kind: "function", key: "whatsapp.read" },
   "WhatsAppController.messages": { kind: "function", key: "whatsapp.read" },
   "WhatsAppController.outbox": { kind: "function", key: "whatsapp.read" },
+  "WhatsAppController.media": { kind: "function", key: "whatsapp.read" },
   "WhatsAppController.qr": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.connect": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.reconnect": { kind: "function", key: "whatsapp.manage" },

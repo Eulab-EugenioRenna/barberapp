@@ -93,7 +93,7 @@
       <p *ngIf="archiveId && !conversations.length" class="wa-empty">Nessuna conversazione acquisita.</p>
       <div class="wa-chat-list">
         <button *ngFor="let chat of conversations; trackBy: trackChat" type="button" class="wa-chat" [class.selected]="chat.chatId === chatId" [attr.aria-pressed]="chat.chatId === chatId" (click)="selectChat(chat)">
-          <span class="wa-chat-name">{{ chat.name || chat.chatId }}</span>
+          <span class="wa-chat-name">{{ chatLabel(chat) }}</span>
           <span class="wa-muted wa-preview">{{ chat.preview || 'Messaggio ' + chat.kind }}</span>
           <time>{{ chat.lastMessageAt | date: 'dd MMM, HH:mm' }}</time>
         </button>
@@ -101,19 +101,55 @@
     </aside>
     <div class="wa-thread">
       <div class="wa-thread-heading">
-        <button *ngIf="chatId" type="button" class="secondary-btn wa-back" (click)="chatId = ''">‹ Conversazioni</button>
+        <button *ngIf="chatId" type="button" class="secondary-btn wa-back" (click)="closeChat()">‹ Conversazioni</button>
         <h2>{{ chatId ? chatName() : 'Scegli una conversazione' }}</h2>
-        <p *ngIf="chatId" class="wa-muted">{{ chatId }}</p>
+        <p *ngIf="currentChat?.phone && currentChat?.name" class="wa-muted">{{ currentChat?.phone }}</p>
       </div>
       <div *ngIf="chatId" class="wa-messages" aria-live="polite">
         <button *ngIf="hasOlder" type="button" class="secondary-btn wa-older" [disabled]="loadingMessages" (click)="olderMessages()">Carica messaggi precedenti</button>
         <p *ngIf="loadingMessages && !messages.length" role="status">Caricamento dei messaggi…</p>
         <article *ngFor="let item of messages; trackBy: trackId" class="wa-message" [class.outgoing]="item.direction === 'outbound'">
-          <p>{{ item.text || (item.selectedButtonId ? 'Risposta interattiva del cliente' : 'Contenuto ' + item.kind) }}</p>
+          <strong *ngIf="currentChat?.isGroup && item.direction === 'inbound' && item.senderName" class="wa-sender">{{ item.senderName }}</strong>
+          <ng-container *ngIf="item.media">
+            <ng-container *ngIf="mediaOf(item.id) as file">
+              <ng-container *ngIf="file.state === 'ready'; else mediaWait">
+                <ng-container [ngSwitch]="mediaKind(item)">
+                  <a *ngSwitchCase="'image'" [href]="$any(file).url" target="_blank" rel="noopener"><img class="wa-media-image" [src]="$any(file).url" [alt]="item.text || 'Foto'" loading="lazy" /></a>
+                  <audio *ngSwitchCase="'audio'" class="wa-media-audio" controls preload="metadata" [src]="$any(file).url"></audio>
+                  <video *ngSwitchCase="'video'" class="wa-media-image" controls preload="metadata" [src]="$any(file).url"></video>
+                  <a *ngSwitchDefault class="secondary-btn" [href]="$any(file).url" [attr.download]="item.media.filename || 'allegato'">Scarica {{ item.media.filename || 'allegato' }}</a>
+                </ng-container>
+              </ng-container>
+              <ng-template #mediaWait>
+                <p class="wa-muted" *ngIf="file.state === 'loading'">Scarico l’allegato…</p>
+                <p class="wa-muted" *ngIf="file.state === 'queued'">Allegato in recupero dal telefono: compare da solo tra poco.</p>
+                <p class="wa-muted" *ngIf="file.state === 'error'">Allegato non disponibile. <button type="button" class="pill-btn" (click)="retryMedia(item.id)">Riprova</button></p>
+              </ng-template>
+            </ng-container>
+          </ng-container>
+          <p *ngIf="item.text || !item.media">{{ item.text || (item.selectedButtonId ? 'Risposta con un pulsante' : item.kind === 'call_log' ? 'Chiamata' : 'Messaggio non mostrabile') }}</p>
           <time>{{ item.occurredAt | date: 'dd MMM, HH:mm' }}</time>
         </article>
       </div>
       <p *ngIf="!chatId" class="wa-thread-empty">I messaggi della conversazione scelta compaiono qui.</p>
+      <form *ngIf="chatId && canSend" class="wa-reply" (ngSubmit)="sendReply()" data-tour="whatsapp-reply">
+        <p *ngIf="!connected" class="wa-muted">Per rispondere il tuo numero deve risultare connesso.</p>
+        <div *ngIf="replyImage" class="wa-attachment">
+          <img [src]="replyImage.data" alt="Foto da inviare" />
+          <button type="button" class="pill-btn" [disabled]="sending" (click)="replyImage = null">Togli foto</button>
+        </div>
+        <div class="wa-reply-row">
+          <label class="wa-attach" [class.disabled]="sending || !connected" title="Allega una foto">
+            <input type="file" accept="image/*" [disabled]="sending || !connected" (change)="pickImage($event, 'reply')" />
+            <span aria-hidden="true">📎</span><span class="sr-only">Allega una foto</span>
+          </label>
+          <textarea name="reply" [(ngModel)]="reply" rows="2" maxlength="16000" [disabled]="sending || !connected"
+            [placeholder]="'Scrivi a ' + chatName() + (replyImage ? ' (didascalia facoltativa)' : '')"></textarea>
+          <button class="primary-btn" [disabled]="sending || !connected || pending.kind !== 'empty' || (!reply.trim() && !replyImage)">{{ sending ? 'Invio…' : 'Invia' }}</button>
+        </div>
+        <p *ngIf="pending.kind !== 'empty'" class="wa-muted">C’è un invio da verificare in «Nuovo messaggio»: completalo prima di scrivere ancora.</p>
+        <p *ngIf="replyFeedback" class="wa-muted" role="status">{{ replyFeedback }}</p>
+      </form>
     </div>
   </section>
 
@@ -130,12 +166,12 @@
         <p>Un invio precedente è da verificare. I dati restano conservati anche ricaricando la pagina.</p>
         <div *ngIf="pendingPayload as saved"><strong>{{ saved.to }}</strong><p class="wa-pending-text">{{ saved.text }}</p></div>
         <button *ngIf="pending.kind === 'pending'" type="button" class="primary-btn" [disabled]="sending" (click)="send(true)">Verifica la stessa richiesta</button>
-        <p *ngIf="pending.kind === 'unreadable'">Richiesta non leggibile: verifica gli invii in Connect prima di procedere.</p>
+        <p *ngIf="pending.kind === 'unreadable'">Richiesta non leggibile: controlla sul telefono se il messaggio è partito, poi scrivi un nuovo messaggio.</p>
       </div>
       <form (ngSubmit)="send()">
         <fieldset [disabled]="draftLocked">
           <div *ngIf="hasRecipient; else pickCustomer" class="wa-recipient">
-            <span>A: <strong>{{ customerId ? customerName : 'conversazione ' + to }}</strong></span>
+            <span>A: <strong>{{ customerId ? customerName : to }}</strong></span>
             <button type="button" class="pill-btn" (click)="clearRecipient()">Cambia</button>
           </div>
           <ng-template #pickCustomer>
@@ -145,9 +181,16 @@
             </div>
             <p *ngIf="customerQuery.trim() && !customerMatches.length" class="wa-muted">Nessun cliente con telefono trovato. Il numero si aggiunge nella scheda cliente.</p>
           </ng-template>
-          <label class="wa-label">Messaggio<textarea name="message" [(ngModel)]="message" rows="5" maxlength="16000" required></textarea></label>
+          <label class="wa-label">{{ image ? 'Didascalia (facoltativa)' : 'Messaggio' }}<textarea name="message" [(ngModel)]="message" rows="5" [attr.maxlength]="image ? 2000 : 16000"></textarea></label>
+          <div *ngIf="image; else addImage" class="wa-attachment">
+            <img [src]="image.data" alt="Foto da inviare" />
+            <button type="button" class="pill-btn" (click)="image = null">Togli foto</button>
+          </div>
+          <ng-template #addImage>
+            <label class="wa-attach wa-attach-wide"><input type="file" accept="image/*" (change)="pickImage($event, 'compose')" />📎 Allega una foto</label>
+          </ng-template>
           <label class="wa-consent"><input type="checkbox" name="consent" [(ngModel)]="recipientAuthorized" />Ho verificato destinatario e autorizzazione a ricevere questo messaggio.</label>
-          <button class="primary-btn" [disabled]="!fresh || !connected || !recipientAuthorized || !message.trim() || !hasRecipient">{{ sending ? 'Invio in verifica…' : 'Invia messaggio' }}</button>
+          <button class="primary-btn" [disabled]="!fresh || !connected || !recipientAuthorized || (!message.trim() && !image) || !hasRecipient">{{ sending ? 'Invio in verifica…' : 'Invia messaggio' }}</button>
         </fieldset>
       </form>
       <p *ngIf="!connected" class="wa-muted">Collega il tuo numero e attendi che risulti connesso per inviare.</p>
@@ -161,12 +204,17 @@
     role="tabpanel" id="ui-tabpanel-outbox" aria-labelledby="ui-tab-outbox"
     class="panel wa-card wa-outbox"
   >
-    <p class="wa-muted">Gli invii dal tuo numero. Gli esiti incerti richiedono verifica: nessun reinvio automatico.</p>
+    <p class="wa-muted">I messaggi partiti dal tuo numero con ALORA. Se WhatsApp non conferma un invio, ALORA non lo ripete da solo: controlla sul telefono.</p>
     <p *ngIf="!outbox.length" class="wa-empty">Nessun invio registrato.</p>
     <ol>
       <li *ngFor="let item of outbox.slice(0, 50); trackBy: trackId">
-        <div><strong>{{ stateLabel(item.state) }}</strong><time>{{ item.createdAt | date: 'dd MMM, HH:mm' }}</time></div>
-        <span *ngIf="item.hasError" class="wa-muted">Verifica richiesta in Connect</span>
+        <div>
+          <strong>{{ item.recipientName || 'Destinatario' }}</strong>
+          <span class="wa-status" [class.online]="item.state === 'sent'">{{ stateLabel(item.state) }}</span>
+          <time>{{ item.createdAt | date: 'dd MMM, HH:mm' }}</time>
+        </div>
+        <p *ngIf="item.preview" class="wa-preview">{{ item.kind === 'image' ? '📷 ' : '' }}{{ item.preview }}</p>
+        <p *ngIf="item.problem" class="wa-muted">{{ item.problem }}</p>
       </li>
     </ol>
   </section>

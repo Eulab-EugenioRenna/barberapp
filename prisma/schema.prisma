@@ -89,6 +89,9 @@ enum BillingInterval {
 
 model Tenant {
   whatsAppLinks WhatsAppLink[]
+  whatsAppMedia WhatsAppMedia[]
+  whatsAppSends WhatsAppSend[]
+  whatsAppChats WhatsAppChat[]
   appointmentAutomationRuns AppointmentAutomationRun[]
   notificationAutomationWebhook NotificationAutomationWebhook?
   notificationAutomationWebhookEvents NotificationAutomationWebhookEvent[]
@@ -1302,4 +1305,54 @@ model WhatsAppLink {
   /// connection stays reconnectable. A disconnect from the phone removes it.
   disconnectRequestedAt DateTime?
   @@index([tenantId, userId])
+}
+
+/// Attachment of a WhatsApp message, copied from Connect into ALORA once
+/// so that photos, voice notes and documents stay viewable here.
+model WhatsAppMedia {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Connect archive (wa_archives.id) and message (messages.id).
+  archiveId String
+  messageId String
+  mimetype  String
+  filename  String?
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+  @@unique([archiveId, messageId])
+  @@index([tenantId])
+}
+
+/// What ALORA asked Connect to send: recipient and text, so «Invii» shows
+/// the outcome of each message without opening Connect.
+model WhatsAppSend {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId        String
+  sessionId     String
+  /// Connect outbox id (outbox.id).
+  outboxId      String   @unique
+  customerId    String?
+  recipient     String
+  recipientName String?
+  kind          String
+  preview       String?
+  createdAt     DateTime @default(now())
+  @@index([tenantId, userId])
+}
+
+/// Display name of a WhatsApp chat (the contact's WhatsApp profile name).
+model WhatsAppChat {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  archiveId String
+  chatId    String
+  name      String?
+  updatedAt DateTime @updatedAt
+  @@unique([archiveId, chatId])
+  @@index([tenantId])
 }

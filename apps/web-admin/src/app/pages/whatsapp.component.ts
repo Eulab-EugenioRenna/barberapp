@@ -3,7 +3,9 @@ import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import type {
   WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView,
+  WhatsAppImageInput,
 } from "@barber/shared/whatsapp";
+import { prepareWhatsAppImage } from "../shared/whatsapp-image";
 import { SessionStore } from "../core/session.store";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
 import { UiPageComponent, UiSelectComponent, UiTabsComponent, type UiOption, type UiTab } from "@alora/ui";
@@ -39,6 +41,12 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   chooseCustomer(id: string) { this.customerId = id; this.customerQuery = ""; this.to = ""; }
   clearRecipient() { this.customerId = ""; this.to = ""; }
   get hasRecipient() { return !!this.customerId || !!this.to.trim(); }
+  /** Reply in the open conversation: always goes to that chat. */
+  reply = ""; replyImage: WhatsAppImageInput | null = null; replyFeedback = "";
+  /** Photo of «Nuovo messaggio». */
+  image: WhatsAppImageInput | null = null;
+  /** Attachments shown in the thread, by message id (object URLs of files saved in ALORA). */
+  media = new Map<string, { state: "loading" | "queued" | "error" } | { state: "ready"; url: string; type: string }>();
   feedback = ""; connectionFeedback = ""; sendFeedback = ""; updatedAt: Date | null = null;
   loading = true; refreshing = false; busy = false; sending = false; loadingMessages = false;
   fresh = false; hasOlder = false; disconnectId = ""; removeId = "";
@@ -70,7 +78,12 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     if (state.kind !== "pending") return null;
     const customerId = String(state.command.body["customerId"] || "");
     const customer = this.customers.find(c => c.id === customerId);
-    return { to: customer ? `${customer.firstName} ${customer.lastName}` : customerId ? "Cliente" : String(state.command.body["to"] || ""), text: String(state.command.body["text"] || "") };
+    const to = String(state.command.body["to"] || "");
+    const chat = this.conversations.find(c => c.chatId === to);
+    return {
+      to: customer ? `${customer.firstName} ${customer.lastName}` : customerId ? "Cliente" : chat ? this.chatLabel(chat) : to,
+      text: String(state.command.body["text"] || "") || (state.command.body["image"] ? "Foto" : ""),
+    };
   }
   get draftLocked() { return this.sending || this.pending.kind !== "empty"; }
   async ngOnInit() {
@@ -78,7 +91,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     await this.refresh();
     if (!this.destroyed) this.timer = setInterval(() => { if (!document.hidden) void this.refresh(); }, 8000);
   }
-  ngOnDestroy() { this.destroyed = true; this.selection++; clearInterval(this.timer); this.stopQr(); this.qr = null; }
+  ngOnDestroy() { this.destroyed = true; this.selection++; clearInterval(this.timer); this.stopQr(); this.qr = null; this.clearMedia(); }
   /** While pairing, the QR rotates: refresh it often, stop as soon as it is linked. */
   private syncQrPolling() {
     const pairing = this.active?.state === "pairing" && this.canManage;
@@ -137,10 +150,44 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     try { await this.loadConversations(); } catch (error) { this.feedback = this.error(error); }
   }
   async selectChat(chat: WhatsAppConversationView) {
+    if (chat.chatId !== this.chatId) { this.reply = ""; this.replyImage = null; this.replyFeedback = ""; this.clearMedia(); }
     this.selection++; this.chatId = chat.chatId; this.messages = []; this.hasOlder = false;
-    if (!this.draftLocked) { this.to = chat.chatId; this.customerId = ""; }
     try { await this.loadMessages(); } catch (error) { this.feedback = this.error(error); }
   }
+  closeChat() { this.chatId = ""; this.clearMedia(); }
+  private clearMedia() {
+    for (const item of this.media.values()) if (item.state === "ready") URL.revokeObjectURL(item.url);
+    this.media = new Map();
+  }
+  /** Photos, voice notes and files of the open chat are copied into ALORA and shown here. */
+  private async loadMedia() {
+    const archiveId = this.archiveId, version = this.selection;
+    const todo = this.messages.filter(m => m.media && (!this.media.has(m.id) || this.media.get(m.id)!.state === "queued"));
+    for (let index = 0; index < todo.length; index += 3) {
+      await Promise.all(todo.slice(index, index + 3).map(async item => {
+        this.media.set(item.id, { state: "loading" });
+        try {
+          const blob = await this.api.media(archiveId, item.id);
+          if (this.destroyed || version !== this.selection) return;
+          this.media.set(item.id, blob
+            ? { state: "ready", url: URL.createObjectURL(blob), type: blob.type || item.media?.mimetype || "" }
+            : { state: "queued" });
+        } catch {
+          if (version === this.selection) this.media.set(item.id, { state: "error" });
+        }
+      }));
+      if (this.destroyed || version !== this.selection) return;
+    }
+  }
+  mediaOf(id: string) { return this.media.get(id); }
+  mediaKind(item: WhatsAppMessageView): "image" | "audio" | "video" | "file" {
+    const type = (this.media.get(item.id) as { type?: string } | undefined)?.type || item.media?.mimetype || "";
+    if (["image", "sticker"].includes(item.kind) || type.startsWith("image/")) return "image";
+    if (["ptt", "audio"].includes(item.kind) || type.startsWith("audio/")) return "audio";
+    if (item.kind === "video" || type.startsWith("video/")) return "video";
+    return "file";
+  }
+  retryMedia(id: string) { this.media.delete(id); void this.loadMedia(); }
   async loadMessages(older = false) {
     if (!this.archiveId || !this.chatId || this.loadingSelection === this.selection) return;
     const version = this.selection, archiveId = this.archiveId, chatId = this.chatId;
@@ -152,6 +199,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
       if (older || !this.messages.length) this.hasOlder = result.length === 50;
       this.messages = [...new Map([...this.messages, ...result].map(m => [m.id, m])).values()]
         .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id));
+      void this.loadMedia();
     } finally {
       if (this.loadingSelection === version) { this.loadingMessages = false; this.loadingSelection = -1; }
     }
@@ -169,32 +217,66 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
       else await this.api.action(id, action);
       this.connectionFeedback = action === "connect"
         ? "Collegamento creato. Inquadra il QR con il telefono."
-        : action === "remove" ? "Collegamento eliminato. Lo storico dei messaggi resta in Connect."
+        : action === "remove" ? "Collegamento eliminato. Lo storico dei messaggi resta conservato."
         : "Richiesta registrata. Attendi l’aggiornamento dello stato.";
     } catch (error) { this.connectionFeedback = this.error(error); }
     finally { this.busy = false; this.fresh = false; }
     await this.refresh();
   }
+  async pickImage(event: Event, target: "reply" | "compose") {
+    const input = event.target as HTMLInputElement, file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    try {
+      const image = await prepareWhatsAppImage(file);
+      if (target === "reply") { this.replyImage = image; this.replyFeedback = ""; }
+      else { this.image = image; this.sendFeedback = ""; }
+    } catch (error) {
+      if (target === "reply") this.replyFeedback = this.error(error); else this.sendFeedback = this.error(error);
+    }
+  }
   async send(retry = false) {
-    if (this.sending || !this.canSend || (!retry && (!this.connected || !this.recipientAuthorized || !this.message.trim()))) return;
+    const content = !!this.message.trim() || !!this.image;
+    if (this.sending || !this.canSend || (!retry && (!this.connected || !this.recipientAuthorized || !content))) return;
     this.sending = true; this.sendFeedback = "";
     try {
-      const ack = retry ? await this.api.retry() : await this.api.send(this.connected!.id, { ...(this.customerId ? { customerId: this.customerId } : { to: this.to }), text: this.message, recipientAuthorized: true });
-      this.sendFeedback = `Richiesta registrata: ${this.stateLabel(ack.state)}. Controlla gli invii recenti.`;
-      this.message = ""; this.recipientAuthorized = false;
+      const ack = retry ? await this.api.retry() : await this.api.send(this.connected!.id, {
+        ...(this.customerId ? { customerId: this.customerId } : { to: this.to }),
+        text: this.message, ...(this.image ? { image: this.image } : {}), recipientAuthorized: true,
+      });
+      this.sendFeedback = `${this.stateLabel(ack.state)}. L’esito è in «Invii».`;
+      this.message = ""; this.image = null; this.recipientAuthorized = false;
       await this.refresh();
     } catch (error) { this.sendFeedback = this.error(error); }
+    finally { this.sending = false; }
+  }
+  /** The person wrote in this chat: replying there is expected, no extra confirmation. */
+  async sendReply() {
+    const chatId = this.chatId;
+    if (this.sending || !this.canSend || !this.connected || !chatId || (!this.reply.trim() && !this.replyImage)) return;
+    this.sending = true; this.replyFeedback = "";
+    try {
+      await this.api.send(this.connected.id, {
+        to: chatId, text: this.reply, ...(this.replyImage ? { image: this.replyImage } : {}), recipientAuthorized: true,
+      });
+      this.reply = ""; this.replyImage = null;
+      this.replyFeedback = "Messaggio affidato a WhatsApp. Compare nella conversazione appena il telefono lo conferma.";
+      await this.refresh();
+    } catch (error) { this.replyFeedback = this.error(error); }
     finally { this.sending = false; }
   }
   stateLabel(state: string) {
     const labels: Record<string, string> = {
       queued: "In coda", pairing: "Da collegare", connected: "Connesso", failed: "Interrotto",
       disconnecting: "Disconnessione in corso", disconnected: "Disconnesso", sending: "Invio in corso",
-      sent: "Inviato al canale", uncertain: "Esito da verificare", cancelled: "Annullato", completed: "Completato",
+      sent: "Inviato", uncertain: "Non confermato", cancelled: "Annullato", completed: "Completato",
     };
     return labels[state] || "Stato da verificare";
   }
-  chatName() { return this.conversations.find(c => c.chatId === this.chatId)?.name || this.chatId; }
+  /** Name first; a phone only when WhatsApp gives one; never the internal «@lid» id. */
+  chatLabel(chat: WhatsAppConversationView) { return chat.name || chat.phone || (chat.isGroup ? "Gruppo WhatsApp" : "Contatto senza nome"); }
+  get currentChat() { return this.conversations.find(c => c.chatId === this.chatId); }
+  chatName() { const chat = this.currentChat; return chat ? this.chatLabel(chat) : "Conversazione"; }
   trackId(_index: number, item: { id: string }) { return item.id; }
   trackChat(_index: number, item: WhatsAppConversationView) { return item.chatId; }
 }

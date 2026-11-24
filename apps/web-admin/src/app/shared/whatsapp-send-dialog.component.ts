@@ -2,7 +2,8 @@ import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, OnInit, Output, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { HttpErrorResponse } from "@angular/common/http";
-import type { WhatsAppAudienceView, WhatsAppConnection } from "@barber/shared/whatsapp";
+import type { WhatsAppAudienceView, WhatsAppConnection, WhatsAppImageInput } from "@barber/shared/whatsapp";
+import { prepareWhatsAppImage } from "./whatsapp-image";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
 
 export interface WhatsAppRecipient {
@@ -49,9 +50,16 @@ export interface WhatsAppRecipient {
           <form *ngIf="canWrite" class="mt-4 grid gap-3" (ngSubmit)="send()">
             <fieldset class="grid gap-3" [disabled]="sending || !!result">
               <label class="field">
-                <span>Messaggio</span>
-                <textarea name="text" rows="5" maxlength="16000" required [(ngModel)]="text" (ngModelChange)="draftChanged()"></textarea>
+                <span>{{ image ? "Didascalia (facoltativa)" : "Messaggio" }}</span>
+                <textarea name="text" rows="5" [attr.maxlength]="image ? 2000 : 16000" [(ngModel)]="text" (ngModelChange)="draftChanged()"></textarea>
               </label>
+              <div *ngIf="image; else addImage" class="wa-send-image">
+                <img [src]="image.data" alt="Foto da inviare" />
+                <button type="button" class="pill-btn" (click)="image = null; draftChanged()">Togli foto</button>
+              </div>
+              <ng-template #addImage>
+                <label class="wa-send-attach"><input type="file" accept="image/*" (change)="pickImage($event)" />📎 Allega una foto</label>
+              </ng-template>
               <label class="flex items-start gap-2 text-sm">
                 <input type="checkbox" name="consent" [(ngModel)]="authorized" />
                 <span>{{ customer
@@ -63,7 +71,7 @@ export interface WhatsAppRecipient {
             <p *ngIf="error" role="alert" class="wa-send-note">{{ error }}</p>
             <div class="flex flex-wrap justify-end gap-2">
               <button type="button" class="pill-btn" (click)="close()">{{ result ? "Chiudi" : "Annulla" }}</button>
-              <button *ngIf="!result" class="primary-btn" [disabled]="sending || !authorized || !text.trim()">
+              <button *ngIf="!result" class="primary-btn" [disabled]="sending || !authorized || (!text.trim() && !image)">
                 {{ sending ? "Invio…" : customer ? "Invia" : "Invia a " + (audience?.eligible ?? 0) + " clienti" }}
               </button>
             </div>
@@ -88,6 +96,10 @@ export interface WhatsAppRecipient {
       }
       .wa-send-ok { font-size: 0.875rem; font-weight: 600; color: var(--accent); }
       textarea { resize: vertical; }
+      .wa-send-image { display: flex; align-items: center; gap: 0.75rem; }
+      .wa-send-image img { width: 5rem; height: 5rem; object-fit: cover; border-radius: 0.75rem; }
+      .wa-send-attach { position: relative; justify-self: start; display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid var(--line); border-radius: 999px; padding: 0.5rem 1rem; font-size: 0.9rem; cursor: pointer; }
+      .wa-send-attach input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
     `,
   ],
 })
@@ -102,6 +114,7 @@ export class WhatsAppSendDialogComponent implements OnInit {
   connection: WhatsAppConnection | null = null;
   audience: WhatsAppAudienceView | null = null;
   text = "";
+  image: WhatsAppImageInput | null = null;
   authorized = false;
   result = "";
   error = "";
@@ -135,24 +148,35 @@ export class WhatsAppSendDialogComponent implements OnInit {
     this.broadcastKey = newKey();
   }
 
+  async pickImage(event: Event) {
+    const input = event.target as HTMLInputElement, file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    try { this.image = await prepareWhatsAppImage(file); this.error = ""; this.draftChanged(); }
+    catch (error) { this.error = message(error); }
+  }
+
   async send() {
-    if (!this.connection || this.sending || !this.authorized || !this.text.trim()) return;
+    if (!this.connection || this.sending || !this.authorized || (!this.text.trim() && !this.image)) return;
     this.sending = true;
     this.error = "";
     try {
       if (this.customer) {
-        await this.api.send(this.connection.id, { customerId: this.customer.id, text: this.text, recipientAuthorized: true });
-        this.result = "Messaggio inviato al canale. Lo stato è in «Messaggi WhatsApp» › Invii.";
+        await this.api.send(this.connection.id, {
+          customerId: this.customer.id, text: this.text, ...(this.image ? { image: this.image } : {}), recipientAuthorized: true,
+        });
+        this.result = "Messaggio affidato a WhatsApp. L’esito è in «Messaggi WhatsApp» › Invii.";
       } else {
         const outcome = await this.api.broadcast(this.connection.id, {
           text: this.text,
+          ...(this.image ? { image: this.image } : {}),
           idempotencyKey: this.broadcastKey,
           recipientAuthorized: true,
         });
         const skipped = outcome.skipped ? ` ${outcome.skipped} esclusi (senza consenso o numero ripetuto).` : "";
         if (outcome.failed)
           this.error = `Inviati ${outcome.sent}, ${outcome.failed} non riusciti. Premi di nuovo «Invia»: chi l'ha già ricevuto non lo riceve due volte.${skipped}`;
-        else this.result = `Inviati ${outcome.sent} messaggi. Lo stato è in «Messaggi WhatsApp» › Invii.${skipped}`;
+        else this.result = `Inviati ${outcome.sent} messaggi. L’esito è in «Messaggi WhatsApp» › Invii.${skipped}`;
       }
     } catch (error) {
       this.error = message(error);

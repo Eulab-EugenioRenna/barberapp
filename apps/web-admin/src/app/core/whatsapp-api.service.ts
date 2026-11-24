@@ -40,6 +40,13 @@ export class WhatsAppApiService {
   messages(id: string, chat: string, before?: string) {
     return firstValueFrom(this.http.get<WhatsAppMessageView[]>(`${this.root}/archives/${encodeURIComponent(id)}/messages`, { params: { chat, ...(before ? { before } : {}) } }));
   }
+  /** Attachment of a message, copied into ALORA. null while it is still being recovered. */
+  async media(archiveId: string, messageId: string): Promise<Blob | null> {
+    const response = await firstValueFrom(this.http.get(
+      `${this.root}/archives/${encodeURIComponent(archiveId)}/messages/${encodeURIComponent(messageId)}/media`,
+      { observe: "response", responseType: "blob" }));
+    return response.status === 204 || !response.body?.size ? null : response.body;
+  }
   /** Customers of the tenant for the recipient picker (no phone numbers, only whether one exists). */
   customers() {
     return firstValueFrom(this.http.get<Array<{ id: string; firstName: string; lastName: string; hasPhone: boolean }>>(`${ADMIN_API_URL}/customers/options`));
@@ -50,13 +57,19 @@ export class WhatsAppApiService {
     return firstValueFrom(this.http.post<WhatsAppBroadcastResult>(`${this.root}/sessions/${encodeURIComponent(sessionId)}/broadcast`, input));
   }
   async send(sessionId: string, input: Omit<WhatsAppSendInput, "idempotencyKey">) {
-    const key = this.key(), command = beginPendingCommand(sessionStorage, key, { sessionId, ...input });
+    const key = this.key();
+    let command: PendingCommand;
+    try { command = beginPendingCommand(sessionStorage, key, { sessionId, ...input }); }
+    catch (error) {
+      if (error instanceof DOMException) throw new Error("La foto è troppo grande per essere inviata da questo browser. Scegline una più leggera.");
+      throw error;
+    }
     this.version.update(v => v + 1);
     return this.sendCommand(key, command);
   }
   retry() {
     const state = this.pending();
-    if (state.kind !== "pending") throw new Error("Richiesta precedente non leggibile: verifica gli invii in Connect");
+    if (state.kind !== "pending") throw new Error("Richiesta precedente non leggibile: controlla sul telefono se il messaggio è partito");
     return this.sendCommand(this.key(), state.command);
   }
   private async sendCommand(key: string, command: PendingCommand) {

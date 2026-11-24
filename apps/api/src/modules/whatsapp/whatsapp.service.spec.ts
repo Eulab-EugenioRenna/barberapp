@@ -27,6 +27,8 @@ const wa = {
   messages: jest.fn(),
   outbox: jest.fn(),
   sendText: jest.fn(),
+  send: jest.fn(),
+  media: jest.fn(),
 };
 jest.mock("../../common/connect-application", () => ({
   connectApplication: jest.fn(async () => ({
@@ -44,8 +46,12 @@ const raw = (n: number, extra: Record<string, unknown> = {}) => ({
 describe("WhatsApp: each account manages only the connection it created", () => {
   let links: Array<{ tenantId: string; userId: string; sessionId: string; removedAt: Date | null; disconnectRequestedAt?: Date | null }>;
   let service: WhatsAppService;
+  let sends: any[];
+  let chats: any[];
+  let media: any;
   beforeEach(() => {
     jest.clearAllMocks();
+    sends = []; chats = []; media = null;
     current = "owner";
     // 1 = owner's connection from ALORA, 2 = colleague's, 3 = created in Connect (no link).
     links = [
@@ -66,6 +72,16 @@ describe("WhatsApp: each account manages only the connection it created", () => 
           for (const l of links) if (ids.includes(l.sessionId)) Object.assign(l, data);
           return { count: ids.length };
         }),
+      },
+      whatsAppSend: { findMany: jest.fn(async () => sends), upsert: jest.fn(async ({ create }: any) => { sends.push(create); return create; }) },
+      whatsAppChat: {
+        findMany: jest.fn(async () => chats), findFirst: jest.fn(async () => null),
+        upsert: jest.fn(async ({ create }: any) => { chats.push({ ...create, updatedAt: new Date() }); return create; }),
+      },
+      whatsAppMedia: { findUnique: jest.fn(async () => media), upsert: jest.fn(async ({ create }: any) => { media = create; return create; }) },
+      customer: {
+        findMany: jest.fn(async () => [{ phone: "333 1234567", firstName: "Mario", lastName: "Rossi" }]),
+        findFirst: jest.fn(async () => ({ phone: "333 1234567", firstName: "Mario", lastName: "Rossi" })),
       },
     } as unknown as PrismaService;
     service = new WhatsAppService(prisma);
@@ -161,5 +177,46 @@ describe("WhatsApp: each account manages only the connection it created", () => 
     wa.sessions.mockResolvedValue([raw(1, { state: "failed" }), raw(2)]);
     expect((await service.sessions("Bearer x")).map((s) => s.state)).toEqual(["failed"]);
     expect(wa.deleteConnection).not.toHaveBeenCalled();
+  });
+
+  it("names chats by customer phone or by the name the person writes with", async () => {
+    wa.conversations.mockResolvedValue([
+      { chat_id: "393331234567@c.us", messages: 2, last_message_at: "2026-11-21T22:00:00.000Z", preview: "ciao", kind: "chat", direction: "in", contact: null },
+      { chat_id: "27684000007464@lid", messages: 3, last_message_at: "2026-11-21T22:00:00.000Z", preview: "ok", kind: "chat", direction: "in", contact: null },
+    ]);
+    wa.messages.mockResolvedValue([{ id: uuid(300), chat_id: "27684000007464@lid", direction: "in", kind: "chat", occurred_at: "2026-11-21T22:00:00.000Z", body: { text: "ok", senderName: "Francesco" } }]);
+    const list = await service.conversations("Bearer x", uuid(101));
+    expect(list.map((c) => [c.name, c.phone])).toEqual([["Mario Rossi", "+393331234567"], ["Francesco", null]]);
+  });
+
+  it("sends a photo with caption and records recipient for «Invii»", async () => {
+    wa.send.mockResolvedValue({ id: uuid(201), state: "queued" });
+    const image = { data: "data:image/jpeg;base64,AAAA", filename: "foto.jpg" };
+    await service.send("Bearer x", uuid(1), { customerId: uuid(50), text: "Ecco", image, idempotencyKey: uuid(9), recipientAuthorized: true });
+    expect(wa.send).toHaveBeenCalledWith(uuid(1), { kind: "image", to: "+393331234567", data: image.data, filename: "foto.jpg", caption: "Ecco" }, expect.any(String));
+    wa.outbox.mockResolvedValue([{ id: uuid(201), session_id: uuid(1), state: "uncertain", created_at: "2026-11-21T22:00:00.000Z", error: "x" }]);
+    const [item] = await service.outbox("Bearer x");
+    expect(item).toMatchObject({ recipientName: "Mario Rossi", preview: "Ecco", kind: "image" });
+    expect(item.problem).toContain("controlla sul telefono");
+  });
+
+  it("refuses an empty message without a photo", async () => {
+    await expect(service.send("Bearer x", uuid(1), { to: "+393331234567", text: "  ", idempotencyKey: uuid(9), recipientAuthorized: true }))
+      .rejects.toThrow("Scrivi un messaggio o allega una foto");
+  });
+
+  it("copies an attachment into ALORA once, then serves it from there", async () => {
+    wa.media.mockResolvedValue({ data: "data:audio/ogg; codecs=opus;base64,T2dnUw==", state: "available" });
+    const first = await service.media("Bearer x", uuid(101), uuid(300));
+    expect(first).toMatchObject({ mimetype: "audio/ogg" });
+    expect(first!.data.toString()).toBe("OggS");
+    const second = await service.media("Bearer x", uuid(101), uuid(300));
+    expect(second!.data.toString()).toBe("OggS");
+    expect(wa.media).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a file still being recovered as null", async () => {
+    wa.media.mockResolvedValue({ data: null, state: "queued" });
+    expect(await service.media("Bearer x", uuid(101), uuid(301))).toBeNull();
   });
 });

@@ -13,7 +13,7 @@ import { requireTenantId, requireUser, resolveRequestSession } from "../../commo
 import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection,
   WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
-  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastResult,
+  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastResult, WhatsAppImageInput,
 } from "../../common/whatsapp-contract";
 import { appointmentPhone } from "../notifications/appointment-automation-state";
 
@@ -34,6 +34,34 @@ function actorKey(parts: unknown[]) {
   const hash = createHash("sha256").update(JSON.stringify(parts)).digest("hex");
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}` as const;
 }
+
+/** Message kinds whose content is a file. */
+export const MEDIA_KINDS = new Set(["image", "sticker", "ptt", "audio", "video", "document"]);
+/** «2768…@lid» is a WhatsApp internal id, not a phone: only «@c.us» chats carry the number. */
+export function chatPhone(chatId: string): string | null {
+  const match = /^(\d{7,15})@c\.us$/.exec(chatId);
+  return match ? `+${match[1]}` : null;
+}
+/** Readable outcome for «Invii»: what happened and what to do, never «check in Connect». */
+export function sendProblem(state: string, error: string | null | undefined): string | null {
+  if (state === "uncertain")
+    return "WhatsApp non ha confermato l’invio: controlla sul telefono se il messaggio è arrivato prima di inviarlo di nuovo.";
+  if (state === "cancelled") {
+    if (error === "explicit_disconnect") return "Annullato: il numero è stato disconnesso prima dell’invio.";
+    if (error === "authorization_revoked") return "Annullato: il numero non era connesso o il permesso di invio non è più attivo.";
+    return "Invio annullato.";
+  }
+  if (state === "failed") return "Invio non riuscito. Verifica che il numero sia connesso e riprova.";
+  return error ? "Invio non confermato: controlla sul telefono se il messaggio è arrivato." : null;
+}
+/** Data URL from Connect («data:audio/ogg; codecs=opus;base64,…») → bytes. */
+export function decodeDataUrl(value: string): { mimetype: string; data: Buffer } | null {
+  const match = /^data:([\w.+-]+\/[\w.+-]+)[^,]*;base64,([A-Za-z0-9+/=\s]+)$/.exec(value);
+  if (!match) return null;
+  return { mimetype: match[1].toLowerCase(), data: Buffer.from(match[2], "base64") };
+}
+const customerName = (c: { firstName: string | null; lastName: string | null }) =>
+  [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || null;
 
 type Client = ReturnType<ConnectServer["whatsapp"]>;
 const uuid = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i;
@@ -231,11 +259,58 @@ export class WhatsAppService {
   conversations(auth: string | undefined, archiveId: string): Promise<WhatsAppConversationView[]> {
     return this.run(auth, "whatsapp.read", async (wa, actor) => {
       await this.ownedArchive(wa, actor, archiveId);
-      return rows(await wa.conversations(archiveId)).map(c => {
+      const list = rows(await wa.conversations(archiveId)).map(c => {
         if (!Number.isSafeInteger(c.messages) || c.messages < 0) return invalid();
-        return { chatId: text(c.chat_id, 100), messages: c.messages, lastMessageAt: date(c.last_message_at), preview: nullable(c.preview),
-          name: nullable(c.contact?.name ?? c.contact?.pushName, 200), kind: text(c.kind, 80), direction: direction(c.direction) };
+        const chatId = text(c.chat_id, 100);
+        return { chatId, messages: c.messages, lastMessageAt: date(c.last_message_at), preview: nullable(c.preview),
+          name: nullable(c.contact?.name ?? c.contact?.pushName, 200), kind: text(c.kind, 80), direction: direction(c.direction),
+          phone: chatPhone(chatId), isGroup: chatId.endsWith("@g.us") || !!c.contact?.isGroup };
       });
+      await this.nameChats(wa, actor, archiveId, list);
+      return list;
+    });
+  }
+  /**
+   * Names, in order: customer saved in ALORA with the chat's phone, the WhatsApp
+   * contact, the profile name the person uses when writing (kept in
+   * WhatsAppChat). Chats never named are looked up a few at a time.
+   */
+  private async nameChats(wa: Client, actor: Actor, archiveId: string,
+    list: Array<{ chatId: string; name: string | null; phone: string | null; isGroup: boolean; messages: number }>) {
+    const phones = list.map((c) => c.phone).filter((p): p is string => !!p);
+    if (phones.length) {
+      const customers = await this.prisma.customer.findMany({
+        where: { tenantId: actor.tenantId, isActive: true, phone: { not: null } },
+        select: { phone: true, firstName: true, lastName: true },
+      });
+      const byPhone = new Map(customers.map((c) => [customerWhatsAppNumber(c.phone), customerName(c)]));
+      for (const chat of list) if (chat.phone && byPhone.get(chat.phone)) chat.name = byPhone.get(chat.phone)!;
+    }
+    const known = await this.prisma.whatsAppChat.findMany({
+      where: { tenantId: actor.tenantId, archiveId, chatId: { in: list.map((c) => c.chatId) } },
+      select: { chatId: true, name: true, updatedAt: true },
+    });
+    const cache = new Map(known.map((k) => [k.chatId, k]));
+    for (const chat of list) if (!chat.name) chat.name = cache.get(chat.chatId)?.name ?? null;
+    // Groups: the sender name is a member, not the group.
+    const stale = Date.now() - 6 * 3600_000;
+    const missing = list
+      .filter((c) => !c.name && !c.isGroup && c.messages > 0 && !(cache.get(c.chatId) && cache.get(c.chatId)!.updatedAt.getTime() > stale))
+      .slice(0, 5);
+    await Promise.all(missing.map(async (chat) => {
+      try {
+        const sender = rows(await wa.messages(archiveId, undefined, chat.chatId))
+          .find((m) => m.direction === "in" && typeof m.body?.senderName === "string" && m.body.senderName.trim().length > 1);
+        chat.name = sender ? sender.body.senderName!.trim().slice(0, 200) : null;
+        await this.rememberChat(actor, archiveId, chat.chatId, chat.name);
+      } catch { /* named on a later refresh */ }
+    }));
+  }
+  private rememberChat(actor: Actor, archiveId: string, chatId: string, name: string | null) {
+    return this.prisma.whatsAppChat.upsert({
+      where: { archiveId_chatId: { archiveId, chatId } },
+      create: { tenantId: actor.tenantId, archiveId, chatId, name },
+      update: { name },
     });
   }
   messages(auth: string | undefined, archiveId: string, before?: string, chat?: string): Promise<WhatsAppMessageView[]> {
@@ -243,46 +318,114 @@ export class WhatsAppService {
     if (chat !== undefined && (typeof chat !== "string" || chat.length > 100)) throw new BadRequestException("Conversazione non valida");
     return this.run(auth, "whatsapp.read", async (wa, actor) => {
       await this.ownedArchive(wa, actor, archiveId);
-      return rows(await wa.messages(archiveId, before, chat)).map(m => ({
-        id: id(m.id), chatId: text(m.chat_id, 100), direction: direction(m.direction), kind: text(m.kind, 80), occurredAt: date(m.occurred_at),
-        text: nullable(m.body?.text ?? (m.body?.interactive && "body" in m.body.interactive ? m.body.interactive.body : null)),
-        selectedButtonId: nullable(m.body?.selectedButtonId, 200),
-      }));
+      const list = rows(await wa.messages(archiveId, before, chat)).map(m => {
+        const kind = text(m.kind, 80);
+        return {
+          id: id(m.id), chatId: text(m.chat_id, 100), direction: direction(m.direction), kind, occurredAt: date(m.occurred_at),
+          text: nullable(m.body?.text ?? (m.body?.interactive && "body" in m.body.interactive ? m.body.interactive.body : null)) || null,
+          selectedButtonId: nullable(m.body?.selectedButtonId, 200),
+          media: MEDIA_KINDS.has(kind) ? { mimetype: nullable(m.body?.mimetype, 200), filename: nullable(m.body?.filename, 300) } : null,
+          senderName: nullable(m.body?.senderName, 200),
+        };
+      });
+      const named = chat && !chat.endsWith("@g.us")
+        ? list.find((m) => m.direction === "inbound" && m.senderName && m.senderName.trim().length > 1) : undefined;
+      if (named && chat) await this.rememberChat(actor, archiveId, chat, named.senderName!.trim());
+      return list;
+    });
+  }
+  /**
+   * Attachment of a message. Copied into ALORA the first time it is available,
+   * then always served from here. null: Connect is still recovering it.
+   */
+  media(auth: string | undefined, archiveId: string, messageId: string) {
+    if (!uuid.test(messageId)) throw new BadRequestException("Messaggio non valido");
+    return this.run(auth, "whatsapp.read", async (wa, actor) => {
+      const where = { archiveId_messageId: { archiveId, messageId } };
+      const saved = await this.prisma.whatsAppMedia.findUnique({ where, select: { tenantId: true, mimetype: true, filename: true, data: true } });
+      if (saved && saved.tenantId !== actor.tenantId) throw notMine();
+      await this.ownedArchive(wa, actor, archiveId);
+      if (saved) return { mimetype: saved.mimetype, filename: saved.filename, data: Buffer.from(saved.data) };
+      const result = await wa.media(archiveId, messageId);
+      if (!result?.data) return null;
+      const decoded = decodeDataUrl(result.data);
+      if (!decoded) return invalid();
+      await this.prisma.whatsAppMedia.upsert({
+        where,
+        create: { tenantId: actor.tenantId, archiveId, messageId, mimetype: decoded.mimetype, size: decoded.data.length, data: decoded.data },
+        update: {},
+      });
+      return { mimetype: decoded.mimetype, filename: null, data: decoded.data };
     });
   }
   outbox(auth?: string): Promise<WhatsAppOutboxView[]> {
     return this.run(auth, "whatsapp.read", async (wa, actor) => {
       const sessionIds = new Set((await this.mine(wa, actor)).map((item) => item.id));
       if (!sessionIds.size) return [];
-      return rows(await wa.outbox())
-        .filter((o) => sessionIds.has(o.session_id))
-        .map(o => ({ id: id(o.id), sessionId: id(o.session_id), state: text(o.state, 80), createdAt: date(o.created_at), hasError: o.error != null }));
+      const items = rows(await wa.outbox()).filter((o) => sessionIds.has(o.session_id));
+      const records = await this.prisma.whatsAppSend.findMany({
+        where: { tenantId: actor.tenantId, outboxId: { in: items.map((o) => o.id) } },
+        select: { outboxId: true, recipientName: true, recipient: true, preview: true, kind: true },
+      });
+      const byId = new Map(records.map((r) => [r.outboxId, r]));
+      return items.map(o => {
+        const state = text(o.state, 80), record = byId.get(o.id);
+        return { id: id(o.id), sessionId: id(o.session_id), state, createdAt: date(o.created_at), hasError: o.error != null,
+          problem: sendProblem(state, o.error), recipientName: record ? record.recipientName || record.recipient : null,
+          preview: record?.preview ?? null, kind: record?.kind ?? null };
+      });
     });
+  }
+  /** Text or image message, recorded so «Invii» can say to whom and what. */
+  private async deliver(wa: Client, actor: Actor, sessionId: string, target: { to: string; customerId?: string; name: string | null },
+    input: { text?: string; image?: WhatsAppImageInput }, key: ReturnType<typeof actorKey>) {
+    const body = input.text?.trim() ? input.text : "";
+    const result = ack(input.image
+      ? await wa.send(sessionId, { kind: "image", to: target.to, data: input.image.data, filename: input.image.filename, caption: body }, key)
+      : await wa.sendText(sessionId, target.to, body, key));
+    const preview = (body || (input.image ? "Foto" : "")).slice(0, 300) || null;
+    try {
+      await this.prisma.whatsAppSend.upsert({
+        where: { outboxId: result.id },
+        create: { tenantId: actor.tenantId, userId: actor.userId, sessionId, outboxId: result.id, customerId: target.customerId ?? null,
+          recipient: target.to, recipientName: target.name, kind: input.image ? "image" : "text", preview },
+        update: {},
+      });
+    } catch { /* the message is sent anyway: only the label in «Invii» is missing */ }
+    return result;
+  }
+  private requireContent(input: { text?: string; image?: WhatsAppImageInput }) {
+    if (!input.image && !input.text?.trim()) throw new BadRequestException("Scrivi un messaggio o allega una foto");
+    if (input.image && (input.text?.length ?? 0) > 2000) throw new BadRequestException("La didascalia della foto può avere al massimo 2000 caratteri");
   }
   send(auth: string | undefined, sessionId: string, input: WhatsAppSendInput) {
     return this.run(auth, "whatsapp.send", async (wa, actor) => {
       await this.ownedSession(wa, actor, sessionId);
       if (!!input.customerId === !!input.to) throw new BadRequestException("Scegli un cliente o un numero");
-      let to = input.to!;
+      this.requireContent(input);
+      let to = input.to!, name: string | null = null;
       if (input.customerId) {
         const customer = await this.prisma.customer.findFirst({
           where: { id: input.customerId, tenantId: actor.tenantId, isActive: true },
-          select: { phone: true },
+          select: { phone: true, firstName: true, lastName: true },
         });
         if (!customer) throw new NotFoundException("Cliente non trovato");
         const number = customerWhatsAppNumber(customer.phone);
         if (!number) throw new BadRequestException("Il cliente non ha un numero di telefono valido");
-        to = number;
+        to = number; name = customerName(customer);
+      } else {
+        const chat = await this.prisma.whatsAppChat.findFirst({ where: { tenantId: actor.tenantId, chatId: to }, select: { name: true } });
+        name = chat?.name ?? chatPhone(to);
       }
       // Connect's installation-wide key is namespaced by the authenticated local actor.
       const key = actorKey([actor.tenantId, actor.userId, input.idempotencyKey]);
-      return ack(await wa.sendText(sessionId, to, input.text, key));
+      return this.deliver(wa, actor, sessionId, { to, customerId: input.customerId, name }, input, key);
     });
   }
   private broadcastCustomers(tenantId: string) {
     return this.prisma.customer.findMany({
       where: { tenantId, isActive: true, phone: { not: null } },
-      select: { id: true, phone: true, marketingConsent: true },
+      select: { id: true, phone: true, marketingConsent: true, firstName: true, lastName: true },
       orderBy: { id: "asc" },
     });
   }
@@ -305,16 +448,17 @@ export class WhatsAppService {
   broadcast(auth: string | undefined, sessionId: string, input: WhatsAppBroadcastInput): Promise<WhatsAppBroadcastResult> {
     return this.run(auth, "whatsapp.send", async (wa, actor) => {
       await this.ownedSession(wa, actor, sessionId);
+      this.requireContent(input);
       const rows = await this.broadcastCustomers(actor.tenantId);
       const seen = new Set<string>();
-      const targets: Array<{ id: string; to: string }> = [];
+      const targets: Array<{ id: string; to: string; name: string | null }> = [];
       let skipped = 0;
       for (const row of rows) {
         const to = row.marketingConsent ? customerWhatsAppNumber(row.phone) : null;
         // Same number on two customer cards: one message only.
         if (!to || seen.has(to)) { skipped++; continue; }
         seen.add(to);
-        targets.push({ id: row.id, to });
+        targets.push({ id: row.id, to, name: customerName(row) });
       }
       if (!targets.length) throw new BadRequestException("Nessun cliente con telefono e consenso marketing");
       if (targets.length > BROADCAST_LIMIT)
@@ -322,7 +466,8 @@ export class WhatsAppService {
       let sent = 0, failed = 0;
       for (let index = 0; index < targets.length; index += 5) {
         const results = await Promise.allSettled(targets.slice(index, index + 5).map((target) =>
-          wa.sendText(sessionId, target.to, input.text, actorKey([actor.tenantId, actor.userId, input.idempotencyKey, target.id]))));
+          this.deliver(wa, actor, sessionId, { to: target.to, customerId: target.id, name: target.name }, input,
+            actorKey([actor.tenantId, actor.userId, input.idempotencyKey, target.id]))));
         for (const result of results) {
           if (result.status === "fulfilled") sent++;
           else failed++;

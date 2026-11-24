@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Post, Query, Req, Res } from "@nestjs/common";
+import type { Response } from "express";
 import { WhatsAppService } from "./whatsapp.service";
 import { BroadcastWhatsAppTextDto, SendWhatsAppTextDto, WhatsAppMessageQueryDto } from "./whatsapp.dto";
 import { type ConnectRequest, connectBrowser } from "../../common/connect-http";
@@ -24,6 +25,18 @@ export class WhatsAppController {
   @Get("archives/:id/messages") @Header("Cache-Control", "no-store")
   messages(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string, @Query() query: WhatsAppMessageQueryDto) {
     return this.whatsapp.messages(r.headers.authorization, id, query.before, query.chat);
+  }
+  /** File of a message: 200 with the bytes, 204 while Connect is still recovering it. */
+  @Get("archives/:id/messages/:messageId/media")
+  async media(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string,
+    @Param("messageId", new ParseUUIDPipe()) messageId: string, @Res() res: Response) {
+    const file = await this.whatsapp.media(r.headers.authorization, id, messageId);
+    res.setHeader("Cache-Control", "private, max-age=86400");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    if (!file) { res.setHeader("Cache-Control", "no-store"); res.status(204).end(); return; }
+    res.setHeader("Content-Type", file.mimetype);
+    res.setHeader("Content-Disposition", "inline");
+    res.status(200).end(file.data);
   }
   @Get("outbox") @Header("Cache-Control", "no-store")
   outbox(@Req() r: ConnectRequest) { return this.whatsapp.outbox(r.headers.authorization); }
