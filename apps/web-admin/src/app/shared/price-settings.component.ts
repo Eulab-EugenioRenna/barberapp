@@ -53,8 +53,8 @@ import { UiSelectComponent, type UiOption } from "@alora/ui";
             [ngModelOptions]="{ standalone: true }"
             placeholder="Non registrato"
         /></label>
-        <div class="select-field">
-          <span>Modalità costo</span
+        <div *ngIf="hasCost" class="select-field">
+          <span>Il costo include l’IVA?</span
           ><ui-select
             label="Modalità costo"
             [options]="costModeOptions"
@@ -63,7 +63,7 @@ import { UiSelectComponent, type UiOption } from "@alora/ui";
             [ngModelOptions]="{ standalone: true }"
           ></ui-select>
         </div>
-        <label
+        <label *ngIf="hasCost"
           >IVA acquisto (%)<input
             type="number"
             min="0"
@@ -83,14 +83,14 @@ import { UiSelectComponent, type UiOption } from "@alora/ui";
         >
       </ng-container>
     </div>
-    <label
-      >Motivo aggiornamento listino<input
+    <label *ngIf="value.id"
+      >Perché cambi il prezzo (facoltativo)<input
         maxlength="500"
         [(ngModel)]="value.priceChangeReason"
         [ngModelOptions]="{ standalone: true }"
         placeholder="Es. nuovo listino"
     /></label>
-    <p>
+    <p *ngIf="value.id">
       Le variazioni del listino non cambiano i prezzi già registrati nei conti.
     </p>
     <button
@@ -215,6 +215,11 @@ export class PriceSettingsComponent implements OnChanges {
     { value: "net", label: "Prezzo IVA esclusa" },
     { value: "gross", label: "Prezzo IVA inclusa" },
   ];
+  /** Cost mode and purchase VAT only matter once a cost is entered. */
+  get hasCost(): boolean {
+    const cost = this.value?.cost;
+    return (cost !== null && cost !== undefined && cost !== "") || !!this.value?.purchaseVatRate;
+  }
   readonly costModeOptions: UiOption[] = [
     { value: "legacy", label: "Valore storico · IVA non definita" },
     { value: "net", label: "Costo IVA esclusa" },

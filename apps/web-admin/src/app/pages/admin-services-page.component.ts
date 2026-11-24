@@ -254,7 +254,6 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
             >
             <input [(ngModel)]="serviceForm.name" name="serviceName" required />
           </label>
-          <alora-price-settings kind="service" [value]="serviceForm"></alora-price-settings>
           <alora-activity-picker
             kind="service"
             [value]="serviceForm.activityId"
@@ -300,6 +299,10 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
               />
             </label>
           </div>
+          <details class="field" [open]="serviceForm.priceMode && serviceForm.priceMode !== 'legacy'">
+            <summary class="cursor-pointer text-sm font-semibold">IVA e tipo di prezzo</summary>
+            <alora-price-settings kind="service" [value]="serviceForm"></alora-price-settings>
+          </details>
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
               <span>Colore</span>
@@ -316,19 +319,21 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                   name="serviceIsPublic"
                   type="checkbox"
                 />
-                <span>Visibile ai clienti online</span>
+                <span>Mostra sulla pagina di prenotazione</span>
               </label>
-              <label class="field checkbox-field">
+              <label *ngIf="serviceForm.isPublic" class="field checkbox-field">
                 <input
                   [(ngModel)]="serviceForm.isBookableOnline"
                   name="serviceIsBookableOnline"
                   type="checkbox"
                 />
-                <span>Prenotabile online</span>
+                <span>I clienti possono prenotarlo da soli</span>
               </label>
             </div>
           </div>
-          <div class="field">
+          <p *ngIf="!serviceForm.id" class="field-hint">Prodotti collegati: salva prima il servizio, poi potrai collegare i prodotti che usa o che consigli.</p>
+          <p *ngIf="serviceForm.id && !products.length" class="field-hint">Prodotti collegati: per collegarli serve prima creare i prodotti nella scheda «Prodotti».</p>
+          <div *ngIf="serviceForm.id && products.length" class="field">
             <span>Prodotti consigliati con il servizio</span>
             <div
               class="mt-3 grid gap-3"
@@ -399,7 +404,7 @@ import { serviceProductModeLabel } from "../shared/presentation-copy";
                   step="1"
                 />
               </label>
-              <label class="field md:col-span-2" aloraFunction="inventory.manage"><span>Consumo fisico per servizio (opzionale)</span><input type="number" min="0.001" step="0.001" [(ngModel)]="serviceProductForm.consumptionUnits" name="consumptionUnits" placeholder="Vuoto: nessuno scarico automatico"></label>
+              <label *ngIf="selectedProductTracked" class="field md:col-span-2" aloraFunction="inventory.manage"><span>Quantità scaricata dal magazzino a ogni servizio (facoltativo)</span><input type="number" min="0.001" step="0.001" [(ngModel)]="serviceProductForm.consumptionUnits" name="consumptionUnits" placeholder="Vuoto: nessuno scarico automatico"></label>
               <label class="field checkbox-field md:col-span-2">
                 <input
                   [(ngModel)]="serviceProductForm.priceLocked"
@@ -569,6 +574,11 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy {
   formatServiceProductMode = serviceProductModeLabel;
   @Input() services: any[] = [];
   @Input() products: any[] = [];
+  /** Stock is unloaded per service only for products whose stock is tracked. */
+  get selectedProductTracked(): boolean {
+    const id = this.serviceProductForm?.productId;
+    return !!id && !!this.products.find((product) => product.id === id)?.stockTracked;
+  }
   @Input() serviceForm: any = {};
   @Input() productForm: any = {};
   @Input() serviceProductForm: any = {};
