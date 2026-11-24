@@ -33,7 +33,7 @@ export interface WhatsAppRecipient {
 
         <p *ngIf="loading" class="mt-3 text-sm text-[var(--muted)]">Verifico il collegamento…</p>
         <ng-container *ngIf="!loading">
-          <p *ngIf="!connection" class="wa-send-note">
+          <p *ngIf="connectionChecked && !connection" class="wa-send-note">
             Il tuo numero WhatsApp non è collegato. Collegalo da «Messaggi WhatsApp», poi torna qui.
           </p>
           <p *ngIf="customer && !customer.phone" class="wa-send-note">
@@ -118,6 +118,7 @@ export class WhatsAppSendDialogComponent implements OnInit {
   authorized = false;
   result = "";
   error = "";
+  connectionChecked = false;
   /** Kept across retries of the same text, so nobody is messaged twice. */
   private broadcastKey = newKey();
 
@@ -130,18 +131,19 @@ export class WhatsAppSendDialogComponent implements OnInit {
   }
 
   async ngOnInit() {
-    try {
-      const [sessions, audience] = await Promise.all([
-        this.api.sessions(),
-        this.customer ? Promise.resolve(null) : this.api.audience(),
-      ]);
-      this.connection = sessions.find((s) => !s.closedAt && s.state === "connected" && s.runnerOnline) ?? null;
-      this.audience = audience;
-    } catch (error) {
-      this.error = message(error);
-    } finally {
-      this.loading = false;
-    }
+    // Two independent reads: a failure counting recipients must not look like
+    // a disconnected number.
+    const [sessions, audience] = await Promise.allSettled([
+      this.api.sessions(),
+      this.customer ? Promise.resolve(null) : this.api.audience(),
+    ]);
+    if (sessions.status === "fulfilled") {
+      this.connection = sessions.value.find((s) => !s.closedAt && s.state === "connected" && s.runnerOnline) ?? null;
+      this.connectionChecked = true;
+    } else this.error = message(sessions.reason);
+    if (audience.status === "fulfilled") this.audience = audience.value;
+    else this.error = "Non riesco a contare i destinatari: " + message(audience.reason);
+    this.loading = false;
   }
 
   draftChanged() {

@@ -10,6 +10,8 @@ import { SectorPickerComponent } from "../shared/sector-picker.component";
 import { offeredAt, sectorForActivity } from "../core/activity-placement";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { SessionStore } from "../core/session.store";
+import { CustomerDirectoryService } from "../core/customer-directory.service";
+import { CustomerSelectComponent } from "../shared/customer-select.component";
 import { CommonModule } from "@angular/common";
 import {
   Component,
@@ -37,6 +39,7 @@ import { BarcodeScannerService } from "../core/barcode-scanner.service";
   selector: "barber-quick-order-modal",
   standalone: true,
   imports: [
+    CustomerSelectComponent,
     AccountPaymentsComponent,
     FunctionAccessDirective,
     SectorPickerComponent,
@@ -65,6 +68,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   private quoteTimer: ReturnType<typeof setTimeout> | null = null;
   private quoteGeneration = 0;
   readonly session = inject(SessionStore);
+  private readonly customerDirectory = inject(CustomerDirectoryService);
 
   protected readonly Number = Number;
   @Input() customers: any[] = [];
@@ -354,6 +358,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   onQuickCreated(event: { kind: QuickCreateKind; entity: any }): void {
     if (event.kind === "customer") {
       this.createdCustomers.unshift(event.entity);
+      this.customerDirectory.add(event.entity);
       this.customerId = event.entity.id;
     } else if (event.kind === "service") {
       this.createdServices.unshift(event.entity);

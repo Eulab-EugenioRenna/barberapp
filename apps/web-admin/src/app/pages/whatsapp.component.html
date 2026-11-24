@@ -182,11 +182,9 @@
             <button type="button" class="pill-btn" (click)="clearRecipient()">Cambia</button>
           </div>
           <ng-template #pickCustomer>
-            <label class="wa-label">Cliente<input name="customerQuery" [(ngModel)]="customerQuery" type="search" autocomplete="off" placeholder="Cerca per nome" /></label>
-            <div *ngIf="customerMatches.length" class="wa-recipient-list" role="listbox" aria-label="Clienti con telefono">
-              <button *ngFor="let c of customerMatches; trackBy: trackId" type="button" role="option" (click)="chooseCustomer(c.id)">{{ c.firstName }} {{ c.lastName }}</button>
+            <div class="wa-label">Cliente
+              <alora-customer-select [withPhoneOnly]="true" [value]="customerId" (valueChange)="chooseCustomer($event)" placeholder="Cerca il cliente per nome"></alora-customer-select>
             </div>
-            <p *ngIf="customerQuery.trim() && !customerMatches.length" class="wa-muted">Nessun cliente con telefono trovato. Il numero si aggiunge nella scheda cliente.</p>
           </ng-template>
           <label class="wa-label">{{ image ? 'Didascalia (facoltativa)' : 'Messaggio' }}<textarea name="message" [(ngModel)]="message" rows="5" [attr.maxlength]="image ? 2000 : 16000"></textarea></label>
           <div *ngIf="image; else addImage" class="wa-attachment">

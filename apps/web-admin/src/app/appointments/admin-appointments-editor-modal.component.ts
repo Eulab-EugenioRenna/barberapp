@@ -250,9 +250,6 @@ import { AppointmentsFacade } from "./appointments.facade";
                 )
               "
               [appointmentForm]="appointmentsFacade.appointmentForm()"
-              [appointmentCustomerOptions]="
-                appointmentsFacade.appointmentCustomerOptions()
-              "
               [serviceSelectOptions]="appointmentsFacade.serviceSelectOptions()"
               [bookingLocationOptions]="appointmentsFacade.bookingLocationOptions()"
               [bookingLocationId]="appointmentsFacade.bookingLocationId()"

@@ -10,8 +10,10 @@ import { SessionStore } from "../core/session.store";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
 import { UiPageComponent, UiSelectComponent, UiTabsComponent, type UiOption, type UiTab } from "@alora/ui";
 import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
+import { CustomerDirectoryService } from "../core/customer-directory.service";
+import { CustomerSelectComponent } from "../shared/customer-select.component";
 @Component({
-  standalone: true, imports: [CommonModule, FormsModule, UiPageComponent, UiTabsComponent, UiSelectComponent, AdminPageHeaderComponent],
+  standalone: true, imports: [CommonModule, FormsModule, CustomerSelectComponent, UiPageComponent, UiTabsComponent, UiSelectComponent, AdminPageHeaderComponent],
   templateUrl: "./whatsapp.component.html", styleUrl: "./whatsapp.component.css",
 })
 export class WhatsAppComponent implements OnInit, OnDestroy {
@@ -25,20 +27,14 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   archiveId = ""; chatId = ""; qr: string | null = null;
   to = ""; message = ""; recipientAuthorized = false;
   /** Recipient: a customer of the salon, or the conversation chosen in «Conversazioni» (`to`). */
-  customers: Array<{ id: string; firstName: string; lastName: string; hasPhone: boolean }> = [];
-  customerId = ""; customerQuery = "";
+  private readonly customerDirectory = inject(CustomerDirectoryService);
+  get customers() { return this.customerDirectory.customers(); }
+  customerId = "";
   get customerName() {
-    const c = this.customers.find(item => item.id === this.customerId);
+    const c = this.customerDirectory.find(this.customerId);
     return c ? `${c.firstName} ${c.lastName}`.trim() : "";
   }
-  get customerMatches() {
-    const terms = this.customerQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (!terms.length) return [];
-    return this.customers
-      .filter(c => c.hasPhone && terms.every(t => `${c.firstName} ${c.lastName}`.toLowerCase().includes(t)))
-      .slice(0, 8);
-  }
-  chooseCustomer(id: string) { this.customerId = id; this.customerQuery = ""; this.to = ""; }
+  chooseCustomer(id: string) { this.customerId = id; this.to = ""; }
   clearRecipient() { this.customerId = ""; this.to = ""; }
   get hasRecipient() { return !!this.customerId || !!this.to.trim(); }
   /** Reply in the open conversation: always goes to that chat. */
@@ -87,7 +83,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   }
   get draftLocked() { return this.sending || this.pending.kind !== "empty"; }
   async ngOnInit() {
-    if (this.canSend) void this.api.customers().then(list => { this.customers = list; }).catch(() => { this.customers = []; });
+    if (this.canSend) void this.customerDirectory.load();
     await this.refresh();
     if (!this.destroyed) this.timer = setInterval(() => { if (!document.hidden) void this.refresh(); }, 8000);
   }

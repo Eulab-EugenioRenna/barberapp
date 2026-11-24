@@ -5,6 +5,7 @@ import { Component, inject, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { UiSelectComponent } from "@alora/ui";
+import { CustomerSelectComponent } from "../shared/customer-select.component";
 import { UiIconComponent } from "../shared/ui-icon.component";
 import { appointmentStatusLabel } from "../shared/presentation-copy";
 
@@ -17,6 +18,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
     "[class.appointments-embedded]": "formOnly",
   },
   imports: [
+    CustomerSelectComponent,
     FunctionAccessDirective,
     CommonModule,
     FormsModule,
@@ -190,17 +192,15 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                 >Cliente
                 <em class="required-mark" aria-hidden="true">*</em></span
               >
-              <ui-select
+              <alora-customer-select
                 [value]="appointmentForm.customerId"
                 (valueChange)="appointmentCustomerSelect.emit($event)"
-                [options]="appointmentCustomerOptions"
-                label="Cliente"
-                placeholder="Cerca o seleziona il cliente"
+                [extra]="appointmentForm.customerId ? { id: appointmentForm.customerId, firstName: appointmentForm.customerName } : null"
                 [createLabel]="
                   session.can('clients.manage') ? 'Aggiungi nuovo cliente' : ''
                 "
                 (createRequest)="quickCreate.emit('customer')"
-              ></ui-select>
+              ></alora-customer-select>
             </div>
           </div>
           <div
@@ -448,8 +448,6 @@ export class AdminAppointmentsPageComponent {
   @Input() formOnly = false;
   @Input() appointments: any[] = [];
   @Input() appointmentForm: any = {};
-  @Input() appointmentCustomerOptions: Array<{ value: string; label: string }> =
-    [];
   @Input() serviceSelectOptions: Array<{ value: string; label: string }> = [];
   @Input() bookingLocationOptions: Array<{ value: string; label: string }> = [];
   @Input() bookingLocationId = "";

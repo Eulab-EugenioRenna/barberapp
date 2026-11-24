@@ -1,6 +1,7 @@
 import { FinancialValuesPanelComponent } from "../shared/financial-values-panel.component";
 import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { SetupChecklistComponent } from "../shared/setup-checklist.component";
+import { CustomerSelectComponent } from "../shared/customer-select.component";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { AdminMetricsGridComponent } from "../shared/admin-metrics-grid.component";
@@ -22,6 +23,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
     FinancialValuesPanelComponent,
     FunctionAccessDirective,
     SetupChecklistComponent,
+    CustomerSelectComponent,
     CommonModule,
     AdminMetricsGridComponent,
     CalendarInputComponent,
@@ -83,13 +85,12 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           </label>
           <div class="field">
             <span>Cliente</span>
-            <ui-select
+            <alora-customer-select
               [value]="revenueFilters.customerId"
               (valueChange)="applyCustomer($event)"
-              [options]="customerFilterOptions"
-              label="Cliente"
+              allLabel="Tutti i clienti"
               placeholder="Tutti i clienti"
-            ></ui-select>
+            ></alora-customer-select>
           </div>
           <div class="field">
             <span>Professionista</span>

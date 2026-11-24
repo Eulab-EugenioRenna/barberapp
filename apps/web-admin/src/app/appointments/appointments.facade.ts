@@ -4,6 +4,7 @@ import { Injectable, computed, signal, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 import { AdminApiService } from "../core/admin-api.service";
 import { AdminFacade } from "../core/admin.facade";
+import { CustomerDirectoryService } from "../core/customer-directory.service";
 import { toLocalDateKey } from "@barber/shared/utils";
 import { appointmentStatusLabel } from "../shared/presentation-copy";
 import { AppointmentsService } from "./appointments.service";
@@ -28,6 +29,7 @@ export class AppointmentsFacade {
   private readonly adminApi = inject(AdminApiService);
   readonly creations = inject(CreateRecoveryService);
   private readonly adminFacade = inject(AdminFacade);
+  private readonly customerDirectory = inject(CustomerDirectoryService);
   private readonly appointmentsService = inject(AppointmentsService);
   private readonly context = inject(OperationalContextService);
 
@@ -776,23 +778,28 @@ export class AppointmentsFacade {
   }
 
   selectAppointmentCustomer(customerId: string): void {
-    const customer = this.customers().find((entry) => entry.id === customerId);
+    // Any customer of the salon: the picker lists all of them, not only the
+    // page loaded here. The booking needs only the id.
+    const customer =
+      this.customers().find((entry) => entry.id === customerId) ||
+      this.customerDirectory.find(customerId);
     if (!customer) return;
     this.appointmentForm.update((form) => ({
       ...form,
       customerId: customer.id,
       customerName: `${customer.firstName} ${customer.lastName}`.trim(),
-      email: customer.email || "",
-      phone: customer.phone || "",
+      email: (customer as any).email || "",
+      phone: (customer as any).phone || "",
     }));
     this.appointmentCustomerSearch.set(
-      this.appointmentCustomerOptionLabel(customer),
+      `${customer.firstName} ${customer.lastName}`.trim(),
     );
   }
 
   selectQuickCreatedEntity(kind: "customer" | "service", entity: any): void {
     if (kind === "customer") {
       this.customersState.update((items) => [entity, ...items]);
+      this.customerDirectory.add(entity);
       this.selectAppointmentCustomer(entity.id);
       return;
     }

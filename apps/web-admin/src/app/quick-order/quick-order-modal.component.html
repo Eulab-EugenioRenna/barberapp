@@ -137,19 +137,15 @@
         <div class="quick-order-catalog">
           <div class="field">
             <span>1 · Cliente</span>
-            <ui-select
+            <alora-customer-select
               [value]="customerId"
               (valueChange)="customerId = $event"
-              [options]="customerOptions"
-              label="Cliente"
-              placeholder="Seleziona il cliente"
+              [extra]="sale?.customer || appointment?.customer"
               [createLabel]="
                 session.can('clients.manage') ? 'Aggiungi nuovo cliente' : ''
               "
-              [remoteSearch]="true"
-              (searchChange)="customerSearchChange.emit($event)"
               (createRequest)="quickCreateKind = 'customer'"
-            ></ui-select>
+            ></alora-customer-select>
           </div>
           <label class="field">
             <span>Scansiona o inserisci un barcode e premi Invio</span>
