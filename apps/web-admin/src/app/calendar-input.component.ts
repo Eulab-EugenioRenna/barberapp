@@ -14,6 +14,7 @@ import {
   TemplateRef,
   ViewChild,
   inject,
+  booleanAttribute,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { UiSelectComponent } from "@alora/ui";
@@ -39,16 +40,18 @@ type CalendarCell = {
       class="calendar-input-shell"
       [class.open]="open"
       [class.disabled]="disabled"
+      [class.compact]="compact"
     >
       <button
         #trigger
         type="button"
         class="calendar-trigger"
+        [attr.aria-label]="compact ? label + ': ' + (displayValue || placeholder) : null"
         [disabled]="disabled"
         (click)="toggleOpen()"
       >
         <span class="calendar-trigger-copy">
-          <span class="calendar-trigger-label">{{ label }}</span>
+          <span *ngIf="!compact" class="calendar-trigger-label">{{ label }}</span>
           <span
             class="calendar-trigger-value"
             [class.placeholder]="!displayValue"
@@ -207,6 +210,23 @@ type CalendarCell = {
           transform 180ms ease,
           border-color 180ms ease,
           box-shadow 180ms ease;
+      }
+
+      .compact .calendar-trigger {
+        min-height: var(--ui-field-height, 2.9rem);
+        border-color: rgba(30, 52, 37, 0.14);
+        border-radius: 1rem;
+        background: #fff;
+        padding: 0.5rem 0.85rem;
+        gap: 0.6rem;
+      }
+      .compact .calendar-trigger:hover {
+        transform: none;
+        box-shadow: none;
+        border-color: rgba(30, 52, 37, 0.3);
+      }
+      .compact .calendar-trigger-value {
+        font-weight: 400;
       }
 
       .calendar-trigger:hover {
@@ -475,6 +495,8 @@ export class CalendarInputComponent implements OnChanges, OnDestroy {
   @Input() mode: CalendarMode = "date";
   @Input() min = "";
   @Input() disabled = false;
+  /** Same size as the other form fields; for fields that already have a label above. */
+  @Input({ transform: booleanAttribute }) compact = false;
   @Output() valueChange = new EventEmitter<string>();
 
   open = false;

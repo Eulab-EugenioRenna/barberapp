@@ -71,6 +71,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <label class="field" *ngIf="revenueFilters.period !== 'all'">
             <span>Data di riferimento</span>
             <barber-calendar-input
+              compact
               [value]="revenueFilters.date"
               (valueChange)="applyDate($event)"
               label="Data"

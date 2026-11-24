@@ -316,6 +316,7 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
             <label class="field">
               <span>Data</span>
               <barber-calendar-input
+              compact
                 [value]="appointmentSelectedDate"
                 (valueChange)="
                   appointmentSelectedDateChange.emit($event);
