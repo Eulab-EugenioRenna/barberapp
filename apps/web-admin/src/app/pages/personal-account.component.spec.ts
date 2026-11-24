@@ -12,6 +12,7 @@ jest.mock("../core/session.store", () => ({ SessionStore: class {} }));
 jest.mock("../core/session-refresh.service", () => ({ SessionRefreshService: class {} }));
 jest.mock("../shared/autofocus-first.directive", () => ({ AutofocusFirstDirective: class {} }));
 jest.mock("../core/onboarding/tour.service", () => ({ TourService: class {} }));
+jest.mock("../shared/amounts-privacy-toggle.component", () => ({ AmountsPrivacyToggleComponent: class {} }));
 import { Router } from "@angular/router";
 import { AuthApiService } from "../core/auth-api.service";
 import { SessionStore } from "../core/session.store";
