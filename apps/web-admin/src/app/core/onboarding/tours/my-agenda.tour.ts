@@ -55,7 +55,7 @@ export const MY_AGENDA_TOUR: TourDefinition = {
       when: (ctx) => ctx.can("dashboard.personal.values.read"),
       title: "Valore dei tuoi servizi",
       body:
-        "Somma delle righe dei conti confermati in cui risulti esecutore, con imposte e sconti. " +
+        "Somma delle righe dei conti confermati in cui risulti come collaboratore, con imposte e sconti. " +
         "Non è un incasso né un compenso.",
     },
     {

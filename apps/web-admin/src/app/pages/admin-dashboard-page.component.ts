@@ -128,7 +128,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
       >
         Differenza storica fra totale conti e righe:
         {{ money(revenueReport.sold.unattributedGross) }}. Questo importo non è
-        attribuito a un’attività o a un esecutore.
+        attribuito a un’attività o a un collaboratore.
       </p>
 
       <barber-admin-metrics-grid
@@ -257,7 +257,7 @@ const BALANCE_STORAGE_KEY = "barber.balance-hidden";
           <article class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Squadra</p>
             <h3 class="font-display text-xl sm:text-2xl">
-              Servizi per esecutore dichiarato
+              Servizi per collaboratore
             </h3>
             <div class="mt-3 grid max-h-[18rem] gap-2 overflow-y-auto pr-1">
               <div

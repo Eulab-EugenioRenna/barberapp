@@ -340,7 +340,7 @@
                   *ngIf="item.kind === 'service' && !nonPerformed(item)"
                   class="cart-field cart-collaborator"
                 >
-                  <span>Esecutore effettivo</span>
+                  <span>Collaboratore</span>
                   <ui-select
                     [value]="item.collaboratorId"
                     (valueChange)="item.collaboratorId = $event"
@@ -354,7 +354,7 @@
                     class="pill-btn"
                     (click)="confirmPlannedPerformer(item)"
                   >
-                    Conferma esecutore prenotato
+                    Conferma collaboratore prenotato
                   </button>
                 </div>
               </div>

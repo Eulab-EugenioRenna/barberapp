@@ -290,7 +290,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         .map((person) => person.id),
     );
     const options = [
-      { value: "", label: "Non dichiarato" },
+      { value: "", label: "Nessun collaboratore" },
       ...this.collaboratorOptions.filter((option) =>
         eligible.has(option.value),
       ),
@@ -306,7 +306,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         value: item.collaboratorId,
         label: recorded
           ? `${recorded.firstName} ${recorded.lastName}`.trim() + " (storico)"
-          : "Esecutore registrato (storico)",
+          : "Collaboratore registrato (storico)",
       });
     }
     return options;

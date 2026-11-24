@@ -78,7 +78,7 @@ export class SaleFulfilmentService {
         !row.collaboratorId
       )
         throw new BadRequestException(
-          "Indica l'esecutore effettivo per ogni prestazione eseguita che lo richiede",
+          "Indica il collaboratore che ha eseguito ogni prestazione che lo richiede",
         );
       if (firstExecution && row.quantity !== 1)
         throw new BadRequestException(

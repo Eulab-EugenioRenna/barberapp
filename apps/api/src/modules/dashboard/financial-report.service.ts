@@ -201,7 +201,7 @@ export class FinancialReportService {
           LEFT JOIN "Customer" c ON c.id=s."customerId" AND c."tenantId"=${scope.tenantId}
           GROUP BY s."customerId",c."firstName",c."lastName")r),'[]'::json),
         'byCollaborator',COALESCE((SELECT json_agg(r ORDER BY r.revenue::numeric DESC,r.label,r.id) FROM (
-          SELECT i.performer AS id,COALESCE(NULLIF(trim(c."firstName"||' '||c."lastName"),''),'Esecutore non dichiarato') AS label,
+          SELECT i.performer AS id,COALESCE(NULLIF(trim(c."firstName"||' '||c."lastName"),''),'Senza collaboratore') AS label,
           SUM(i.gross)::numeric(30,2)::text AS revenue FROM sold_lines i
           LEFT JOIN "Collaborator" c ON c.id=i.performer AND c."tenantId"=${scope.tenantId}
           WHERE i."serviceId" IS NOT NULL GROUP BY i.performer,c."firstName",c."lastName")r),'[]'::json),
