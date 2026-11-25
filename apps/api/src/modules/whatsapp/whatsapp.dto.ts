@@ -25,3 +25,8 @@ export class BroadcastWhatsAppTextDto {
   @Equals(true) recipientAuthorized!: true;
   @IsOptional() @ValidateNested() @Type(() => WhatsAppImageDto) image?: WhatsAppImageDto;
 }
+
+/** Link by phone number (code typed on the phone) instead of the QR; no phone = QR. */
+export class WhatsAppLinkDto {
+  @IsOptional() @IsString() @MaxLength(30) phone?: string;
+}

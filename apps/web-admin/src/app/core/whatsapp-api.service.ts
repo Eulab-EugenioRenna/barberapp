@@ -30,12 +30,18 @@ export class WhatsAppApiService {
   sessions() { return firstValueFrom(this.http.get<WhatsAppConnection[]>(this.root + "/sessions")); }
   archives() { return firstValueFrom(this.http.get<WhatsAppArchiveView[]>(this.root + "/archives")); }
   outbox() { return firstValueFrom(this.http.get<WhatsAppOutboxView[]>(this.root + "/outbox")); }
-  connect() { return firstValueFrom(this.http.post<WhatsAppAcknowledgement>(this.root + "/sessions", {})); }
+  connect(phone?: string) { return firstValueFrom(this.http.post<WhatsAppAcknowledgement>(this.root + "/sessions", phone ? { phone } : {})); }
+  /** Switches a waiting link: with a phone the code, without it the QR. */
+  relink(id: string, phone?: string) {
+    return firstValueFrom(this.http.post<WhatsAppAcknowledgement>(`${this.root}/sessions/${encodeURIComponent(id)}/relink`, phone ? { phone } : {}));
+  }
   action(id: string, action: "reconnect" | "disconnect") {
     return firstValueFrom(this.http.post<WhatsAppAcknowledgement>(`${this.root}/sessions/${encodeURIComponent(id)}/${action}`, {}));
   }
   remove(id: string) { return firstValueFrom(this.http.delete<WhatsAppAcknowledgement>(`${this.root}/sessions/${encodeURIComponent(id)}`)); }
-  qr(id: string) { return firstValueFrom(this.http.get<{ state: string; qr: string | null }>(`${this.root}/sessions/${encodeURIComponent(id)}/qr`)); }
+  qr(id: string) {
+    return firstValueFrom(this.http.get<{ state: string; qr: string | null; linkCode: string | null; method: "qr" | "phone" }>(`${this.root}/sessions/${encodeURIComponent(id)}/qr`));
+  }
   conversations(id: string) { return firstValueFrom(this.http.get<WhatsAppConversationView[]>(`${this.root}/archives/${encodeURIComponent(id)}/conversations`)); }
   messages(id: string, chat: string, before?: string) {
     return firstValueFrom(this.http.get<WhatsAppMessageView[]>(`${this.root}/archives/${encodeURIComponent(id)}/messages`, { params: { chat, ...(before ? { before } : {}) } }));

@@ -68,13 +68,43 @@
     </div>
 
     <div *ngIf="canManage && active?.state === 'pairing'" class="wa-qr" data-tour="whatsapp-qr" aria-live="polite">
-      <img *ngIf="qr; else waitingQr" [src]="qr" alt="QR per collegare il tuo numero WhatsApp" width="240" height="240" />
-      <ng-template #waitingQr><div class="wa-qr-wait" role="status">Preparazione del QR…</div></ng-template>
-      <ol class="wa-qr-steps">
-        <li>Apri WhatsApp sul telefono</li>
-        <li>Vai in <strong>Dispositivi collegati</strong> › <strong>Collega un dispositivo</strong></li>
-        <li>Inquadra il codice: si aggiorna da solo</li>
-      </ol>
+      <ng-container *ngIf="linkMethod === 'qr'">
+        <ng-container *ngIf="!askPhone">
+          <img *ngIf="qr; else waitingQr" [src]="qr" alt="QR per collegare il tuo numero WhatsApp" width="240" height="240" />
+          <ng-template #waitingQr><div class="wa-qr-wait" role="status">Preparazione del QR…</div></ng-template>
+          <ol class="wa-qr-steps">
+            <li>Apri WhatsApp sul telefono</li>
+            <li>Vai in <strong>Dispositivi collegati</strong> › <strong>Collega un dispositivo</strong></li>
+            <li>Inquadra il codice: si aggiorna da solo</li>
+          </ol>
+          <button type="button" class="wa-link-btn wa-mode-link" [disabled]="busy" (click)="askPhone = true">
+            Sei sul telefono o non riesci a inquadrare? Collega con il numero di telefono
+          </button>
+        </ng-container>
+        <form *ngIf="askPhone" class="wa-phone-form" (ngSubmit)="switchLink(linkPhone)">
+          <label class="wa-label">
+            <span>Numero WhatsApp da collegare</span>
+            <input name="linkPhone" [(ngModel)]="linkPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="333 1234567" required />
+          </label>
+          <p class="wa-muted">Ti mostriamo un codice di 8 caratteri da scrivere su WhatsApp, senza inquadrare nulla.</p>
+          <button type="submit" class="primary-btn" [disabled]="busy || !linkPhone.trim()">{{ busy ? 'Preparazione…' : 'Ricevi il codice' }}</button>
+          <button type="button" class="wa-link-btn wa-mode-link" [disabled]="busy" (click)="askPhone = false">Torna al QR</button>
+        </form>
+      </ng-container>
+      <ng-container *ngIf="linkMethod === 'phone'">
+        <div *ngIf="linkCode; else waitingCode" class="wa-link-code" aria-label="Codice di collegamento">
+          <span *ngFor="let part of linkCodeParts">{{ part }}</span>
+        </div>
+        <ng-template #waitingCode><div class="wa-qr-wait wa-code-wait" role="status">Preparazione del codice…</div></ng-template>
+        <button *ngIf="linkCode" type="button" class="pill-btn" (click)="copyLinkCode()">Copia il codice</button>
+        <ol class="wa-qr-steps">
+          <li>Apri WhatsApp sul telefono</li>
+          <li>Vai in <strong>Dispositivi collegati</strong> › <strong>Collega un dispositivo</strong></li>
+          <li>Tocca <strong>Collega con il numero di telefono</strong> (in basso)</li>
+          <li>Scrivi il codice qui sopra</li>
+        </ol>
+        <button type="button" class="wa-link-btn wa-mode-link" [disabled]="busy" (click)="switchLink()">Torna al QR</button>
+      </ng-container>
     </div>
   </section>
 

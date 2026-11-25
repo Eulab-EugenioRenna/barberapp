@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Post, Query, Req, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { WhatsAppService } from "./whatsapp.service";
-import { BroadcastWhatsAppTextDto, SendWhatsAppTextDto, WhatsAppMessageQueryDto } from "./whatsapp.dto";
+import { BroadcastWhatsAppTextDto, SendWhatsAppTextDto, WhatsAppLinkDto, WhatsAppMessageQueryDto } from "./whatsapp.dto";
 import { type ConnectRequest, connectBrowser } from "../../common/connect-http";
 @Controller("whatsapp")
 export class WhatsAppController {
@@ -9,7 +9,12 @@ export class WhatsAppController {
   @Get("sessions") @Header("Cache-Control", "no-store")
   sessions(@Req() r: ConnectRequest) { return this.whatsapp.sessions(r.headers.authorization); }
   @Post("sessions")
-  connect(@Req() r: ConnectRequest) { connectBrowser(r); return this.whatsapp.connect(r.headers.authorization); }
+  connect(@Req() r: ConnectRequest, @Body() body: WhatsAppLinkDto) { connectBrowser(r); return this.whatsapp.connect(r.headers.authorization, body?.phone); }
+  /** Switches a link still waiting between QR and phone-number code. */
+  @Post("sessions/:id/relink")
+  relink(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() body: WhatsAppLinkDto) {
+    connectBrowser(r); return this.whatsapp.relink(r.headers.authorization, id, body?.phone);
+  }
   @Get("sessions/:id/qr") @Header("Cache-Control", "no-store")
   qr(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string) { return this.whatsapp.qr(r.headers.authorization, id); }
   @Post("sessions/:id/reconnect")

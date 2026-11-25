@@ -250,7 +250,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     try {
       const result = await this.api.qr(active.id);
       if (this.destroyed) return;
-      this.qr = result.qr;
+      this.qr = result.qr; this.linkCode = result.linkCode; this.linkMethod = result.method;
       // Linked on the phone: reload the whole state once.
       if (result.state !== "pairing") { this.stopQr(); await this.refresh(); }
     } catch { /* the 8s refresh reports errors */ }
@@ -273,8 +273,8 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
       await this.loadConversations();
       if (this.active?.state === "pairing" && this.canManage) {
         const result = await this.api.qr(this.active.id);
-        if (!this.destroyed) this.qr = result.qr;
-      } else this.qr = null;
+        if (!this.destroyed) { this.qr = result.qr; this.linkCode = result.linkCode; this.linkMethod = result.method; }
+      } else { this.qr = null; this.linkCode = null; }
       this.syncQrPolling();
     } catch (error) {
       this.fresh = false; this.qr = null;
@@ -370,6 +370,27 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   async olderMessages() {
     try { await this.loadMessages(true); }
     catch (error) { this.feedback = this.error(error); this.fresh = false; }
+  }
+  /** Linking by phone number: WhatsApp gives a code to type on the phone, handy when the QR is on the same phone. */
+  linkCode: string | null = null;
+  linkMethod: "qr" | "phone" = "qr";
+  askPhone = false;
+  linkPhone = "";
+  get linkCodeParts() { return this.linkCode ? this.linkCode.replace(/-/g, "").match(/.{1,4}/g) ?? [] : []; }
+  async switchLink(phone?: string) {
+    const active = this.active;
+    if (!active || this.busy) return;
+    this.busy = true; this.connectionFeedback = ""; this.qr = null; this.linkCode = null;
+    try {
+      await this.api.relink(active.id, phone);
+      this.linkMethod = phone ? "phone" : "qr"; this.askPhone = false;
+    } catch (error) { this.connectionFeedback = this.error(error); }
+    finally { this.busy = false; this.fresh = false; }
+    await this.refresh();
+  }
+  async copyLinkCode() {
+    if (!this.linkCode) return;
+    try { await navigator.clipboard.writeText(this.linkCode.replace(/-/g, "")); this.connectionFeedback = "Codice copiato."; } catch { /* manual copy */ }
   }
   async connectionAction(action: "connect" | "reconnect" | "disconnect" | "remove", id = "") {
     if (this.busy || !this.fresh) return;

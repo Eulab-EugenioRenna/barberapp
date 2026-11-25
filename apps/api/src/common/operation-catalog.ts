@@ -18,6 +18,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "WhatsAppController.media": { kind: "function", key: "whatsapp.read" },
   "WhatsAppController.qr": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.connect": { kind: "function", key: "whatsapp.manage" },
+  "WhatsAppController.relink": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.reconnect": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.disconnect": { kind: "function", key: "whatsapp.manage" },
   "WhatsAppController.remove": { kind: "function", key: "whatsapp.manage" },

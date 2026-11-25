@@ -274,14 +274,45 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     return this.run(auth, "whatsapp.read", async (wa, actor) => (await this.mine(wa, actor)).map((s) => this.view(s)));
   }
 
+  /** The salon's own number for the code link: Italian without prefix, like customers' numbers. */
+  private linkPhone(phone: string | undefined) {
+    if (phone === undefined || !phone.trim()) return undefined;
+    const to = checkCustomerPhone(phone).to;
+    if (!to || checkCustomerPhone(phone).issue === "landline")
+      throw new BadRequestException("Scrivi il numero WhatsApp del telefono da collegare, ad esempio 333 1234567 o +41 79 123 45 67");
+    return to;
+  }
   /** One open connection per account: a second request returns the existing one. */
-  connect(auth?: string) {
+  async connect(auth?: string, phone?: string) {
+    const linkPhone = this.linkPhone(phone);
     return this.run(auth, "whatsapp.manage", async (wa, actor) => {
       const open = (await this.mine(wa, actor)).find((item) => item.closed_at == null);
       if (open) return { id: id(open.id), state: text(open.state, 80) };
+      return this.createLink(wa, actor, linkPhone);
+    });
+  }
+  /**
+   * A link still waiting can change mode: the waiting one is closed and a new
+   * one opens with the code (phone) or with the QR (no phone).
+   */
+  async relink(auth: string | undefined, sessionId: string, phone?: string) {
+    const linkPhone = this.linkPhone(phone);
+    return this.run(auth, "whatsapp.manage", async (wa, actor) => {
+      const session = await this.ownedSession(wa, actor, sessionId);
+      if (!["queued", "pairing"].includes(String(session.state)))
+        throw new ConflictException("Il numero è già collegato: per cambiarlo eliminalo e collegalo di nuovo");
+      const result = await wa.deleteConnection(sessionId);
+      if (typeof result?.removed !== "boolean") return invalid();
+      await this.prisma.whatsAppLink.updateMany({ where: { sessionId }, data: { removedAt: new Date() } });
+      return this.createLink(wa, actor, linkPhone);
+    });
+  }
+  private async createLink(wa: Client, actor: Actor, linkPhone: string | undefined) {
       let created: WhatsAppAcknowledgement;
+      // SDK 0.13: with a phone WhatsApp gives a code to type on the phone instead of the QR.
+      const connect = wa.connect as unknown as (options?: { phone?: string }) => Promise<WhatsAppAcknowledgement>;
       try {
-        created = ack(await wa.connect());
+        created = ack(await connect(linkPhone ? { phone: linkPhone } : {}));
       } catch (error) {
         // Connect allows one open WhatsApp connection per activity.
         if (error && typeof error === "object" && "status" in error && error.status === 409)
@@ -294,7 +325,6 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         data: { tenantId: actor.tenantId, userId: actor.userId, sessionId: created.id },
       });
       return created;
-    });
   }
   reconnect(auth: string | undefined, sessionId: string) {
     return this.run(auth, "whatsapp.manage", async (wa, actor) => {
@@ -326,9 +356,11 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   qr(auth: string | undefined, sessionId: string) {
     return this.run(auth, "whatsapp.manage", async (wa, actor) => {
       await this.ownedSession(wa, actor, sessionId);
-      const value = await wa.qr(sessionId), state = text(value?.state, 80), qr = nullable(value?.qr, 500000);
+      const value = await wa.qr(sessionId) as { state: unknown; qr: unknown; linkCode?: unknown; method?: unknown };
+      const state = text(value?.state, 80), qr = nullable(value?.qr, 500000), linkCode = nullable(value?.linkCode ?? null, 20);
       if (qr !== null && (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(qr) || state !== "pairing")) return invalid();
-      return { state, qr };
+      if (linkCode !== null && (!/^[A-Z0-9-]{8,9}$/.test(linkCode) || state !== "pairing")) return invalid();
+      return { state, qr, linkCode, method: value?.method === "phone" ? "phone" as const : "qr" as const };
     });
   }
   archives(auth?: string): Promise<WhatsAppArchiveView[]> {

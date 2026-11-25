@@ -124,6 +124,33 @@ describe("WhatsApp: each account manages only the connection it created", () => 
     expect(wa.connect).toHaveBeenCalledTimes(1);
   });
 
+  it("links with the phone number: Connect gets the number, ALORA shows the code", async () => {
+    links = links.filter((l) => l.userId !== "owner");
+    wa.connect.mockResolvedValue({ id: uuid(4), state: "queued" });
+    await service.connect("Bearer x", "333 123 4567");
+    expect(wa.connect).toHaveBeenCalledWith({ phone: "+393331234567" });
+    await expect(service.connect("Bearer x", "06 1234567")).rejects.toThrow(/numero WhatsApp del telefono/);
+    wa.sessions.mockResolvedValue([raw(2), raw(4, { state: "pairing", archive_id: null })]);
+    wa.qr.mockResolvedValue({ state: "pairing", method: "phone", qr: null, linkCode: "AB12CD34" });
+    expect(await service.qr("Bearer x", uuid(4))).toEqual({ state: "pairing", qr: null, linkCode: "AB12CD34", method: "phone" });
+    wa.qr.mockResolvedValue({ state: "pairing", qr: null, linkCode: "<script>" });
+    await expect(service.qr("Bearer x", uuid(4))).rejects.toThrow();
+  });
+
+  it("switches a waiting link between QR and phone code, never a linked number", async () => {
+    links = links.filter((l) => l.userId !== "owner");
+    links.push({ tenantId: "t1", userId: "owner", sessionId: uuid(4), removedAt: null });
+    wa.sessions.mockResolvedValue([raw(2), raw(4, { state: "pairing", archive_id: null })]);
+    wa.deleteConnection.mockResolvedValue({ removed: true, state: "deleted" });
+    wa.connect.mockResolvedValue({ id: uuid(5), state: "queued" });
+    expect(await service.relink("Bearer x", uuid(4), "+41 79 123 45 67")).toEqual({ id: uuid(5), state: "queued" });
+    expect(wa.deleteConnection).toHaveBeenCalledWith(uuid(4));
+    expect(wa.connect).toHaveBeenLastCalledWith({ phone: "+41791234567" });
+    expect(links.find((l) => l.sessionId === uuid(4))?.removedAt).toBeInstanceOf(Date);
+    wa.sessions.mockResolvedValue([raw(2), raw(5, { state: "connected" })]);
+    await expect(service.relink("Bearer x", uuid(5))).rejects.toThrow(/già collegato/);
+  });
+
   it("explains why Connect refuses a second open connection in the activity", async () => {
     links = links.filter((l) => l.userId !== "owner");
     wa.connect.mockRejectedValue({ status: 409 });
