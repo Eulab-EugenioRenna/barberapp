@@ -53,17 +53,17 @@ describe("till schedule warnings", () => {
     expect(await service.warnings("t1", new Date("2026-11-20T09:00:00.000Z"), [line])).toEqual([]);
   });
 
-  it("warns, without blocking, about overlaps and hours", async () => {
+  it("warns, without blocking, about overlaps and the collaborator's hours", async () => {
     prisma.appointment.findFirst.mockResolvedValueOnce({
       startsAt: new Date("2026-11-20T19:15:00.000Z"),
       service: { name: "Barba" },
     });
-    // 20:00 Rome: after the 09:00–19:00 legacy day and the collaborator's hours.
+    // 20:00 Rome: after the collaborator's hours. Opening hours (09:00–19:00)
+    // bind online booking only, so they never warn here.
     const warnings = await service.warnings("t1", new Date("2026-11-20T19:00:00.000Z"), [line], "sale-1");
     expect(warnings.map((w) => w.code).sort()).toEqual([
       "COLLABORATOR_BUSY",
       "OUTSIDE_COLLABORATOR_HOURS",
-      "OUTSIDE_SECTOR_HOURS",
     ]);
     expect(warnings.find((w) => w.code === "COLLABORATOR_BUSY")?.message).toContain("Marco Neri");
     // The account's own appointments never count as overlaps.

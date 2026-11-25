@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { zonedDateKey, zonedDateParts } from "../../common/zoned-time";
 import { CollaboratorScheduleService } from "../availability/collaborator-schedule.service";
-import { sectorWorkingWindow } from "../locations/operational-hours";
 import { PrismaService } from "../../prisma/prisma.service";
 
 /** A till records services already performed: a small clock skew is tolerated. */
@@ -79,17 +78,7 @@ export class SaleScheduleWarningsService {
       const startMinutes = from.hour * 60 + from.minute;
       const endMinutes =
         zonedDateKey(end, timezone) === date ? to.hour * 60 + to.minute : 24 * 60;
-      if (line.sectorId) {
-        const window = await sectorWorkingWindow(this.prisma, line.sectorId, date);
-        if (!window || startMinutes < window.startMinutes || endMinutes > window.endMinutes)
-          warnings.push({
-            code: "OUTSIDE_SECTOR_HOURS",
-            lineIndex,
-            message: window
-              ? `${line.label}: fuori dall'orario di apertura (${hhmm(window.startMinutes)}–${hhmm(window.endMinutes)}).`
-              : `${line.label}: la sede o l'attività risultava chiusa quel giorno.`,
-          });
-      }
+      // Opening hours bind online booking only: staff may record any time.
       if (!line.collaboratorId) continue;
       if (!names.has(line.collaboratorId)) {
         const person = await this.prisma.collaborator.findFirst({
