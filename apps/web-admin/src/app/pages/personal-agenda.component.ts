@@ -1,3 +1,4 @@
+import { CalendarInputComponent } from "../calendar-input.component";
 import { UiPageComponent, UiSelectComponent, type UiOption } from "@alora/ui";
 import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { CommonModule } from "@angular/common";
@@ -13,7 +14,7 @@ import { SessionStore } from "../core/session.store";
 import { PersonalBookingComponent } from "./personal-booking.component";
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PersonalBookingComponent, UiPageComponent, UiSelectComponent, AdminPageHeaderComponent],
+  imports: [CalendarInputComponent, CommonModule, FormsModule, RouterLink, PersonalBookingComponent, UiPageComponent, UiSelectComponent, AdminPageHeaderComponent],
   template: `<ui-page>
     <alora-page-header
       navKey="my-agenda"
@@ -27,7 +28,7 @@ import { PersonalBookingComponent } from "./personal-booking.component";
       <p *ngIf="data" class="text-sm opacity-75">{{ data.professional.firstName }} {{ data.professional.lastName }} · Orari {{ data.timezone }}</p>
       <form class="mt-3 flex flex-wrap items-end gap-3" data-tour="my-agenda-period" (ngSubmit)="load(false, true)">
         <div class="field"><span>Periodo</span><ui-select name="period" label="Periodo" [options]="periodOptions" [filterable]="false" [(ngModel)]="period" [disabled]="loading || !!updatingId"></ui-select></div>
-        <label class="field"><span>Data di riferimento</span><input type="date" name="referenceDate" [(ngModel)]="referenceDate" [disabled]="loading || !!updatingId" /></label>
+        <div class="field"><span>Data di riferimento</span><barber-calendar-input compact label="Data di riferimento" [value]="referenceDate" (valueChange)="referenceDate = $event" [disabled]="loading || !!updatingId"></barber-calendar-input></div>
         <button class="primary-btn" type="submit" [disabled]="loading || !!updatingId">Mostra</button>
         <button class="secondary-btn" type="button" data-tour="my-agenda-today" [disabled]="loading || !!updatingId" (click)="today()">Oggi</button>
         <button class="secondary-btn" type="button" data-tour="my-agenda-refresh" [disabled]="loading || !!updatingId" (click)="load()">Aggiorna</button>

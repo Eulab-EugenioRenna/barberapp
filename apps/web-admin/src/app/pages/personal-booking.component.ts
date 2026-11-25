@@ -1,3 +1,4 @@
+import { CalendarInputComponent } from "../calendar-input.component";
 import { slotOptions } from "../core/slot-options";
 import { CommonModule } from "@angular/common";
 import { HttpClient } from "@angular/common/http";
@@ -30,7 +31,7 @@ interface ContextService {
 @Component({
   selector: "alora-personal-booking",
   standalone: true,
-  imports: [CommonModule, FormsModule, UiSelectComponent, CustomerSelectComponent],
+  imports: [CalendarInputComponent, CommonModule, FormsModule, UiSelectComponent, CustomerSelectComponent],
   template: `
     <section class="panel rounded-[2rem] p-5 sm:p-6" data-tour="my-agenda-booking" aria-labelledby="personal-booking-title">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -68,7 +69,7 @@ interface ContextService {
 
           <label *ngIf="serviceId" class="field">
             <span>Giorno <em class="required-mark" aria-hidden="true">*</em></span>
-            <input type="date" name="date" [min]="todayKey" [ngModel]="date" (ngModelChange)="setDate($event)" />
+            <barber-calendar-input compact label="Giorno" placeholder="Scegli il giorno" [min]="todayKey" [value]="date" (valueChange)="setDate($event)"></barber-calendar-input>
           </label>
 
           <div *ngIf="serviceId && date" class="field">

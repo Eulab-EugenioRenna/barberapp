@@ -1,3 +1,4 @@
+import { CalendarInputComponent } from "../calendar-input.component";
 import { RouterLink } from "@angular/router";
 import { SectorPickerComponent } from "../shared/sector-picker.component";
 import { AdminTeamPageComponent } from "./admin-team-page.component";
@@ -14,6 +15,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
   selector: "barber-admin-collaborators-page",
   standalone: true,
   imports: [
+    CalendarInputComponent,
     RouterLink,
     SectorPickerComponent,
     AdminTeamPageComponent,
@@ -283,14 +285,16 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                   class="rounded-[1rem] border border-[var(--line)] p-3"
                 >
                   <div class="grid gap-3 md:grid-cols-2">
-                    <label class="field">
+                    <div class="field">
                       <span>Data</span>
-                      <input
-                        [(ngModel)]="override.date"
-                        [name]="'overrideDate' + i"
-                        type="date"
-                      />
-                    </label>
+                      <barber-calendar-input
+                        compact
+                        label="Data"
+                        placeholder="Scegli il giorno"
+                        [value]="override.date"
+                        (valueChange)="override.date = $event"
+                      ></barber-calendar-input>
+                    </div>
                     <label class="field checkbox-field pt-6">
                       <input
                         [(ngModel)]="override.isHoliday"

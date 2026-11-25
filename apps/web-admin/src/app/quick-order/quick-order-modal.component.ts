@@ -1,3 +1,4 @@
+import { CalendarInputComponent } from "../calendar-input.component";
 import { wholeQuantity } from "./quick-order-quantity";
 import { CreateRecoveryService } from "../core/create-recovery.service";
 import { AccountPaymentsComponent } from "../shared/account-payments.component";
@@ -39,6 +40,7 @@ import { BarcodeScannerService } from "../core/barcode-scanner.service";
   selector: "barber-quick-order-modal",
   standalone: true,
   imports: [
+    CalendarInputComponent,
     CustomerSelectComponent,
     AccountPaymentsComponent,
     FunctionAccessDirective,
@@ -126,7 +128,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       "";
     if (!this.context.locations().length)
       void this.context.load().catch(() => undefined);
-    this.  attachScanner();
+    this.attachScanner();
     setTimeout(() => {
       this.entering = false;
     }, 220);
@@ -221,8 +223,16 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   /** Rebuilt only when its sources change: a new array per check re-renders the open list. */
   get customerOptions(): UiOption[] {
     const selectedCustomer = this.sale?.customer || this.appointment?.customer;
-    const key = [this.customers, selectedCustomer, this.createdCustomers.length, this.createdCustomers[0]];
-    if (key.length === this.customerOptionsKey.length && key.every((part, i) => part === this.customerOptionsKey[i]))
+    const key = [
+      this.customers,
+      selectedCustomer,
+      this.createdCustomers.length,
+      this.createdCustomers[0],
+    ];
+    if (
+      key.length === this.customerOptionsKey.length &&
+      key.every((part, i) => part === this.customerOptionsKey[i])
+    )
       return this.customerOptionsCache;
     this.customerOptionsKey = key;
     return (this.customerOptionsCache = this.uniqueEntities([
@@ -238,7 +248,11 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   /** Sector of the service's activity at the account's location. */
   private serviceSectorId(service: any): string {
     return (
-      sectorForActivity(this.context.sectors, service?.activityId, this.locationId)?.id ||
+      sectorForActivity(
+        this.context.sectors,
+        service?.activityId,
+        this.locationId,
+      )?.id ||
       service?.sectorId ||
       ""
     );
@@ -255,7 +269,8 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     this.items = this.items.filter((item) => {
       if (item.id) return true;
       if (item.kind === "service") {
-        const service = this.catalogServices.find((row) => row.id === item.serviceId) ||
+        const service =
+          this.catalogServices.find((row) => row.id === item.serviceId) ||
           this.services.find((row) => row.id === item.serviceId);
         if (service && !offeredAt(this.context.sectors, service, locationId)) {
           removed.push(item.label);
@@ -264,9 +279,12 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         item.sectorId = this.serviceSectorId(service);
         return true;
       }
-      const product = this.catalogProducts.find((row) => row.id === item.productId);
+      const product = this.catalogProducts.find(
+        (row) => row.id === item.productId,
+      );
       item.sectorId =
-        sectorForActivity(this.context.sectors, product?.activityId, locationId)?.id || "";
+        sectorForActivity(this.context.sectors, product?.activityId, locationId)
+          ?.id || "";
       return true;
     });
     if (removed.length)
@@ -368,7 +386,8 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       const existing =
         this.quickCreatePrefill?.barcode &&
         this.items.find(
-          (item) => item.kind === "product" && item.productId === event.entity.id,
+          (item) =>
+            item.kind === "product" && item.productId === event.entity.id,
         );
       if (existing) {
         existing.quantity = Number(existing.quantity || 1) + 1;
@@ -465,7 +484,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     const line = event.currentTarget as HTMLElement | null;
     line?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
-    /** Quantity typed in the cart: whole number, at least 1, written back on blur. */
+  /** Quantity typed in the cart: whole number, at least 1, written back on blur. */
   fixQuantity(item: any): void {
     const quantity = wholeQuantity(item.quantity);
     if (item.quantity !== quantity) {
@@ -531,7 +550,9 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
    */
   /** Service lines not yet in the agenda: confirming creates their appointment. */
   get newServiceItems(): any[] {
-    return this.items.filter((item) => item.kind === "service" && !item.booking);
+    return this.items.filter(
+      (item) => item.kind === "service" && !item.booking,
+    );
   }
 
   get hasNewServices(): boolean {
@@ -585,7 +606,11 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     const sameDay = startsAt.toDateString() === new Date().toDateString();
     const day = sameDay
       ? "oggi"
-      : startsAt.toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "2-digit" });
+      : startsAt.toLocaleDateString("it-IT", {
+          weekday: "short",
+          day: "2-digit",
+          month: "2-digit",
+        });
     return `${day}, ${time(startsAt)} – ${time(endsAt)}`;
   }
 
@@ -631,7 +656,11 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       quantity: 1,
       // Its own activity here if it runs here; otherwise chosen on the line.
       sectorId:
-        sectorForActivity(this.context.sectors, product.activityId, this.locationId)?.id || "",
+        sectorForActivity(
+          this.context.sectors,
+          product.activityId,
+          this.locationId,
+        )?.id || "",
       unitPrice: requiresPrice ? "" : Number(product.price),
       priceMode: product.priceMode || "legacy",
       vatRate: product.vatRate ?? "",
@@ -719,7 +748,14 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       }
       this.showScanFeedback("ok", `Scansione: ${product.name}`);
     } catch (error: any) {
-      if (this.destroyed || this.loading || this.quickCreateKind || locationId !== this.locationId || this.writeState.kind !== "empty") return;
+      if (
+        this.destroyed ||
+        this.loading ||
+        this.quickCreateKind ||
+        locationId !== this.locationId ||
+        this.writeState.kind !== "empty"
+      )
+        return;
       if (error?.status === 404) return await this.unknownBarcode(barcode);
       this.showScanFeedback(
         "error",
@@ -902,4 +938,3 @@ function toLocalInput(value: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
-

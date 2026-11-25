@@ -1,3 +1,4 @@
+import { CalendarInputComponent } from "../calendar-input.component";
 import {
   localBookingTime,
   parseLocalBookingTime,
@@ -43,7 +44,13 @@ type Action = "revise" | "cancel_all" | "cancel_line";
 @Component({
   selector: "alora-booking-order-editor",
   standalone: true,
-  imports: [CommonModule, FormsModule, UiSelectComponent, AppointmentContactComponent],
+  imports: [
+    CalendarInputComponent,
+    CommonModule,
+    FormsModule,
+    UiSelectComponent,
+    AppointmentContactComponent,
+  ],
   styles: [
     `
       :host {
@@ -189,7 +196,12 @@ type Action = "revise" | "cancel_all" | "cancel_line";
         Orari nel fuso {{ timeZone }}. Ogni orario inserito viene rispettato; la
         disponibilità viene ricontrollata al salvataggio.
       </p>
-      <app-appointment-contact *ngIf="session.can('appointments.update.all')" [appointmentId]="appointmentId" [disabled]="busy || loading || pendingState().kind !== 'empty'" (changed)="load()" />
+      <app-appointment-contact
+        *ngIf="session.can('appointments.update.all')"
+        [appointmentId]="appointmentId"
+        [disabled]="busy || loading || pendingState().kind !== 'empty'"
+        (changed)="load()"
+      />
       <div *ngIf="pendingState().kind !== 'empty'" role="status" class="notice">
         <p>
           L’invio precedente è da verificare. Recupera lo stesso esito prima di
@@ -216,33 +228,35 @@ type Action = "revise" | "cancel_all" | "cancel_line";
             >
               <strong>{{ index + 1 }}. {{ serviceName(row.serviceId) }}</strong>
               <div class="fields">
-                <div class="field"
-                  ><span>Servizio</span
+                <div class="field">
+                  <span>Servizio</span
                   ><ui-select
                     [value]="row.serviceId"
                     [options]="optionsFor(row)"
                     [label]="'Servizio ' + (index + 1)"
                     (valueChange)="changeService(row, $event)"
-                  ></ui-select
-                ></div>
-                <label class="field"
-                  ><span>Inizio</span
-                  ><input
-                    type="datetime-local"
-                    step="0.001"
-                    [attr.aria-label]="'Inizio servizio ' + (index + 1)"
-                    [(ngModel)]="row.startsAt"
-                    (ngModelChange)="changed()"
-                /></label>
-                <div class="field"
-                  ><span>Professionista</span
+                  ></ui-select>
+                </div>
+                <div class="field">
+                  <span>Inizio</span
+                  ><barber-calendar-input
+                    compact
+                    mode="datetime"
+                    [label]="'Inizio servizio ' + (index + 1)"
+                    placeholder="Data e ora"
+                    [value]="row.startsAt"
+                    (valueChange)="row.startsAt = $event; changed()"
+                  ></barber-calendar-input>
+                </div>
+                <div class="field">
+                  <span>Professionista</span
                   ><ui-select
                     [value]="row.collaboratorId"
                     [options]="peopleFor(row)"
                     [label]="'Professionista servizio ' + (index + 1)"
                     (valueChange)="row.collaboratorId = $event; changed()"
-                  ></ui-select
-                ></div>
+                  ></ui-select>
+                </div>
                 <label *ngIf="row.roomId" class="field"
                   ><span>Risorsa già assegnata</span
                   ><button

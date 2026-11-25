@@ -27,6 +27,7 @@ jest.mock("@alora/ui", () => ({
     (items ?? []).map((item) => ({ value: value(item), label: label(item) })),
 }));
 jest.mock("../shell/admin-page-header.component", () => ({ AdminPageHeaderComponent: class {} }));
+jest.mock("../calendar-input.component", () => ({ CalendarInputComponent: class {} }));
 jest.mock("../core/admin-api.service", () => ({ AdminApiService: class {} }));
 jest.mock("../core/operational-context.service", () => ({
   OperationalContextService: class {},

@@ -121,8 +121,8 @@
       style="border: 0; padding: 0; margin: 0; min-width: 0; display: contents"
       [disabled]="writeState.kind !== 'empty'"
     >
-      <div class="field px-5"
-        ><span>Sede del conto</span
+      <div class="field px-5">
+        <span>Sede del conto</span
         ><ui-select
           name="quickLocation"
           [ngModel]="locationId"
@@ -131,8 +131,8 @@
           [options]="locationOptions"
           label="Sede del conto"
           placeholder="Seleziona una sede"
-        ></ui-select></div
-      >
+        ></ui-select>
+      </div>
       <div class="quick-order-layout">
         <div class="quick-order-catalog">
           <div class="field">
@@ -213,15 +213,33 @@
         </div>
 
         <aside class="quick-order-cart">
-            <div class="quick-order-cart-scroll" #cartScroll>
+          <div class="quick-order-cart-scroll" #cartScroll>
             <p class="quick-order-step">3 · Riepilogo vendita</p>
-            <div class="scan-feedback" *ngIf="scanFeedback" role="status" [attr.aria-live]="scanFeedbackKind === 'error' ? 'assertive' : 'polite'" [class]="scanFeedbackKind">
+            <div
+              class="scan-feedback"
+              *ngIf="scanFeedback"
+              role="status"
+              [attr.aria-live]="
+                scanFeedbackKind === 'error' ? 'assertive' : 'polite'
+              "
+              [class]="scanFeedbackKind"
+            >
               {{ scanFeedback }}
             </div>
-            <div *ngIf="!online" role="alert" aria-live="assertive" class="notice notice-error">
+            <div
+              *ngIf="!online"
+              role="alert"
+              aria-live="assertive"
+              class="notice notice-error"
+            >
               Rete assente: verifica la connessione e riprova l'invio.
             </div>
-            <div class="cart-empty" *ngIf="!items.length" role="status" aria-live="polite">
+            <div
+              class="cart-empty"
+              *ngIf="!items.length"
+              role="status"
+              aria-live="polite"
+            >
               Tocca un servizio o un prodotto per iniziare.
             </div>
             <article
@@ -258,14 +276,20 @@
                     step="1"
                     inputmode="numeric"
                   />
-                  <small *ngIf="item.kind === 'service'" class="text-[var(--muted)]"
-                    >Una prestazione per riga: imposta 1 e aggiungi di nuovo il servizio.</small
+                  <small
+                    *ngIf="item.kind === 'service'"
+                    class="text-[var(--muted)]"
+                    >Una prestazione per riga: imposta 1 e aggiungi di nuovo il
+                    servizio.</small
                   >
                 </label>
                 <ng-template #oneService>
                   <div class="cart-field">
                     <span>Q.tà</span>
-                    <strong title="Una prestazione per riga: per farne due aggiungi di nuovo il servizio">1</strong>
+                    <strong
+                      title="Una prestazione per riga: per farne due aggiungi di nuovo il servizio"
+                      >1</strong
+                    >
                   </div>
                 </ng-template>
                 <p
@@ -316,28 +340,28 @@
                 <details class="cart-more" [open]="item.priceMode !== 'legacy'">
                   <summary>IVA e tipo di prezzo</summary>
                   <div class="cart-more-fields">
-                <div class="cart-field"
-                  ><span>Prezzo inserito</span
-                  ><ui-select
-                    [(ngModel)]="item.priceMode"
-                    [name]="'mode' + i"
-                    (ngModelChange)="queueQuote()"
-                    [options]="priceModeOptions"
-                    [filterable]="false"
-                    label="Prezzo inserito"
-                  ></ui-select></div
-                >
-                <label *ngIf="item.priceMode !== 'legacy'"
-                  ><span>IVA (%)</span
-                  ><input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    [(ngModel)]="item.vatRate"
-                    [name]="'vat' + i"
-                    (ngModelChange)="queueQuote()"
-                /></label>
+                    <div class="cart-field">
+                      <span>Prezzo inserito</span
+                      ><ui-select
+                        [(ngModel)]="item.priceMode"
+                        [name]="'mode' + i"
+                        (ngModelChange)="queueQuote()"
+                        [options]="priceModeOptions"
+                        [filterable]="false"
+                        label="Prezzo inserito"
+                      ></ui-select>
+                    </div>
+                    <label *ngIf="item.priceMode !== 'legacy'"
+                      ><span>IVA (%)</span
+                      ><input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        [(ngModel)]="item.vatRate"
+                        [name]="'vat' + i"
+                        (ngModelChange)="queueQuote()"
+                    /></label>
                   </div>
                 </details>
                 <label
@@ -406,18 +430,26 @@
                 <button type="button" (click)="clearPrice()">C</button>
               </div>
             </div>
-            <div *ngIf="hasNewServices" class="field performed-at" data-tour="sales-performed-at">
+            <div
+              *ngIf="hasNewServices"
+              class="field performed-at"
+              data-tour="sales-performed-at"
+            >
               <span>Eseguito il / alle</span>
-              <input
-                type="datetime-local"
-                name="quickPerformedAt"
+              <barber-calendar-input
+                compact
+                mode="datetime"
+                label="Eseguito il / alle"
+                placeholder="Adesso"
                 [max]="performedAtMax"
-                [ngModel]="performedAt"
-                (ngModelChange)="setPerformedAt($event)"
+                [value]="performedAt"
+                (valueChange)="setPerformedAt($event)"
                 aria-describedby="performed-at-help"
-              />
+              ></barber-calendar-input>
               <small id="performed-at-help" class="text-xs text-[var(--muted)]">
-                <ng-container *ngIf="!performedAt">Vuoto: i servizi finiscono adesso.</ng-container>
+                <ng-container *ngIf="!performedAt"
+                  >Vuoto: i servizi finiscono adesso.</ng-container
+                >
                 In agenda: <strong>{{ appointmentWindowLabel }}</strong>
                 <button
                   *ngIf="performedAt"
@@ -428,7 +460,11 @@
                   Usa adesso
                 </button>
               </small>
-              <small *ngIf="performedAtError" class="text-xs font-semibold text-red-700" role="alert">
+              <small
+                *ngIf="performedAtError"
+                class="text-xs font-semibold text-red-700"
+                role="alert"
+              >
                 {{ performedAtError }}
               </small>
             </div>
@@ -439,7 +475,9 @@
               data-tour="sales-warnings"
             >
               <li *ngFor="let warning of scheduleWarnings">{{ warning }}</li>
-              <li class="schedule-warnings-note">Puoi registrare lo stesso: è solo un avviso.</li>
+              <li class="schedule-warnings-note">
+                Puoi registrare lo stesso: è solo un avviso.
+              </li>
             </ul>
             <label class="field"
               ><span>Sconto complessivo sul totale</span

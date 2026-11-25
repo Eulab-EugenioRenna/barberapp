@@ -1,3 +1,4 @@
+import { CalendarInputComponent } from "../calendar-input.component";
 import { Component, LOCALE_ID, OnInit, inject } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
@@ -21,7 +22,7 @@ import { DurationFieldComponent, splitMinutes } from "./duration-field.component
 @Component({
   selector: "app-appointment-automation-policy",
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, UiSelectComponent, SetupStepComponent, DurationFieldComponent],
+  imports: [CalendarInputComponent, CommonModule, FormsModule, RouterLink, UiSelectComponent, SetupStepComponent, DurationFieldComponent],
   template: ` <section class="policy" aria-label="Promemoria automatici">
     <header>
       <div>
@@ -177,7 +178,7 @@ import { DurationFieldComponent, splitMinutes } from "./duration-field.component
           <div class="fields">
             <div class="select-field"><span>Sede e attività</span>
               <ui-select label="Sede e attività" placeholder="Scegli" [options]="sectorOptions" [(ngModel)]="sectorId" [disabled]="busy" (ngModelChange)="preview = null"></ui-select></div>
-            <label class="field">Giorno e ora dell’appuntamento<input type="datetime-local" [(ngModel)]="localStartsAt" [disabled]="busy" (ngModelChange)="preview = null" /></label>
+            <div class="field"><span>Giorno e ora dell’appuntamento</span><barber-calendar-input compact mode="datetime" label="Giorno e ora dell’appuntamento" placeholder="Scegli" [value]="localStartsAt" [disabled]="busy" (valueChange)="localStartsAt = $event; preview = null"></barber-calendar-input></div>
           </div>
           <button type="button" class="secondary-btn" [disabled]="busy || !sectorId || !localStartsAt" (click)="simulate()">Calcola quando partono</button>
           <div *ngIf="preview" class="plan" aria-live="polite">

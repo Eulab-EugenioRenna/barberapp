@@ -46,12 +46,16 @@ type CalendarCell = {
         #trigger
         type="button"
         class="calendar-trigger"
-        [attr.aria-label]="compact ? label + ': ' + (displayValue || placeholder) : null"
+        [attr.aria-label]="
+          compact ? label + ': ' + (displayValue || placeholder) : null
+        "
         [disabled]="disabled"
         (click)="toggleOpen()"
       >
         <span class="calendar-trigger-copy">
-          <span *ngIf="!compact" class="calendar-trigger-label">{{ label }}</span>
+          <span *ngIf="!compact" class="calendar-trigger-label">{{
+            label
+          }}</span>
           <span
             class="calendar-trigger-value"
             [class.placeholder]="!displayValue"
@@ -494,6 +498,8 @@ export class CalendarInputComponent implements OnChanges, OnDestroy {
   @Input() placeholder = "Seleziona una data";
   @Input() mode: CalendarMode = "date";
   @Input() min = "";
+  /** Last selectable day (same format as `value`). */
+  @Input() max = "";
   @Input() disabled = false;
   /** Same size as the other form fields; for fields that already have a label above. */
   @Input({ transform: booleanAttribute }) compact = false;
@@ -508,15 +514,31 @@ export class CalendarInputComponent implements OnChanges, OnDestroy {
 
   readonly weekdays = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
   readonly hours = Array.from({ length: 24 }, (_, index) => this.pad(index));
-  readonly minutes = ["00", "15", "30", "45"];
+  /** Five-minute steps; a stored minute outside them stays selectable. */
+  readonly minutes = Array.from({ length: 12 }, (_, index) =>
+    this.pad(index * 5),
+  );
   readonly hourOptions = this.hours.map((hour) => ({
     value: hour,
     label: hour,
   }));
-  readonly minuteOptions = this.minutes.map((minute) => ({
-    value: minute,
-    label: minute,
-  }));
+  private minuteCache: {
+    key: string;
+    options: Array<{ value: string; label: string }>;
+  } | null = null;
+  get minuteOptions() {
+    const key = this.minutes.includes(this.selectedMinute)
+      ? ""
+      : this.selectedMinute;
+    if (this.minuteCache?.key !== key) {
+      const minutes = key ? [...this.minutes, key].sort() : this.minutes;
+      this.minuteCache = {
+        key,
+        options: minutes.map((minute) => ({ value: minute, label: minute })),
+      };
+    }
+    return this.minuteCache.options;
+  }
 
   get monthLabel(): string {
     return new Intl.DateTimeFormat("it-IT", {
@@ -547,7 +569,12 @@ export class CalendarInputComponent implements OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes["value"] || changes["mode"] || changes["min"]) {
+    if (
+      changes["value"] ||
+      changes["mode"] ||
+      changes["min"] ||
+      changes["max"]
+    ) {
       this.syncFromValue();
     }
   }
@@ -748,7 +775,7 @@ export class CalendarInputComponent implements OnChanges, OnDestroy {
     const base = parsed || this.defaultSelectionDate();
     this.visibleMonth = this.startOfMonth(base);
     this.selectedHour = this.pad(base.getHours());
-    this.selectedMinute = this.padToQuarter(base.getMinutes());
+    this.selectedMinute = this.pad(base.getMinutes());
     this.syncSelectedTime();
     this.buildCalendar();
   }
@@ -763,6 +790,8 @@ export class CalendarInputComponent implements OnChanges, OnDestroy {
     const today = this.toDateKey(new Date());
     const minDate = this.parseValue(this.min);
     const minKey = minDate ? this.toDateKey(minDate) : "";
+    const maxDate = this.parseValue(this.max);
+    const maxKey = maxDate ? this.toDateKey(maxDate) : "";
 
     this.calendarCells = Array.from({ length: 42 }, (_, index) => {
       const value = new Date(gridStart);
@@ -775,7 +804,9 @@ export class CalendarInputComponent implements OnChanges, OnDestroy {
         inMonth: value.getMonth() === this.visibleMonth.getMonth(),
         isToday: key === today,
         isSelected: key === selected,
-        isDisabled: Boolean(minKey) && key < minKey,
+        isDisabled:
+          (Boolean(minKey) && key < minKey) ||
+          (Boolean(maxKey) && key > maxKey),
         value,
       };
     });

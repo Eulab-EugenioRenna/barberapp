@@ -1,3 +1,4 @@
+import { CalendarInputComponent } from "../calendar-input.component";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -8,7 +9,7 @@ import { AmountsPrivacyToggleComponent } from "../shared/amounts-privacy-toggle.
 @Component({
   selector: "barber-admin-settings-page",
   standalone: true,
-  imports: [CommonModule, FormsModule, UiSelectComponent, AmountsPrivacyToggleComponent],
+  imports: [CalendarInputComponent, CommonModule, FormsModule, UiSelectComponent, AmountsPrivacyToggleComponent],
   template: `
     <section class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
       <article class="dark-panel rounded-[2rem] p-4 text-white sm:p-5" data-tour="settings-preview">
@@ -399,11 +400,13 @@ import { AmountsPrivacyToggleComponent } from "../shared/amounts-privacy-toggle.
                 *ngFor="let holiday of settingsForm.holidays; let i = index"
                 class="grid gap-3 rounded-[1rem] border border-[var(--line)]/70 p-3 md:grid-cols-[0.8fr_1.2fr_auto] md:items-center"
               >
-                <input
-                  [(ngModel)]="holiday.date"
-                  [name]="'holidayDate' + i"
-                  type="date"
-                />
+                <barber-calendar-input
+                  compact
+                  label="Data della chiusura"
+                  placeholder="Scegli il giorno"
+                  [value]="holiday.date"
+                  (valueChange)="holiday.date = $event"
+                ></barber-calendar-input>
                 <input
                   [(ngModel)]="holiday.name"
                   [name]="'holidayName' + i"
