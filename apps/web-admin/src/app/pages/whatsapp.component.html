@@ -124,9 +124,15 @@
                 </ng-container>
               </ng-container>
               <ng-template #mediaWait>
-                <p class="wa-muted" *ngIf="file.state === 'loading'">Scarico l’allegato…</p>
-                <p class="wa-muted" *ngIf="file.state === 'queued'">Allegato in recupero dal telefono: compare da solo tra poco.</p>
-                <p class="wa-muted" *ngIf="file.state === 'error'">Allegato non disponibile. <button type="button" class="pill-btn" (click)="retryMedia(item.id)">Riprova</button></p>
+                <img *ngIf="item.media.thumbnail" class="wa-media-image wa-media-thumb" [src]="item.media.thumbnail" [alt]="mediaLabel(item)" />
+                <div *ngIf="!item.media.thumbnail" class="wa-media-placeholder" [class.compact]="mediaKind(item) === 'audio' || mediaKind(item) === 'file'" aria-hidden="true">{{ mediaIcon(item) }}</div>
+                <p class="wa-media-note" *ngIf="file.state === 'loading'">Scarico {{ mediaLabel(item) | lowercase }}…</p>
+                <p class="wa-media-note" *ngIf="file.state === 'queued' && mediaRecent(item)">{{ item.media.thumbnail ? 'Anteprima: l’originale arriva dal telefono tra poco.' : mediaLabel(item) + ' in arrivo dal telefono.' }}</p>
+                <p class="wa-media-note" *ngIf="file.state === 'queued' && !mediaRecent(item)">
+                  {{ item.media.thumbnail ? 'Solo anteprima: il telefono non ha inviato l’originale.' : mediaLabel(item) + ' non scaricato dal telefono.' }}
+                  <button type="button" class="wa-link-btn" (click)="retryMedia(item.id)">Riprova</button>
+                </p>
+                <p class="wa-media-note" *ngIf="file.state === 'error'">{{ mediaLabel(item) }} non disponibile. <button type="button" class="wa-link-btn" (click)="retryMedia(item.id)">Riprova</button></p>
               </ng-template>
             </ng-container>
           </ng-container>

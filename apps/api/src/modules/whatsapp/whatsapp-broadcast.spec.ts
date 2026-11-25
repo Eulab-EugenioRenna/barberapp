@@ -298,3 +298,14 @@ describe("sendProblem", () => {
     expect(sendProblem("sent", null)).toBeNull();
   });
 });
+
+describe("inlineThumbnail", () => {
+  it("turns WhatsApp's base64 preview into a picture, never text", () => {
+    const { inlineThumbnail } = jest.requireActual("./whatsapp.service");
+    const jpeg = "/9j/4AAQSkZJRgABAQAAAQABAAD" + "A".repeat(400);
+    expect(inlineThumbnail(jpeg)).toBe(`data:image/jpeg;base64,${jpeg}`);
+    expect(inlineThumbnail("AAAA".repeat(100))).toBe("");
+    expect(inlineThumbnail("Ciao, ci vediamo domani alle 10")).toBeNull();
+    expect(inlineThumbnail(null)).toBeNull();
+  });
+});

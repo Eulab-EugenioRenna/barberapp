@@ -16,7 +16,9 @@ export interface WhatsAppMessageView {
   id: string; chatId: string; direction: string; kind: string; occurredAt: string;
   text: string | null; selectedButtonId: string | null;
   /** Attachment (image, voice note, audio, video, document): fetched through ALORA. */
-  media: { mimetype: string | null; filename: string | null } | null;
+  media: { mimetype: string | null; filename: string | null;
+    /** Low-resolution preview sent by WhatsApp (data URL), shown until the full file arrives. */
+    thumbnail: string | null } | null;
   senderName: string | null;
 }
 export interface WhatsAppOutboxView {

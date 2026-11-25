@@ -293,6 +293,16 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     if (item.kind === "video" || type.startsWith("video/")) return "video";
     return "file";
   }
+  mediaLabel(item: WhatsAppMessageView) {
+    const kind = this.mediaKind(item);
+    return kind === "image" ? (item.kind === "sticker" ? "Sticker" : "Foto") : kind === "audio" ? "Messaggio vocale" : kind === "video" ? "Video" : "Documento";
+  }
+  mediaIcon(item: WhatsAppMessageView) {
+    const kind = this.mediaKind(item);
+    return kind === "image" ? "📷" : kind === "audio" ? "🎤" : kind === "video" ? "🎬" : "📄";
+  }
+  /** The phone usually hands the original over within minutes; after that it is not coming by itself. */
+  mediaRecent(item: WhatsAppMessageView) { return Date.now() - Date.parse(item.occurredAt) < 10 * 60_000; }
   retryMedia(id: string) { this.media.delete(id); void this.loadMedia(); }
   async loadMessages(older = false) {
     if (!this.archiveId || !this.chatId || this.loadingSelection === this.selection) return;

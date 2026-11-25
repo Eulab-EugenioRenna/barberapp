@@ -102,6 +102,16 @@ export function recipientProblem(error: unknown, attempts: number): string {
   if (status === 429) return `WhatsApp ha chiesto di rallentare e non ha accettato il messaggio${tries}.`;
   return `Connect non raggiungibile${tries}: il messaggio non è partito.`;
 }
+/**
+ * WhatsApp puts the low-resolution preview of a photo or video in the message
+ * body as raw base64 JPEG: it is a thumbnail, never text to show.
+ */
+export function inlineThumbnail(value: string | null | undefined): string | null {
+  if (!value || value.length < 200) return null;
+  const compact = value.replace(/\s/g, "");
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(compact)) return null;
+  return compact.startsWith("/9j/") && compact.length <= 300_000 ? `data:image/jpeg;base64,${compact}` : "";
+}
 /** Data URL from Connect («data:audio/ogg; codecs=opus;base64,…») → bytes. */
 export function decodeDataUrl(value: string): { mimetype: string; data: Buffer } | null {
   const match = /^data:([\w.+-]+\/[\w.+-]+)[^,]*;base64,([A-Za-z0-9+/=\s]+)$/.exec(value);
@@ -327,7 +337,9 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       const list = rows(await wa.conversations(archiveId)).map(c => {
         if (!Number.isSafeInteger(c.messages) || c.messages < 0) return invalid();
         const chatId = text(c.chat_id, 100);
-        return { chatId, messages: c.messages, lastMessageAt: date(c.last_message_at), preview: nullable(c.preview),
+        const preview = nullable(c.preview);
+        return { chatId, messages: c.messages, lastMessageAt: date(c.last_message_at),
+          preview: inlineThumbnail(preview) === null ? preview : "📷 Foto",
           name: nullable(c.contact?.name ?? c.contact?.pushName, 200), kind: text(c.kind, 80), direction: direction(c.direction),
           phone: chatPhone(chatId), isGroup: chatId.endsWith("@g.us") || !!c.contact?.isGroup };
       });
@@ -385,11 +397,16 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       await this.ownedArchive(wa, actor, archiveId);
       const list = rows(await wa.messages(archiveId, before, chat)).map(m => {
         const kind = text(m.kind, 80);
+        const raw = nullable(m.body?.text ?? (m.body?.interactive && "body" in m.body.interactive ? m.body.interactive.body : null)) || null;
+        // Base64 in the body is the attachment preview: shown as a picture, never as text.
+        const thumbnail = MEDIA_KINDS.has(kind) ? inlineThumbnail(raw) : null;
         return {
           id: id(m.id), chatId: text(m.chat_id, 100), direction: direction(m.direction), kind, occurredAt: date(m.occurred_at),
-          text: nullable(m.body?.text ?? (m.body?.interactive && "body" in m.body.interactive ? m.body.interactive.body : null)) || null,
+          // Connect keeps the caption only when there is no preview: nothing else to show.
+          text: thumbnail === null ? raw : null,
           selectedButtonId: nullable(m.body?.selectedButtonId, 200),
-          media: MEDIA_KINDS.has(kind) ? { mimetype: nullable(m.body?.mimetype, 200), filename: nullable(m.body?.filename, 300) } : null,
+          media: MEDIA_KINDS.has(kind)
+            ? { mimetype: nullable(m.body?.mimetype, 200), filename: nullable(m.body?.filename, 300), thumbnail: thumbnail || null } : null,
           senderName: nullable(m.body?.senderName, 200),
         };
       });
