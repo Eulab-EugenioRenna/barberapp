@@ -68,6 +68,10 @@ export class OperationalContextService {
       })),
     );
   }
+  /** The scope bar only matters with more than one location or activity to pick. */
+  get hasChoice(): boolean {
+    return this.locations().length > 1 || this.sectors.length > 1;
+  }
   async load() {
     this.locations.set(
       await firstValueFrom(

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from "@angular/core";
+import { Component, HostBinding, Input, OnInit, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { UiIconComponent, UiSelectComponent, type UiOption } from "@alora/ui";
@@ -47,7 +47,7 @@ import { OperationalContextService } from "../core/operational-context.service";
           (valueChange)="context.select(context.selected.locationId, $event)"
         ></ui-select>
       </div>
-      <p *ngIf="context.sectorTotal() !== null" class="total">
+      <p *ngIf="!inline && context.sectorTotal() !== null" class="total">
         Venduto dell'attività, da sempre: <strong>€ {{ context.sectorTotal() }}</strong>
       </p>
     </div>
@@ -121,6 +121,14 @@ import { OperationalContextService } from "../core/operational-context.service";
         font-size: 0.8rem;
       }
 
+      :host(.inline) .scope {
+        border: 0;
+        background: transparent;
+        padding: 0;
+      }
+      :host(.inline) ui-select {
+        width: 12rem;
+      }
       @media (min-width: 48rem) {
         .scope {
           padding: 0.5rem 0.75rem;
@@ -157,6 +165,8 @@ export class OperationalSelectorComponent implements OnInit {
   readonly context = inject(OperationalContextService);
   error = "";
   expanded = false;
+  /** Inside a page title: no panel, no running total. */
+  @Input() @HostBinding("class.inline") inline = false;
 
   get locationOptions(): UiOption[] {
     return this.cache("locations", () => [
@@ -207,8 +217,8 @@ export class OperationalSelectorComponent implements OnInit {
 
   async ngOnInit() {
     try {
-      await this.context.load();
-      await this.context.loadTotals();
+      if (!this.inline || !this.context.locations().length) await this.context.load();
+      if (!this.inline) await this.context.loadTotals();
     } catch {
       this.error = "Sedi non disponibili. Ricarica la pagina.";
     }

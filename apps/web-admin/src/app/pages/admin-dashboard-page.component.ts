@@ -5,6 +5,8 @@ import { CustomerSelectComponent } from "../shared/customer-select.component";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { AmountsPrivacyService } from "../core/amounts-privacy.service";
+import { OperationalContextService } from "../core/operational-context.service";
+import { OperationalSelectorComponent } from "../shared/operational-selector.component";
 import { AdminMetricsGridComponent } from "../shared/admin-metrics-grid.component";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { UiSelectComponent } from "@alora/ui";
@@ -18,6 +20,7 @@ import {
   selector: "barber-admin-dashboard-page",
   standalone: true,
   imports: [
+    OperationalSelectorComponent,
     FinancialValuesPanelComponent,
     FunctionAccessDirective,
     SetupChecklistComponent,
@@ -30,6 +33,22 @@ import {
   ],
   styles: [
     `
+      .title-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 1rem;
+      }
+      .filters {
+        display: grid;
+        gap: 0.6rem;
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+        align-items: end;
+      }
+      .filters .reset {
+        justify-self: end;
+        white-space: nowrap;
+      }
       .kind-switch {
         display: inline-flex;
         flex-wrap: wrap;
@@ -64,11 +83,13 @@ import {
       <alora-setup-checklist aloraFunction="settings.manage"></alora-setup-checklist>
       <article class="panel rounded-[2rem] p-4 sm:p-5">
         <div class="page-head">
-          <div class="min-w-0">
-            <p class="eyebrow text-[var(--accent)]">Andamento del salone</p>
-            <h3 class="mt-1 font-display text-2xl sm:text-3xl">
-              Venduto e incassi
-            </h3>
+          <div class="title-row min-w-0">
+            <h3 class="font-display text-2xl sm:text-3xl">Venduto e incassi</h3>
+            <!-- Sede e attività: only when there is something to pick. -->
+            <alora-operational-selector
+              *ngIf="context.hasChoice"
+              inline
+            ></alora-operational-selector>
           </div>
           <div
             class="kind-switch"
@@ -88,10 +109,7 @@ import {
             </button>
           </div>
         </div>
-        <div
-          class="mt-4 grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-4"
-          data-tour="dashboard-filters"
-        >
+        <div class="filters mt-3" data-tour="dashboard-filters">
           <div class="field">
             <span>Periodo</span>
             <ui-select
@@ -120,7 +138,7 @@ import {
               placeholder="Tutti i clienti"
             ></alora-customer-select>
           </div>
-          <div class="field" *ngIf="kind !== 'products'">
+          <div class="field" *ngIf="kind !== 'products' && hasTeam">
             <span>Professionista</span>
             <ui-select
               [value]="revenueFilters.collaboratorId"
@@ -130,11 +148,9 @@ import {
               placeholder="Tutta la squadra"
             ></ui-select>
           </div>
-        </div>
-        <div class="mt-3 flex justify-end">
           <button
             type="button"
-            class="ghost-btn"
+            class="ghost-btn reset"
             data-tour="dashboard-reset"
             [disabled]="loading"
             (click)="resetRevenueFilters.emit()"
@@ -145,29 +161,21 @@ import {
       </article>
 
       <p
-        class="px-1 text-sm text-[var(--muted)]"
+        class="px-1 text-xs text-[var(--muted)]"
         *ngIf="revenueReport?.basis?.lineFiltered"
       >
-        {{
-          kind === "services"
-            ? "Vedi solo i servizi venduti."
-            : kind === "products"
-              ? "Vedi solo i prodotti venduti."
-              : "Il venduto comprende le righe selezionate."
-        }}
-        Incassi e saldi sono registrati sul conto intero: li trovi in «Tutto»,
-        senza filtri per attività o professionista.
+        Incassi e saldi sono sul conto intero: li vedi in «Tutto» senza filtri.
       </p>
       <p
-        class="px-1 text-sm text-[var(--muted)]"
+        class="px-1 text-xs text-[var(--muted)]"
         *ngIf="
-          revenueReport?.sold?.unattributedGross !== '0.00' &&
-          revenueReport?.sold
+          kind === 'all' &&
+          revenueReport?.sold &&
+          revenueReport.sold.unattributedGross !== '0.00'
         "
       >
-        Differenza storica fra totale conti e righe:
-        {{ money(revenueReport.sold.unattributedGross) }}. Questo importo non è
-        attribuito a un’attività o a un collaboratore.
+        {{ money(revenueReport.sold.unattributedGross) }} di conti storici non
+        hanno righe e non sono attribuiti ad attività o collaboratori.
       </p>
 
       <barber-admin-metrics-grid
@@ -293,7 +301,7 @@ import {
               </p>
             </div>
           </article>
-          <article *ngIf="kind !== 'products'" class="panel rounded-[2rem] p-4 sm:p-5">
+          <article *ngIf="kind !== 'products' && hasTeam" class="panel rounded-[2rem] p-4 sm:p-5">
             <p class="eyebrow text-[var(--accent)]">Squadra</p>
             <h3 class="font-display text-xl sm:text-2xl">
               Servizi per collaboratore
@@ -317,7 +325,7 @@ import {
         </div>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-2">
+      <div *ngIf="breakdownGroups.length" class="grid gap-4 md:grid-cols-2">
         <article
           *ngFor="let group of breakdownGroups"
           class="panel min-w-0 rounded-[2rem] p-4 sm:p-5"
@@ -407,10 +415,6 @@ import {
         >
           <p class="eyebrow text-white/50">Situazione attuale</p>
           <h3 class="mt-1 font-display text-2xl">Conti del periodo</h3>
-          <p class="mt-2 text-sm text-white/65">
-            Conti aperti e confermati con data nel periodo, aggiornati ai
-            movimenti registrati oggi.
-          </p>
           <dl
             *ngIf="
               revenueReport?.accounts as balances;
@@ -454,6 +458,7 @@ import {
   `,
 })
 export class AdminDashboardPageComponent {
+  readonly context = inject(OperationalContextService);
   @Input() revenueMetrics: any[] = [];
   @Input() appointmentStats: any = null;
   @Input() appointments: any[] = [];
@@ -499,7 +504,19 @@ export class AdminDashboardPageComponent {
     this.applyRevenueFilters.emit();
   }
 
+  /** With one location or one activity, «per sede» / «per attività» say nothing. */
   get breakdownGroups(): Array<{ title: string; rows: any[]; unit: string; empty: string }> {
+    const several = {
+      "Venduto per sede": this.context.locations().length > 1,
+      "Venduto per attività": this.context.sectors.length > 1,
+    } as Record<string, boolean>;
+    return this.allBreakdownGroups.filter((group) => several[group.title] ?? true);
+  }
+  /** One performer: the team filter and the per-collaborator card are noise. */
+  get hasTeam(): boolean {
+    return (this.revenueReport?.collaboratorOptions || []).length > 1;
+  }
+  private get allBreakdownGroups(): Array<{ title: string; rows: any[]; unit: string; empty: string }> {
     const report = this.revenueReport;
     const empty = "Nessuna vendita nel periodo.";
     if (this.kind === "services")

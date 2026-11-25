@@ -24,6 +24,7 @@ import { AppointmentOrderNotificationsService } from "../core/appointment-order-
 import { SessionStore } from "../core/session.store";
 import { AdminPwaBannerComponent } from "../shared/admin-pwa-banner.component";
 import { OperationalSelectorComponent } from "../shared/operational-selector.component";
+import { OperationalContextService } from "../core/operational-context.service";
 import { TourOverlayComponent } from "../shared/tour-overlay.component";
 import { TourService } from "../core/onboarding/tour.service";
 
@@ -122,8 +123,11 @@ const SELF_LOADING_VIEWS: ReadonlySet<AdminNavKey> = new Set([
 
     <div uiShellTopbar *ngIf="showTopbar()" class="topbar-stack">
       <barber-admin-pwa-banner></barber-admin-pwa-banner>
+      <!-- Kept in the DOM (it loads the locations); shown only when there is a choice.
+           The Panoramica puts it in its own title row. -->
       <alora-operational-selector
         *ngIf="showScope()"
+        [class.scope-hidden]="!scopeVisible()"
         data-tour="shell-scope"
       ></alora-operational-selector>
     </div>
@@ -234,6 +238,9 @@ const SELF_LOADING_VIEWS: ReadonlySet<AdminNavKey> = new Set([
         outline: 0.1875rem solid var(--alora-lime);
         outline-offset: 0.125rem;
       }
+      .scope-hidden {
+        display: none;
+      }
       .topbar-stack {
         display: grid;
         gap: 0.65rem;
@@ -248,6 +255,7 @@ export class AdminShellComponent implements OnInit {
   private readonly orderAlerts = inject(AppointmentOrderNotificationsService);
   private readonly router = inject(Router);
   private readonly tour = inject(TourService);
+  private readonly operational = inject(OperationalContextService);
 
   readonly drawerOpen = signal(false);
   private currentPath = this.router.url.split("?")[0];
@@ -275,6 +283,12 @@ export class AdminShellComponent implements OnInit {
   readonly isPlatformAdmin = computed(() => this.user()?.role === "platform_admin");
   readonly isPro = computed(() => hasAllLocalFunctions(this.user()));
   readonly showScope = computed(() => !!this.user() && !this.isPlatformAdmin());
+  readonly scopeVisible = computed(
+    () =>
+      this.operational.locations().length > 0 &&
+      this.operational.hasChoice &&
+      this.activeKey() !== "dashboard",
+  );
   // The PWA banner renders nothing when not needed; the scope bar decides.
   readonly showTopbar = computed(() => this.showScope());
   readonly tenantName = computed(() =>
