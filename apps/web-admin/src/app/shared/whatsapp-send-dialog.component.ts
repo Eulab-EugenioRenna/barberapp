@@ -61,25 +61,25 @@ export interface WhatsAppRecipient {
             </li>
           </ul>
 
-          <section *ngIf="job" class="wa-job" role="status" aria-live="polite">
-            <p class="wa-job-title">{{ jobTitle }}</p>
-            <div class="wa-job-bar" aria-hidden="true"><span [style.width.%]="jobPercent"></span></div>
+          <section *ngFor="let job of jobs; trackBy: trackJob" class="wa-job" role="status" aria-live="polite">
+            <p class="wa-job-title">{{ jobTitle(job) }}<span *ngIf="job.preview" class="wa-job-preview"> · «{{ job.preview }}»</span></p>
+            <div class="wa-job-bar" aria-hidden="true"><span [style.width.%]="jobPercent(job)"></span></div>
             <p class="text-sm">
               Inviati <strong>{{ job.sent }}</strong> su {{ job.total }}<ng-container *ngIf="job.failed"> · {{ job.failed }} non riusciti</ng-container><ng-container *ngIf="job.skipped"> · {{ job.skipped }} saltati (numero ripetuto, non leggibile o già raggiunto con lo stesso testo)</ng-container>.
             </p>
             <p *ngIf="job.error" class="wa-send-note">{{ job.error }}</p>
-            <p *ngIf="job.status === 'running'" class="text-xs text-[var(--muted)]">
-              Parte a gruppi di 30 con una pausa tra un gruppo e l’altro, per non far bloccare il numero. Puoi chiudere questa finestra: l’invio continua.
-            </p>
             <div class="flex flex-wrap justify-end gap-2">
-              <button *ngIf="job.status === 'running' || job.status === 'paused'" type="button" class="pill-btn" [disabled]="sending" (click)="cancelJob()">Annulla l’invio</button>
-              <button *ngIf="job.status === 'paused'" type="button" class="primary-btn" [disabled]="sending" (click)="resumeJob()">Riprendi</button>
-              <button *ngIf="job.status === 'done' || job.status === 'cancelled'" type="button" class="pill-btn" (click)="newMessage()">Nuovo messaggio</button>
-              <button type="button" class="pill-btn" (click)="close()">Chiudi</button>
+              <button *ngIf="job.status === 'running' || job.status === 'paused'" type="button" class="pill-btn" [disabled]="sending" (click)="cancelJob(job)">Annulla l’invio</button>
+              <button *ngIf="job.status === 'paused'" type="button" class="primary-btn" [disabled]="sending" (click)="resumeJob(job)">Riprendi</button>
+              <button *ngIf="job.status === 'done' || job.status === 'cancelled'" type="button" class="pill-btn" (click)="dismissJob(job)">Togli</button>
             </div>
           </section>
+          <p *ngIf="jobs.length" class="mt-2 text-xs text-[var(--muted)]">
+            Ogni messaggio è una coda a sé: parte a gruppi di 30 con una pausa, e un numero riceve il messaggio successivo solo dopo il precedente.
+            Puoi chiudere questa finestra: l’invio continua.
+          </p>
 
-          <form *ngIf="canWrite && !job" class="mt-4 grid gap-3" (ngSubmit)="send()">
+          <form *ngIf="canWrite" class="mt-4 grid gap-3" (ngSubmit)="send()">
             <fieldset class="grid gap-3" [disabled]="sending || !!result">
               <label class="field">
                 <span>{{ image ? "Didascalia (facoltativa)" : "Messaggio" }}</span>
@@ -131,6 +131,7 @@ export interface WhatsAppRecipient {
       .wa-send-invalid { color: var(--ink); }
       .wa-job { margin-top: 1rem; display: grid; gap: 0.6rem; }
       .wa-job-title { font-weight: 650; }
+      .wa-job-preview { font-weight: 400; color: var(--muted); }
       .wa-job-bar { height: 0.5rem; border-radius: 999px; background: var(--line); overflow: hidden; }
       .wa-job-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.4s; }
       textarea { resize: vertical; }
@@ -157,8 +158,8 @@ export class WhatsAppSendDialogComponent implements OnInit, OnDestroy {
   result = "";
   error = "";
   connectionChecked = false;
-  /** Background «Messaggio a tutti» of this account, while it runs or just finished. */
-  job: WhatsAppBroadcastView | null = null;
+  /** Background «Messaggio a tutti» queues of this account: running, paused or just finished. */
+  jobs: WhatsAppBroadcastView[] = [];
   private poll?: ReturnType<typeof setTimeout>;
   /** Kept across retries of the same text, so nobody is messaged twice. */
   private broadcastKey = newKey();
@@ -185,8 +186,8 @@ export class WhatsAppSendDialogComponent implements OnInit, OnDestroy {
     if (audience.status === "fulfilled") this.audience = audience.value;
     else this.error = "Non riesco a contare i destinatari: " + message(audience.reason);
     if (!this.customer) {
-      const latest = await this.api.latestBroadcast().catch(() => null);
-      if (latest && (latest.status === "running" || latest.status === "paused")) this.track(latest);
+      const active = await this.api.activeBroadcasts().catch(() => []);
+      active.forEach((job) => this.track(job));
     }
     this.loading = false;
   }
@@ -195,48 +196,58 @@ export class WhatsAppSendDialogComponent implements OnInit, OnDestroy {
     if (this.poll) clearTimeout(this.poll);
   }
 
-  get jobPercent(): number {
-    if (!this.job?.total) return 0;
-    return Math.round(((this.job.sent + this.job.failed) / this.job.total) * 100);
+  jobPercent(job: WhatsAppBroadcastView): number {
+    if (!job.total) return 0;
+    return Math.round(((job.sent + job.failed) / job.total) * 100);
   }
-  get jobTitle(): string {
-    switch (this.job?.status) {
+  jobTitle(job: WhatsAppBroadcastView): string {
+    switch (job.status) {
       case "running": return "Invio in corso";
       case "paused": return "Invio in pausa";
       case "cancelled": return "Invio annullato";
       default: return "Invio completato";
     }
   }
+  trackJob = (_: number, job: WhatsAppBroadcastView) => job.id;
+  /** Adds or refreshes a queue; running queues are polled every 3 seconds. */
   private track(job: WhatsAppBroadcastView) {
-    this.job = job;
+    const index = this.jobs.findIndex((row) => row.id === job.id);
+    if (index >= 0) this.jobs[index] = job;
+    else this.jobs = [...this.jobs, job];
+    this.schedulePoll();
+  }
+  private schedulePoll() {
     if (this.poll) clearTimeout(this.poll);
-    if (job.status !== "running") return;
+    const running = this.jobs.filter((job) => job.status === "running");
+    if (!running.length) return;
     this.poll = setTimeout(async () => {
-      try { this.track(await this.api.broadcastStatus(job.id)); }
-      catch { this.track(job); }
+      for (const job of running) {
+        try { this.track(await this.api.broadcastStatus(job.id)); }
+        catch { /* retried at the next poll */ }
+      }
+      this.schedulePoll();
     }, 3000);
   }
-  async cancelJob() {
-    if (!this.job) return;
+  async cancelJob(job: WhatsAppBroadcastView) {
     this.sending = true;
-    try { this.track(await this.api.cancelBroadcast(this.job.id)); }
+    try { this.track(await this.api.cancelBroadcast(job.id)); }
     catch (error) { this.error = message(error); }
     finally { this.sending = false; }
   }
-  async resumeJob() {
-    if (!this.job) return;
+  async resumeJob(job: WhatsAppBroadcastView) {
     this.sending = true;
-    try { this.track(await this.api.resumeBroadcast(this.job.id)); }
+    try { this.track(await this.api.resumeBroadcast(job.id)); }
     catch (error) { this.error = message(error); }
     finally { this.sending = false; }
   }
-  newMessage() {
-    this.job = null;
+  dismissJob(job: WhatsAppBroadcastView) {
+    this.jobs = this.jobs.filter((row) => row.id !== job.id);
+  }
+  /** After queuing, the form is ready for the next message. */
+  private clearDraft() {
     this.text = "";
     this.image = null;
     this.authorized = false;
-    this.result = "";
-    this.error = "";
     this.draftChanged();
   }
 
@@ -269,6 +280,7 @@ export class WhatsAppSendDialogComponent implements OnInit, OnDestroy {
           idempotencyKey: this.broadcastKey,
           recipientAuthorized: true,
         }));
+        this.clearDraft();
       }
     } catch (error) {
       this.error = message(error);

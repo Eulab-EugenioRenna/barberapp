@@ -49,10 +49,11 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
       findUnique: jest.fn(async ({ where }: any) => jobs.find((j) => j.id === where.id || (where.tenantId_userId_idempotencyKey && j.idempotencyKey === where.tenantId_userId_idempotencyKey.idempotencyKey)) ?? null),
       findUniqueOrThrow: jest.fn(async ({ where }: any) => jobs.find((j) => j.id === where.id)),
       findFirst: jest.fn(async ({ where }: any) => jobs.find((j) => match(j, where)) ?? null),
+      findMany: jest.fn(async ({ where }: any) => jobs.filter((j) => match(j, where))),
       count: jest.fn(async ({ where }: any) => jobs.filter((j) => match(j, where)).length),
       create: jest.fn(async ({ data }: any) => {
         const { recipients: nested, ...rest } = data;
-        const job = { id: "job-" + (jobs.length + 1), status: "running", sent: 0, failed: 0, error: null, nextRunAt: new Date(0), createdAt: new Date(), finishedAt: null, ...rest };
+        const job = { id: "job-" + (jobs.length + 1), status: "running", sent: 0, failed: 0, error: null, nextRunAt: new Date(0), createdAt: new Date(Date.now() + jobs.length), finishedAt: null, ...rest };
         jobs.push(job);
         for (const row of nested.create) recipients.push({ id: "r" + recipients.length, broadcastId: job.id, state: "pending", attempts: 0, ...row });
         return job;
@@ -65,8 +66,20 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
       }),
     },
     whatsAppBroadcastRecipient: {
-      findMany: jest.fn(async ({ where, take }: any) =>
-        recipients.filter((r) => match(r, where)).sort((a, b) => a.position - b.position).slice(0, take)),
+      findMany: jest.fn(async ({ where, take }: any) => {
+        const { broadcast, recipient, ...plain } = where;
+        let rows = recipients.filter((r) => match(r, plain));
+        if (recipient?.notIn) rows = rows.filter((r) => !recipient.notIn.includes(r.recipient));
+        if (broadcast) {
+          // Earlier active queues of the account.
+          rows = rows.filter((r) => {
+            const job = jobs.find((j) => j.id === r.broadcastId);
+            return job && broadcast.status.in.includes(job.status) &&
+              (job.createdAt < broadcast.OR[0].createdAt.lt || (job.createdAt === broadcast.OR[1].createdAt && job.id < broadcast.OR[1].id.lt));
+          });
+        }
+        return rows.sort((a, b) => a.position - b.position).slice(0, take);
+      }),
       update: jest.fn(async ({ where, data }: any) => apply(recipients.find((r) => r.id === where.id), data)),
       count: jest.fn(async ({ where }: any) => recipients.filter((r) => match(r, where)).length),
     },
@@ -76,7 +89,12 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
     for (const job of jobs) job.nextRunAt = new Date(0);
     await service.tick();
   };
-  return { service, jobs, recipients, run };
+  /** One step of one queue, as the worker would pick it. */
+  const runJob = async (id: string) => {
+    for (const job of jobs) job.nextRunAt = job.id === id ? new Date(0) : new Date(Date.now() + 3600_000);
+    await service.tick();
+  };
+  return { service, jobs, recipients, run, runJob };
 }
 const input = { text: "Promo di Natale", idempotencyKey: "key-12345678", recipientAuthorized: true as const };
 
@@ -142,9 +160,46 @@ describe("«Messaggio a tutti» in the background", () => {
     expect(jobs[0]).toMatchObject({ status: "done", sent: 1 });
   });
 
-  it("refuses a second broadcast while one is running", async () => {
+  it("queues more messages: a number gets the second only after the first", async () => {
+    // Let the delayed worker runs of earlier tests finish first.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    wa.sendText.mockClear();
+    const customers = Array.from({ length: 45 }, (_, i) => ({ id: "c" + i, phone: "333" + String(1000000 + i) }));
+    const { service, jobs, runJob } = setup(customers);
+    await service.broadcast("auth", SESSION, input);
+    const second = await service.broadcast("auth", SESSION, { ...input, text: "Orari delle feste", idempotencyKey: "other-12345" });
+    expect(second).toMatchObject({ status: "running", total: 45, preview: "Orari delle feste" });
+    expect((await service.activeBroadcasts("auth")).map((job) => job.preview)).toEqual(["Promo di Natale", "Orari delle feste"]);
+    await runJob(jobs[0].id); // first 30 get the promo
+    await runJob(jobs[1].id); // the same 30 can get the second message
+    expect(jobs[1]).toMatchObject({ status: "running", sent: 30 });
+    await runJob(jobs[1].id); // the other 15 still wait for the promo
+    expect(jobs[1]).toMatchObject({ status: "running", sent: 30, error: "15 numeri aspettano che parta il messaggio precedente" });
+    await runJob(jobs[0].id);
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 45 });
+    await runJob(jobs[1].id);
+    expect(jobs[1]).toMatchObject({ status: "done", sent: 45 });
+    // Per number, the promo always left first.
+    const order = new Map<string, string[]>();
+    for (const [, to, text] of wa.sendText.mock.calls) order.set(to, [...(order.get(to) ?? []), text]);
+    expect(order.size).toBe(45);
+    for (const texts of order.values()) expect(texts).toEqual(["Promo di Natale", "Orari delle feste"]);
+  });
+
+  it("frees the waiting numbers when the earlier queue is cancelled", async () => {
+    const { service, jobs, runJob } = setup([{ id: "a", phone: "3331111111" }]);
+    await service.broadcast("auth", SESSION, input);
+    await service.broadcast("auth", SESSION, { ...input, text: "Orari delle feste", idempotencyKey: "other-12345" });
+    await runJob(jobs[1].id);
+    expect(jobs[1].sent).toBe(0);
+    await service.cancelBroadcast("auth", jobs[0].id);
+    await runJob(jobs[1].id);
+    expect(jobs[1]).toMatchObject({ status: "done", sent: 1 });
+  });
+
+  it("does not queue the same text twice", async () => {
     const { service } = setup([{ id: "a", phone: "3331111111" }]);
     await service.broadcast("auth", SESSION, input);
-    await expect(service.broadcast("auth", SESSION, { ...input, idempotencyKey: "other-12345" })).rejects.toThrow("già un messaggio a tutti");
+    await expect(service.broadcast("auth", SESSION, { ...input, idempotencyKey: "other-12345" })).rejects.toThrow("già in coda");
   });
 });

@@ -509,18 +509,22 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   }
   private broadcastView(row: {
     id: string; status: string; total: number; sent: number; failed: number; skipped: number;
-    error: string | null; createdAt: Date; finishedAt: Date | null;
+    error: string | null; text: string | null; image?: unknown; createdAt: Date; finishedAt: Date | null;
   }): WhatsAppBroadcastView {
+    const text = row.text?.trim() ?? "";
     return {
       id: row.id, status: row.status as WhatsAppBroadcastView["status"], total: row.total, sent: row.sent,
       failed: row.failed, skipped: row.skipped, pending: Math.max(0, row.total - row.sent - row.failed),
-      error: row.error, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null,
+      error: row.error, preview: text ? text.slice(0, 80) : row.image ? "Foto" : null,
+      createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null,
     };
   }
   /**
    * «Messaggio a tutti» is queued and sent in the background, 30 recipients
    * per step (see tick). Each recipient has its own key derived from the
    * request key: repeating the request never writes to a customer twice.
+   * Several messages can be queued: each is its own queue, and a number gets
+   * the next message only after the earlier one reached it (see step).
    */
   broadcast(auth: string | undefined, sessionId: string, input: WhatsAppBroadcastInput): Promise<WhatsAppBroadcastView> {
     return this.run(auth, "whatsapp.send", async (wa, actor) => {
@@ -530,10 +534,12 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       if (existing) return this.broadcastView(existing);
       await this.ownedSession(wa, actor, sessionId);
       this.requireContent(input);
-      const active = await this.prisma.whatsAppBroadcast.count({
-        where: { tenantId: actor.tenantId, status: { in: ["running", "paused"] } },
-      });
-      if (active) throw new ConflictException("C’è già un messaggio a tutti in corso: aspetta che finisca o annullalo");
+      if (input.text?.trim() && !input.image) {
+        const queued = await this.prisma.whatsAppBroadcast.count({
+          where: { tenantId: actor.tenantId, status: { in: ["running", "paused"] }, text: input.text, image: { equals: Prisma.DbNull } },
+        });
+        if (queued) throw new ConflictException("Questo messaggio è già in coda");
+      }
       const preview = this.preview(input);
       const already = new Set(
         (await this.prisma.whatsAppSend.findMany({
@@ -583,6 +589,16 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   }
   async broadcastStatus(auth: string | undefined, id: string): Promise<WhatsAppBroadcastView> {
     return this.broadcastView((await this.ownBroadcast(auth, id)).job);
+  }
+  /** Queues still running or paused, oldest first: each has its own progress. */
+  async activeBroadcasts(auth: string | undefined): Promise<WhatsAppBroadcastView[]> {
+    const session = await resolveRequestSession(this.prisma, auth);
+    const user = requireUser(session), tenantId = requireTenantId(session);
+    const jobs = await this.prisma.whatsAppBroadcast.findMany({
+      where: { tenantId, userId: user.id, status: { in: ["running", "paused"] } },
+      orderBy: { createdAt: "asc" }, take: 20,
+    });
+    return jobs.map((job) => this.broadcastView(job));
   }
   /** The latest «Messaggio a tutti» of this account, to show its progress again. */
   async latestBroadcast(auth: string | undefined): Promise<WhatsAppBroadcastView | null> {
@@ -644,10 +660,37 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
 
   private async step(id: string): Promise<void> {
     const job = await this.prisma.whatsAppBroadcast.findUniqueOrThrow({ where: { id } });
-    const batch = await this.prisma.whatsAppBroadcastRecipient.findMany({
-      where: { broadcastId: id, state: "pending" }, orderBy: { position: "asc" }, take: BROADCAST_STEP,
+    // A number still waiting for an earlier queued message gets this one later.
+    const waiting = await this.prisma.whatsAppBroadcastRecipient.findMany({
+      where: {
+        state: "pending",
+        broadcast: {
+          tenantId: job.tenantId, status: { in: ["running", "paused"] },
+          OR: [{ createdAt: { lt: job.createdAt } }, { createdAt: job.createdAt, id: { lt: job.id } }],
+        },
+      },
+      select: { recipient: true }, distinct: ["recipient"],
     });
-    if (!batch.length) return this.finish(id);
+    const batch = await this.prisma.whatsAppBroadcastRecipient.findMany({
+      where: {
+        broadcastId: id, state: "pending",
+        ...(waiting.length ? { recipient: { notIn: waiting.map((row) => row.recipient) } } : {}),
+      },
+      orderBy: { position: "asc" }, take: BROADCAST_STEP,
+    });
+    if (!batch.length) {
+      const pending = await this.prisma.whatsAppBroadcastRecipient.count({ where: { broadcastId: id, state: "pending" } });
+      if (!pending) return this.finish(id);
+      await this.prisma.whatsAppBroadcast.update({
+        where: { id },
+        data: {
+          nextRunAt: new Date(Date.now() + broadcastTiming.stepPauseMs),
+          error: `${pending} numeri aspettano che parta il messaggio precedente`,
+        },
+      });
+      this.logger.log(`${id}: ${pending} numeri aspettano il messaggio precedente`);
+      return;
+    }
     const input = {
       text: job.text ?? undefined,
       image: (job.image as WhatsAppImageInput | null) ?? undefined,

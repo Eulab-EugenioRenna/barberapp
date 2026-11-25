@@ -50,6 +50,8 @@ export class WhatsAppController {
   broadcast(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() body: BroadcastWhatsAppTextDto) {
     connectBrowser(r); return this.whatsapp.broadcast(r.headers.authorization, id, body);
   }
+  @Get("broadcasts/active") @Header("Cache-Control", "no-store")
+  activeBroadcasts(@Req() r: ConnectRequest) { return this.whatsapp.activeBroadcasts(r.headers.authorization); }
   @Get("broadcasts/latest") @Header("Cache-Control", "no-store")
   latestBroadcast(@Req() r: ConnectRequest) { return this.whatsapp.latestBroadcast(r.headers.authorization); }
   @Get("broadcasts/:id") @Header("Cache-Control", "no-store")

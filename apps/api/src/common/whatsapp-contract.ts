@@ -51,6 +51,8 @@ export interface WhatsAppBroadcastView {
   skipped: number;
   pending: number;
   error: string | null;
+  /** Start of the text («Foto» for a photo alone), to tell queues apart. */
+  preview: string | null;
   createdAt: string;
   finishedAt: string | null;
 }
