@@ -48,6 +48,8 @@ export class LegacyWriteDto {
   @IsOptional() @IsString() @MaxLength(100) sectorId?: string;
   /** Activity of a service or product (Barberia, Estetica, Rivendita…). */
   @IsOptional() @IsString() @MaxLength(100) activityId?: string;
+  /** Brand of a product; null or empty removes it. */
+  @IsOptional() @IsString() @MaxLength(100) brandId?: string | null;
   @IsOptional() @IsString() @MaxLength(100) locationId?: string;
   @IsOptional() @IsString() @MaxLength(4000) name?: string;
   @IsOptional() @IsString() @MaxLength(4000) firstName?: string;
