@@ -156,6 +156,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         priceOverrideReason: item.priceOverrideReason || "",
         quantity: Number(item.quantity || 1),
         unitPrice: Number(item.unitPrice || 0),
+        baselinePrice: Number(item.unitPrice || 0),
         collaboratorId: item.collaboratorId || item.collaborator?.id || "",
         originalCollaboratorId: item.collaboratorId || null,
         booking: item.booking || null,
@@ -187,15 +188,10 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     this.online = false;
   }
 
-  readonly priceModeOptions: UiOption[] = [
-    { value: "legacy", label: "Valore storico" },
-    { value: "net", label: "IVA esclusa" },
-    { value: "gross", label: "IVA inclusa" },
-  ];
   readonly paymentMethodOptions: UiOption[] = [
     { value: "cash", label: "Contanti" },
     { value: "card", label: "Carta" },
-    { value: "bank", label: "Bonifico ricevuto" },
+    { value: "bank", label: "Bonifico" },
     { value: "other", label: "Altro" },
   ];
   readonly paymentStatusOptions: UiOption[] = [
@@ -474,9 +470,9 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       unitPrice: String(item.unitPrice),
       discount: String(item.discount ?? 0),
       taxTotal: String(item.taxTotal ?? 0),
-      priceMode: item.priceMode || "legacy",
-      vatRate: item.vatRate === "" ? null : item.vatRate,
-      priceOverrideReason: item.priceOverrideReason || undefined,
+      // VAT and price mode are never chosen at the till: the server takes
+      // them from the price list (new lines) or keeps the recorded ones.
+      priceOverrideReason: item.priceOverrideReason?.trim() || undefined,
     }));
   }
   /** The line being edited stays whole in view instead of half under the bar. */
@@ -636,6 +632,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       quantity: 1,
       sectorId: this.serviceSectorId(service),
       unitPrice: Number(service.basePrice || 0),
+      baselinePrice: Number(service.basePrice || 0),
       priceMode: service.priceMode || "legacy",
       vatRate: service.vatRate ?? "",
       priceOverrideReason: "",
@@ -662,6 +659,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
           this.locationId,
         )?.id || "",
       unitPrice: requiresPrice ? "" : Number(product.price),
+      baselinePrice: requiresPrice ? null : Number(product.price),
       priceMode: product.priceMode || "legacy",
       vatRate: product.vatRate ?? "",
       priceOverrideReason: "",
@@ -669,8 +667,22 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       taxTotal: 0,
       requiresPrice,
     });
-    if (requiresPrice) this.pricePadIndex = this.items.length - 1;
+    if (requiresPrice) {
+      this.pricePadIndex = this.items.length - 1;
+      this.focusPrice(this.pricePadIndex);
+    }
     this.queueQuote();
+  }
+
+  /** A product without list price: the cursor goes straight to its price. */
+  private focusPrice(index: number): void {
+    if (typeof document === "undefined") return;
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        `.quick-order-cart [data-price-index="${index}"]`,
+      );
+      input?.focus();
+    });
   }
 
   private attachScanner(): void {
@@ -811,24 +823,83 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     if (this.pricePadIndex > index) this.pricePadIndex -= 1;
   }
 
+  /**
+   * The server asks why a list price changed on a line with defined VAT
+   * (audit of price changes): only then the line shows the reason field.
+   */
+  priceReasonRequired(item: any): boolean {
+    if ((item.priceMode || "legacy") === "legacy") return false;
+    if (item.baselinePrice === null || item.baselinePrice === undefined)
+      return false;
+    if (item.unitPrice === "" || item.unitPrice === null) return false;
+    return Number(item.unitPrice) !== Number(item.baselinePrice);
+  }
+
+  /** Second row of a line: collaborator, or what the line still needs. */
+  hasDetailRow(item: any): boolean {
+    return (
+      (item.kind === "service" && !this.nonPerformed(item)) ||
+      (item.kind === "product" && !item.sectorId) ||
+      this.priceReasonRequired(item) ||
+      this.nonPerformed(item)
+    );
+  }
+
+  dragIndex = -1;
+  dropIndex = -1;
+  /** Lines are reordered by dragging their handle (mouse, pen or finger). */
+  startDrag(index: number, event: PointerEvent): void {
+    if (this.writeState.kind !== "empty") return;
+    event.preventDefault();
+    this.dragIndex = index;
+    this.dropIndex = index;
+    (event.currentTarget as Element | null)?.setPointerCapture?.(
+      event.pointerId,
+    );
+  }
+  dragMove(event: PointerEvent): void {
+    if (this.dragIndex < 0 || typeof document === "undefined") return;
+    const line = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest("[data-line-index]");
+    if (line) this.dropIndex = Number(line.getAttribute("data-line-index"));
+    // Near the edges the list scrolls, so far lines can be reached.
+    const list = this.cartScroll?.nativeElement;
+    if (!list) return;
+    const box = list.getBoundingClientRect();
+    if (event.clientY < box.top + 32) list.scrollTop -= 12;
+    else if (event.clientY > box.bottom - 32) list.scrollTop += 12;
+  }
+  endDrag(): void {
+    const from = this.dragIndex,
+      to = this.dropIndex;
+    this.cancelDrag();
+    if (from >= 0 && to >= 0) this.moveItem(from, to);
+  }
+  cancelDrag(): void {
+    this.dragIndex = -1;
+    this.dropIndex = -1;
+  }
+  /** The account keeps the lines in this order. */
+  moveItem(from: number, to: number): void {
+    if (
+      from === to ||
+      from < 0 ||
+      to < 0 ||
+      from >= this.items.length ||
+      to >= this.items.length
+    )
+      return;
+    const [row] = this.items.splice(from, 1);
+    this.items.splice(to, 0, row);
+    this.pricePadIndex = -1;
+    // Quote rows are positional: recompute them in the new order.
+    this.queueQuote();
+  }
+
   /** Conferma su azioni distruttive. Overridabile nei test. */
   protected confirmDestructive(message: string): boolean {
     return window.confirm(message);
-  }
-
-  appendPrice(value: string): void {
-    const item = this.items[this.pricePadIndex];
-    if (!item) return;
-    const current = String(item.unitPrice ?? "");
-    if (value === "." && current.includes(".")) return;
-    item.unitPrice = `${current}${value}`;
-    this.queueQuote();
-  }
-
-  clearPrice(): void {
-    const item = this.items[this.pricePadIndex];
-    if (item) item.unitPrice = "";
-    this.queueQuote();
   }
 
   get writeState() {
@@ -887,6 +958,8 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         (item) =>
           item.unitPrice !== "" &&
           Number(item.unitPrice) >= 0 &&
+          (!this.priceReasonRequired(item) ||
+            (item.priceOverrideReason || "").trim().length >= 3) &&
           (keepOpen || !this.requiresActual(item) || !!item.collaboratorId) &&
           (keepOpen ||
             !this.requiresChargeReason(item) ||

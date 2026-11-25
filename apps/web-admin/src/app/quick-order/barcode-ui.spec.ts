@@ -23,11 +23,19 @@ jest.mock("@alora/ui", () => ({
   UiPageComponent: class {},
   UiTabsComponent: class {},
   UiSelectComponent: class {},
-  uiOptions: (items: any[] | null | undefined, value: (item: any) => unknown, label: (item: any) => string) =>
+  uiOptions: (
+    items: any[] | null | undefined,
+    value: (item: any) => unknown,
+    label: (item: any) => string,
+  ) =>
     (items ?? []).map((item) => ({ value: value(item), label: label(item) })),
 }));
-jest.mock("../shell/admin-page-header.component", () => ({ AdminPageHeaderComponent: class {} }));
-jest.mock("../calendar-input.component", () => ({ CalendarInputComponent: class {} }));
+jest.mock("../shell/admin-page-header.component", () => ({
+  AdminPageHeaderComponent: class {},
+}));
+jest.mock("../calendar-input.component", () => ({
+  CalendarInputComponent: class {},
+}));
 jest.mock("../core/admin-api.service", () => ({ AdminApiService: class {} }));
 jest.mock("../core/operational-context.service", () => ({
   OperationalContextService: class {},
@@ -193,6 +201,46 @@ describe("barcode UI workflows", () => {
     expect(modal.items[0].quantity).toBe(2);
     expect(modal.queueQuote).toHaveBeenCalledTimes(2);
     expect(modal.scanFeedback).toContain("Shampoo");
+  });
+  it("reorders lines and sends them in the new order", () => {
+    modal.addService({ id: "service-1", name: "Taglio", basePrice: 20 });
+    modal.addProduct({ ...product, price: 10 });
+    modal.moveItem(1, 0);
+    expect(modal.items.map((row) => row.label)).toEqual(["Shampoo", "Taglio"]);
+    modal.moveItem(0, 5);
+    expect(modal.items[0].label).toBe("Shampoo");
+    modal.customerId = "customer-1";
+    modal.online = true;
+    modal.items[1].collaboratorId = "staff-1";
+    modal.quote = { total: 30 };
+    modal.submit();
+    const sent = (modal.submitOrder.emit as jest.Mock).mock.calls[0][0].items;
+    expect(sent.map((row: any) => row.kind)).toEqual(["product", "service"]);
+    // VAT and price mode are never chosen at the till.
+    expect(sent[0]).not.toHaveProperty("vatRate");
+    expect(sent[0]).not.toHaveProperty("priceMode");
+  });
+  it("asks why only when a list price with defined VAT changes", () => {
+    modal.addService({
+      id: "service-1",
+      name: "Taglio",
+      basePrice: 20,
+      priceMode: "gross",
+      vatRate: 22,
+    });
+    modal.addService({ id: "service-2", name: "Barba", basePrice: 10 });
+    expect(modal.priceReasonRequired(modal.items[0])).toBe(false);
+    modal.items[0].unitPrice = 18;
+    modal.items[1].unitPrice = 8;
+    expect(modal.priceReasonRequired(modal.items[0])).toBe(true);
+    // Historical lines without VAT: the server asks nothing.
+    expect(modal.priceReasonRequired(modal.items[1])).toBe(false);
+    modal.customerId = "customer-1";
+    modal.items.forEach((row) => (row.collaboratorId = "staff-1"));
+    modal.quote = { total: 26 };
+    expect(modal.canSubmit()).toBe(false);
+    modal.items[0].priceOverrideReason = "Promo";
+    expect(modal.canSubmit()).toBe(true);
   });
   it("preserves manually entered rows and prices", async () => {
     modal.addProduct({ ...product, price: null });
