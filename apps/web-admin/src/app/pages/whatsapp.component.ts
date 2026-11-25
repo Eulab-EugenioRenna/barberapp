@@ -125,6 +125,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
       case "resumed": return "Ripreso";
       case "cancelled": return `Annullato (${event.sent} già inviati)`;
       case "done": return `Completato: ${event.sent} inviati${event.failed ? `, ${event.failed} non riusciti` : ""}`;
+      case "retried": return `Completa e riprova: ${event.note || `${event.pending} da inviare`}`;
     }
   }
   /** Delivery state reported by WhatsApp for one message of a queue, when still listed. */
@@ -178,12 +179,13 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
       this.scheduleDetail();
     }, 3000);
   }
-  async broadcastAction(action: "cancel" | "resume") {
+  async broadcastAction(action: "cancel" | "resume" | "retry") {
     if (this.detail?.kind !== "broadcast") return;
     const id = this.detail.job.id;
     this.busy = true;
     try {
       if (action === "cancel") await this.api.cancelBroadcast(id);
+      else if (action === "retry") await this.api.retryBroadcast(id);
       else await this.api.resumeBroadcast(id);
       const full = await this.api.broadcastDetail(id);
       this.detail = { kind: "broadcast", job: full };

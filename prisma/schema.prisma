@@ -1411,6 +1411,8 @@ model WhatsAppBroadcastRecipient {
   /// pending | sent | failed | skipped (left out at queue time, reason in error)
   state       String            @default("pending")
   attempts    Int               @default(0)
+  /// Bumped by «Completa e riprova»: a new idempotency key for Connect.
+  round       Int               @default(0)
   error       String?
   outboxId    String?
   sentAt      DateTime?

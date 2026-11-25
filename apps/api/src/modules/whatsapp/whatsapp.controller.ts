@@ -72,4 +72,8 @@ export class WhatsAppController {
   resumeBroadcast(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string) {
     connectBrowser(r); return this.whatsapp.resumeBroadcast(r.headers.authorization, id);
   }
+  @Post("broadcasts/:id/retry")
+  retryBroadcast(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string) {
+    connectBrowser(r); return this.whatsapp.retryBroadcast(r.headers.authorization, id);
+  }
 }

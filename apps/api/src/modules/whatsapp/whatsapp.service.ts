@@ -543,6 +543,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       failed: row.failed, skipped: row.skipped, pending: Math.max(0, row.total - row.sent - row.failed),
       error: row.error, preview: text ? text.slice(0, 80) : row.image ? "Foto" : null,
       createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null,
+      retryable: (row.status === "done" || row.status === "cancelled") && !!text,
     };
   }
   /**
@@ -708,6 +709,92 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     setTimeout(() => void this.tick(), 100);
     return this.broadcastView(updated);
   }
+  /**
+   * «Completa e riprova i rimanenti» on a closed queue: failed recipients and
+   * messages Connect cancelled go again, and customers not reached yet
+   * (new, or left out before the reasons were saved) are added. Whoever got
+   * it or might have got it (not confirmed) is never written to twice.
+   */
+  async retryBroadcast(auth: string | undefined, id: string): Promise<WhatsAppBroadcastView> {
+    const { job, session } = await this.ownBroadcast(auth, id);
+    if (!["done", "cancelled"].includes(job.status)) return this.broadcastView(job);
+    if (!job.text?.trim()) throw new BadRequestException("La foto di questo invio non è più disponibile: crea un nuovo «Messaggio a tutti»");
+    if (!session.connectSessionId) throw new UnauthorizedException("Accedi tramite Connect");
+    const queued = await this.prisma.whatsAppBroadcast.count({
+      where: { tenantId: job.tenantId, status: { in: ["running", "paused"] }, text: job.text, image: { equals: Prisma.DbNull } },
+    });
+    if (queued) throw new ConflictException("Questo messaggio è già in coda");
+    return this.run(auth, "whatsapp.send", async (wa, actor) => {
+      const sessionIds = new Set((await this.mine(wa, actor)).map((item) => item.id));
+      if (!sessionIds.has(job.sessionId)) throw new BadRequestException("Il numero WhatsApp di questo invio non è più collegato");
+      const list = await this.prisma.whatsAppBroadcastRecipient.findMany({ where: { broadcastId: id }, orderBy: { position: "asc" } });
+      const outbox = new Map(list.some((r) => r.state === "sent" && r.outboxId)
+        ? rows(await wa.outbox()).map((o) => [String(o.id), String(o.state)] as const) : []);
+      const failed = list.filter((r) => r.state === "failed" || (r.state === "pending"));
+      const cancelled = list.filter((r) => r.state === "sent" && r.outboxId && outbox.get(r.outboxId) === "cancelled");
+      // Numbers this queue already reached (or may have): never again.
+      const reached = new Set(list.filter((r) => r.state === "sent" && !cancelled.includes(r)).map((r) => r.recipient));
+      const preview = this.preview({ text: job.text });
+      for (const row of await this.prisma.whatsAppSend.findMany({
+        // Whoever got this text since 48 hours before the queue started, also from other sends.
+        where: { tenantId: job.tenantId, preview,
+          createdAt: { gt: new Date(Math.min(Date.now(), job.createdAt.getTime()) - BROADCAST_REPEAT_WINDOW_MS) } },
+        select: { recipient: true, outboxId: true },
+      })) if (!cancelled.some((r) => r.outboxId === row.outboxId)) reached.add(row.recipient);
+      const retry = [...failed, ...cancelled].filter((r) => !reached.has(r.recipient));
+      const taken = new Set([...reached, ...retry.map((r) => r.recipient)]);
+      const known = new Set(list.map((r) => r.customerId));
+      const added: Array<{ customerId: string; recipient: string; name: string | null }> = [];
+      for (const customer of await this.broadcastCustomers(job.tenantId)) {
+        const to = customerWhatsAppNumber(customer.phone);
+        if (!to || taken.has(to)) continue;
+        // Known customers come back only if they were left out for a missing or unreadable number, now fixed.
+        if (known.has(customer.id) && !list.some((r) => r.customerId === customer.id && r.state === "skipped"
+          && (r.error?.startsWith("Numero non leggibile") || r.error?.startsWith("Nessun numero")))) continue;
+        taken.add(to);
+        added.push({ customerId: customer.id, recipient: to, name: customerName(customer) });
+      }
+      if (!retry.length && !added.length)
+        throw new BadRequestException("Niente da completare: tutti i clienti con un numero valido hanno già ricevuto questo messaggio");
+      if (job.total + added.length > BROADCAST_LIMIT)
+        throw new BadRequestException(`Troppi destinatari: il massimo per invio è ${BROADCAST_LIMIT}`);
+      let position = list.reduce((max, r) => Math.max(max, r.position), -1) + 1;
+      const wasFailed = retry.filter((r) => r.state === "failed").length;
+      const wasSent = retry.filter((r) => r.state === "sent").length;
+      const updated = await this.prisma.$transaction(async (tx) => {
+        for (const r of retry)
+          await tx.whatsAppBroadcastRecipient.update({
+            where: { id: r.id }, data: { state: "pending", attempts: 0, error: null, outboxId: null, sentAt: null, round: { increment: 1 } },
+          });
+        // A skipped customer that now has a valid number moves back in the queue.
+        const revived = added.filter((a) => list.some((r) => r.customerId === a.customerId));
+        for (const a of revived)
+          await tx.whatsAppBroadcastRecipient.updateMany({
+            where: { broadcastId: id, customerId: a.customerId, state: "skipped" },
+            data: { state: "pending", recipient: a.recipient, name: a.name, error: null, round: { increment: 1 } },
+          });
+        const fresh = added.filter((a) => !revived.includes(a));
+        if (fresh.length)
+          await tx.whatsAppBroadcastRecipient.createMany({
+            data: fresh.map((a) => ({ ...a, broadcastId: id, position: position++, round: 1 })),
+          });
+        return tx.whatsAppBroadcast.update({
+          where: { id },
+          data: {
+            status: "running", error: null, finishedAt: null, nextRunAt: new Date(), connectSessionId: session.connectSessionId!,
+            total: { increment: added.length }, failed: { decrement: wasFailed }, sent: { decrement: wasSent },
+            skipped: { decrement: revived.length },
+          },
+        });
+      });
+      const note = [retry.length ? `${retry.length} da riprovare` : "", added.length ? `${added.length} clienti aggiunti` : ""]
+        .filter(Boolean).join(" · ");
+      this.logger.log(`${id}: completa e riprova – ${note}`);
+      await this.event(id, "retried", { sent: updated.sent, failed: updated.failed, pending: retry.length + added.length, note });
+      setTimeout(() => void this.tick(), 100);
+      return this.broadcastView(updated);
+    });
+  }
   private preview(input: { text?: string | null; image?: unknown }) {
     const body = input.text?.trim() ? input.text : "";
     return (body || (input.image ? "Foto" : "")).slice(0, 300) || null;
@@ -789,7 +876,9 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
           try {
             const result = await this.deliver(wa, actor, job.sessionId,
               { to: target.recipient, customerId: target.customerId, name: target.name }, input,
-              actorKey([job.tenantId, job.userId, job.idempotencyKey, target.customerId]));
+              actorKey(target.round
+                ? [job.tenantId, job.userId, job.idempotencyKey, target.customerId, target.round]
+                : [job.tenantId, job.userId, job.idempotencyKey, target.customerId]));
             await this.prisma.whatsAppBroadcastRecipient.update({
               where: { id: target.id }, data: { state: "sent", outboxId: result.id, attempts: { increment: 1 }, error: null, sentAt: new Date() },
             });

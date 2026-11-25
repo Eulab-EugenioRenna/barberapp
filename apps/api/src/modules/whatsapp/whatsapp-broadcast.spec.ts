@@ -8,12 +8,13 @@ jest.mock("../../common/connect-runtime", () => ({
   loadConnectConfig: jest.fn(async () => ({ installationId: "i1" })),
   openConnect: (value: string) => value,
 }));
-const wa = { sessions: jest.fn(), sendText: jest.fn(), send: jest.fn() };
+const wa = { sessions: jest.fn(), sendText: jest.fn(), send: jest.fn(), outbox: jest.fn(async () => [] as any[]) };
 jest.mock("../../common/connect-application", () => ({
   connectApplication: jest.fn(async () => ({
     services: (_handle: unknown, operation: any) => operation({ whatsapp: () => wa }, "token"),
   })),
 }));
+import { Prisma } from "@prisma/client";
 import { BROADCAST_STEP, WhatsAppService, broadcastTiming } from "./whatsapp.service";
 
 const SESSION = "00000000-0000-4000-8000-000000000001";
@@ -32,6 +33,8 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
   const apply = (row: any, data: any) => {
     for (const [key, value] of Object.entries(data)) {
       if (value && typeof value === "object" && "increment" in (value as any)) row[key] += (value as any).increment;
+      else if (value && typeof value === "object" && "decrement" in (value as any)) row[key] -= (value as any).decrement;
+      else if (value === Prisma.DbNull) row[key] = null;
       else row[key] = value;
     }
     return row;
@@ -56,7 +59,7 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
         const { recipients: nested, ...rest } = data;
         const job = { id: "job-" + (jobs.length + 1), status: "running", sent: 0, failed: 0, error: null, nextRunAt: new Date(0), createdAt: new Date(Date.now() + jobs.length), finishedAt: null, ...rest };
         jobs.push(job);
-        for (const row of nested.create) recipients.push({ id: "r" + recipients.length, broadcastId: job.id, state: "pending", attempts: 0, ...row });
+        for (const row of nested.create) recipients.push({ id: "r" + recipients.length, broadcastId: job.id, state: "pending", attempts: 0, round: 0, ...row });
         return job;
       }),
       update: jest.fn(async ({ where, data }: any) => apply(jobs.find((j) => j.id === where.id), data)),
@@ -87,7 +90,17 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
       }),
       update: jest.fn(async ({ where, data }: any) => apply(recipients.find((r) => r.id === where.id), data)),
       count: jest.fn(async ({ where }: any) => recipients.filter((r) => match(r, where)).length),
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        const found = recipients.filter((r) => match(r, where));
+        found.forEach((r) => apply(r, data));
+        return { count: found.length };
+      }),
+      createMany: jest.fn(async ({ data }: any) => {
+        for (const row of data) recipients.push({ id: "r" + recipients.length, state: "pending", attempts: 0, round: 0, ...row });
+        return { count: data.length };
+      }),
     },
+    $transaction: jest.fn(async (fn: any) => fn(prisma)),
   };
   const service = new WhatsAppService(prisma);
   const run = async () => {
@@ -99,7 +112,7 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
     for (const job of jobs) job.nextRunAt = job.id === id ? new Date(0) : new Date(Date.now() + 3600_000);
     await service.tick();
   };
-  return { service, jobs, recipients, run, runJob };
+  return { service, jobs, recipients, run, runJob, customers };
 }
 const input = { text: "Promo di Natale", idempotencyKey: "key-12345678", recipientAuthorized: true as const };
 
@@ -144,6 +157,36 @@ describe("«Messaggio a tutti» in the background", () => {
       ["d", "Ha già ricevuto questo messaggio nelle ultime 48 ore"],
     ]);
     expect(recipients.filter((r) => r.state === "pending").map((r) => r.customerId)).toEqual(["a", "e"]);
+  });
+
+  it("«Completa e riprova» resends failed and cancelled ones, adds new customers, never writes twice", async () => {
+    const customers = [{ id: "a", phone: "3331111111" }, { id: "b", phone: "3332222222" }, { id: "c", phone: "3333333333" }];
+    const { service, jobs, recipients, run } = setup(customers);
+    await service.broadcast("auth", SESSION, input);
+    wa.sendText
+      .mockResolvedValueOnce({ id: "00000000-0000-4000-9000-00000000000a", state: "queued" })
+      .mockRejectedValueOnce(Object.assign(new Error("Bad Request"), { status: 400 }))
+      .mockResolvedValueOnce({ id: "00000000-0000-4000-9000-00000000000c", state: "queued" });
+    await run();
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 2, failed: 1 });
+    expect((await service.broadcastStatus("auth", jobs[0].id)).retryable).toBe(true);
+    // Connect cancelled c's message (WhatsApp disconnected); a new customer d arrived.
+    wa.outbox.mockResolvedValueOnce([
+      { id: "00000000-0000-4000-9000-00000000000a", state: "sent" },
+      { id: "00000000-0000-4000-9000-00000000000c", state: "cancelled" },
+    ]);
+    customers.push({ id: "d", phone: "3334444444" });
+    const view = await service.retryBroadcast("auth", jobs[0].id);
+    expect(view).toMatchObject({ status: "running", total: 4, sent: 1, failed: 0, pending: 3 });
+    const before = wa.sendText.mock.calls.length;
+    await run();
+    const calls = wa.sendText.mock.calls.slice(before);
+    expect(calls.map((c: any[]) => c[1])).toEqual(["+393332222222", "+393333333333", "+393334444444"]);
+    // A new round sends with a new idempotency key, so Connect does not hand back the cancelled message.
+    expect(new Set(calls.map((c: any[]) => JSON.stringify(c[3]))).size).toBe(3);
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 4, failed: 0 });
+    expect(recipients.map((r) => r.state)).toEqual(["sent", "sent", "sent", "sent"]);
+    await expect(service.retryBroadcast("auth", jobs[0].id)).rejects.toThrow(/Niente da completare/);
   });
 
   it("says in plain words why a recipient failed", async () => {

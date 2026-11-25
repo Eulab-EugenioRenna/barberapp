@@ -69,6 +69,9 @@ export class WhatsAppApiService {
   resumeBroadcast(id: string) {
     return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/broadcasts/${encodeURIComponent(id)}/resume`, {}));
   }
+  retryBroadcast(id: string) {
+    return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/broadcasts/${encodeURIComponent(id)}/retry`, {}));
+  }
   async send(sessionId: string, input: Omit<WhatsAppSendInput, "idempotencyKey">) {
     const key = this.key();
     let command: PendingCommand;

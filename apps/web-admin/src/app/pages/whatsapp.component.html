@@ -265,6 +265,10 @@
             <button type="button" class="pill-btn" [disabled]="busy" (click)="broadcastAction('cancel')">Annulla l’invio</button>
             <button *ngIf="job.status === 'paused'" type="button" class="primary-btn" [disabled]="busy" (click)="broadcastAction('resume')">Riprendi</button>
           </div>
+          <div *ngIf="job.retryable" class="wa-actions">
+            <button type="button" class="primary-btn" [disabled]="busy" (click)="broadcastAction('retry')">Completa e riprova i rimanenti</button>
+            <small class="wa-muted">Riprova chi non l’ha ricevuto e aggiunge i clienti non ancora raggiunti. Chi l’ha già ricevuto, o forse ricevuto, non riceve un secondo messaggio.</small>
+          </div>
           <h3 class="wa-detail-section">Passaggi</h3>
           <p *ngIf="!job.events.length" class="wa-muted">Passaggi registrati da questo aggiornamento in poi.</p>
           <ol class="wa-timeline">

@@ -45,7 +45,7 @@ export interface WhatsAppBroadcastInput {
 /** «Messaggio a tutti», sent in the background a step at a time. */
 /** One moment in the life of a «Messaggio a tutti». */
 export interface WhatsAppBroadcastEventView {
-  kind: "queued" | "step" | "waiting" | "busy" | "paused" | "resumed" | "cancelled" | "done";
+  kind: "queued" | "step" | "waiting" | "busy" | "paused" | "resumed" | "cancelled" | "done" | "retried";
   sent: number; failed: number; pending: number; note: string | null; at: string;
 }
 export interface WhatsAppBroadcastRecipientView {
@@ -73,6 +73,8 @@ export interface WhatsAppBroadcastView {
   preview: string | null;
   createdAt: string;
   finishedAt: string | null;
+  /** Closed text queue: «Completa e riprova i rimanenti» is possible. */
+  retryable: boolean;
 }
 export interface WhatsAppAudienceView {
   /** Active customers. */
