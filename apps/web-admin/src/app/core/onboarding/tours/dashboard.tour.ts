@@ -5,7 +5,7 @@ export const DASHBOARD_TOUR: TourDefinition = {
   id: "dashboard",
   navKey: "dashboard",
   title: "Panoramica",
-  version: 4,
+  version: 5,
   when: (ctx) => ctx.canView("dashboard"),
   steps: () => [
     {
@@ -25,8 +25,13 @@ export const DASHBOARD_TOUR: TourDefinition = {
       target: "dashboard-filters",
       title: "Scegli cosa analizzare",
       body:
-        "Imposta periodo (giorno, settimana, mese, anno o tutto), data di riferimento, cliente e professionista: " +
+        "Imposta periodo (giorno, settimana, mese, anno o tutto), data di riferimento, cliente e, se la squadra ha più persone, professionista: " +
         "i numeri si aggiornano appena cambi un filtro.",
+    },
+    {
+      target: "dashboard-scope",
+      title: "Sede e attività",
+      body: "Con più sedi o attività scegli qui, accanto al titolo, quale analizzare. Con una sola sede e attività questa scelta non compare.",
     },
     {
       target: "dashboard-reset",
@@ -58,7 +63,7 @@ export const DASHBOARD_TOUR: TourDefinition = {
     {
       target: "dashboard-breakdown",
       title: "Chi ha generato il venduto",
-      body: "Il venduto suddiviso per cliente e i servizi per professionista che li ha eseguiti; più in basso trovi anche sede e attività.",
+      body: "Il venduto suddiviso per cliente e, con più professionisti, i servizi per chi li ha eseguiti. Con più sedi o attività, più in basso trovi anche il venduto per sede e per attività.",
     },
     {
       target: "dashboard-upcoming",

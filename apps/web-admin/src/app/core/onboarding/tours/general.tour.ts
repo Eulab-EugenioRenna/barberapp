@@ -16,7 +16,7 @@ export const GENERAL_TOUR: TourDefinition = {
   navKey: null,
   title: "Benvenuto",
   // v2: unified till ("Conti da chiudere" is now inside "Cassa").
-  version: 2,
+  version: 3,
   steps: (ctx) => {
     const visible = ADMIN_NAV.filter((entry) => entry.isVisible(ctx.user));
     // On mobile only the bottom bar is on screen; the rest lives under "Altro".
@@ -32,9 +32,10 @@ export const GENERAL_TOUR: TourDefinition = {
           `Ti mostro dove si trova ogni cosa: usa «Avanti» per proseguire, puoi uscire quando vuoi.`,
       },
       {
-        target: "shell-scope",
+        // In Panoramica the picker sits in the title; with one location and one activity it is hidden and the step skipped.
+        target: ["shell-scope", "dashboard-scope"],
         title: "Sede e attività di lavoro",
-        body: "Scegli qui su quale sede e attività stai lavorando: agenda, cassa e magazzino mostrano i dati della selezione.",
+        body: "Scegli qui su quale sede e attività stai lavorando: agenda, cassa e magazzino mostrano i dati della selezione. Compare solo se hai più sedi o più attività.",
       },
       ...onScreen.map<TourStep>((entry) => ({
         target: `nav-${entry.key}`,

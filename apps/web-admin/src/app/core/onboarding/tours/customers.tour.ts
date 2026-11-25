@@ -5,7 +5,7 @@ export const CUSTOMERS_TOUR: TourDefinition = {
   id: "customers",
   navKey: "customers",
   title: "Clienti",
-  version: 3,
+  version: 4,
   when: (ctx) => ctx.canView("customers"),
   steps: (ctx) => {
     const canManage = ctx.can("clients.manage");
@@ -44,7 +44,7 @@ export const CUSTOMERS_TOUR: TourDefinition = {
       {
         target: "customers-whatsapp-all",
         title: "Messaggio a tutti",
-        body: "Invia lo stesso messaggio WhatsApp, dal tuo numero collegato, a tutti i clienti con telefono e consenso marketing. Per un solo cliente usa «Invia messaggio» nella sua scheda.",
+        body: "Invia lo stesso messaggio WhatsApp, dal tuo numero collegato, a tutti i clienti con telefono. Parte in background a gruppi di 30: puoi chiudere la finestra e riaprirla per vedere l'avanzamento. Chi ha già ricevuto lo stesso testo non lo riceve due volte. Per un solo cliente usa «Invia messaggio» nella sua scheda.",
         when: (c) => c.can("whatsapp.send"),
       },
       {

@@ -5,7 +5,7 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
   id: "appointments",
   navKey: "appointments",
   title: "Agenda",
-  version: 4,
+  version: 5,
   when: (ctx) => ctx.canView("appointments"),
   steps: () => [
     {
@@ -22,7 +22,7 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
       body: (c) =>
         [
           c.can("sales.manage") && "«Vendi adesso» apre la cassa: prodotti soli, servizi soli o entrambi. I servizi finiscono in agenda, anche con un orario passato.",
-          c.can("appointments.create") && "«Prenota» fissa un appuntamento futuro controllando orari e disponibilità; con più sedi scegli prima la sede e vedi solo i servizi delle attività svolte lì. Il conto lo chiudi poi in Cassa.",
+          c.can("appointments.create") && "«Prenota» fissa un appuntamento futuro controllando orari e disponibilità; con più sedi scegli prima la sede e vedi solo i servizi delle attività svolte lì. Gli orari di apertura valgono per le prenotazioni online: qui puoi scegliere anche un orario del gruppo «Fuori orario». Il conto lo chiudi poi in Cassa.",
         ]
           .filter(Boolean)
           .join(" "),

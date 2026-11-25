@@ -9,7 +9,8 @@ export const SALES_TOUR: TourDefinition = {
   navKey: "sales",
   title: "Cassa",
   // v2: "Conti da chiudere" merged into the till.
-  version: 3,
+  // v4: quick sale modal (barcode in the title bar, one row per line, VAT from the price list).
+  version: 4,
   when: (ctx) => ctx.canView("sales"),
   steps: () => [
     {
@@ -34,6 +35,14 @@ export const SALES_TOUR: TourDefinition = {
           .filter(Boolean)
           .join(" "),
       when: (c) => c.can("sales.manage") || c.can("appointments.create"),
+    },
+    {
+      title: "La cassa veloce",
+      body:
+        "In alto, accanto al titolo, scansiona o scrivi il barcode e premi Invio. Ogni riga sta su una linea, con sotto il professionista: " +
+        "tocca il prezzo per cambiarlo e trascina ⋮⋮ per riordinare le righe. IVA e tipo di prezzo arrivano dal listino e si impostano " +
+        "nelle pagine di servizi e prodotti. Il pagamento parte già su Contanti, pagato.",
+      when: (c) => c.can("sales.manage"),
     },
     {
       title: "Ogni sede, le sue attività",

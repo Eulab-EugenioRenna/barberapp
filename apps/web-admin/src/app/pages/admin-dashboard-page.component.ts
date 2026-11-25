@@ -89,6 +89,7 @@ import {
             <alora-operational-selector
               *ngIf="context.hasChoice"
               inline
+              data-tour="dashboard-scope"
             ></alora-operational-selector>
           </div>
           <div

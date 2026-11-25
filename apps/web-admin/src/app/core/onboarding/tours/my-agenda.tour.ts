@@ -8,7 +8,7 @@ export const MY_AGENDA_TOUR: TourDefinition = {
   id: "my-agenda",
   navKey: "my-agenda",
   title: "La mia agenda",
-  version: 2,
+  version: 3,
   when: (ctx) =>
     ctx.role !== "platform_admin" &&
     !!ctx.user?.collaboratorId &&
@@ -26,7 +26,8 @@ export const MY_AGENDA_TOUR: TourDefinition = {
       title: "Segna un tuo appuntamento",
       body:
         "Con «Nuovo appuntamento» prenoti nella tua agenda: scegli il cliente (o inseriscilo se è nuovo), " +
-        "il servizio e il giorno, poi uno degli orari liberi che ALORA ti propone.",
+        "il servizio e il giorno, poi uno degli orari liberi che ALORA ti propone. Puoi scegliere anche un orario «Fuori orario»: " +
+        "gli orari di apertura valgono solo per le prenotazioni online.",
     },
     {
       target: "my-agenda-back",
