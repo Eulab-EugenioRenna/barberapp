@@ -44,7 +44,15 @@ export interface WhatsAppAudienceView {
   customers: number;
   /** Active customers with a usable phone number. */
   withPhone: number;
-  /** With phone and marketing consent: who «Invia a tutti» reaches. */
+  /** Distinct numbers «Invia a tutti» reaches (consent is handled outside ALORA). */
   eligible: number;
+  /** Saved without prefix, read as Italian (+39 added). */
+  prefixAdded: number;
+  /** Italian landlines: sent, but often not on WhatsApp. */
+  landline: number;
+  /** Phones that are not a number ALORA can read: excluded. */
+  invalid: number;
+  /** Up to ten customers whose phone must be corrected. */
+  invalidCustomers: Array<{ id: string; name: string; phone: string }>;
 }
 export interface WhatsAppAcknowledgement { id: string; state: string }

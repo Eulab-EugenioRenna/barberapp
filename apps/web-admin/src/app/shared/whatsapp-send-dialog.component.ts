@@ -16,7 +16,7 @@ export interface WhatsAppRecipient {
 /**
  * WhatsApp message from the signed-in account's own linked number.
  * With a customer: one message to that customer. Without: the same text to
- * every customer with a phone and marketing consent.
+ * every active customer with a valid phone (consent is handled outside ALORA).
  */
 @Component({
   selector: "alora-whatsapp-send-dialog",
@@ -40,12 +40,26 @@ export interface WhatsAppRecipient {
             Il cliente non ha un numero di telefono: aggiungilo nella scheda per scrivergli.
           </p>
           <p *ngIf="!customer && audience" class="mt-3 text-sm text-[var(--muted)]">
-            Riceveranno il messaggio <strong>{{ audience.eligible }}</strong> clienti con telefono e consenso marketing
+            Riceveranno il messaggio <strong>{{ audience.eligible }}</strong> clienti con telefono
             su {{ audience.customers }} clienti attivi.
             <ng-container *ngIf="audience.withPhone > audience.eligible">
-              {{ audience.withPhone - audience.eligible }} con telefono non hanno il consenso e sono esclusi.
+              {{ audience.withPhone - audience.eligible }} numeri ripetuti su più schede ricevono un solo messaggio.
             </ng-container>
           </p>
+          <ul *ngIf="!customer && audience && (audience.prefixAdded || audience.landline || audience.invalid)" class="wa-send-checks">
+            <li *ngIf="audience.prefixAdded">
+              {{ audience.prefixAdded }} numeri salvati senza prefisso: li tratto come italiani (+39).
+            </li>
+            <li *ngIf="audience.landline">
+              {{ audience.landline }} sono numeri fissi: spesso non hanno WhatsApp e l’invio può non riuscire.
+            </li>
+            <li *ngIf="audience.invalid" class="wa-send-invalid">
+              {{ audience.invalid }} numeri non sono leggibili e restano esclusi: senza prefisso valgono solo i numeri italiani.
+              Correggili nella scheda cliente<ng-container *ngIf="audience.invalidCustomers.length">:
+                <span *ngFor="let row of audience.invalidCustomers; let last = last">{{ row.name }} ({{ row.phone }}){{ last ? (audience.invalid > audience.invalidCustomers.length ? "…" : ".") : ", " }}</span>
+              </ng-container>
+            </li>
+          </ul>
 
           <form *ngIf="canWrite" class="mt-4 grid gap-3" (ngSubmit)="send()">
             <fieldset class="grid gap-3" [disabled]="sending || !!result">
@@ -64,7 +78,7 @@ export interface WhatsAppRecipient {
                 <input type="checkbox" name="consent" [(ngModel)]="authorized" />
                 <span>{{ customer
                   ? "Ho verificato che il cliente ha acconsentito a ricevere questo messaggio."
-                  : "Confermo che è una comunicazione per clienti che hanno dato il consenso marketing." }}</span>
+                  : "Confermo l’invio a tutti i clienti con telefono." }}</span>
               </label>
             </fieldset>
             <p *ngIf="result" role="status" class="wa-send-ok">{{ result }}</p>
@@ -95,6 +109,8 @@ export interface WhatsAppRecipient {
         font-size: 0.875rem;
       }
       .wa-send-ok { font-size: 0.875rem; font-weight: 600; color: var(--accent); }
+      .wa-send-checks { margin-top: 0.5rem; display: grid; gap: 0.35rem; padding-left: 1.1rem; list-style: disc; font-size: 0.8rem; color: var(--muted); }
+      .wa-send-invalid { color: var(--ink); }
       textarea { resize: vertical; }
       .wa-send-image { display: flex; align-items: center; gap: 0.75rem; }
       .wa-send-image img { width: 5rem; height: 5rem; object-fit: cover; border-radius: 0.75rem; }
@@ -105,7 +121,7 @@ export interface WhatsAppRecipient {
 })
 export class WhatsAppSendDialogComponent implements OnInit {
   private readonly api = inject(WhatsAppApiService);
-  /** Recipient; null sends to every customer with marketing consent. */
+  /** Recipient; null sends to every active customer with a phone. */
   @Input() customer: WhatsAppRecipient | null = null;
   @Output() closed = new EventEmitter<void>();
 

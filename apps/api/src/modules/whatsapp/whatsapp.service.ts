@@ -23,12 +23,30 @@ export const BROADCAST_LIMIT = 500;
  * Customer phone in international form. Numbers saved without prefix are
  * Italian (the salon's country), e.g. «333 1234567» → +393331234567.
  */
+export type PhoneIssue = "prefix_added" | "landline" | "invalid";
+/**
+ * How a saved phone becomes a WhatsApp number. Without a prefix only Italian
+ * shapes are accepted (mobile 3…, landline 0…, «39» written without «+»);
+ * anything else is invalid rather than guessed.
+ */
+export function checkCustomerPhone(phone: string | null | undefined): { to: string | null; issue: PhoneIssue | null } {
+  const compact = (phone ?? "").trim().replace(/[\s()./-]/g, "");
+  if (!compact) return { to: null, issue: null };
+  const read = (value: string) => {
+    const digits = appointmentPhone(value);
+    return digits ? `+${digits}` : null;
+  };
+  if (compact.startsWith("+") || compact.startsWith("00")) {
+    const to = read(compact);
+    return { to, issue: to ? null : "invalid" };
+  }
+  if (/^393\d{8,9}$/.test(compact)) return { to: `+${compact}`, issue: "prefix_added" };
+  if (/^3\d{8,9}$/.test(compact)) return { to: `+39${compact}`, issue: "prefix_added" };
+  if (/^0\d{5,10}$/.test(compact)) return { to: `+39${compact}`, issue: "landline" };
+  return { to: null, issue: "invalid" };
+}
 export function customerWhatsAppNumber(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const compact = phone.trim().replace(/[\s().-]/g, "");
-  const international = compact.startsWith("+") || compact.startsWith("00") ? compact : `+39${compact}`;
-  const digits = appointmentPhone(international);
-  return digits ? `+${digits}` : null;
+  return checkCustomerPhone(phone).to;
 }
 function actorKey(parts: unknown[]) {
   const hash = createHash("sha256").update(JSON.stringify(parts)).digest("hex");
@@ -411,7 +429,12 @@ export class WhatsAppService {
         });
         if (!customer) throw new NotFoundException("Cliente non trovato");
         const number = customerWhatsAppNumber(customer.phone);
-        if (!number) throw new BadRequestException("Il cliente non ha un numero di telefono valido");
+        if (!number)
+          throw new BadRequestException(
+            customer.phone?.trim()
+              ? "Il numero del cliente non è leggibile: senza prefisso valgono solo i numeri italiani. Aggiungi il prefisso (es. +41) nella scheda cliente."
+              : "Il cliente non ha un numero di telefono",
+          );
         to = number; name = customerName(customer);
       } else {
         const chat = await this.prisma.whatsAppChat.findFirst({ where: { tenantId: actor.tenantId, chatId: to }, select: { name: true } });
@@ -425,7 +448,7 @@ export class WhatsAppService {
   private broadcastCustomers(tenantId: string) {
     return this.prisma.customer.findMany({
       where: { tenantId, isActive: true, phone: { not: null } },
-      select: { id: true, phone: true, marketingConsent: true, firstName: true, lastName: true },
+      select: { id: true, phone: true, firstName: true, lastName: true },
       orderBy: { id: "asc" },
     });
   }
@@ -438,8 +461,23 @@ export class WhatsAppService {
       this.prisma.customer.count({ where: { tenantId, isActive: true } }),
       this.broadcastCustomers(tenantId),
     ]);
-    const reachable = rows.filter((row) => customerWhatsAppNumber(row.phone));
-    return { customers, withPhone: reachable.length, eligible: reachable.filter((row) => row.marketingConsent).length };
+    // Consent is collected outside ALORA: every reachable number, once.
+    const checked = rows.map((row) => ({ row, ...checkCustomerPhone(row.phone) }));
+    const numbers = checked.flatMap((item) => (item.to ? [item.to] : []));
+    const invalid = checked.filter((item) => item.issue === "invalid");
+    return {
+      customers,
+      withPhone: numbers.length,
+      eligible: new Set(numbers).size,
+      prefixAdded: checked.filter((item) => item.issue === "prefix_added").length,
+      landline: checked.filter((item) => item.issue === "landline").length,
+      invalid: invalid.length,
+      invalidCustomers: invalid.slice(0, 10).map((item) => ({
+        id: item.row.id,
+        name: customerName(item.row) ?? "Cliente senza nome",
+        phone: item.row.phone ?? "",
+      })),
+    };
   }
   /**
    * One message per customer, each with its own key derived from the request
@@ -454,13 +492,13 @@ export class WhatsAppService {
       const targets: Array<{ id: string; to: string; name: string | null }> = [];
       let skipped = 0;
       for (const row of rows) {
-        const to = row.marketingConsent ? customerWhatsAppNumber(row.phone) : null;
+        const to = customerWhatsAppNumber(row.phone);
         // Same number on two customer cards: one message only.
         if (!to || seen.has(to)) { skipped++; continue; }
         seen.add(to);
         targets.push({ id: row.id, to, name: customerName(row) });
       }
-      if (!targets.length) throw new BadRequestException("Nessun cliente con telefono e consenso marketing");
+      if (!targets.length) throw new BadRequestException("Nessun cliente con un numero di telefono valido");
       if (targets.length > BROADCAST_LIMIT)
         throw new BadRequestException(`Troppi destinatari (${targets.length}): il massimo per invio è ${BROADCAST_LIMIT}`);
       let sent = 0, failed = 0;
