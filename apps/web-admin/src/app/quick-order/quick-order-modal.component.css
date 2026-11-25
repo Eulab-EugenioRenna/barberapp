@@ -226,15 +226,14 @@
   border-radius: 0.9rem;
   background: rgba(255, 255, 255, 0.05);
 }
+.cart-line.draggable {
+  cursor: grab;
+}
 .cart-line.dragging {
-  opacity: 0.55;
-  border-style: dashed;
-}
-.cart-line.drop-before {
-  box-shadow: 0 -3px 0 var(--alora-lime);
-}
-.cart-line.drop-after {
-  box-shadow: 0 3px 0 var(--alora-lime);
+  cursor: grabbing;
+  border-color: var(--alora-lime);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  user-select: none;
 }
 .cart-row {
   display: flex;
@@ -247,15 +246,21 @@
 }
 .drag-handle {
   flex: 0 0 auto;
-  width: 1.2rem;
+  width: 1.6rem;
+  margin: -0.3rem 0 -0.3rem -0.35rem;
   border: 0;
-  padding: 0.3rem 0;
-  color: rgba(255, 255, 255, 0.55);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0;
+  color: rgba(255, 255, 255, 0.75);
   background: transparent;
   cursor: grab;
   touch-action: none;
   font-size: 0.9rem;
   line-height: 1;
+}
+.drag-handle:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
 }
 .drag-handle:active {
   cursor: grabbing;

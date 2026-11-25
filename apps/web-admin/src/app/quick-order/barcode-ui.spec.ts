@@ -220,6 +220,85 @@ describe("barcode UI workflows", () => {
     expect(sent[0]).not.toHaveProperty("vatRate");
     expect(sent[0]).not.toHaveProperty("priceMode");
   });
+  it("drags a line with the mouse and moves it while the pointer moves", () => {
+    modal.addService({ id: "service-1", name: "Taglio", basePrice: 20 });
+    modal.addProduct({ ...product, price: 10 });
+    modal.addService({ id: "service-2", name: "Barba", basePrice: 12 });
+    const listeners: Record<string, (event: any) => void> = {};
+    let over = 0;
+    const lineAt = (index: number) => ({
+      closest: () => ({ getAttribute: () => String(index) }),
+    });
+    const previous = (globalThis as any).document;
+    (globalThis as any).document = {
+      addEventListener: (name: string, fn: any) => (listeners[name] = fn),
+      removeEventListener: (name: string) => delete listeners[name],
+      elementFromPoint: () => lineAt(over),
+    };
+    try {
+      const label = {
+        closest: () => null,
+      };
+      const down = {
+        button: 0,
+        pointerType: "mouse",
+        pointerId: 1,
+        clientY: 0,
+        target: label,
+        preventDefault: jest.fn(),
+      };
+      modal.startDrag(0, down as any);
+      expect(modal.dragging).toBe(false); // a click is not a drag
+      const move = (y: number, index: number) => {
+        over = index;
+        listeners["pointermove"]({
+          pointerId: 1,
+          clientX: 0,
+          clientY: y,
+          preventDefault: jest.fn(),
+        });
+      };
+      move(10, 1);
+      expect(modal.dragging).toBe(true);
+      expect(modal.items.map((row) => row.label)).toEqual([
+        "Shampoo",
+        "Taglio",
+        "Barba",
+      ]);
+      move(20, 2);
+      expect(modal.items.map((row) => row.label)).toEqual([
+        "Shampoo",
+        "Barba",
+        "Taglio",
+      ]);
+      (modal.queueQuote as any) = jest.fn();
+      listeners["pointerup"]({});
+      expect(modal.dragging).toBe(false);
+      expect(modal.queueQuote).toHaveBeenCalledTimes(1);
+      expect(listeners["pointermove"]).toBeUndefined();
+      // Fields and buttons in a line keep working: no drag starts there.
+      const input = {
+        closest: (sel: string) => (sel === ".drag-handle" ? null : {}),
+      };
+      modal.startDrag(0, { ...down, target: input } as any);
+      expect(listeners["pointermove"]).toBeUndefined();
+      // A finger scrolls the list unless it starts on the handle.
+      modal.startDrag(0, { ...down, pointerType: "touch" } as any);
+      expect(listeners["pointermove"]).toBeUndefined();
+      const handle = {
+        closest: (sel: string) => (sel === ".drag-handle" ? {} : null),
+      };
+      modal.startDrag(0, {
+        ...down,
+        pointerType: "touch",
+        target: handle,
+      } as any);
+      expect(modal.dragging).toBe(true);
+      listeners["pointercancel"]({});
+    } finally {
+      (globalThis as any).document = previous;
+    }
+  });
   it("never asks why a price changed: the server records it", () => {
     modal.addService({
       id: "service-1",

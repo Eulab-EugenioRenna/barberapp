@@ -208,7 +208,7 @@
               Conto · {{ items.length }}
               {{ items.length === 1 ? "riga" : "righe"
               }}<span *ngIf="items.length > 1" class="qo-hint">
-                · trascina ⋮⋮ per riordinare</span
+                · trascina una riga per riordinarla</span
               >
             </p>
             <div
@@ -242,13 +242,9 @@
               *ngFor="let item of items; let i = index"
               class="cart-line"
               [attr.data-line-index]="i"
-              [class.dragging]="dragIndex === i"
-              [class.drop-before]="
-                dragIndex >= 0 && dropIndex === i && dropIndex < dragIndex
-              "
-              [class.drop-after]="
-                dragIndex >= 0 && dropIndex === i && dropIndex > dragIndex
-              "
+              [class.draggable]="items.length > 1"
+              [class.dragging]="dragging && dragIndex === i"
+              (pointerdown)="startDrag(i, $event)"
               (focusin)="revealLine($event)"
               (keydown.alt.arrowup)="
                 $event.preventDefault(); moveItem(i, i - 1)
@@ -266,10 +262,6 @@
                     'Sposta ' + item.label + ' (frecce su e giù)'
                   "
                   title="Trascina per spostare"
-                  (pointerdown)="startDrag(i, $event)"
-                  (pointermove)="dragMove($event)"
-                  (pointerup)="endDrag()"
-                  (pointercancel)="cancelDrag()"
                   (keydown.arrowup)="
                     $event.preventDefault(); moveItem(i, i - 1)
                   "

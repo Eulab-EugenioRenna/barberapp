@@ -419,6 +419,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.destroyed = true;
+    this.cancelDrag();
     this.cancelQuickCreate();
     if (this.quoteTimer) clearTimeout(this.quoteTimer);
     this.quoteGeneration++;
@@ -832,24 +833,73 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     );
   }
 
+  /** Line being dragged; it moves in the list while the pointer moves. */
   dragIndex = -1;
-  dropIndex = -1;
-  /** Lines are reordered by dragging their handle (mouse, pen or finger). */
+  private drag: {
+    pointerId: number;
+    startY: number;
+    active: boolean;
+    moved: boolean;
+    detach: () => void;
+  } | null = null;
+  /**
+   * Lines are reordered by dragging: with a mouse anywhere on the line, with a
+   * finger or pen from the ⋮⋮ handle (elsewhere a finger scrolls the list).
+   */
   startDrag(index: number, event: PointerEvent): void {
-    if (this.writeState.kind !== "empty") return;
+    if (this.writeState.kind !== "empty" || this.items.length < 2) return;
+    if (event.button !== undefined && event.button > 0) return;
+    const target = event.target as Element | null;
+    const onHandle = !!target?.closest?.(".drag-handle");
+    if (!onHandle) {
+      if (event.pointerType && event.pointerType !== "mouse") return;
+      if (target?.closest?.("input, select, textarea, button, a, label"))
+        return;
+    }
+    if (typeof document === "undefined") return;
+    this.finishDrag();
+    // No text selection or focus jump while dragging.
     event.preventDefault();
+    const move = (e: PointerEvent) => this.dragMove(e);
+    const up = () => this.finishDrag();
+    const cancel = () => this.finishDrag();
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", cancel);
     this.dragIndex = index;
-    this.dropIndex = index;
-    (event.currentTarget as Element | null)?.setPointerCapture?.(
-      event.pointerId,
-    );
+    this.drag = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      active: onHandle,
+      moved: false,
+      detach: () => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        document.removeEventListener("pointercancel", cancel);
+      },
+    };
+  }
+  get dragging(): boolean {
+    return !!this.drag?.active;
   }
   dragMove(event: PointerEvent): void {
-    if (this.dragIndex < 0 || typeof document === "undefined") return;
+    const drag = this.drag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (!drag.active) {
+      // A click is not a drag: start after a few pixels.
+      if (Math.abs(event.clientY - drag.startY) < 5) return;
+      drag.active = true;
+    }
+    event.preventDefault();
     const line = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest("[data-line-index]");
-    if (line) this.dropIndex = Number(line.getAttribute("data-line-index"));
+    const over = line ? Number(line.getAttribute("data-line-index")) : -1;
+    if (over >= 0 && over !== this.dragIndex) {
+      this.placeItem(this.dragIndex, over);
+      this.dragIndex = over;
+      drag.moved = true;
+    }
     // Near the edges the list scrolls, so far lines can be reached.
     const list = this.cartScroll?.nativeElement;
     if (!list) return;
@@ -857,15 +907,24 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     if (event.clientY < box.top + 32) list.scrollTop -= 12;
     else if (event.clientY > box.bottom - 32) list.scrollTop += 12;
   }
-  endDrag(): void {
-    const from = this.dragIndex,
-      to = this.dropIndex;
-    this.cancelDrag();
-    if (from >= 0 && to >= 0) this.moveItem(from, to);
+  private finishDrag(): void {
+    const drag = this.drag;
+    this.drag = null;
+    this.dragIndex = -1;
+    if (!drag) return;
+    drag.detach();
+    if (drag.moved) {
+      this.pricePadIndex = -1;
+      // Quote rows are positional: recompute them in the new order.
+      this.queueQuote();
+    }
   }
   cancelDrag(): void {
-    this.dragIndex = -1;
-    this.dropIndex = -1;
+    this.finishDrag();
+  }
+  private placeItem(from: number, to: number): void {
+    const [row] = this.items.splice(from, 1);
+    this.items.splice(to, 0, row);
   }
   /** The account keeps the lines in this order. */
   moveItem(from: number, to: number): void {
@@ -877,8 +936,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       to >= this.items.length
     )
       return;
-    const [row] = this.items.splice(from, 1);
-    this.items.splice(to, 0, row);
+    this.placeItem(from, to);
     this.pricePadIndex = -1;
     // Quote rows are positional: recompute them in the new order.
     this.queueQuote();
