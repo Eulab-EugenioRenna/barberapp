@@ -24,7 +24,13 @@ import { appointmentPhone } from "../notifications/appointment-automation-state"
 export const BROADCAST_LIMIT = 500;
 /** Recipients per background step, and the pauses that keep Connect's rate limit (15 req/s) far away. */
 export const BROADCAST_STEP = 30;
-export const broadcastTiming = { messageGapMs: 600, stepPauseMs: 20_000, busyPauseMs: 60_000 };
+export const broadcastTiming = {
+  messageGapMs: 600, stepPauseMs: 20_000, busyPauseMs: 60_000,
+  /** Each message waits for its outcome on Connect before the next one. */
+  outcomePollMs: 1_500, outcomeTimeoutMs: 120_000, stepBudgetMs: 4 * 60_000,
+};
+/** Photos of closed queues are kept this long so «Completa e riprova» works for them too. */
+const BROADCAST_IMAGE_KEEP_MS = 7 * 24 * 3600_000;
 const BROADCAST_MAX_ATTEMPTS = 5;
 /** Who already got this very text from ALORA recently is not written to again. */
 const BROADCAST_REPEAT_WINDOW_MS = 48 * 3600_000;
@@ -88,7 +94,10 @@ export function sendProblem(state: string, error: string | null | undefined): st
     if (error === "bot_configuration_changed") return "Non inviato: la risposta automatica è stata modificata prima dell’invio.";
     return "Invio annullato prima di partire.";
   }
-  if (state === "failed") return "Invio non riuscito. Verifica che il numero sia connesso e riprova.";
+  if (state === "failed") {
+    if (error === "provider_rejected") return "WhatsApp ha rifiutato l’invio: di solito il numero non ha WhatsApp.";
+    return "Invio non riuscito. Verifica che il numero sia connesso e riprova.";
+  }
   return error ? "Invio non confermato: controlla sul telefono se il messaggio è arrivato." : null;
 }
 /** Why Connect refused one recipient of a «Messaggio a tutti», in words the salon understands. */
@@ -551,16 +560,17 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     };
   }
   private broadcastView(row: {
-    id: string; status: string; total: number; sent: number; failed: number; skipped: number;
+    id: string; status: string; total: number; sent: number; failed: number; skipped: number; uncertain?: number;
     error: string | null; text: string | null; image?: unknown; createdAt: Date; finishedAt: Date | null;
   }): WhatsAppBroadcastView {
     const text = row.text?.trim() ?? "";
     return {
       id: row.id, status: row.status as WhatsAppBroadcastView["status"], total: row.total, sent: row.sent,
-      failed: row.failed, skipped: row.skipped, pending: Math.max(0, row.total - row.sent - row.failed),
+      failed: row.failed, skipped: row.skipped, uncertain: row.uncertain ?? 0,
+      pending: Math.max(0, row.total - row.sent - row.failed - (row.uncertain ?? 0)),
       error: row.error, preview: text ? text.slice(0, 80) : row.image ? "Foto" : null,
       createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null,
-      retryable: (row.status === "done" || row.status === "cancelled") && !!text,
+      retryable: (row.status === "done" || row.status === "cancelled") && (!!text || !!row.image),
     };
   }
   /**
@@ -578,19 +588,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       if (existing) return this.broadcastView(existing);
       await this.ownedSession(wa, actor, sessionId);
       this.requireContent(input);
-      if (input.text?.trim() && !input.image) {
-        const queued = await this.prisma.whatsAppBroadcast.count({
-          where: { tenantId: actor.tenantId, status: { in: ["running", "paused"] }, text: input.text, image: { equals: Prisma.DbNull } },
-        });
-        if (queued) throw new ConflictException("Questo messaggio è già in coda");
-      }
-      const preview = this.preview(input);
-      const already = new Set(
-        (await this.prisma.whatsAppSend.findMany({
-          where: { tenantId: actor.tenantId, preview, createdAt: { gt: new Date(Date.now() - BROADCAST_REPEAT_WINDOW_MS) } },
-          select: { recipient: true },
-        })).map((row) => row.recipient),
-      );
+      if (await this.sameContentQueued(actor.tenantId, input)) throw new ConflictException("Questo messaggio è già in coda");
+      const already = new Set((await this.reachedWith(actor.tenantId, input, new Date(Date.now() - BROADCAST_REPEAT_WINDOW_MS))).keys());
       const rows = await this.broadcastCustomers(actor.tenantId);
       const seen = new Map<string, string>();
       const targets: Array<{ customerId: string; recipient: string; name: string | null }> = [];
@@ -622,7 +621,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
           tenantId: actor.tenantId, userId: actor.userId, connectSessionId: actor.connectSessionId!, sessionId,
           idempotencyKey: input.idempotencyKey, text: input.text?.trim() ? input.text : null,
           image: input.image ? ({ data: input.image.data, filename: input.image.filename } as Prisma.InputJsonValue) : undefined,
-          total: targets.length, skipped,
+          total: targets.length, skipped, contentHash: this.contentHash(input),
           recipients: { create: [
             ...targets.map((target, position) => ({ ...target, position })),
             ...left.map((target, index) => ({ ...target, state: "skipped", position: targets.length + index })),
@@ -707,7 +706,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     const { job } = await this.ownBroadcast(auth, id);
     if (!["running", "paused"].includes(job.status)) return this.broadcastView(job);
     const updated = await this.prisma.whatsAppBroadcast.update({
-      where: { id }, data: { status: "cancelled", finishedAt: new Date(), image: Prisma.DbNull },
+      where: { id }, data: { status: "cancelled", finishedAt: new Date() },
     });
     this.logger.log(`${id}: annullato (${updated.sent} inviati)`);
     await this.event(id, "cancelled", { sent: updated.sent, failed: updated.failed, pending: Math.max(0, updated.total - updated.sent - updated.failed) });
@@ -735,12 +734,11 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   async retryBroadcast(auth: string | undefined, id: string): Promise<WhatsAppBroadcastView> {
     const { job, session } = await this.ownBroadcast(auth, id);
     if (!["done", "cancelled"].includes(job.status)) return this.broadcastView(job);
-    if (!job.text?.trim()) throw new BadRequestException("La foto di questo invio non è più disponibile: crea un nuovo «Messaggio a tutti»");
+    if (!job.text?.trim() && !job.image)
+      throw new BadRequestException("La foto di questo invio non è più disponibile: crea un nuovo «Messaggio a tutti»");
     if (!session.connectSessionId) throw new UnauthorizedException("Accedi tramite Connect");
-    const queued = await this.prisma.whatsAppBroadcast.count({
-      where: { tenantId: job.tenantId, status: { in: ["running", "paused"] }, text: job.text, image: { equals: Prisma.DbNull } },
-    });
-    if (queued) throw new ConflictException("Questo messaggio è già in coda");
+    const content = { text: job.text, image: job.image };
+    if (await this.sameContentQueued(job.tenantId, content, id)) throw new ConflictException("Questo messaggio è già in coda");
     return this.run(auth, "whatsapp.send", async (wa, actor) => {
       const sessionIds = new Set((await this.mine(wa, actor)).map((item) => item.id));
       if (!sessionIds.has(job.sessionId)) throw new BadRequestException("Il numero WhatsApp di questo invio non è più collegato");
@@ -750,14 +748,11 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       const failed = list.filter((r) => r.state === "failed" || (r.state === "pending"));
       const cancelled = list.filter((r) => r.state === "sent" && r.outboxId && outbox.get(r.outboxId) === "cancelled");
       // Numbers this queue already reached (or may have): never again.
-      const reached = new Set(list.filter((r) => r.state === "sent" && !cancelled.includes(r)).map((r) => r.recipient));
-      const preview = this.preview({ text: job.text });
-      for (const row of await this.prisma.whatsAppSend.findMany({
-        // Whoever got this text since 48 hours before the queue started, also from other sends.
-        where: { tenantId: job.tenantId, preview,
-          createdAt: { gt: new Date(Math.min(Date.now(), job.createdAt.getTime()) - BROADCAST_REPEAT_WINDOW_MS) } },
-        select: { recipient: true, outboxId: true },
-      })) if (!cancelled.some((r) => r.outboxId === row.outboxId)) reached.add(row.recipient);
+      const reached = new Set(list.filter((r) => (r.state === "sent" && !cancelled.includes(r)) || r.state === "uncertain").map((r) => r.recipient));
+      // Whoever got this content since 48 hours before the queue started, also from other sends.
+      for (const [recipient, outboxId] of await this.reachedWith(job.tenantId, content,
+        new Date(Math.min(Date.now(), job.createdAt.getTime()) - BROADCAST_REPEAT_WINDOW_MS)))
+        if (!cancelled.some((r) => r.outboxId === outboxId)) reached.add(recipient);
       const retry = [...failed, ...cancelled].filter((r) => !reached.has(r.recipient));
       const taken = new Set([...reached, ...retry.map((r) => r.recipient)]);
       const known = new Set(list.map((r) => r.customerId));
@@ -800,6 +795,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
           data: {
             status: "running", error: null, finishedAt: null, nextRunAt: new Date(), connectSessionId: session.connectSessionId!,
             total: { increment: added.length }, failed: { decrement: wasFailed }, sent: { decrement: wasSent },
+            contentHash: job.contentHash ?? this.contentHash(content),
             skipped: { decrement: revived.length },
           },
         });
@@ -812,6 +808,55 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       return this.broadcastView(updated);
     });
   }
+  /** Same text and same photo → same hash: «already received» means exactly this content. */
+  private contentHash(input: { text?: string | null; image?: unknown }) {
+    const image = input.image as { data?: string } | null | undefined;
+    return createHash("sha256").update(JSON.stringify([input.text?.trim() ?? "", image?.data ?? ""])).digest("hex");
+  }
+  /**
+   * Who already got this content: for a photo, recipients of queues with the
+   * same photo and text; for text alone, also single sends with the same text.
+   */
+  private async reachedWith(tenantId: string, input: { text?: string | null; image?: unknown }, since: Date) {
+    const hash = this.contentHash(input);
+    const rows = await this.prisma.whatsAppBroadcastRecipient.findMany({
+      where: { state: { in: ["sent", "uncertain"] }, broadcast: { tenantId, contentHash: hash, createdAt: { gt: since } } },
+      select: { recipient: true, outboxId: true },
+    });
+    const reached = new Map(rows.map((r) => [r.recipient, r.outboxId]));
+    if (!input.image) {
+      const sends = await this.prisma.whatsAppSend.findMany({
+        where: { tenantId, preview: this.preview(input), kind: "text", createdAt: { gt: since } },
+        select: { recipient: true, outboxId: true },
+      });
+      // A queue message that Connect refused or cancelled did not arrive.
+      const failed = new Set((await this.prisma.whatsAppBroadcastRecipient.findMany({
+        where: { outboxId: { in: sends.map((r) => r.outboxId) }, state: "failed" }, select: { outboxId: true },
+      })).map((r) => r.outboxId));
+      for (const row of sends) if (!failed.has(row.outboxId) && !reached.has(row.recipient)) reached.set(row.recipient, row.outboxId);
+    }
+    return reached;
+  }
+  private async sameContentQueued(tenantId: string, input: { text?: string | null; image?: unknown }, except?: string) {
+    return this.prisma.whatsAppBroadcast.count({
+      where: { tenantId, status: { in: ["running", "paused"] }, contentHash: this.contentHash(input), ...(except ? { id: { not: except } } : {}) },
+    });
+  }
+  /** Waits for Connect's outcome of one queued message. */
+  private async outcome(wa: Client, outboxId: string): Promise<{ state: "sent" | "failed" | "uncertain"; error: string | null }> {
+    const until = Date.now() + broadcastTiming.outcomeTimeoutMs;
+    for (;;) {
+      const row = rows(await wa.outbox()).find((o) => o.id === outboxId);
+      const state = row ? String(row.state) : "queued";
+      if (state === "sent") return { state: "sent", error: null };
+      if (state === "failed" || state === "cancelled")
+        return { state: "failed", error: sendProblem(state, row?.error ?? null) };
+      if (state === "uncertain") return { state: "uncertain", error: sendProblem(state, row?.error ?? null) };
+      if (Date.now() > until)
+        return { state: "uncertain", error: "Connect non ha dato l’esito entro 2 minuti: controlla sul telefono prima di inviarlo di nuovo." };
+      await sleep(broadcastTiming.outcomePollMs);
+    }
+  }
   private preview(input: { text?: string | null; image?: unknown }) {
     const body = input.text?.trim() ? input.text : "";
     return (body || (input.image ? "Foto" : "")).slice(0, 300) || null;
@@ -822,6 +867,10 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     if (this.working) return;
     this.working = true;
     try {
+      await this.prisma.whatsAppBroadcast.updateMany({
+        where: { status: { in: ["done", "cancelled"] }, finishedAt: { lt: new Date(Date.now() - BROADCAST_IMAGE_KEEP_MS) }, image: { not: Prisma.DbNull } },
+        data: { image: Prisma.DbNull },
+      }).catch(() => undefined);
       const due = await this.prisma.whatsAppBroadcast.findFirst({
         where: { status: "running", nextRunAt: { lte: new Date() } },
         orderBy: { nextRunAt: "asc" }, select: { id: true, nextRunAt: true },
@@ -879,7 +928,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       text: job.text ?? undefined,
       image: (job.image as WhatsAppImageInput | null) ?? undefined,
     };
-    let sent = 0, failed = 0, busy = false;
+    let sent = 0, failed = 0, uncertain = 0, busy = false;
+    const started = Date.now();
     const pause = async (error: string) => {
       const paused = await this.prisma.whatsAppBroadcast.update({ where: { id }, data: { status: "paused", error } });
       this.logger.warn(`${id}: in pausa – ${error}`);
@@ -890,17 +940,39 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         for (const [index, target] of batch.entries()) {
           const current = await this.prisma.whatsAppBroadcast.findUnique({ where: { id }, select: { status: true } });
           if (current?.status !== "running") return;
+          // Long steps hand over to the next tick, inside the ten-minute lease.
+          if (Date.now() - started > broadcastTiming.stepBudgetMs) return;
+          let queued: { id: string } | null = null;
           try {
             const result = await this.deliver(wa, actor, job.sessionId,
               { to: target.recipient, customerId: target.customerId, name: target.name }, input,
               actorKey(target.round
                 ? [job.tenantId, job.userId, job.idempotencyKey, target.customerId, target.round]
                 : [job.tenantId, job.userId, job.idempotencyKey, target.customerId]));
+            queued = result;
+            // Taken by Connect: from here on it is never sent again by ALORA.
             await this.prisma.whatsAppBroadcastRecipient.update({
-              where: { id: target.id }, data: { state: "sent", outboxId: result.id, attempts: { increment: 1 }, error: null, sentAt: new Date() },
+              where: { id: target.id }, data: { state: "uncertain", outboxId: result.id, attempts: { increment: 1 }, error: "In invio" },
             });
-            sent++;
+            // One at a time: the next message leaves only after this one has its outcome.
+            const outcome = await this.outcome(wa, result.id);
+            await this.prisma.whatsAppBroadcastRecipient.update({
+              where: { id: target.id },
+              data: { state: outcome.state, error: outcome.error, sentAt: outcome.state === "sent" ? new Date() : null },
+            });
+            if (outcome.state === "sent") sent++;
+            else if (outcome.state === "failed") failed++;
+            else uncertain++;
           } catch (error) {
+            if (queued) {
+              // Already on Connect: the outcome is unknown, never resend.
+              await this.prisma.whatsAppBroadcastRecipient.update({
+                where: { id: target.id },
+                data: { state: "uncertain", error: "Esito non letto da Connect: controlla sul telefono prima di inviarlo di nuovo." },
+              });
+              uncertain++;
+              busy = true; break;
+            }
             const status = errorStatus(error);
             if (status === 401 || status === 403) throw error;
             const transient = status === 429 || status === undefined || status >= 500;
@@ -929,13 +1001,14 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     const updated = await this.prisma.whatsAppBroadcast.update({
       where: { id },
       data: {
-        sent: { increment: sent }, failed: { increment: failed },
+        sent: { increment: sent }, failed: { increment: failed }, uncertain: { increment: uncertain },
         ...(busy ? { error: "WhatsApp occupato: riprovo tra un minuto" } : {}),
       },
     });
     const pending = await this.prisma.whatsAppBroadcastRecipient.count({ where: { broadcastId: id, state: "pending" } });
-    this.logger.log(`${id}: passo +${sent} inviati, +${failed} non riusciti, ${pending} da inviare (totale ${updated.sent}/${updated.total})${busy ? ", Connect occupato" : ""}`);
-    if (sent || failed) await this.event(id, "step", { sent, failed, pending });
+    this.logger.log(`${id}: passo +${sent} inviati, +${failed} non riusciti, +${uncertain} non confermati, ${pending} da inviare (totale ${updated.sent}/${updated.total})${busy ? ", Connect occupato" : ""}`);
+    if (sent || failed || uncertain)
+      await this.event(id, "step", { sent, failed, pending, note: uncertain ? `${uncertain} non confermati` : null });
     if (busy && job.error !== "WhatsApp occupato: riprovo tra un minuto") await this.event(id, "busy", { pending, note: "WhatsApp occupato: riprovo tra un minuto" });
     if (updated.status !== "running") return;
     if (!pending) return this.finish(id);
@@ -949,8 +1022,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   }
   private async finish(id: string) {
     const job = await this.prisma.whatsAppBroadcast.update({
-      // The photo is not kept once every message is out.
-      where: { id }, data: { status: "done", finishedAt: new Date(), error: null, image: Prisma.DbNull },
+      // The photo stays a week, for «Completa e riprova».
+      where: { id }, data: { status: "done", finishedAt: new Date(), error: null },
     });
     this.logger.log(`${id}: completato, ${job.sent} inviati, ${job.failed} non riusciti, ${job.skipped} saltati`);
     await this.event(id, "done", { sent: job.sent, failed: job.failed, note: job.skipped ? `${job.skipped} saltati` : null });

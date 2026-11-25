@@ -57,7 +57,7 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
       count: jest.fn(async ({ where }: any) => jobs.filter((j) => match(j, where)).length),
       create: jest.fn(async ({ data }: any) => {
         const { recipients: nested, ...rest } = data;
-        const job = { id: "job-" + (jobs.length + 1), status: "running", sent: 0, failed: 0, error: null, nextRunAt: new Date(0), createdAt: new Date(Date.now() + jobs.length), finishedAt: null, ...rest };
+        const job = { id: "job-" + (jobs.length + 1), status: "running", sent: 0, failed: 0, uncertain: 0, error: null, nextRunAt: new Date(0), createdAt: new Date(Date.now() + jobs.length), finishedAt: null, ...rest };
         jobs.push(job);
         for (const row of nested.create) recipients.push({ id: "r" + recipients.length, broadcastId: job.id, state: "pending", attempts: 0, round: 0, ...row });
         return job;
@@ -78,6 +78,14 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
         const { broadcast, recipient, ...plain } = where;
         let rows = recipients.filter((r) => match(r, plain));
         if (recipient?.notIn) rows = rows.filter((r) => !recipient.notIn.includes(r.recipient));
+        if (where.state?.in) rows = recipients.filter((r) => where.state.in.includes(r.state));
+        if (broadcast?.contentHash) {
+          // Same content within the window.
+          return rows.filter((r) => {
+            const job = jobs.find((j) => j.id === r.broadcastId);
+            return job && job.contentHash === broadcast.contentHash && job.createdAt > broadcast.createdAt.gt;
+          });
+        }
         if (broadcast) {
           // Earlier active queues of the account.
           rows = rows.filter((r) => {
@@ -122,7 +130,13 @@ describe("«Messaggio a tutti» in the background", () => {
     broadcastTiming.messageGapMs = 0;
     wa.sessions.mockResolvedValue([{ id: SESSION, state: "connected", closed_at: null, runner_online: true }]);
     let n = 0;
+    broadcastTiming.outcomePollMs = 0;
     wa.sendText.mockImplementation(async () => ({ id: `00000000-0000-4000-9000-${String(++n).padStart(12, "0")}`, state: "queued" }));
+    // Connect sends whatever it took: every queued message comes back «sent».
+    wa.outbox.mockImplementation(async () => {
+      const acks = await Promise.allSettled(wa.sendText.mock.results.filter((r: any) => r.type === "return").map((r: any) => r.value));
+      return acks.flatMap((a: any) => (a.status === "fulfilled" && a.value?.id ? [{ id: a.value.id, state: "sent", error: null }] : []));
+    });
   });
 
   it("queues at once and sends 30 recipients per step", async () => {
@@ -159,6 +173,26 @@ describe("«Messaggio a tutti» in the background", () => {
     expect(recipients.filter((r) => r.state === "pending").map((r) => r.customerId)).toEqual(["a", "e"]);
   });
 
+  it("waits for each outcome: unconfirmed messages are never resent", async () => {
+    const { service, jobs, recipients, run } = setup([{ id: "a", phone: "3331111111" }, { id: "b", phone: "3332222222" }]);
+    await service.broadcast("auth", SESSION, input);
+    const real = wa.outbox.getMockImplementation()!;
+    wa.outbox.mockImplementation(async () => (await real()).map((o: any, i: number) => (i === 0 ? { ...o, state: "uncertain", error: "x" } : o)));
+    await run();
+    wa.outbox.mockImplementation(real);
+    expect(recipients.map((r) => r.state)).toEqual(["uncertain", "sent"]);
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 1, uncertain: 1, failed: 0 });
+    await expect(service.retryBroadcast("auth", jobs[0].id)).rejects.toThrow(/Niente da completare/);
+  });
+
+  it("a different photo is not «already received»", async () => {
+    const { service } = setup([{ id: "a", phone: "3331111111" }]);
+    const photo = (data: string) => ({ idempotencyKey: "k-" + data.slice(-6), recipientAuthorized: true as const, image: { data, filename: "p.jpg" } });
+    await service.broadcast("auth", SESSION, photo("data:image/jpeg;base64,AAAA111111"));
+    await service.cancelBroadcast("auth", "job-1");
+    expect(await service.broadcast("auth", SESSION, photo("data:image/jpeg;base64,BBBB222222"))).toMatchObject({ total: 1, skipped: 0 });
+  });
+
   it("«Completa e riprova» resends failed and cancelled ones, adds new customers, never writes twice", async () => {
     const customers = [{ id: "a", phone: "3331111111" }, { id: "b", phone: "3332222222" }, { id: "c", phone: "3333333333" }];
     const { service, jobs, recipients, run } = setup(customers);
@@ -167,14 +201,15 @@ describe("«Messaggio a tutti» in the background", () => {
       .mockResolvedValueOnce({ id: "00000000-0000-4000-9000-00000000000a", state: "queued" })
       .mockRejectedValueOnce(Object.assign(new Error("Bad Request"), { status: 400 }))
       .mockResolvedValueOnce({ id: "00000000-0000-4000-9000-00000000000c", state: "queued" });
+    // Connect sends a, but cancels c (WhatsApp disconnected).
+    const real = wa.outbox.getMockImplementation()!;
+    wa.outbox.mockImplementation(async () => (await real()).map((o: any) =>
+      o.id.endsWith("c") ? { ...o, state: "cancelled", error: "authorization_revoked" } : o));
     await run();
-    expect(jobs[0]).toMatchObject({ status: "done", sent: 2, failed: 1 });
+    wa.outbox.mockImplementation(real);
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 1, failed: 2 });
+    expect(recipients[2]).toMatchObject({ state: "failed", error: expect.stringMatching(/non era connesso/) });
     expect((await service.broadcastStatus("auth", jobs[0].id)).retryable).toBe(true);
-    // Connect cancelled c's message (WhatsApp disconnected); a new customer d arrived.
-    wa.outbox.mockResolvedValueOnce([
-      { id: "00000000-0000-4000-9000-00000000000a", state: "sent" },
-      { id: "00000000-0000-4000-9000-00000000000c", state: "cancelled" },
-    ]);
     customers.push({ id: "d", phone: "3334444444" });
     const view = await service.retryBroadcast("auth", jobs[0].id);
     expect(view).toMatchObject({ status: "running", total: 4, sent: 1, failed: 0, pending: 3 });

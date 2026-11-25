@@ -82,7 +82,7 @@
   <section
     *ngIf="section === 'chats'"
     role="tabpanel" id="ui-tabpanel-chats" aria-labelledby="ui-tab-chats"
-    class="panel wa-workspace" [class.wa-has-chat]="!!chatId"
+    class="panel wa-workspace" [class.wa-has-chat]="!!chatId" #workspace
   >
     <aside class="wa-chats">
       <div *ngIf="archives.length > 1" class="wa-label">
@@ -108,7 +108,7 @@
         <h2>{{ chatId ? chatName() : 'Scegli una conversazione' }}</h2>
         <p *ngIf="currentChat?.phone && currentChat?.name" class="wa-muted">{{ currentChat?.phone }}</p>
       </div>
-      <div *ngIf="chatId" class="wa-messages" aria-live="polite">
+      <div *ngIf="chatId" class="wa-messages" aria-live="polite" #messagesBox>
         <button *ngIf="hasOlder" type="button" class="secondary-btn wa-older" [disabled]="loadingMessages" (click)="olderMessages()">Carica messaggi precedenti</button>
         <p *ngIf="loadingMessages && !messages.length" role="status">Caricamento dei messaggi…</p>
         <article *ngFor="let item of messages; trackBy: trackId" class="wa-message" [class.outgoing]="item.direction === 'outbound'">
@@ -117,14 +117,14 @@
             <ng-container *ngIf="mediaOf(item.id) as file">
               <ng-container *ngIf="file.state === 'ready'; else mediaWait">
                 <ng-container [ngSwitch]="mediaKind(item)">
-                  <a *ngSwitchCase="'image'" [href]="$any(file).url" target="_blank" rel="noopener"><img class="wa-media-image" [src]="$any(file).url" [alt]="item.text || 'Foto'" loading="lazy" /></a>
+                  <a *ngSwitchCase="'image'" [href]="$any(file).url" target="_blank" rel="noopener"><img class="wa-media-image" [src]="$any(file).url" [alt]="item.text || 'Foto'" (load)="mediaLoaded()" /></a>
                   <audio *ngSwitchCase="'audio'" class="wa-media-audio" controls preload="metadata" [src]="$any(file).url"></audio>
                   <video *ngSwitchCase="'video'" class="wa-media-image" controls preload="metadata" [src]="$any(file).url"></video>
                   <a *ngSwitchDefault class="secondary-btn" [href]="$any(file).url" [attr.download]="item.media.filename || 'allegato'">Scarica {{ item.media.filename || 'allegato' }}</a>
                 </ng-container>
               </ng-container>
               <ng-template #mediaWait>
-                <img *ngIf="item.media.thumbnail" class="wa-media-image wa-media-thumb" [src]="item.media.thumbnail" [alt]="mediaLabel(item)" />
+                <img *ngIf="item.media.thumbnail" class="wa-media-image wa-media-thumb" [src]="item.media.thumbnail" [alt]="mediaLabel(item)" (load)="mediaLoaded()" />
                 <div *ngIf="!item.media.thumbnail" class="wa-media-placeholder" [class.compact]="mediaKind(item) === 'audio' || mediaKind(item) === 'file'" aria-hidden="true">{{ mediaIcon(item) }}</div>
                 <p class="wa-media-note" *ngIf="file.state === 'loading'">Scarico {{ mediaLabel(item) | lowercase }}…</p>
                 <p class="wa-media-note" *ngIf="file.state === 'queued' && mediaRecent(item)">{{ item.media.thumbnail ? 'Anteprima: l’originale arriva dal telefono tra poco.' : mediaLabel(item) + ' in arrivo dal telefono.' }}</p>
@@ -152,10 +152,12 @@
             <input type="file" accept="image/*" [disabled]="sending || !connected" (change)="pickImage($event, 'reply')" />
             <span aria-hidden="true">📎</span><span class="sr-only">Allega una foto</span>
           </label>
-          <textarea name="reply" [(ngModel)]="reply" rows="2" maxlength="16000" [disabled]="sending || !connected"
+          <textarea #replyBox name="reply" [(ngModel)]="reply" rows="1" maxlength="16000" [disabled]="sending || !connected"
+            class="wa-reply-input" aria-label="Messaggio" (input)="growReply(replyBox)" (keydown.enter)="replyEnter($event)"
             [placeholder]="'Scrivi a ' + chatName() + (replyImage ? ' (didascalia facoltativa)' : '')"></textarea>
           <button class="primary-btn" [disabled]="sending || !connected || pending.kind !== 'empty' || (!reply.trim() && !replyImage)">{{ sending ? 'Invio…' : 'Invia' }}</button>
         </div>
+        <p class="wa-reply-hint">Invio per mandare · Maiusc+Invio per andare a capo</p>
         <p *ngIf="pending.kind !== 'empty'" class="wa-muted">C’è un invio da verificare in «Nuovo messaggio»: completalo prima di scrivere ancora.</p>
         <p *ngIf="replyFeedback" class="wa-muted" role="status">{{ replyFeedback }}</p>
       </form>
@@ -228,7 +230,7 @@
           <p *ngIf="job.preview" class="wa-preview">{{ job.preview }}</p>
           <div class="wa-bar" aria-hidden="true"><span [style.width.%]="broadcastPercent(job)"></span></div>
           <p class="wa-muted">
-            {{ job.sent }} inviati su {{ job.total }}<ng-container *ngIf="job.failed"> · {{ job.failed }} non riusciti</ng-container><ng-container *ngIf="job.skipped"> · {{ job.skipped }} saltati</ng-container> · apri i dettagli
+            {{ job.sent }} inviati su {{ job.total }}<ng-container *ngIf="job.failed"> · {{ job.failed }} non riusciti</ng-container><ng-container *ngIf="job.uncertain"> · {{ job.uncertain }} non confermati</ng-container><ng-container *ngIf="job.skipped"> · {{ job.skipped }} saltati</ng-container> · apri i dettagli
           </p>
         </button>
         <button *ngIf="row.item as item" type="button" class="wa-send-row" (click)="openSingle(item)">
@@ -263,6 +265,7 @@
             <div><dt>Inviati</dt><dd>{{ job.sent }}</dd></div>
             <div><dt>Da inviare</dt><dd>{{ job.pending }}</dd></div>
             <div><dt>Non riusciti</dt><dd>{{ job.failed }}</dd></div>
+            <div><dt>Non confermati</dt><dd>{{ job.uncertain }}</dd></div>
             <div><dt>Saltati</dt><dd>{{ job.skipped }}</dd></div>
           </dl>
           <p *ngIf="job.error" class="wa-feedback">{{ job.error }}</p>

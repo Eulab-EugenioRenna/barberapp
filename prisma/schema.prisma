@@ -1386,7 +1386,11 @@ model WhatsAppBroadcast {
   total            Int                          @default(0)
   sent             Int                          @default(0)
   failed           Int                          @default(0)
+  /// WhatsApp did not confirm: maybe delivered, never resent automatically.
+  uncertain        Int                          @default(0)
   skipped          Int                          @default(0)
+  /// sha256 of text and photo: «already received» means this very content.
+  contentHash      String?
   error            String?
   nextRunAt        DateTime                     @default(now())
   createdAt        DateTime                     @default(now())
@@ -1398,6 +1402,7 @@ model WhatsAppBroadcast {
   @@unique([tenantId, userId, idempotencyKey])
   @@index([status, nextRunAt])
   @@index([tenantId, userId, createdAt])
+  @@index([tenantId, contentHash])
 }
 
 model WhatsAppBroadcastRecipient {
@@ -1408,7 +1413,7 @@ model WhatsAppBroadcastRecipient {
   recipient   String
   name        String?
   position    Int
-  /// pending | sent | failed | skipped (left out at queue time, reason in error)
+  /// pending | sent | failed | uncertain | skipped (left out at queue time, reason in error)
   state       String            @default("pending")
   attempts    Int               @default(0)
   /// Bumped by «Completa e riprova»: a new idempotency key for Connect.

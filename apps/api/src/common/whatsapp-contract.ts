@@ -51,7 +51,7 @@ export interface WhatsAppBroadcastEventView {
   sent: number; failed: number; pending: number; note: string | null; at: string;
 }
 export interface WhatsAppBroadcastRecipientView {
-  name: string | null; recipient: string; state: "pending" | "sent" | "failed" | "skipped";
+  name: string | null; recipient: string; state: "pending" | "sent" | "failed" | "uncertain" | "skipped";
   attempts: number; error: string | null; outboxId: string | null; sentAt: string | null;
 }
 /** Detail card: the queue, its steps and every recipient. */
@@ -69,6 +69,8 @@ export interface WhatsAppBroadcastView {
   failed: number;
   /** Duplicates, unreadable numbers, or already reached with the same text. */
   skipped: number;
+  /** Taken by WhatsApp without a confirmation: maybe delivered, never resent. */
+  uncertain: number;
   pending: number;
   error: string | null;
   /** Start of the text («Foto» for a photo alone), to tell queues apart. */

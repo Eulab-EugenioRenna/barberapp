@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject } from "@angular/core";
+import { AfterViewChecked, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import type {
@@ -16,7 +16,48 @@ import { CustomerSelectComponent } from "../shared/customer-select.component";
   standalone: true, imports: [CommonModule, FormsModule, CustomerSelectComponent, UiPageComponent, UiTabsComponent, UiSelectComponent, AdminPageHeaderComponent],
   templateUrl: "./whatsapp.component.html", styleUrl: "./whatsapp.component.css",
 })
-export class WhatsAppComponent implements OnInit, OnDestroy {
+export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
+  /** Conversations use all the height left in the window. */
+  @ViewChild("workspace") workspace?: ElementRef<HTMLElement>;
+  private workspaceHeight = 0;
+  @ViewChild("messagesBox") messagesBox?: ElementRef<HTMLElement>;
+  @ViewChild("replyBox") replyBox?: ElementRef<HTMLTextAreaElement>;
+  private scrollToEnd = false;
+  /** Pictures load after the text: until then the view keeps following the end. */
+  private stickUntil = 0;
+  ngAfterViewChecked() {
+    this.fitWorkspace();
+    const box = this.messagesBox?.nativeElement;
+    if (this.scrollToEnd && box) { this.scrollToEnd = false; this.stickUntil = Date.now() + 3000; box.scrollTop = box.scrollHeight; }
+  }
+  mediaLoaded() {
+    const box = this.messagesBox?.nativeElement;
+    if (box && Date.now() < this.stickUntil) box.scrollTop = box.scrollHeight;
+  }
+  /** The reply box grows with its lines, up to about eight. */
+  growReply(box: HTMLTextAreaElement) {
+    const list = this.messagesBox?.nativeElement;
+    const atEnd = !!list && list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+    box.style.height = "auto";
+    box.style.height = `${Math.min(box.scrollHeight, 200)}px`;
+    // A taller box must not hide the last message being answered.
+    if (list && atEnd) list.scrollTop = list.scrollHeight;
+  }
+  /** Enter sends, Shift+Enter starts a new line (as in WhatsApp Web). */
+  replyEnter(event: Event) {
+    const key = event as KeyboardEvent;
+    // On phones Enter keeps starting a new line: the «Invia» button sends.
+    if (key.shiftKey || key.isComposing || window.matchMedia("(pointer: coarse)").matches) return;
+    key.preventDefault();
+    if (!this.sending && this.connected && this.pending.kind === "empty" && (this.reply.trim() || this.replyImage)) void this.sendReply();
+  }
+  @HostListener("window:resize") fitWorkspace() {
+    const el = this.workspace?.nativeElement;
+    if (!el || window.innerWidth < 768) { if (el) el.style.height = ""; return; }
+    const height = Math.max(420, Math.floor(window.innerHeight - (el.getBoundingClientRect().top + window.scrollY) - 16));
+    if (height !== this.workspaceHeight || !el.style.height) { this.workspaceHeight = height; el.style.height = `${height}px`; }
+  }
+
   readonly session = inject(SessionStore);
   readonly api = inject(WhatsAppApiService);
   connections: WhatsAppConnection[] = [];
@@ -113,12 +154,12 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     return ({ running: "In esecuzione", paused: "In pausa", done: "Completato", cancelled: "Annullato" } as Record<string, string>)[status] ?? status;
   }
   broadcastPercent(job: WhatsAppBroadcastView) {
-    return job.total ? Math.round(((job.sent + job.failed) / job.total) * 100) : 0;
+    return job.total ? Math.round(((job.sent + job.failed + (job.uncertain ?? 0)) / job.total) * 100) : 0;
   }
   eventLabel(event: WhatsAppBroadcastEventView) {
     switch (event.kind) {
       case "queued": return `Messo in coda: ${event.pending} destinatari`;
-      case "step": return `Gruppo inviato: ${event.sent} inviati${event.failed ? `, ${event.failed} non riusciti` : ""} · ${event.pending} da inviare`;
+      case "step": return `Gruppo concluso: ${event.sent} consegnati a WhatsApp${event.failed ? `, ${event.failed} non riusciti` : ""}${event.note ? `, ${event.note}` : ""} · ${event.pending} da inviare`;
       case "waiting": return `${event.pending} numeri aspettano il messaggio precedente`;
       case "busy": return "WhatsApp occupato: nuovo tentativo dopo un minuto";
       case "paused": return "In pausa";
@@ -137,6 +178,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   recipientOutcome(row: WhatsAppBroadcastRecipientView): { label: string; reason: string | null } {
     if (row.state === "skipped") return { label: "Saltato", reason: row.error };
     if (row.state === "failed") return { label: "Non riuscito", reason: row.error };
+    if (row.state === "uncertain") return { label: row.error === "In invio" ? "In invio…" : "Non confermato", reason: row.error === "In invio" ? null : row.error };
     if (row.state === "pending") return { label: "Da inviare", reason: row.error ? `Ultimo tentativo: ${row.error}` : null };
     const item = row.outboxId ? this.outbox.find((o) => o.id === row.outboxId) : undefined;
     return { label: item ? this.stateLabel(item.state) : "Inviato", reason: item?.problem ?? null };
@@ -310,8 +352,13 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     this.loadingMessages = true;
     this.loadingSelection = version;
     try {
+      const box = this.messagesBox?.nativeElement;
+      const atEnd = !box || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+      const known = this.messages.length;
       const result = await this.api.messages(archiveId, chatId, older ? this.messages[0]?.id : undefined);
       if (this.destroyed || version !== this.selection) return;
+      // Opening a chat, or new messages while reading the end: show the latest.
+      if (!older && (!known || atEnd)) this.scrollToEnd = true;
       if (older || !this.messages.length) this.hasOlder = result.length === 50;
       this.messages = [...new Map([...this.messages, ...result].map(m => [m.id, m])).values()]
         .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.id.localeCompare(b.id));
@@ -376,6 +423,8 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
         to: chatId, text: this.reply, ...(this.replyImage ? { image: this.replyImage } : {}), recipientAuthorized: true,
       });
       this.reply = ""; this.replyImage = null;
+      if (this.replyBox) this.replyBox.nativeElement.style.height = "";
+      this.scrollToEnd = true;
       this.replyFeedback = "Messaggio affidato a WhatsApp. Compare nella conversazione appena il telefono lo conferma.";
       await this.refresh();
     } catch (error) { this.replyFeedback = this.error(error); }
