@@ -157,6 +157,7 @@ model Tenant {
   @@index([createdAt])
   @@index([isActive, isSuspended])
   productBrands ProductBrand[]
+  whatsappBroadcasts WhatsAppBroadcast[]
 }
 
 model TenantHoliday {
@@ -1358,6 +1359,56 @@ model WhatsAppSend {
   preview       String?
   createdAt     DateTime @default(now())
   @@index([tenantId, userId])
+}
+
+/// «Messaggio a tutti»: sent in the background, 30 recipients per step.
+model WhatsAppBroadcast {
+  id               String                       @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId           String
+  /// Connect session of the person who launched it: its credentials send the messages.
+  connectSessionId String
+  /// WhatsApp session (the linked number) on Connect.
+  sessionId        String
+  idempotencyKey   String
+  text             String?
+  /// { data, filename } of the photo, when there is one.
+  image            Json?
+  /// running | paused | done | cancelled
+  status           String                       @default("running")
+  total            Int                          @default(0)
+  sent             Int                          @default(0)
+  failed           Int                          @default(0)
+  skipped          Int                          @default(0)
+  error            String?
+  nextRunAt        DateTime                     @default(now())
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  finishedAt       DateTime?
+  recipients       WhatsAppBroadcastRecipient[]
+
+  @@unique([tenantId, userId, idempotencyKey])
+  @@index([status, nextRunAt])
+  @@index([tenantId, userId, createdAt])
+}
+
+model WhatsAppBroadcastRecipient {
+  id          String            @id @default(uuid())
+  broadcastId String
+  broadcast   WhatsAppBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  customerId  String
+  recipient   String
+  name        String?
+  position    Int
+  /// pending | sent | failed
+  state       String            @default("pending")
+  attempts    Int               @default(0)
+  error       String?
+  outboxId    String?
+  updatedAt   DateTime          @updatedAt
+
+  @@index([broadcastId, state, position])
 }
 
 /// Display name of a WhatsApp chat (the contact's WhatsApp profile name).

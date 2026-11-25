@@ -1,7 +1,9 @@
 import {
   BadGatewayException, BadRequestException, ConflictException, ForbiddenException,
-  HttpException, Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException,
+  HttpException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit,
+  ServiceUnavailableException, UnauthorizedException,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 import type { ConnectServer } from "@eulab/connect/server";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -13,12 +15,21 @@ import { requireTenantId, requireUser, resolveRequestSession } from "../../commo
 import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection,
   WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
-  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastResult, WhatsAppImageInput,
+  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastView, WhatsAppImageInput,
 } from "../../common/whatsapp-contract";
 import { appointmentPhone } from "../notifications/appointment-automation-state";
 
 /** Most recipients per «Invia a tutti»: larger lists risk the number being blocked. */
 export const BROADCAST_LIMIT = 500;
+/** Recipients per background step, and the pauses that keep Connect's rate limit (15 req/s) far away. */
+export const BROADCAST_STEP = 30;
+export const broadcastTiming = { messageGapMs: 600, stepPauseMs: 20_000, busyPauseMs: 60_000 };
+const BROADCAST_MAX_ATTEMPTS = 5;
+/** Who already got this very text from ALORA recently is not written to again. */
+const BROADCAST_REPEAT_WINDOW_MS = 48 * 3600_000;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const errorStatus = (error: unknown) =>
+  error && typeof error === "object" && "status" in error ? Number((error as { status: unknown }).status) : undefined;
 /**
  * Customer phone in international form. Numbers saved without prefix are
  * Italian (the salon's country), e.g. «333 1234567» → +393331234567.
@@ -99,7 +110,7 @@ function direction(value: unknown): string {
 function rows<T>(value: T[]): T[] { if (!Array.isArray(value) || value.length > 10000) return invalid(); return value; }
 function ack(value: WhatsAppAcknowledgement): WhatsAppAcknowledgement { return { id: id(value?.id), state: text(value?.state, 80) }; }
 
-type Actor = { tenantId: string; userId: string };
+type Actor = { tenantId: string; userId: string; connectSessionId?: string };
 type RawSession = Awaited<ReturnType<Client["sessions"]>>[number];
 /**
  * States in which the WhatsApp device is no longer linked. "failed" is not
@@ -117,8 +128,35 @@ const notMine = () => new NotFoundException("Collegamento WhatsApp non disponibi
  * elsewhere (e.g. in Connect) or by colleagues are never listed or usable here.
  */
 @Injectable()
-export class WhatsAppService {
+export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger("WhatsAppBroadcast");
+  private timer?: ReturnType<typeof setInterval>;
+  private working = false;
   constructor(private readonly prisma: PrismaService) {}
+
+  onModuleInit() {
+    if (process.env["NODE_ENV"] === "test") return;
+    this.timer = setInterval(() => void this.tick(), 5000);
+  }
+  onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  /** Opens Connect with the stored credentials of one ALORA sign-in. */
+  private async withConnect<T>(tenantId: string, userId: string, connectSessionId: string,
+    operation: (client: Client, actor: Actor) => Promise<T>): Promise<T> {
+    const linked = await this.prisma.connectSession.findFirst({
+      where: { id: connectSessionId, userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      select: { sdkSessionCipher: true, installationId: true },
+    });
+    if (!linked?.sdkSessionCipher) throw new UnauthorizedException("Ripeti l’accesso Connect");
+    const binding = await loadConnectConfig(this.prisma, tenantId);
+    if (!binding || binding.installationId !== linked.installationId)
+      throw new ForbiddenException("Collegamento WhatsApp dell’attività da verificare");
+    const application = await connectApplication(this.prisma);
+    return application.services(openConnect(linked.sdkSessionCipher), (client, token) =>
+      operation(client.whatsapp(token), { tenantId, userId, connectSessionId }));
+  }
 
   private async run<T>(authorization: string | undefined, permission: FunctionKey,
     operation: (client: Client, actor: Actor) => Promise<T>): Promise<T> {
@@ -127,18 +165,8 @@ export class WhatsAppService {
     if (user.technicalAccess || user.role === "platform_admin" || !canUseLocalFunction(user, permission))
       throw new ForbiddenException("Permesso WhatsApp esplicito richiesto");
     if (!session.connectSessionId) throw new UnauthorizedException("Accedi tramite Connect");
-    const linked = await this.prisma.connectSession.findFirst({
-      where: { id: session.connectSessionId, userId: user.id, revokedAt: null, expiresAt: { gt: new Date() } },
-      select: { sdkSessionCipher: true, installationId: true },
-    });
-    if (!linked?.sdkSessionCipher) throw new UnauthorizedException("Ripeti l’accesso Connect");
-    const binding = await loadConnectConfig(this.prisma, tenantId);
-    if (!binding || binding.installationId !== linked.installationId)
-      throw new ForbiddenException("Collegamento WhatsApp dell’attività da verificare");
     try {
-      const application = await connectApplication(this.prisma);
-      return await application.services(openConnect(linked.sdkSessionCipher), (client, token) =>
-        operation(client.whatsapp(token), { tenantId, userId: user.id }));
+      return await this.withConnect(tenantId, user.id, session.connectSessionId, operation);
     } catch (error) {
       if (error instanceof HttpException) throw error;
       const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
@@ -479,39 +507,219 @@ export class WhatsAppService {
       })),
     };
   }
+  private broadcastView(row: {
+    id: string; status: string; total: number; sent: number; failed: number; skipped: number;
+    error: string | null; createdAt: Date; finishedAt: Date | null;
+  }): WhatsAppBroadcastView {
+    return {
+      id: row.id, status: row.status as WhatsAppBroadcastView["status"], total: row.total, sent: row.sent,
+      failed: row.failed, skipped: row.skipped, pending: Math.max(0, row.total - row.sent - row.failed),
+      error: row.error, createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null,
+    };
+  }
   /**
-   * One message per customer, each with its own key derived from the request
-   * key: repeating the same request never sends a customer the text twice.
+   * «Messaggio a tutti» is queued and sent in the background, 30 recipients
+   * per step (see tick). Each recipient has its own key derived from the
+   * request key: repeating the request never writes to a customer twice.
    */
-  broadcast(auth: string | undefined, sessionId: string, input: WhatsAppBroadcastInput): Promise<WhatsAppBroadcastResult> {
+  broadcast(auth: string | undefined, sessionId: string, input: WhatsAppBroadcastInput): Promise<WhatsAppBroadcastView> {
     return this.run(auth, "whatsapp.send", async (wa, actor) => {
+      const existing = await this.prisma.whatsAppBroadcast.findUnique({
+        where: { tenantId_userId_idempotencyKey: { tenantId: actor.tenantId, userId: actor.userId, idempotencyKey: input.idempotencyKey } },
+      });
+      if (existing) return this.broadcastView(existing);
       await this.ownedSession(wa, actor, sessionId);
       this.requireContent(input);
+      const active = await this.prisma.whatsAppBroadcast.count({
+        where: { tenantId: actor.tenantId, status: { in: ["running", "paused"] } },
+      });
+      if (active) throw new ConflictException("C’è già un messaggio a tutti in corso: aspetta che finisca o annullalo");
+      const preview = this.preview(input);
+      const already = new Set(
+        (await this.prisma.whatsAppSend.findMany({
+          where: { tenantId: actor.tenantId, preview, createdAt: { gt: new Date(Date.now() - BROADCAST_REPEAT_WINDOW_MS) } },
+          select: { recipient: true },
+        })).map((row) => row.recipient),
+      );
       const rows = await this.broadcastCustomers(actor.tenantId);
       const seen = new Set<string>();
-      const targets: Array<{ id: string; to: string; name: string | null }> = [];
+      const targets: Array<{ customerId: string; recipient: string; name: string | null }> = [];
       let skipped = 0;
       for (const row of rows) {
         const to = customerWhatsAppNumber(row.phone);
-        // Same number on two customer cards: one message only.
-        if (!to || seen.has(to)) { skipped++; continue; }
+        // Same number on two customer cards, or already reached with this text: one message only.
+        if (!to || seen.has(to) || already.has(to)) { skipped++; continue; }
         seen.add(to);
-        targets.push({ id: row.id, to, name: customerName(row) });
+        targets.push({ customerId: row.id, recipient: to, name: customerName(row) });
       }
-      if (!targets.length) throw new BadRequestException("Nessun cliente con un numero di telefono valido");
+      if (!targets.length)
+        throw new BadRequestException(already.size
+          ? "Tutti i clienti con telefono hanno già ricevuto questo messaggio"
+          : "Nessun cliente con un numero di telefono valido");
       if (targets.length > BROADCAST_LIMIT)
         throw new BadRequestException(`Troppi destinatari (${targets.length}): il massimo per invio è ${BROADCAST_LIMIT}`);
-      let sent = 0, failed = 0;
-      for (let index = 0; index < targets.length; index += 5) {
-        const results = await Promise.allSettled(targets.slice(index, index + 5).map((target) =>
-          this.deliver(wa, actor, sessionId, { to: target.to, customerId: target.id, name: target.name }, input,
-            actorKey([actor.tenantId, actor.userId, input.idempotencyKey, target.id]))));
-        for (const result of results) {
-          if (result.status === "fulfilled") sent++;
-          else failed++;
-        }
-      }
-      return { sent, failed, skipped };
+      const job = await this.prisma.whatsAppBroadcast.create({
+        data: {
+          tenantId: actor.tenantId, userId: actor.userId, connectSessionId: actor.connectSessionId!, sessionId,
+          idempotencyKey: input.idempotencyKey, text: input.text?.trim() ? input.text : null,
+          image: input.image ? ({ data: input.image.data, filename: input.image.filename } as Prisma.InputJsonValue) : undefined,
+          total: targets.length, skipped,
+          recipients: { create: targets.map((target, position) => ({ ...target, position })) },
+        },
+      });
+      this.logger.log(`${job.id}: in coda ${targets.length} destinatari, ${skipped} saltati`);
+      setTimeout(() => void this.tick(), 100);
+      return this.broadcastView(job);
     });
+  }
+  private async ownBroadcast(auth: string | undefined, id: string) {
+    const session = await resolveRequestSession(this.prisma, auth);
+    const user = requireUser(session), tenantId = requireTenantId(session);
+    if (user.technicalAccess || user.role === "platform_admin" || !canUseLocalFunction(user, "whatsapp.send"))
+      throw new ForbiddenException("Permesso WhatsApp esplicito richiesto");
+    const job = await this.prisma.whatsAppBroadcast.findFirst({ where: { id, tenantId, userId: user.id } });
+    if (!job) throw new NotFoundException("Invio non trovato");
+    return { job, session, user };
+  }
+  async broadcastStatus(auth: string | undefined, id: string): Promise<WhatsAppBroadcastView> {
+    return this.broadcastView((await this.ownBroadcast(auth, id)).job);
+  }
+  /** The latest «Messaggio a tutti» of this account, to show its progress again. */
+  async latestBroadcast(auth: string | undefined): Promise<WhatsAppBroadcastView | null> {
+    const session = await resolveRequestSession(this.prisma, auth);
+    const user = requireUser(session), tenantId = requireTenantId(session);
+    const job = await this.prisma.whatsAppBroadcast.findFirst({
+      where: { tenantId, userId: user.id }, orderBy: { createdAt: "desc" },
+    });
+    return job ? this.broadcastView(job) : null;
+  }
+  async cancelBroadcast(auth: string | undefined, id: string): Promise<WhatsAppBroadcastView> {
+    const { job } = await this.ownBroadcast(auth, id);
+    if (!["running", "paused"].includes(job.status)) return this.broadcastView(job);
+    const updated = await this.prisma.whatsAppBroadcast.update({
+      where: { id }, data: { status: "cancelled", finishedAt: new Date(), image: Prisma.DbNull },
+    });
+    this.logger.log(`${id}: annullato (${updated.sent} inviati)`);
+    return this.broadcastView(updated);
+  }
+  /** Resumes a paused job with the credentials of the current sign-in. */
+  async resumeBroadcast(auth: string | undefined, id: string): Promise<WhatsAppBroadcastView> {
+    const { job, session } = await this.ownBroadcast(auth, id);
+    if (job.status !== "paused") return this.broadcastView(job);
+    if (!session.connectSessionId) throw new UnauthorizedException("Accedi tramite Connect");
+    const updated = await this.prisma.whatsAppBroadcast.update({
+      where: { id },
+      data: { status: "running", error: null, nextRunAt: new Date(), connectSessionId: session.connectSessionId },
+    });
+    setTimeout(() => void this.tick(), 100);
+    return this.broadcastView(updated);
+  }
+  private preview(input: { text?: string | null; image?: unknown }) {
+    const body = input.text?.trim() ? input.text : "";
+    return (body || (input.image ? "Foto" : "")).slice(0, 300) || null;
+  }
+
+  /** Background worker: one step of one due job at a time. */
+  async tick(): Promise<void> {
+    if (this.working) return;
+    this.working = true;
+    try {
+      const due = await this.prisma.whatsAppBroadcast.findFirst({
+        where: { status: "running", nextRunAt: { lte: new Date() } },
+        orderBy: { nextRunAt: "asc" }, select: { id: true, nextRunAt: true },
+      });
+      if (!due) return;
+      // Lease: a restart mid-step resumes after ten minutes, never twice at once.
+      const claimed = await this.prisma.whatsAppBroadcast.updateMany({
+        where: { id: due.id, status: "running", nextRunAt: due.nextRunAt },
+        data: { nextRunAt: new Date(Date.now() + 10 * 60_000) },
+      });
+      if (claimed.count) await this.step(due.id);
+    } catch (error) {
+      this.logger.error(`passo non riuscito: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      this.working = false;
+    }
+  }
+
+  private async step(id: string): Promise<void> {
+    const job = await this.prisma.whatsAppBroadcast.findUniqueOrThrow({ where: { id } });
+    const batch = await this.prisma.whatsAppBroadcastRecipient.findMany({
+      where: { broadcastId: id, state: "pending" }, orderBy: { position: "asc" }, take: BROADCAST_STEP,
+    });
+    if (!batch.length) return this.finish(id);
+    const input = {
+      text: job.text ?? undefined,
+      image: (job.image as WhatsAppImageInput | null) ?? undefined,
+    };
+    let sent = 0, failed = 0, busy = false;
+    const pause = async (error: string) => {
+      await this.prisma.whatsAppBroadcast.update({ where: { id }, data: { status: "paused", error } });
+      this.logger.warn(`${id}: in pausa – ${error}`);
+    };
+    try {
+      await this.withConnect(job.tenantId, job.userId, job.connectSessionId, async (wa, actor) => {
+        for (const [index, target] of batch.entries()) {
+          const current = await this.prisma.whatsAppBroadcast.findUnique({ where: { id }, select: { status: true } });
+          if (current?.status !== "running") return;
+          try {
+            const result = await this.deliver(wa, actor, job.sessionId,
+              { to: target.recipient, customerId: target.customerId, name: target.name }, input,
+              actorKey([job.tenantId, job.userId, job.idempotencyKey, target.customerId]));
+            await this.prisma.whatsAppBroadcastRecipient.update({
+              where: { id: target.id }, data: { state: "sent", outboxId: result.id, attempts: { increment: 1 }, error: null },
+            });
+            sent++;
+          } catch (error) {
+            const status = errorStatus(error);
+            if (status === 401 || status === 403) throw error;
+            const transient = status === 429 || status === undefined || status >= 500;
+            const giveUp = !transient || target.attempts + 1 >= BROADCAST_MAX_ATTEMPTS;
+            await this.prisma.whatsAppBroadcastRecipient.update({
+              where: { id: target.id },
+              data: {
+                attempts: { increment: 1 }, state: giveUp ? "failed" : "pending",
+                error: (error instanceof Error ? error.message : String(error)).slice(0, 300),
+              },
+            });
+            if (giveUp) failed++;
+            if (transient) { busy = true; break; }
+          }
+          if (index < batch.length - 1) await sleep(broadcastTiming.messageGapMs);
+        }
+      });
+    } catch (error) {
+      const status = errorStatus(error);
+      if (error instanceof UnauthorizedException || status === 401)
+        await pause("Accesso Connect scaduto: apri ALORA e premi «Riprendi»");
+      else if (error instanceof ForbiddenException || status === 403)
+        await pause("WhatsApp non autorizzato dalla delega o dalla licenza Connect");
+      else { busy = true; this.logger.warn(`${id}: Connect non raggiungibile – ${error instanceof Error ? error.message : error}`); }
+    }
+    const updated = await this.prisma.whatsAppBroadcast.update({
+      where: { id },
+      data: {
+        sent: { increment: sent }, failed: { increment: failed },
+        ...(busy ? { error: "WhatsApp occupato: riprovo tra un minuto" } : {}),
+      },
+    });
+    const pending = await this.prisma.whatsAppBroadcastRecipient.count({ where: { broadcastId: id, state: "pending" } });
+    this.logger.log(`${id}: passo +${sent} inviati, +${failed} non riusciti, ${pending} da inviare (totale ${updated.sent}/${updated.total})${busy ? ", Connect occupato" : ""}`);
+    if (updated.status !== "running") return;
+    if (!pending) return this.finish(id);
+    await this.prisma.whatsAppBroadcast.update({
+      where: { id },
+      data: {
+        nextRunAt: new Date(Date.now() + (busy ? broadcastTiming.busyPauseMs : broadcastTiming.stepPauseMs)),
+        ...(busy ? {} : { error: null }),
+      },
+    });
+  }
+  private async finish(id: string) {
+    const job = await this.prisma.whatsAppBroadcast.update({
+      // The photo is not kept once every message is out.
+      where: { id }, data: { status: "done", finishedAt: new Date(), error: null, image: Prisma.DbNull },
+    });
+    this.logger.log(`${id}: completato, ${job.sent} inviati, ${job.failed} non riusciti, ${job.skipped} saltati`);
   }
 }

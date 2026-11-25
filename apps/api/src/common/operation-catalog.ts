@@ -24,6 +24,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "WhatsAppController.send": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.audience": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.broadcast": { kind: "function", key: "whatsapp.send" },
+  "WhatsAppController.latestBroadcast": { kind: "function", key: "whatsapp.send" },
+  "WhatsAppController.broadcastStatus": { kind: "function", key: "whatsapp.send" },
+  "WhatsAppController.cancelBroadcast": { kind: "function", key: "whatsapp.send" },
+  "WhatsAppController.resumeBroadcast": { kind: "function", key: "whatsapp.send" },
   "LocationsController.context": { kind: "session" },
   "LocationsController.totals": {
     kind: "function",

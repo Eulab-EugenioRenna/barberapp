@@ -1,0 +1,150 @@
+const owner = { id: "owner", role: "owner", tenantId: "t1", connectFunctions: ["whatsapp.read", "whatsapp.manage", "whatsapp.send"] };
+jest.mock("../../common/request-session", () => ({
+  resolveRequestSession: jest.fn(async () => ({ connectSessionId: "cs", user: owner })),
+  requireUser: (session: any) => session.user,
+  requireTenantId: (session: any) => session.user.tenantId,
+}));
+jest.mock("../../common/connect-runtime", () => ({
+  loadConnectConfig: jest.fn(async () => ({ installationId: "i1" })),
+  openConnect: (value: string) => value,
+}));
+const wa = { sessions: jest.fn(), sendText: jest.fn(), send: jest.fn() };
+jest.mock("../../common/connect-application", () => ({
+  connectApplication: jest.fn(async () => ({
+    services: (_handle: unknown, operation: any) => operation({ whatsapp: () => wa }, "token"),
+  })),
+}));
+import { BROADCAST_STEP, WhatsAppService, broadcastTiming } from "./whatsapp.service";
+
+const SESSION = "00000000-0000-4000-8000-000000000001";
+function setup(customers: Array<{ id: string; phone: string | null }>, alreadySent: string[] = []) {
+  const jobs: any[] = [];
+  const recipients: any[] = [];
+  const sends: any[] = alreadySent.map((recipient) => ({ recipient }));
+  const match = (row: any, where: any = {}) =>
+    Object.entries(where).every(([key, value]: [string, any]) =>
+      value && typeof value === "object" && !(value instanceof Date)
+        ? "in" in value ? value.in.includes(row[key])
+          : "lte" in value ? row[key] <= value.lte
+            : true
+        : row[key] === value);
+  const apply = (row: any, data: any) => {
+    for (const [key, value] of Object.entries(data)) {
+      if (value && typeof value === "object" && "increment" in (value as any)) row[key] += (value as any).increment;
+      else row[key] = value;
+    }
+    return row;
+  };
+  const prisma: any = {
+    connectSession: { findFirst: jest.fn(async () => ({ sdkSessionCipher: "cipher", installationId: "i1" })) },
+    whatsAppLink: { findMany: jest.fn(async () => [{ tenantId: "t1", userId: "owner", sessionId: SESSION, removedAt: null }]), updateMany: jest.fn() },
+    whatsAppSend: {
+      findMany: jest.fn(async () => sends),
+      upsert: jest.fn(async ({ create }: any) => { sends.push(create); return create; }),
+    },
+    customer: {
+      findMany: jest.fn(async () => customers.map((c) => ({ ...c, firstName: c.id, lastName: null }))),
+    },
+    whatsAppBroadcast: {
+      findUnique: jest.fn(async ({ where }: any) => jobs.find((j) => j.id === where.id || (where.tenantId_userId_idempotencyKey && j.idempotencyKey === where.tenantId_userId_idempotencyKey.idempotencyKey)) ?? null),
+      findUniqueOrThrow: jest.fn(async ({ where }: any) => jobs.find((j) => j.id === where.id)),
+      findFirst: jest.fn(async ({ where }: any) => jobs.find((j) => match(j, where)) ?? null),
+      count: jest.fn(async ({ where }: any) => jobs.filter((j) => match(j, where)).length),
+      create: jest.fn(async ({ data }: any) => {
+        const { recipients: nested, ...rest } = data;
+        const job = { id: "job-" + (jobs.length + 1), status: "running", sent: 0, failed: 0, error: null, nextRunAt: new Date(0), createdAt: new Date(), finishedAt: null, ...rest };
+        jobs.push(job);
+        for (const row of nested.create) recipients.push({ id: "r" + recipients.length, broadcastId: job.id, state: "pending", attempts: 0, ...row });
+        return job;
+      }),
+      update: jest.fn(async ({ where, data }: any) => apply(jobs.find((j) => j.id === where.id), data)),
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        const found = jobs.filter((j) => j.id === where.id && j.status === where.status);
+        found.forEach((j) => apply(j, data));
+        return { count: found.length };
+      }),
+    },
+    whatsAppBroadcastRecipient: {
+      findMany: jest.fn(async ({ where, take }: any) =>
+        recipients.filter((r) => match(r, where)).sort((a, b) => a.position - b.position).slice(0, take)),
+      update: jest.fn(async ({ where, data }: any) => apply(recipients.find((r) => r.id === where.id), data)),
+      count: jest.fn(async ({ where }: any) => recipients.filter((r) => match(r, where)).length),
+    },
+  };
+  const service = new WhatsAppService(prisma);
+  const run = async () => {
+    for (const job of jobs) job.nextRunAt = new Date(0);
+    await service.tick();
+  };
+  return { service, jobs, recipients, run };
+}
+const input = { text: "Promo di Natale", idempotencyKey: "key-12345678", recipientAuthorized: true as const };
+
+describe("«Messaggio a tutti» in the background", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    broadcastTiming.messageGapMs = 0;
+    wa.sessions.mockResolvedValue([{ id: SESSION, state: "connected", closed_at: null, runner_online: true }]);
+    let n = 0;
+    wa.sendText.mockImplementation(async () => ({ id: `00000000-0000-4000-9000-${String(++n).padStart(12, "0")}`, state: "queued" }));
+  });
+
+  it("queues at once and sends 30 recipients per step", async () => {
+    const customers = Array.from({ length: 45 }, (_, i) => ({ id: "c" + i, phone: "333" + String(1000000 + i) }));
+    const { service, jobs, run } = setup(customers);
+    const view = await service.broadcast("auth", SESSION, input);
+    expect(view).toMatchObject({ status: "running", total: 45, sent: 0, pending: 45 });
+    expect(wa.sendText).not.toHaveBeenCalled();
+    await run();
+    expect(wa.sendText).toHaveBeenCalledTimes(BROADCAST_STEP);
+    expect(jobs[0]).toMatchObject({ status: "running", sent: 30 });
+    await run();
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 45, failed: 0 });
+  });
+
+  it("skips duplicates, unreadable numbers and who already got the same text", async () => {
+    const { service } = setup(
+      [
+        { id: "a", phone: "333 1111111" },
+        { id: "b", phone: "+39 333 1111111" },
+        { id: "c", phone: "79 123 45 67" },
+        { id: "d", phone: "333 2222222" },
+        { id: "e", phone: "333 3333333" },
+      ],
+      ["+393332222222"],
+    );
+    expect(await service.broadcast("auth", SESSION, input)).toMatchObject({ total: 2, skipped: 3 });
+  });
+
+  it("keeps recipients pending when Connect is busy (503) and retries later", async () => {
+    const { service, jobs, recipients, run } = setup([
+      { id: "a", phone: "3331111111" },
+      { id: "b", phone: "3332222222" },
+    ]);
+    await service.broadcast("auth", SESSION, input);
+    wa.sendText.mockRejectedValueOnce(Object.assign(new Error("Service Unavailable"), { status: 503 }));
+    await run();
+    expect(recipients.map((r) => r.state)).toEqual(["pending", "pending"]);
+    expect(jobs[0]).toMatchObject({ status: "running", sent: 0, error: "WhatsApp occupato: riprovo tra un minuto" });
+    expect(jobs[0].nextRunAt.getTime()).toBeGreaterThan(Date.now() + 30_000);
+    await run();
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 2, error: null });
+  });
+
+  it("pauses when the Connect sign-in expired, and resumes", async () => {
+    const { service, jobs, run } = setup([{ id: "a", phone: "3331111111" }]);
+    await service.broadcast("auth", SESSION, input);
+    wa.sendText.mockRejectedValueOnce(Object.assign(new Error("Unauthorized"), { status: 401 }));
+    await run();
+    expect(jobs[0].status).toBe("paused");
+    expect((await service.resumeBroadcast("auth", jobs[0].id)).status).toBe("running");
+    await run();
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 1 });
+  });
+
+  it("refuses a second broadcast while one is running", async () => {
+    const { service } = setup([{ id: "a", phone: "3331111111" }]);
+    await service.broadcast("auth", SESSION, input);
+    await expect(service.broadcast("auth", SESSION, { ...input, idempotencyKey: "other-12345" })).rejects.toThrow("già un messaggio a tutti");
+  });
+});

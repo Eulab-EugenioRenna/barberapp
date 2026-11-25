@@ -1,8 +1,8 @@
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, OnInit, Output, inject } from "@angular/core";
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { HttpErrorResponse } from "@angular/common/http";
-import type { WhatsAppAudienceView, WhatsAppConnection, WhatsAppImageInput } from "@barber/shared/whatsapp";
+import type { WhatsAppAudienceView, WhatsAppBroadcastView, WhatsAppConnection, WhatsAppImageInput } from "@barber/shared/whatsapp";
 import { prepareWhatsAppImage } from "./whatsapp-image";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
 
@@ -61,7 +61,25 @@ export interface WhatsAppRecipient {
             </li>
           </ul>
 
-          <form *ngIf="canWrite" class="mt-4 grid gap-3" (ngSubmit)="send()">
+          <section *ngIf="job" class="wa-job" role="status" aria-live="polite">
+            <p class="wa-job-title">{{ jobTitle }}</p>
+            <div class="wa-job-bar" aria-hidden="true"><span [style.width.%]="jobPercent"></span></div>
+            <p class="text-sm">
+              Inviati <strong>{{ job.sent }}</strong> su {{ job.total }}<ng-container *ngIf="job.failed"> · {{ job.failed }} non riusciti</ng-container><ng-container *ngIf="job.skipped"> · {{ job.skipped }} saltati (numero ripetuto, non leggibile o già raggiunto con lo stesso testo)</ng-container>.
+            </p>
+            <p *ngIf="job.error" class="wa-send-note">{{ job.error }}</p>
+            <p *ngIf="job.status === 'running'" class="text-xs text-[var(--muted)]">
+              Parte a gruppi di 30 con una pausa tra un gruppo e l’altro, per non far bloccare il numero. Puoi chiudere questa finestra: l’invio continua.
+            </p>
+            <div class="flex flex-wrap justify-end gap-2">
+              <button *ngIf="job.status === 'running' || job.status === 'paused'" type="button" class="pill-btn" [disabled]="sending" (click)="cancelJob()">Annulla l’invio</button>
+              <button *ngIf="job.status === 'paused'" type="button" class="primary-btn" [disabled]="sending" (click)="resumeJob()">Riprendi</button>
+              <button *ngIf="job.status === 'done' || job.status === 'cancelled'" type="button" class="pill-btn" (click)="newMessage()">Nuovo messaggio</button>
+              <button type="button" class="pill-btn" (click)="close()">Chiudi</button>
+            </div>
+          </section>
+
+          <form *ngIf="canWrite && !job" class="mt-4 grid gap-3" (ngSubmit)="send()">
             <fieldset class="grid gap-3" [disabled]="sending || !!result">
               <label class="field">
                 <span>{{ image ? "Didascalia (facoltativa)" : "Messaggio" }}</span>
@@ -111,6 +129,10 @@ export interface WhatsAppRecipient {
       .wa-send-ok { font-size: 0.875rem; font-weight: 600; color: var(--accent); }
       .wa-send-checks { margin-top: 0.5rem; display: grid; gap: 0.35rem; padding-left: 1.1rem; list-style: disc; font-size: 0.8rem; color: var(--muted); }
       .wa-send-invalid { color: var(--ink); }
+      .wa-job { margin-top: 1rem; display: grid; gap: 0.6rem; }
+      .wa-job-title { font-weight: 650; }
+      .wa-job-bar { height: 0.5rem; border-radius: 999px; background: var(--line); overflow: hidden; }
+      .wa-job-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.4s; }
       textarea { resize: vertical; }
       .wa-send-image { display: flex; align-items: center; gap: 0.75rem; }
       .wa-send-image img { width: 5rem; height: 5rem; object-fit: cover; border-radius: 0.75rem; }
@@ -119,7 +141,7 @@ export interface WhatsAppRecipient {
     `,
   ],
 })
-export class WhatsAppSendDialogComponent implements OnInit {
+export class WhatsAppSendDialogComponent implements OnInit, OnDestroy {
   private readonly api = inject(WhatsAppApiService);
   /** Recipient; null sends to every active customer with a phone. */
   @Input() customer: WhatsAppRecipient | null = null;
@@ -135,6 +157,9 @@ export class WhatsAppSendDialogComponent implements OnInit {
   result = "";
   error = "";
   connectionChecked = false;
+  /** Background «Messaggio a tutti» of this account, while it runs or just finished. */
+  job: WhatsAppBroadcastView | null = null;
+  private poll?: ReturnType<typeof setTimeout>;
   /** Kept across retries of the same text, so nobody is messaged twice. */
   private broadcastKey = newKey();
 
@@ -159,7 +184,60 @@ export class WhatsAppSendDialogComponent implements OnInit {
     } else this.error = message(sessions.reason);
     if (audience.status === "fulfilled") this.audience = audience.value;
     else this.error = "Non riesco a contare i destinatari: " + message(audience.reason);
+    if (!this.customer) {
+      const latest = await this.api.latestBroadcast().catch(() => null);
+      if (latest && (latest.status === "running" || latest.status === "paused")) this.track(latest);
+    }
     this.loading = false;
+  }
+
+  ngOnDestroy() {
+    if (this.poll) clearTimeout(this.poll);
+  }
+
+  get jobPercent(): number {
+    if (!this.job?.total) return 0;
+    return Math.round(((this.job.sent + this.job.failed) / this.job.total) * 100);
+  }
+  get jobTitle(): string {
+    switch (this.job?.status) {
+      case "running": return "Invio in corso";
+      case "paused": return "Invio in pausa";
+      case "cancelled": return "Invio annullato";
+      default: return "Invio completato";
+    }
+  }
+  private track(job: WhatsAppBroadcastView) {
+    this.job = job;
+    if (this.poll) clearTimeout(this.poll);
+    if (job.status !== "running") return;
+    this.poll = setTimeout(async () => {
+      try { this.track(await this.api.broadcastStatus(job.id)); }
+      catch { this.track(job); }
+    }, 3000);
+  }
+  async cancelJob() {
+    if (!this.job) return;
+    this.sending = true;
+    try { this.track(await this.api.cancelBroadcast(this.job.id)); }
+    catch (error) { this.error = message(error); }
+    finally { this.sending = false; }
+  }
+  async resumeJob() {
+    if (!this.job) return;
+    this.sending = true;
+    try { this.track(await this.api.resumeBroadcast(this.job.id)); }
+    catch (error) { this.error = message(error); }
+    finally { this.sending = false; }
+  }
+  newMessage() {
+    this.job = null;
+    this.text = "";
+    this.image = null;
+    this.authorized = false;
+    this.result = "";
+    this.error = "";
+    this.draftChanged();
   }
 
   draftChanged() {
@@ -185,16 +263,12 @@ export class WhatsAppSendDialogComponent implements OnInit {
         });
         this.result = "Messaggio affidato a WhatsApp. L’esito è in «Messaggi WhatsApp» › Invii.";
       } else {
-        const outcome = await this.api.broadcast(this.connection.id, {
+        this.track(await this.api.broadcast(this.connection.id, {
           text: this.text,
           ...(this.image ? { image: this.image } : {}),
           idempotencyKey: this.broadcastKey,
           recipientAuthorized: true,
-        });
-        const skipped = outcome.skipped ? ` ${outcome.skipped} esclusi (senza consenso o numero ripetuto).` : "";
-        if (outcome.failed)
-          this.error = `Inviati ${outcome.sent}, ${outcome.failed} non riusciti. Premi di nuovo «Invia»: chi l'ha già ricevuto non lo riceve due volte.${skipped}`;
-        else this.result = `Inviati ${outcome.sent} messaggi. L’esito è in «Messaggi WhatsApp» › Invii.${skipped}`;
+        }));
       }
     } catch (error) {
       this.error = message(error);

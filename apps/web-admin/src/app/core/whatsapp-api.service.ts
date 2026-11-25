@@ -7,7 +7,7 @@ import {
 import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView,
   WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
-  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastResult,
+  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastView,
 } from "@barber/shared/whatsapp";
 import { ADMIN_API_URL } from "./api-config";
 import { SessionStore } from "./session.store";
@@ -54,7 +54,17 @@ export class WhatsAppApiService {
   audience() { return firstValueFrom(this.http.get<WhatsAppAudienceView>(this.root + "/audience")); }
   /** Same key for a repeated request: customers already reached are not messaged again. */
   broadcast(sessionId: string, input: WhatsAppBroadcastInput) {
-    return firstValueFrom(this.http.post<WhatsAppBroadcastResult>(`${this.root}/sessions/${encodeURIComponent(sessionId)}/broadcast`, input));
+    return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/sessions/${encodeURIComponent(sessionId)}/broadcast`, input));
+  }
+  latestBroadcast() { return firstValueFrom(this.http.get<WhatsAppBroadcastView | null>(this.root + "/broadcasts/latest")); }
+  broadcastStatus(id: string) {
+    return firstValueFrom(this.http.get<WhatsAppBroadcastView>(`${this.root}/broadcasts/${encodeURIComponent(id)}`));
+  }
+  cancelBroadcast(id: string) {
+    return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/broadcasts/${encodeURIComponent(id)}/cancel`, {}));
+  }
+  resumeBroadcast(id: string) {
+    return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/broadcasts/${encodeURIComponent(id)}/resume`, {}));
   }
   async send(sessionId: string, input: Omit<WhatsAppSendInput, "idempotencyKey">) {
     const key = this.key();

@@ -38,7 +38,22 @@ export interface WhatsAppBroadcastInput {
   text?: string; idempotencyKey: string; recipientAuthorized: true;
   image?: WhatsAppImageInput;
 }
-export interface WhatsAppBroadcastResult { sent: number; failed: number; skipped: number }
+/** «Messaggio a tutti», sent in the background a step at a time. */
+export interface WhatsAppBroadcastView {
+  id: string;
+  /** running: in progress · paused: waits for «Riprendi» · done · cancelled */
+  status: "running" | "paused" | "done" | "cancelled";
+  /** Recipients queued (skipped excluded). */
+  total: number;
+  sent: number;
+  failed: number;
+  /** Duplicates, unreadable numbers, or already reached with the same text. */
+  skipped: number;
+  pending: number;
+  error: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
 export interface WhatsAppAudienceView {
   /** Active customers. */
   customers: number;
