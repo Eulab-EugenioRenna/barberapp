@@ -591,3 +591,17 @@
   margin-top: 0.25rem;
   font-weight: 600;
 }
+
+/* Cards are held to be moved: no text selection or system menu meanwhile. */
+.touch-card {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.touch-card.tile-dragging {
+  outline: 2px solid var(--alora-lime);
+  outline-offset: 2px;
+  transform: scale(1.04);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  cursor: grabbing;
+}

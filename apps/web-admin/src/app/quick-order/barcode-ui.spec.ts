@@ -299,6 +299,80 @@ describe("barcode UI workflows", () => {
       (globalThis as any).document = previous;
     }
   });
+  it("holding a grid card moves it and saves the shared order", async () => {
+    jest.useFakeTimers();
+    // Which services a location offers is covered elsewhere.
+    const services = [
+      { id: "s1", name: "Taglio", basePrice: 20 },
+      { id: "s2", name: "Barba", basePrice: 12 },
+    ];
+    Object.defineProperty(modal, "catalogServices", { get: () => services });
+    modal.products = [{ id: "p1", name: "Shampoo", price: 10 }];
+    const keys = () => modal.catalogTiles.map((tile) => tile.key);
+    // Never arranged: services first, then products, by name.
+    expect(keys()).toEqual(["service:s2", "service:s1", "product:p1"]);
+    const listeners: Record<string, (event: any) => void> = {};
+    let over = "";
+    const previous = (globalThis as any).document;
+    (globalThis as any).document = {
+      addEventListener: (name: string, fn: any) => (listeners[name] = fn),
+      removeEventListener: (name: string) => delete listeners[name],
+      elementFromPoint: () => ({
+        closest: () => ({ getAttribute: () => over }),
+      }),
+    };
+    http.post.mockReturnValue(of({ saved: 3 }));
+    try {
+      const shampoo = modal.catalogTiles[2];
+      const down = { button: 0, pointerId: 7, clientX: 0, clientY: 0 };
+      // A quick tap is still a tap: it adds the product.
+      modal.pressTile(shampoo, down as any);
+      listeners["pointerup"]({});
+      modal.tileClick(shampoo);
+      expect(modal.items.map((row) => row.label)).toEqual(["Shampoo"]);
+      // Moving before the hold scrolls the page: nothing is picked up.
+      modal.pressTile(shampoo, down as any);
+      listeners["pointermove"]({
+        pointerId: 7,
+        clientX: 0,
+        clientY: 20,
+        preventDefault: jest.fn(),
+      });
+      jest.advanceTimersByTime(1000);
+      expect(modal.tileDragKey).toBe("");
+      // Held, then dragged onto the first card.
+      modal.pressTile(shampoo, down as any);
+      jest.advanceTimersByTime(500);
+      expect(modal.tileDragKey).toBe("product:p1");
+      over = "service:s2";
+      listeners["pointermove"]({
+        pointerId: 7,
+        clientX: 0,
+        clientY: -40,
+        preventDefault: jest.fn(),
+      });
+      expect(keys()).toEqual(["product:p1", "service:s2", "service:s1"]);
+      listeners["pointerup"]({});
+      // The click that ends the hold does not add another line.
+      modal.tileClick(shampoo);
+      expect(modal.items).toHaveLength(1);
+      await Promise.resolve();
+      expect(http.post).toHaveBeenCalledWith("/api/catalog-order", {
+        items: [
+          { kind: "product", id: "p1" },
+          { kind: "service", id: "s2" },
+          { kind: "service", id: "s1" },
+        ],
+      });
+      // Without catalogue access a hold does nothing.
+      allowed = false;
+      modal.pressTile(shampoo, down as any);
+      expect(listeners["pointermove"]).toBeUndefined();
+    } finally {
+      (globalThis as any).document = previous;
+      jest.useRealTimers();
+    }
+  });
   it("never asks why a price changed: the server records it", () => {
     modal.addService({
       id: "service-1",

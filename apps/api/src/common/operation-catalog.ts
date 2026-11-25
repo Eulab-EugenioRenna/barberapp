@@ -142,6 +142,7 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "ProductBrandsController.remove": { kind: "function", key: "services.manage" },
   "ProductsController.update": { kind: "function", key: "services.manage" },
   "ProductsController.remove": { kind: "function", key: "services.manage" },
+  "CatalogOrderController.save": { kind: "function", key: "services.manage" },
   "CollaboratorsController.findOne": {
     kind: "function",
     key: "collaborators.read",

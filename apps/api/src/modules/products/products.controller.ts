@@ -55,13 +55,13 @@ export class ProductsController {
     });
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.productsList(tenantId)}:activity-v1:brand-v1:p${page}:s${pageSize}`,
+      `${cacheKeys.productsList(tenantId)}:activity-v1:brand-v1:order-v1:p${page}:s${pageSize}`,
       CACHE_TTL_SECONDS.lists,
       async () => {
         const [items, total] = await Promise.all([
           this.prisma.product.findMany({
             where: { tenantId },
-            orderBy: [{ isActive: "desc" }, { name: "asc" }],
+            orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
             skip,
             take,
             include: {

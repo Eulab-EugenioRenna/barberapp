@@ -331,6 +331,8 @@ model Service {
   isBookableOnline     Boolean          @default(false)
   color                String           @default("#0f766e")
   isActive             Boolean          @default(true)
+  /// Position in the till grid (shared with products); ties fall back to the name.
+  sortOrder            Int              @default(0)
   appointments         Appointment[]
   serviceProducts      ServiceProduct[]
   saleItems            SaleItem[]
@@ -401,6 +403,8 @@ model Appointment {
 }
 
 model Product {
+  /// Position in the till grid (shared with services); ties fall back to the name.
+  sortOrder Int @default(0)
   purchaseVatRate Decimal? @db.Decimal(5,2)
   costMode String @default("legacy")
   priceMode String @default("legacy")

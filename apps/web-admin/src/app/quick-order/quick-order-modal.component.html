@@ -153,7 +153,16 @@
           </div>
           <div>
             <div class="flex items-center justify-between gap-3">
-              <p class="quick-order-step">Tocca per aggiungere</p>
+              <p class="quick-order-step">
+                Tocca per aggiungere<span
+                  *ngIf="canArrangeTiles"
+                  class="qo-hint"
+                >
+                  · tieni premuto per spostare</span
+                ><span *ngIf="tileOrderFeedback" class="qo-hint" role="status">
+                  · {{ tileOrderFeedback }}</span
+                >
+              </p>
               <div class="flex gap-2">
                 <button
                   aloraFunction="services.manage"
@@ -175,27 +184,28 @@
             </div>
             <div class="touch-grid">
               <button
-                *ngFor="let service of catalogServices"
+                *ngFor="let tile of catalogTiles; trackBy: trackTile"
                 type="button"
-                class="touch-card service-card"
-                (click)="addService(service)"
+                class="touch-card"
+                [class.service-card]="tile.kind === 'service'"
+                [class.product-card]="tile.kind === 'product'"
+                [class.tile-dragging]="tileDragKey === tile.key"
+                [attr.data-tile-key]="tile.key"
+                (pointerdown)="pressTile(tile, $event)"
+                (contextmenu)="canArrangeTiles && $event.preventDefault()"
+                (click)="tileClick(tile)"
               >
-                <span class="touch-card-kind">Servizio</span>
-                <strong>{{ service.name }}</strong>
-                <span>€{{ Number(service.basePrice || 0).toFixed(2) }}</span>
-              </button>
-              <button
-                *ngFor="let product of catalogProducts"
-                type="button"
-                class="touch-card product-card"
-                (click)="addProduct(product)"
-              >
-                <span class="touch-card-kind">Prodotto</span>
-                <strong>{{ product.name }}</strong>
-                <span>{{
-                  product.price === null || product.price === undefined
+                <span class="touch-card-kind">{{
+                  tile.kind === "service" ? "Servizio" : "Prodotto"
+                }}</span>
+                <strong>{{ tile.entity.name }}</strong>
+                <span *ngIf="tile.kind === 'service'"
+                  >€{{ Number(tile.entity.basePrice || 0).toFixed(2) }}</span
+                >
+                <span *ngIf="tile.kind === 'product'">{{
+                  tile.entity.price === null || tile.entity.price === undefined
                     ? "Prezzo da inserire"
-                    : "€" + Number(product.price).toFixed(2)
+                    : "€" + Number(tile.entity.price).toFixed(2)
                 }}</span>
               </button>
             </div>

@@ -62,13 +62,13 @@ export class ServicesController {
     });
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.servicesList(tenantId)}:activity-v1:p${page}:s${pageSize}`,
+      `${cacheKeys.servicesList(tenantId)}:activity-v1:order-v1:p${page}:s${pageSize}`,
       CACHE_TTL_SECONDS.lists,
       async () => {
         const [items, total] = await Promise.all([
           this.prisma.service.findMany({
             where: { tenantId, ...serviceScopeFilter(scope) },
-            orderBy: [{ isActive: "desc" }, { name: "asc" }],
+            orderBy: [{ isActive: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
             skip,
             take,
             include: {

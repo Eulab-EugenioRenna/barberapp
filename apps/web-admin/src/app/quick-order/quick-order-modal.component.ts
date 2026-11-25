@@ -36,6 +36,14 @@ import {
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { BarcodeScannerService } from "../core/barcode-scanner.service";
 
+type CatalogTile = {
+  kind: "service" | "product";
+  key: string;
+  entity: any;
+};
+/** How long a card is held before it can be moved. */
+const TILE_HOLD_MS = 450;
+
 @Component({
   selector: "barber-quick-order-modal",
   standalone: true,
@@ -369,6 +377,145 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     ]).filter((row) => row.isActive !== false);
   }
 
+  /**
+   * Services and products share one grid order, chosen by long-pressing a
+   * card and dragging it. Ties (never arranged) keep services first by name.
+   */
+  get catalogTiles(): CatalogTile[] {
+    const tiles: CatalogTile[] = [
+      ...this.catalogServices.map((entity) => ({
+        kind: "service" as const,
+        key: "service:" + entity.id,
+        entity,
+      })),
+      ...this.catalogProducts.map((entity) => ({
+        kind: "product" as const,
+        key: "product:" + entity.id,
+        entity,
+      })),
+    ];
+    return tiles.sort(
+      (a, b) =>
+        Number(a.entity.sortOrder || 0) - Number(b.entity.sortOrder || 0) ||
+        (a.kind === b.kind ? 0 : a.kind === "service" ? -1 : 1) ||
+        String(a.entity.name || "").localeCompare(String(b.entity.name || "")),
+    );
+  }
+  trackTile = (_: number, tile: CatalogTile) => tile.key;
+  get canArrangeTiles(): boolean {
+    return this.session.can("services.manage");
+  }
+
+  tileDragKey = "";
+  tileOrderFeedback = "";
+  private tileDrag: {
+    key: string;
+    pointerId: number;
+    x: number;
+    y: number;
+    active: boolean;
+    moved: boolean;
+    timer: ReturnType<typeof setTimeout>;
+    detach: () => void;
+  } | null = null;
+  private skipTileClick = false;
+
+  /** Holding a card for a moment picks it up; moving earlier is a normal tap or scroll. */
+  pressTile(tile: CatalogTile, event: PointerEvent): void {
+    if (!this.canArrangeTiles || typeof document === "undefined") return;
+    if (event.button !== undefined && event.button > 0) return;
+    this.endTileDrag();
+    const move = (e: PointerEvent) => this.moveTile(e);
+    const up = () => this.endTileDrag();
+    // While a card is held, the finger moves the card instead of the page.
+    const touchMove = (e: TouchEvent) => {
+      if (this.tileDrag?.active) e.preventDefault();
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+    document.addEventListener("pointercancel", up);
+    document.addEventListener("touchmove", touchMove, { passive: false });
+    this.tileDrag = {
+      key: tile.key,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      active: false,
+      moved: false,
+      timer: setTimeout(() => {
+        if (!this.tileDrag) return;
+        this.tileDrag.active = true;
+        this.tileDragKey = this.tileDrag.key;
+        navigator.vibrate?.(15);
+      }, TILE_HOLD_MS),
+      detach: () => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        document.removeEventListener("pointercancel", up);
+        document.removeEventListener("touchmove", touchMove);
+      },
+    };
+  }
+  moveTile(event: PointerEvent): void {
+    const drag = this.tileDrag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (!drag.active) {
+      if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 8)
+        this.endTileDrag();
+      return;
+    }
+    event.preventDefault();
+    const over = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest("[data-tile-key]")
+      ?.getAttribute("data-tile-key");
+    if (!over || over === drag.key) return;
+    const tiles = this.catalogTiles;
+    const from = tiles.findIndex((tile) => tile.key === drag.key);
+    const to = tiles.findIndex((tile) => tile.key === over);
+    if (from < 0 || to < 0) return;
+    const [tile] = tiles.splice(from, 1);
+    tiles.splice(to, 0, tile);
+    tiles.forEach((row, index) => (row.entity.sortOrder = index));
+    drag.moved = true;
+  }
+  private endTileDrag(): void {
+    const drag = this.tileDrag;
+    this.tileDrag = null;
+    this.tileDragKey = "";
+    if (!drag) return;
+    clearTimeout(drag.timer);
+    drag.detach();
+    if (!drag.active) return;
+    // The click that ends a hold does not add the card to the account.
+    this.skipTileClick = true;
+    setTimeout(() => (this.skipTileClick = false), 400);
+    if (drag.moved) void this.saveTileOrder();
+  }
+  tileClick(tile: CatalogTile): void {
+    if (this.skipTileClick) {
+      this.skipTileClick = false;
+      return;
+    }
+    if (tile.kind === "service") this.addService(tile.entity);
+    else this.addProduct(tile.entity);
+  }
+  async saveTileOrder(): Promise<void> {
+    const items = this.catalogTiles.map((tile) => ({
+      kind: tile.kind,
+      id: tile.entity.id,
+    }));
+    this.tileOrderFeedback = "";
+    try {
+      await firstValueFrom(
+        this.http.post(`${ADMIN_API_URL}/catalog-order`, { items }),
+      );
+      this.tileOrderFeedback = "ordine salvato";
+    } catch {
+      this.tileOrderFeedback = "ordine non salvato, riprova";
+    }
+  }
+
   onQuickCreated(event: { kind: QuickCreateKind; entity: any }): void {
     if (event.kind === "customer") {
       this.createdCustomers.unshift(event.entity);
@@ -420,6 +567,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroyed = true;
     this.cancelDrag();
+    this.endTileDrag();
     this.cancelQuickCreate();
     if (this.quoteTimer) clearTimeout(this.quoteTimer);
     this.quoteGeneration++;
