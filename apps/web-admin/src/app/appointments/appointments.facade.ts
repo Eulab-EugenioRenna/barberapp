@@ -1,3 +1,4 @@
+import { slotOptions } from "../core/slot-options";
 import { bookingInstant, localBookingTime } from "./booking-local-time";
 import { CreateRecoveryService } from "../core/create-recovery.service";
 import { Injectable, computed, signal, inject } from "@angular/core";
@@ -96,7 +97,7 @@ export class AppointmentsFacade {
   readonly filteredAppointmentCustomers = signal<any[]>([]);
   readonly appointmentSelectedDate = signal(toLocalDateKey(new Date()));
   readonly appointmentSlots = signal<
-    Array<{ startsAt: string; label: string }>
+    Array<{ startsAt: string; label: string; outsideHours?: boolean }>
   >([]);
   readonly calendarView = signal<CalendarView>("week");
   readonly calendarDate = signal(new Date());
@@ -106,7 +107,7 @@ export class AppointmentsFacade {
   readonly detailAppointmentId = signal("");
   readonly quickRescheduleState = signal<QuickRescheduleState | null>(null);
   readonly quickRescheduleSlots = signal<
-    Array<{ startsAt: string; label: string }>
+    Array<{ startsAt: string; label: string; outsideHours?: boolean }>
   >([]);
   readonly listFilterDate = signal("");
   readonly loading = signal(false);
@@ -198,10 +199,7 @@ export class AppointmentsFacade {
   }
 
   readonly appointmentSlotOptions = computed(() =>
-    this.appointmentSlots().map((slot) => ({
-      value: slot.startsAt,
-      label: slot.label,
-    })),
+    slotOptions(this.appointmentSlots()),
   );
 
   readonly appointmentStatusOptions = computed(() =>
@@ -508,10 +506,7 @@ export class AppointmentsFacade {
   );
 
   readonly quickRescheduleSlotOptions = computed(() =>
-    this.quickRescheduleSlots().map((slot) => ({
-      value: slot.startsAt,
-      label: slot.label,
-    })),
+    slotOptions(this.quickRescheduleSlots()),
   );
 
   replaceSourceData(input: {
@@ -1241,6 +1236,7 @@ export class AppointmentsFacade {
       const slots = (response.slots || []).map((slot: any) => ({
         startsAt: slot.startsAt,
         label: `${slot.label} – ${new Date(slot.endsAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`,
+        outsideHours: !!slot.outsideHours,
       }));
       this.quickRescheduleSlots.set(slots);
       if (

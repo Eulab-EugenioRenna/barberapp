@@ -250,6 +250,7 @@ export class BookingAvailabilityService {
           label: string;
           endsAt: string;
           estimatedTotal: string;
+          outsideHours?: boolean;
           lines: Array<{
             serviceId: string;
             name: string;
@@ -272,6 +273,9 @@ export class BookingAvailabilityService {
               excludeAppointmentIds,
               durationMilliseconds: heldDuration,
               sectorId: services.find((row) => row.id === first.serviceId)?.sectorId,
+              // Staff see the whole day; a range only marks days with
+              // slots inside opening hours.
+              includeOutsideHours: !publicOnly && !!body.date,
             },
             client,
           );
@@ -330,6 +334,7 @@ export class BookingAvailabilityService {
               );
               hasSlots = true;
               if (!body.date) break;
+              const outsideHours = rows.some((row) => row.outsideHours);
               const total = sumPricedLines(
                 rows.map((row) =>
                   priceLine({
@@ -346,6 +351,7 @@ export class BookingAvailabilityService {
                   Math.max(...rows.map((row) => row.endsAt.getTime())),
                 ).toISOString(),
                 estimatedTotal: total.total,
+                ...(outsideHours ? { outsideHours: true } : {}),
                 lines: rows.map((row) => ({
                   serviceId: row.serviceId,
                   name: row.service.name,

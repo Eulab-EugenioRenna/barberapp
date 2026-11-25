@@ -26,11 +26,9 @@ function fixture() {
   const calendar = {
     service: {
       findMany: jest.fn().mockResolvedValue(services),
-      aggregate: jest
-        .fn()
-        .mockResolvedValue({
-          _max: { bufferBeforeMinutes: 0, bufferAfterMinutes: 0 },
-        }),
+      aggregate: jest.fn().mockResolvedValue({
+        _max: { bufferBeforeMinutes: 0, bufferAfterMinutes: 0 },
+      }),
     },
     collaborator: { findMany: jest.fn().mockResolvedValue(people) },
     room: { findMany: jest.fn().mockResolvedValue([]) },
@@ -44,14 +42,12 @@ function fixture() {
             where.activityId.in.includes(row.activityId),
         ),
       ),
-      findFirst: jest
-        .fn()
-        .mockResolvedValue({
-          tenantId: "tenant",
-          weeklyHours: null,
-          closures: [],
-          location: { weeklyHours: null, closures: [] },
-        }),
+      findFirst: jest.fn().mockResolvedValue({
+        tenantId: "tenant",
+        weeklyHours: null,
+        closures: [],
+        location: { weeklyHours: null, closures: [] },
+      }),
     },
     tenantHoliday: {
       count: jest.fn().mockResolvedValue(0),
@@ -78,7 +74,8 @@ function fixture() {
       { serviceId: "one", startsAt: at("09:00") },
       { serviceId: "two", startsAt: at("09:00") },
     ],
-  ) => planner.plan(calendar as never, "tenant", "Europe/Rome", lines);
+    options: { enforceHours?: boolean } = {},
+  ) => planner.plan(calendar as never, "tenant", "Europe/Rome", lines, options);
   return { calendar, services, people, plan, activitySectors };
 }
 describe("transaction-bound booking resource planner", () => {
@@ -104,16 +101,27 @@ describe("transaction-bound booking resource planner", () => {
             }
           : null,
     );
-    await expect(plan()).rejects.toMatchObject({
-      response: { code: "RESOURCES_UNAVAILABLE" },
-    });
+    await expect(plan(undefined, { enforceHours: true })).rejects.toMatchObject(
+      {
+        response: { code: "RESOURCES_UNAVAILABLE" },
+      },
+    );
+    // Staff may book someone off shift: planned, and flagged.
+    const staff = await plan();
+    expect(staff.map((row) => row.collaboratorId)).toEqual(["B", "A"]);
+    expect(staff.map((row) => row.outsideHours)).toEqual([true, false]);
   });
   it("rejects company holidays and mixed locations before returning an assignment", async () => {
     const { calendar, plan, activitySectors } = fixture();
     calendar.tenantHoliday.count.mockResolvedValue(1);
-    await expect(plan()).rejects.toMatchObject({
-      response: { code: "BOOKING_OUTSIDE_HOURS" },
-    });
+    await expect(plan(undefined, { enforceHours: true })).rejects.toMatchObject(
+      {
+        response: { code: "BOOKING_OUTSIDE_HOURS" },
+      },
+    );
+    // Opening hours bind the public; staff book on a closed day, flagged.
+    const staff = await plan();
+    expect(staff.every((row) => row.outsideHours)).toBe(true);
     // The second service's activity does not run at this location.
     calendar.tenantHoliday.count.mockResolvedValue(0);
     activitySectors[1].locationId = "different-site";

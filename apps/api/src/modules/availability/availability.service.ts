@@ -28,6 +28,8 @@ export type AvailabilitySlot = {
   collaboratorId: string | null;
   collaboratorName: string;
   isWorkingSlot?: boolean;
+  /** Staff only: outside opening or the collaborator's schedule. */
+  outsideHours?: boolean;
   roomId?: string;
 };
 
@@ -100,6 +102,11 @@ export class AvailabilityService {
       /** Sector already resolved by the caller (activity at the location). */
       sectorId?: string;
       locationId?: string;
+      /**
+       * Staff only: list the whole day. Opening and working hours are for the
+       * public; slots outside them are kept and flagged `outsideHours`.
+       */
+      includeOutsideHours?: boolean;
     },
     client: AvailabilityCalendar = this.prisma,
   ): Promise<AvailabilitySlot[]> {
@@ -183,7 +190,15 @@ export class AvailabilityService {
       dateKey,
       options?.publicOnly,
     );
-    if (!businessWindow) return [];
+    const bypassHours = !!options?.includeOutsideHours && !options?.publicOnly;
+    if (!businessWindow && !bypassHours) return [];
+    const loopWindow = bypassHours
+      ? { startMinutes: 0, endMinutes: 1440 }
+      : businessWindow!;
+    const outsideOpening = (start: number, end: number) =>
+      !businessWindow ||
+      start < businessWindow.startMinutes ||
+      end > businessWindow.endMinutes;
     const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
     if (!dateMatch) {
       throw new BadRequestException("La data scelta non è valida");
@@ -294,8 +309,8 @@ export class AvailabilityService {
     }
 
     for (
-      let hour = Math.floor(businessWindow.startMinutes / 60);
-      hour <= Math.floor(businessWindow.endMinutes / 60);
+      let hour = Math.floor(loopWindow.startMinutes / 60);
+      hour <= Math.floor(loopWindow.endMinutes / 60);
       hour += 1
     ) {
       for (const minute of [0, 30]) {
@@ -303,11 +318,16 @@ export class AvailabilityService {
         const slotEndMinutes = slotStartMinutes + duration / 60000;
 
         if (
-          slotStartMinutes < businessWindow.startMinutes ||
-          slotEndMinutes > businessWindow.endMinutes
+          slotStartMinutes < loopWindow.startMinutes ||
+          slotEndMinutes > loopWindow.endMinutes
         ) {
           continue;
         }
+        if (hour >= 24) continue;
+        const slotOutsideOpening = outsideOpening(
+          slotStartMinutes,
+          slotEndMinutes,
+        );
 
         const startsAt = zonedTimeToUtc(
           { year, month, day: dayOfMonth, hour, minute },
@@ -324,18 +344,14 @@ export class AvailabilityService {
 
         for (const collaborator of availableCollaborators) {
           const workingWindow = collaboratorWindows.get(collaborator.id);
+          let outsideSchedule = false;
 
           if (service.requiresCollaborator && collaborator.id !== "any") {
-            if (!workingWindow?.isAvailable) {
-              continue;
-            }
-
-            if (
+            outsideSchedule =
+              !workingWindow?.isAvailable ||
               slotStartMinutes < workingWindow.startMinutes ||
-              slotEndMinutes > workingWindow.endMinutes
-            ) {
-              continue;
-            }
+              slotEndMinutes > workingWindow.endMinutes;
+            if (outsideSchedule && !bypassHours) continue;
           }
 
           const collaboratorConflicts = appointments.some((appointment) => {
@@ -431,6 +447,9 @@ export class AvailabilityService {
             collaboratorName:
               `${collaborator.firstName} ${collaborator.lastName}`.trim(),
             isWorkingSlot: true,
+            ...(slotOutsideOpening || outsideSchedule
+              ? { outsideHours: true }
+              : {}),
           });
         }
       }

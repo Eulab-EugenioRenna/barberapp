@@ -50,8 +50,14 @@ export class BookingResourcesService {
       excludeAppointmentIds?: string[];
       /** Location (or sector) of the booking: services resolve their activity there. */
       target?: SectorTarget;
+      /**
+       * Opening and working hours bind the public. Staff may book outside
+       * them (default): the line is planned and flagged `outsideHours`.
+       */
+      enforceHours?: boolean;
     } = {},
   ) {
+    const enforceHours = options.enforceHours ?? !!options.publicOnly;
     if (
       !lines.length ||
       lines.length > 20 ||
@@ -216,6 +222,8 @@ export class BookingResourcesService {
       Awaited<ReturnType<typeof sectorWorkingWindow>>
     >();
     const demands: ResourceDemand[] = [];
+    const flags: Array<{ outsideOpening: boolean; offSchedule: Set<string> }> =
+      [];
     for (const row of rows) {
       const date = zonedDateKey(row.startsAt, timezone),
         start = zonedDateParts(row.startsAt, timezone),
@@ -242,12 +250,13 @@ export class BookingResourcesService {
         end.minute +
         end.second / 60 +
         row.endsAt.getUTCMilliseconds() / 60000;
-      if (
+      const sameDay = zonedDateKey(row.endsAt, timezone) === date;
+      const outsideOpening =
         !window ||
-        zonedDateKey(row.endsAt, timezone) !== date ||
+        !sameDay ||
         startMinutes < window.startMinutes ||
-        endMinutes > window.endMinutes
-      )
+        endMinutes > window.endMinutes;
+      if (outsideOpening && enforceHours)
         throw new ConflictException({
           code: "BOOKING_OUTSIDE_HOURS",
           message: "Uno dei servizi è fuori apertura della sede o del settore",
@@ -282,6 +291,7 @@ export class BookingResourcesService {
           "Professionista richiesto non disponibile nel settore",
         );
       const eligible: string[] = [];
+      const offSchedule: string[] = [];
       for (const person of candidates) {
         const personKey = person.id + ":" + date;
         if (!windows.has(personKey))
@@ -301,7 +311,11 @@ export class BookingResourcesService {
           endMinutes <= schedule.endMinutes
         )
           eligible.push(person.id);
+        else offSchedule.push(person.id);
       }
+      // Staff bypass: whoever is on shift first, then the others.
+      if (!enforceHours) eligible.push(...offSchedule);
+      flags.push({ outsideOpening, offSchedule: new Set(offSchedule) });
       const demand = {
         start: row.startsAt.getTime() - row.service.bufferBeforeMinutes * 60000,
         end: row.endsAt.getTime() + row.service.bufferAfterMinutes * 60000,
@@ -346,10 +360,16 @@ export class BookingResourcesService {
         message:
           "Le risorse per l'intera prenotazione non sono disponibili agli orari scelti",
       });
-    return rows.map((row, index) => ({
-      ...row,
-      collaboratorId: allocation![index].collaboratorId,
-      roomId: allocation![index].roomId,
-    }));
+    return rows.map((row, index) => {
+      const collaboratorId = allocation![index].collaboratorId;
+      return {
+        ...row,
+        collaboratorId,
+        roomId: allocation![index].roomId,
+        outsideHours:
+          flags[index].outsideOpening ||
+          (!!collaboratorId && flags[index].offSchedule.has(collaboratorId)),
+      };
+    });
   }
 }

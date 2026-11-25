@@ -1,3 +1,4 @@
+import { slotOptions } from "../core/slot-options";
 import { CommonModule } from "@angular/common";
 import { HttpClient } from "@angular/common/http";
 import { Component, EventEmitter, Input, OnInit, Output, inject } from "@angular/core";
@@ -73,7 +74,7 @@ interface ContextService {
           <div *ngIf="serviceId && date" class="field">
             <span>Orario <em class="required-mark" aria-hidden="true">*</em></span>
             <p *ngIf="slotsLoading" class="text-sm opacity-75" role="status">Cerco gli orari liberi…</p>
-            <ui-select *ngIf="!slotsLoading && slotOptions.length" name="slot" label="Orario" [options]="slotOptions" [filterable]="false" [(ngModel)]="startsAt" placeholder="Scegli l’orario"></ui-select>
+            <ui-select *ngIf="!slotsLoading && slotOptions.length" name="slot" label="Orario" [options]="slotOptions" [(ngModel)]="startsAt" placeholder="Scegli l’orario"></ui-select>
             <p *ngIf="!slotsLoading && !slotOptions.length" class="text-sm opacity-75">Nessun orario libero in questo giorno: prova un altro giorno.</p>
           </div>
 
@@ -203,7 +204,7 @@ export class PersonalBookingComponent implements OnInit {
         }),
       );
       if (request !== this.slotsRequest) return;
-      this.slotOptions = (response.slots || []).map((slot: { startsAt: string; label: string }) => ({ value: slot.startsAt, label: slot.label }));
+      this.slotOptions = slotOptions(response.slots || []);
     } catch (error: any) {
       if (request === this.slotsRequest) this.feedback = error?.error?.message || "Orari non disponibili: riprova.";
     } finally {

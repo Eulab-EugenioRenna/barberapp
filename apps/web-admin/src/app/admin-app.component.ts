@@ -1,3 +1,4 @@
+import { slotOptions } from "./core/slot-options";
 import { OperationalContextService } from "./core/operational-context.service";
 import { UiPageComponent } from "@alora/ui";
 import type { AdminNavKey } from "./core/admin-navigation";
@@ -597,7 +598,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   appointmentCustomerSearch = "";
   filteredAppointmentCustomers: any[] = [];
   appointmentSelectedDate = toLocalDateKey(new Date());
-  appointmentSlots: Array<{ startsAt: string; label: string }> = [];
+  appointmentSlots: Array<{ startsAt: string; label: string; outsideHours?: boolean }> = [];
 
   can(key: string): boolean {
     return this.sessionStore.can(key);
@@ -674,10 +675,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   get appointmentSlotOptions(): Array<{ value: string; label: string }> {
-    return this.appointmentSlots.map((slot) => ({
-      value: slot.startsAt,
-      label: slot.label,
-    }));
+    return slotOptions(this.appointmentSlots);
   }
 
   get appointmentStatusOptions(): Array<{ value: string; label: string }> {
