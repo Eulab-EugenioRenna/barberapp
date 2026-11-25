@@ -972,13 +972,20 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     if (this.pricePadIndex > index) this.pricePadIndex -= 1;
   }
 
-  /** Second row of a line: collaborator, or what the line still needs. */
-  hasDetailRow(item: any): boolean {
-    return (
-      (item.kind === "service" && !this.nonPerformed(item)) ||
-      (item.kind === "product" && !item.sectorId) ||
-      this.nonPerformed(item)
-    );
+  /** Keypad under the lines: types into the price being edited. */
+  appendPrice(value: string): void {
+    const item = this.items[this.pricePadIndex];
+    if (!item) return;
+    const current = String(item.unitPrice ?? "");
+    if (value === "." && current.includes(".")) return;
+    item.unitPrice = `${current}${value}`;
+    this.queueQuote();
+  }
+  clearPrice(): void {
+    const item = this.items[this.pricePadIndex];
+    if (!item) return;
+    item.unitPrice = "";
+    this.queueQuote();
   }
 
   /** Line being dragged; it moves in the list while the pointer moves. */

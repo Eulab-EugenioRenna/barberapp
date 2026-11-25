@@ -10,7 +10,7 @@ export const SALES_TOUR: TourDefinition = {
   title: "Cassa",
   // v2: "Conti da chiudere" merged into the till.
   // v4: quick sale modal (barcode in the title bar, one row per line, VAT from the price list).
-  version: 5,
+  version: 6,
   when: (ctx) => ctx.canView("sales"),
   steps: () => [
     {
@@ -39,8 +39,8 @@ export const SALES_TOUR: TourDefinition = {
     {
       title: "La cassa veloce",
       body:
-        "In alto, accanto al titolo, scansiona o scrivi il barcode e premi Invio. Ogni riga sta su una linea, con sotto il professionista: " +
-        "tocca il prezzo per cambiarlo e trascina una riga per riordinarla. Nella griglia, tieni premuta una card per spostarla: l'ordine resta salvato. IVA e tipo di prezzo arrivano dal listino e si impostano " +
+        "In alto, accanto al titolo, scansiona o scrivi il barcode e premi Invio. Nel riepilogo ogni riga ha quantità, prezzo e professionista: " +
+        "tocca il prezzo per cambiarlo, anche con il tastierino, e trascina una riga per riordinarla. Nella griglia, tieni premuta una card per spostarla: l'ordine resta salvato. IVA e tipo di prezzo arrivano dal listino e si impostano " +
         "nelle pagine di servizi e prodotti. Il pagamento parte già su Contanti, pagato.",
       when: (c) => c.can("sales.manage"),
     },

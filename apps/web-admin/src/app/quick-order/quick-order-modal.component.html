@@ -42,6 +42,16 @@
                     : "Vendi adesso"
           }}
         </h2>
+        <p class="qo-subtitle">
+          <ng-container *ngIf="isLinkedToAppointment; else quickIntro">
+            La vendita verrà collegata all'appuntamento e chiuderà il conto del
+            cliente.
+          </ng-container>
+          <ng-template #quickIntro>
+            Registra in pochi tocchi servizi e prodotti acquistati senza
+            prenotazione.
+          </ng-template>
+        </p>
       </div>
       <label *ngIf="sale?.orderStatus !== 'cancelled'" class="qo-scan">
         <span class="qo-scan-icon" aria-hidden="true">▥</span>
@@ -140,7 +150,7 @@
             ></ui-select>
           </div>
           <div class="field">
-            <span>Cliente</span>
+            <span>1 · Cliente</span>
             <alora-customer-select
               [value]="customerId"
               (valueChange)="customerId = $event"
@@ -154,7 +164,7 @@
           <div>
             <div class="flex items-center justify-between gap-3">
               <p class="quick-order-step">
-                Tocca per aggiungere<span
+                2 · Tocca servizi o prodotti<span
                   *ngIf="canArrangeTiles"
                   class="qo-hint"
                 >
@@ -215,9 +225,10 @@
         <aside class="quick-order-cart">
           <div class="quick-order-cart-scroll" #cartScroll>
             <p class="quick-order-step">
-              Conto · {{ items.length }}
-              {{ items.length === 1 ? "riga" : "righe"
-              }}<span *ngIf="items.length > 1" class="qo-hint">
+              3 · Riepilogo vendita<span
+                *ngIf="items.length > 1"
+                class="qo-hint"
+              >
                 · trascina una riga per riordinarla</span
               >
             </p>
@@ -263,7 +274,7 @@
                 $event.preventDefault(); moveItem(i, i + 1)
               "
             >
-              <div class="cart-row">
+              <div class="cart-line-head">
                 <button
                   *ngIf="items.length > 1"
                   type="button"
@@ -281,48 +292,57 @@
                 >
                   ⋮⋮
                 </button>
-                <span
-                  class="line-kind"
-                  [class.is-service]="item.kind === 'service'"
-                  [attr.title]="
-                    item.kind === 'service' ? 'Servizio' : 'Prodotto'
-                  "
-                  aria-hidden="true"
-                ></span>
-                <strong class="line-label" [attr.title]="item.label">{{
-                  item.label
-                }}</strong>
-                <span *ngIf="+item.discount > 0" class="line-tag"
-                  >−€{{ +item.discount | number: "1.2-2" }}</span
+                <div class="cart-line-name">
+                  <span class="touch-card-kind">{{
+                    item.kind === "service" ? "Servizio" : "Prodotto"
+                  }}</span>
+                  <strong [attr.title]="item.label">{{ item.label }}</strong>
+                  <span *ngIf="+item.discount > 0" class="line-tag"
+                    >Sconto −€{{ +item.discount | number: "1.2-2" }}</span
+                  >
+                </div>
+                <button
+                  type="button"
+                  class="remove-line"
+                  [disabled]="!!item.booking"
+                  [attr.aria-label]="'Rimuovi ' + item.label"
+                  (click)="removeItem(i)"
                 >
-                <input
-                  *ngIf="quantityEditable(item)"
-                  class="line-qty"
-                  [(ngModel)]="item.quantity"
-                  (ngModelChange)="queueQuote()"
-                  (blur)="fixQuantity(item)"
-                  [name]="'quickQty' + i"
-                  [attr.aria-label]="'Quantità ' + item.label"
-                  type="number"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                />
-                <label
-                  class="line-price"
-                  [class.missing]="item.unitPrice === ''"
-                >
-                  <span aria-hidden="true">€</span
-                  ><input
+                  Rimuovi
+                </button>
+              </div>
+              <div class="cart-line-fields">
+                <label>
+                  <span>Q.tà</span>
+                  <input
+                    *ngIf="quantityEditable(item); else fixedQuantity"
+                    [(ngModel)]="item.quantity"
+                    (ngModelChange)="queueQuote()"
+                    (blur)="fixQuantity(item)"
+                    [name]="'quickQty' + i"
+                    [attr.aria-label]="'Quantità ' + item.label"
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputmode="numeric"
+                  />
+                  <ng-template #fixedQuantity>
+                    <input
+                      [value]="item.quantity"
+                      [attr.aria-label]="'Quantità ' + item.label"
+                      disabled
+                    />
+                  </ng-template>
+                </label>
+                <label [class.missing]="item.unitPrice === ''">
+                  <span>Prezzo</span>
+                  <input
                     [(ngModel)]="item.unitPrice"
                     (ngModelChange)="queueQuote()"
                     (focus)="pricePadIndex = i"
-                    (blur)="pricePadIndex = -1"
                     [name]="'quickPrice' + i"
                     [attr.data-price-index]="i"
-                    [attr.aria-label]="
-                      'Prezzo ' + item.label + ' (tocca per cambiarlo)'
-                    "
+                    [attr.aria-label]="'Prezzo ' + item.label"
                     type="number"
                     min="0"
                     step="0.01"
@@ -330,56 +350,88 @@
                     placeholder="Prezzo"
                   />
                 </label>
-                <button
-                  type="button"
-                  class="remove-line"
-                  [disabled]="!!item.booking"
-                  [attr.aria-label]="'Rimuovi ' + item.label"
-                  title="Rimuovi"
-                  (click)="removeItem(i)"
-                >
-                  ×
-                </button>
-              </div>
-              <div *ngIf="hasDetailRow(item)" class="cart-row cart-row-detail">
                 <div
                   *ngIf="item.kind === 'service' && !nonPerformed(item)"
                   class="cart-collaborator"
                 >
-                  <ui-select
-                    [value]="item.collaboratorId"
-                    (valueChange)="item.collaboratorId = $event"
-                    [options]="collaboratorOptionsFor(item)"
-                    [label]="'Professionista per ' + item.label"
-                    placeholder="Chi l’ha eseguito?"
-                  ></ui-select>
-                  <button
-                    *ngIf="item.booking?.collaboratorId && !item.collaboratorId"
-                    type="button"
-                    class="pill-btn"
-                    (click)="confirmPlannedPerformer(item)"
-                  >
-                    Prenotato
-                  </button>
+                  <span>Professionista</span>
+                  <div class="cart-collaborator-row">
+                    <ui-select
+                      [value]="item.collaboratorId"
+                      (valueChange)="item.collaboratorId = $event"
+                      [options]="collaboratorOptionsFor(item)"
+                      [label]="'Professionista per ' + item.label"
+                      placeholder="Scegli il professionista"
+                    ></ui-select>
+                    <button
+                      *ngIf="
+                        item.booking?.collaboratorId && !item.collaboratorId
+                      "
+                      type="button"
+                      class="pill-btn"
+                      (click)="confirmPlannedPerformer(item)"
+                    >
+                      Prenotato
+                    </button>
+                  </div>
                 </div>
-                <alora-sector-picker
+                <div
                   *ngIf="item.kind === 'product' && !item.sectorId"
-                  [(value)]="item.sectorId"
-                  [locationId]="locationId"
-                  [disabled]="!!item.id"
-                ></alora-sector-picker>
-                <input
-                  *ngIf="nonPerformed(item)"
-                  class="line-reason"
-                  [(ngModel)]="item.nonPerformanceChargeReason"
-                  [name]="'nonPerformanceReason' + i"
-                  [attr.aria-label]="'Motivo quota non eseguita ' + (i + 1)"
-                  maxlength="500"
-                  (ngModelChange)="queueQuote()"
-                  placeholder="Non eseguito: perché lo fai pagare?"
-                />
+                  class="cart-line-wide"
+                >
+                  <span>Attività</span>
+                  <alora-sector-picker
+                    [(value)]="item.sectorId"
+                    [locationId]="locationId"
+                    [disabled]="!!item.id"
+                  ></alora-sector-picker>
+                </div>
+                <label *ngIf="nonPerformed(item)" class="cart-line-wide">
+                  <span>Non eseguito: perché lo fai pagare?</span>
+                  <input
+                    [(ngModel)]="item.nonPerformanceChargeReason"
+                    [name]="'nonPerformanceReason' + i"
+                    [attr.aria-label]="'Motivo quota non eseguita ' + (i + 1)"
+                    maxlength="500"
+                    (ngModelChange)="queueQuote()"
+                  />
+                </label>
               </div>
             </article>
+
+            <div
+              *ngIf="pricePadIndex >= 0 && items[pricePadIndex]"
+              class="price-pad"
+            >
+              <div class="price-pad-title">
+                <span>Prezzo · {{ items[pricePadIndex].label }}</span>
+                <button type="button" (click)="pricePadIndex = -1">OK</button>
+              </div>
+              <div class="price-pad-grid">
+                <button
+                  *ngFor="
+                    let key of [
+                      '1',
+                      '2',
+                      '3',
+                      '4',
+                      '5',
+                      '6',
+                      '7',
+                      '8',
+                      '9',
+                      '0',
+                      '.',
+                    ]
+                  "
+                  type="button"
+                  (click)="appendPrice(key)"
+                >
+                  {{ key }}
+                </button>
+                <button type="button" (click)="clearPrice()">C</button>
+              </div>
+            </div>
             <div
               *ngIf="hasNewServices"
               class="field performed-at"
@@ -489,38 +541,32 @@
             />
           </div>
           <div class="checkout-bar">
-            <div
-              *ngIf="!sale"
-              class="pay-chips"
-              role="group"
-              aria-label="Pagamento"
-            >
-              <button
-                *ngFor="let option of paymentMethodOptions"
-                type="button"
-                class="pay-chip"
-                [attr.aria-pressed]="
-                  paymentStatus === 'paid' && paymentMethod === option.value
-                "
-                (click)="
-                  paymentMethod = $any(option.value); paymentStatus = 'paid'
-                "
-              >
-                {{ option.label }}
-              </button>
-              <button
-                type="button"
-                class="pay-chip pay-chip-later"
-                [attr.aria-pressed]="paymentStatus === 'unpaid'"
-                (click)="
-                  paymentStatus = paymentStatus === 'unpaid' ? 'paid' : 'unpaid'
-                "
-              >
-                Da pagare
-              </button>
-            </div>
+            <ng-container *ngIf="!sale">
+              <label class="field">
+                <span>Pagamento</span>
+                <select [(ngModel)]="paymentMethod" name="quickPaymentMethod">
+                  <option
+                    *ngFor="let option of paymentMethodOptions"
+                    [value]="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Stato</span>
+                <select [(ngModel)]="paymentStatus" name="quickPaymentStatus">
+                  <option
+                    *ngFor="let option of paymentStatusOptions"
+                    [value]="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+            </ng-container>
             <div class="checkout-total">
-              <span>Totale conto</span
+              <span>Totale</span
               ><strong>{{
                 quoteBusy ? "Calcolo…" : "€" + total.toFixed(2)
               }}</strong>
