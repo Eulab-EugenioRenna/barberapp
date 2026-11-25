@@ -367,16 +367,6 @@
                   [disabled]="!!item.id"
                 ></alora-sector-picker>
                 <input
-                  *ngIf="priceReasonRequired(item)"
-                  class="line-reason"
-                  [(ngModel)]="item.priceOverrideReason"
-                  [name]="'priceReason' + i"
-                  maxlength="500"
-                  (ngModelChange)="queueQuote()"
-                  [attr.aria-label]="'Perché cambi il prezzo di ' + item.label"
-                  placeholder="Prezzo cambiato: perché? (es. promo)"
-                />
-                <input
                   *ngIf="nonPerformed(item)"
                   class="line-reason"
                   [(ngModel)]="item.nonPerformanceChargeReason"

@@ -220,7 +220,7 @@ describe("barcode UI workflows", () => {
     expect(sent[0]).not.toHaveProperty("vatRate");
     expect(sent[0]).not.toHaveProperty("priceMode");
   });
-  it("asks why only when a list price with defined VAT changes", () => {
+  it("never asks why a price changed: the server records it", () => {
     modal.addService({
       id: "service-1",
       name: "Taglio",
@@ -228,18 +228,10 @@ describe("barcode UI workflows", () => {
       priceMode: "gross",
       vatRate: 22,
     });
-    modal.addService({ id: "service-2", name: "Barba", basePrice: 10 });
-    expect(modal.priceReasonRequired(modal.items[0])).toBe(false);
     modal.items[0].unitPrice = 18;
-    modal.items[1].unitPrice = 8;
-    expect(modal.priceReasonRequired(modal.items[0])).toBe(true);
-    // Historical lines without VAT: the server asks nothing.
-    expect(modal.priceReasonRequired(modal.items[1])).toBe(false);
     modal.customerId = "customer-1";
     modal.items.forEach((row) => (row.collaboratorId = "staff-1"));
-    modal.quote = { total: 26 };
-    expect(modal.canSubmit()).toBe(false);
-    modal.items[0].priceOverrideReason = "Promo";
+    modal.quote = { total: 18 };
     expect(modal.canSubmit()).toBe(true);
   });
   it("preserves manually entered rows and prices", async () => {

@@ -498,6 +498,8 @@ export class BookingMutationService {
               saleId: account.id,
               sectorId: String(itemInputs[index]["sectorId"]),
               stockState: "pending",
+              // New services go after the lines arranged at the till.
+              position: account.items.length + index,
             },
           });
       }

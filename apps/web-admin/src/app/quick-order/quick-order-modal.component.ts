@@ -823,24 +823,11 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     if (this.pricePadIndex > index) this.pricePadIndex -= 1;
   }
 
-  /**
-   * The server asks why a list price changed on a line with defined VAT
-   * (audit of price changes): only then the line shows the reason field.
-   */
-  priceReasonRequired(item: any): boolean {
-    if ((item.priceMode || "legacy") === "legacy") return false;
-    if (item.baselinePrice === null || item.baselinePrice === undefined)
-      return false;
-    if (item.unitPrice === "" || item.unitPrice === null) return false;
-    return Number(item.unitPrice) !== Number(item.baselinePrice);
-  }
-
   /** Second row of a line: collaborator, or what the line still needs. */
   hasDetailRow(item: any): boolean {
     return (
       (item.kind === "service" && !this.nonPerformed(item)) ||
       (item.kind === "product" && !item.sectorId) ||
-      this.priceReasonRequired(item) ||
       this.nonPerformed(item)
     );
   }
@@ -958,8 +945,6 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         (item) =>
           item.unitPrice !== "" &&
           Number(item.unitPrice) >= 0 &&
-          (!this.priceReasonRequired(item) ||
-            (item.priceOverrideReason || "").trim().length >= 3) &&
           (keepOpen || !this.requiresActual(item) || !!item.collaboratorId) &&
           (keepOpen ||
             !this.requiresChargeReason(item) ||

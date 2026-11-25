@@ -219,6 +219,7 @@ export class SalesController {
             take,
             include: {
               items: {
+                orderBy: [{ position: "asc" }, { id: "asc" }],
                 include: {
                   product: true,
                   service: true,
@@ -287,6 +288,7 @@ export class SalesController {
       take: 100,
       include: {
         items: {
+          orderBy: [{ position: "asc" }, { id: "asc" }],
           include: {
             product: true,
             service: true,
@@ -340,6 +342,7 @@ export class SalesController {
       where: { id: booking.orderItem.saleId, tenantId, ...saleFilter(scope) },
       include: {
         items: {
+          orderBy: [{ position: "asc" }, { id: "asc" }],
           include: {
             service: true,
             product: true,
@@ -616,10 +619,11 @@ export class SalesController {
           throw new BadRequestException(
             "Aggiungi ogni prestazione come riga separata",
           );
-        const rowInputs = normalizedItems.map((item) => ({
+        const rowInputs = normalizedItems.map((item, position) => ({
           ...item,
           id: randomUUID(),
           stockState: "pending",
+          position,
         }));
         const createdSale = await transaction.sale.create({
           data: {
@@ -953,12 +957,12 @@ export class SalesController {
             },
           },
         });
-        for (const item of attribution.items) {
+        for (const [position, item] of attribution.items.entries()) {
           if (item.id) {
             const { id: rowId, ...data } = item;
             await transaction.saleItem.update({
               where: { id: rowId, saleId: id },
-              data: { ...data, collaboratorId: data.collaboratorId ?? null },
+              data: { ...data, collaboratorId: data.collaboratorId ?? null, position },
             });
           }
         }
@@ -986,12 +990,13 @@ export class SalesController {
               create: attribution.items.flatMap((item, index) =>
                 item.id
                   ? []
-                  : [{ ...item, id: rowOrder[index], stockState: "pending" }],
+                  : [{ ...item, id: rowOrder[index], stockState: "pending", position: index }],
               ),
             },
           },
           include: {
             items: {
+              orderBy: [{ position: "asc" }, { id: "asc" }],
               include: {
                 product: true,
                 service: true,
@@ -1188,6 +1193,7 @@ export class SalesController {
         data: { appointmentId, revision: { increment: 1 } },
         include: {
           items: {
+            orderBy: [{ position: "asc" }, { id: "asc" }],
             include: {
               service: true,
               product: true,
@@ -1360,6 +1366,7 @@ export class SalesController {
           where: { id, tenantId, ...saleFilter(scope) },
           include: {
             items: {
+              orderBy: [{ position: "asc" }, { id: "asc" }],
               include: {
                 product: true,
                 service: true,

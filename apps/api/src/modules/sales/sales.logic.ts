@@ -183,7 +183,7 @@ export function normalizeOrderItems(input: {
       item["vatRate"] === undefined
         ? (old?.vatRate ?? catalog?.vatRate)
         : item["vatRate"];
-    const reason =
+    let reason =
       typeof item["priceOverrideReason"] === "string"
         ? item["priceOverrideReason"].trim()
         : old?.priceOverrideReason || undefined;
@@ -203,6 +203,10 @@ export function normalizeOrderItems(input: {
       ) !== 0;
     const changedMode =
       mode !== (old?.priceMode ?? catalog?.priceMode ?? "legacy");
+    // A price typed at the till is audited with an automatic reason; VAT and
+    // price-mode changes still need one written by a person.
+    if (!changedRate && !changedMode && mode !== "legacy" && changedPrice && (!reason || reason.length < 3))
+      reason = "Prezzo modificato in cassa";
     if (
       (changedRate || changedMode || (mode !== "legacy" && changedPrice)) &&
       (!reason || reason.length < 3)

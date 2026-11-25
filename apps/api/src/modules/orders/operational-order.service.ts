@@ -166,6 +166,7 @@ export class OperationalOrderService {
         items: {
           create: lines.map(({ id, line, reason }, index) => ({
             id,
+            position: index,
             sectorId: appointments[index].sectorId,
             serviceId: appointments[index].serviceId,
             label: appointments[index].service.name,
