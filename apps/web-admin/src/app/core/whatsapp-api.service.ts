@@ -7,7 +7,7 @@ import {
 import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView,
   WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
-  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastView,
+  WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastView, WhatsAppBroadcastDetail,
 } from "@barber/shared/whatsapp";
 import { ADMIN_API_URL } from "./api-config";
 import { SessionStore } from "./session.store";
@@ -56,6 +56,8 @@ export class WhatsAppApiService {
   broadcast(sessionId: string, input: WhatsAppBroadcastInput) {
     return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/sessions/${encodeURIComponent(sessionId)}/broadcast`, input));
   }
+  listBroadcasts() { return firstValueFrom(this.http.get<WhatsAppBroadcastView[]>(this.root + "/broadcasts")); }
+  broadcastDetail(id: string) { return firstValueFrom(this.http.get<WhatsAppBroadcastDetail>(this.root + "/broadcasts/" + encodeURIComponent(id) + "/detail")); }
   activeBroadcasts() { return firstValueFrom(this.http.get<WhatsAppBroadcastView[]>(this.root + "/broadcasts/active")); }
   latestBroadcast() { return firstValueFrom(this.http.get<WhatsAppBroadcastView | null>(this.root + "/broadcasts/latest")); }
   broadcastStatus(id: string) {

@@ -3,7 +3,7 @@ import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import type {
   WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView,
-  WhatsAppImageInput,
+  WhatsAppImageInput, WhatsAppBroadcastView, WhatsAppBroadcastDetail, WhatsAppBroadcastEventView,
 } from "@barber/shared/whatsapp";
 import { prepareWhatsAppImage } from "../shared/whatsapp-image";
 import { SessionStore } from "../core/session.store";
@@ -24,6 +24,12 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   conversations: WhatsAppConversationView[] = [];
   messages: WhatsAppMessageView[] = [];
   outbox: WhatsAppOutboxView[] = [];
+  /** «Messaggio a tutti» of this account: one row each in «Invii». */
+  broadcasts: WhatsAppBroadcastView[] = [];
+  /** Detail card open in «Invii»: a whole queue or one message. */
+  detail: { kind: "broadcast"; job: WhatsAppBroadcastDetail } | { kind: "single"; item: WhatsAppOutboxView } | null = null;
+  detailLoading = false; detailFeedback = "";
+  private detailTimer?: ReturnType<typeof setTimeout>;
   archiveId = ""; chatId = ""; qr: string | null = null;
   to = ""; message = ""; recipientAuthorized = false;
   /** Recipient: a customer of the salon, or the conversation chosen in «Conversazioni» (`to`). */
@@ -87,7 +93,95 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     await this.refresh();
     if (!this.destroyed) this.timer = setInterval(() => { if (!document.hidden) void this.refresh(); }, 8000);
   }
-  ngOnDestroy() { this.destroyed = true; this.selection++; clearInterval(this.timer); this.stopQr(); this.qr = null; this.clearMedia(); }
+  ngOnDestroy() {
+    this.destroyed = true; this.selection++; clearInterval(this.timer); this.stopQr(); this.qr = null; this.clearMedia();
+    if (this.detailTimer) clearTimeout(this.detailTimer);
+  }
+
+  /** «Invii»: each «Messaggio a tutti» is one row, single messages one row each, newest first. */
+  get sendRows(): Array<{ key: string; at: string; job?: WhatsAppBroadcastView; item?: WhatsAppOutboxView }> {
+    const known = new Set(this.broadcasts.map((job) => job.id));
+    return [
+      ...this.broadcasts.map((job) => ({ key: "b:" + job.id, at: job.createdAt, job })),
+      ...this.outbox
+        .filter((item) => !item.broadcastId || !known.has(item.broadcastId))
+        .map((item) => ({ key: "m:" + item.id, at: item.createdAt, item })),
+    ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 80);
+  }
+  trackKey(_index: number, row: { key: string }) { return row.key; }
+  broadcastStatus(status: string) {
+    return ({ running: "In esecuzione", paused: "In pausa", done: "Completato", cancelled: "Annullato" } as Record<string, string>)[status] ?? status;
+  }
+  broadcastPercent(job: WhatsAppBroadcastView) {
+    return job.total ? Math.round(((job.sent + job.failed) / job.total) * 100) : 0;
+  }
+  eventLabel(event: WhatsAppBroadcastEventView) {
+    switch (event.kind) {
+      case "queued": return `Messo in coda: ${event.pending} destinatari`;
+      case "step": return `Gruppo inviato: ${event.sent} inviati${event.failed ? `, ${event.failed} non riusciti` : ""} · ${event.pending} da inviare`;
+      case "waiting": return `${event.pending} numeri aspettano il messaggio precedente`;
+      case "busy": return "WhatsApp occupato: nuovo tentativo dopo un minuto";
+      case "paused": return "In pausa";
+      case "resumed": return "Ripreso";
+      case "cancelled": return `Annullato (${event.sent} già inviati)`;
+      case "done": return `Completato: ${event.sent} inviati${event.failed ? `, ${event.failed} non riusciti` : ""}`;
+    }
+  }
+  /** Delivery state reported by WhatsApp for one message of a queue, when still listed. */
+  deliveryOf(outboxId: string | null) {
+    const item = outboxId ? this.outbox.find((row) => row.id === outboxId) : undefined;
+    return item ? this.stateLabel(item.state) : "";
+  }
+  async openBroadcast(job: WhatsAppBroadcastView) {
+    this.detailFeedback = "";
+    this.detailLoading = true;
+    try {
+      const full = await this.api.broadcastDetail(job.id);
+      if (this.destroyed) return;
+      this.detail = { kind: "broadcast", job: full };
+      this.scheduleDetail();
+    } catch (error) {
+      this.detailFeedback = this.error(error);
+    } finally { this.detailLoading = false; }
+  }
+  openSingle(item: WhatsAppOutboxView) {
+    this.detailFeedback = "";
+    this.detail = { kind: "single", item };
+  }
+  closeDetail() {
+    this.detail = null;
+    if (this.detailTimer) clearTimeout(this.detailTimer);
+  }
+  /** A running queue refreshes its card every 3 seconds while it is open. */
+  private scheduleDetail() {
+    if (this.detailTimer) clearTimeout(this.detailTimer);
+    const open = this.detail;
+    if (open?.kind !== "broadcast" || open.job.status !== "running") return;
+    this.detailTimer = setTimeout(async () => {
+      if (this.detail?.kind !== "broadcast" || this.detail.job.id !== open.job.id) return;
+      try {
+        const full = await this.api.broadcastDetail(open.job.id);
+        if (this.detail?.kind === "broadcast" && this.detail.job.id === full.id) this.detail = { kind: "broadcast", job: full };
+        this.broadcasts = this.broadcasts.map((job) => (job.id === full.id ? full : job));
+      } catch { /* next try in 3 seconds */ }
+      this.scheduleDetail();
+    }, 3000);
+  }
+  async broadcastAction(action: "cancel" | "resume") {
+    if (this.detail?.kind !== "broadcast") return;
+    const id = this.detail.job.id;
+    this.busy = true;
+    try {
+      if (action === "cancel") await this.api.cancelBroadcast(id);
+      else await this.api.resumeBroadcast(id);
+      const full = await this.api.broadcastDetail(id);
+      this.detail = { kind: "broadcast", job: full };
+      this.broadcasts = this.broadcasts.map((job) => (job.id === full.id ? full : job));
+      this.scheduleDetail();
+    } catch (error) {
+      this.detailFeedback = this.error(error);
+    } finally { this.busy = false; }
+  }
   /** While pairing, the QR rotates: refresh it often, stop as soon as it is linked. */
   private syncQrPolling() {
     const pairing = this.active?.state === "pairing" && this.canManage;
@@ -111,9 +205,12 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
     if (this.refreshing || this.destroyed) return;
     this.refreshing = true;
     try {
-      const [connections, archives, outbox] = await Promise.all([this.api.sessions(), this.api.archives(), this.api.outbox()]);
+      const [connections, archives, outbox, broadcasts] = await Promise.all([
+        this.api.sessions(), this.api.archives(), this.api.outbox(),
+        this.canSend ? this.api.listBroadcasts().catch(() => this.broadcasts) : Promise.resolve([]),
+      ]);
       if (this.destroyed) return;
-      this.connections = connections; this.archives = archives; this.outbox = outbox;
+      this.connections = connections; this.archives = archives; this.outbox = outbox; this.broadcasts = broadcasts;
       this.fresh = true; this.feedback = ""; this.updatedAt = new Date();
       if (!archives.some(a => a.id === this.archiveId)) {
         this.archiveId = archives[0]?.id || ""; this.chatId = ""; this.messages = []; this.selection++;

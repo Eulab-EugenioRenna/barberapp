@@ -209,17 +209,104 @@
     class="panel wa-card wa-outbox"
   >
     <p class="wa-muted">I messaggi partiti dal tuo numero con ALORA. Se WhatsApp non conferma un invio, ALORA non lo ripete da solo: controlla sul telefono.</p>
-    <p *ngIf="!outbox.length" class="wa-empty">Nessun invio registrato.</p>
+    <p *ngIf="!sendRows.length" class="wa-empty">Nessun invio registrato.</p>
+    <p *ngIf="detailFeedback && !detail" role="alert" class="wa-feedback">{{ detailFeedback }}</p>
     <ol>
-      <li *ngFor="let item of outbox.slice(0, 50); trackBy: trackId">
-        <div>
-          <strong>{{ item.recipientName || 'Destinatario' }}</strong>
-          <span class="wa-status" [class.online]="item.state === 'sent'">{{ stateLabel(item.state) }}</span>
-          <time>{{ item.createdAt | date: 'dd MMM, HH:mm' }}</time>
-        </div>
-        <p *ngIf="item.preview" class="wa-preview">{{ item.kind === 'image' ? '📷 ' : '' }}{{ item.preview }}</p>
-        <p *ngIf="item.problem" class="wa-muted">{{ item.problem }}</p>
+      <li *ngFor="let row of sendRows; trackBy: trackKey">
+        <button *ngIf="row.job as job" type="button" class="wa-send-row" [disabled]="detailLoading" (click)="openBroadcast(job)">
+          <div>
+            <strong>Messaggio a tutti</strong>
+            <span class="wa-status" [class.online]="job.status === 'done'" [class.wa-running]="job.status === 'running'">{{ broadcastStatus(job.status) }}</span>
+            <time>{{ job.createdAt | date: 'dd MMM, HH:mm' }}</time>
+          </div>
+          <p *ngIf="job.preview" class="wa-preview">{{ job.preview }}</p>
+          <div class="wa-bar" aria-hidden="true"><span [style.width.%]="broadcastPercent(job)"></span></div>
+          <p class="wa-muted">
+            {{ job.sent }} inviati su {{ job.total }}<ng-container *ngIf="job.failed"> · {{ job.failed }} non riusciti</ng-container><ng-container *ngIf="job.skipped"> · {{ job.skipped }} saltati</ng-container> · apri i dettagli
+          </p>
+        </button>
+        <button *ngIf="row.item as item" type="button" class="wa-send-row" (click)="openSingle(item)">
+          <div>
+            <strong>{{ item.recipientName || 'Destinatario' }}</strong>
+            <span class="wa-status" [class.online]="item.state === 'sent'">{{ stateLabel(item.state) }}</span>
+            <time>{{ item.createdAt | date: 'dd MMM, HH:mm' }}</time>
+          </div>
+          <p *ngIf="item.preview" class="wa-preview">{{ item.kind === 'image' ? '📷 ' : '' }}{{ item.preview }}</p>
+          <p *ngIf="item.problem" class="wa-muted">{{ item.problem }}</p>
+        </button>
       </li>
     </ol>
   </section>
+
+  <div *ngIf="detail" class="confirm-overlay">
+    <button type="button" class="confirm-backdrop" aria-label="Chiudi dettaglio invio" (click)="closeDetail()"></button>
+    <article class="confirm-dialog panel wa-detail" role="dialog" aria-modal="true" aria-labelledby="wa-detail-title">
+      <ng-container *ngIf="detail.kind === 'broadcast'">
+        <ng-container *ngIf="detail.job as job">
+          <div class="wa-detail-head">
+            <div>
+              <p class="eyebrow text-[var(--accent)]">Messaggio a tutti</p>
+              <h2 id="wa-detail-title" class="font-display text-2xl">{{ broadcastStatus(job.status) }}</h2>
+              <p class="wa-muted">Creato il {{ job.createdAt | date: 'dd MMM yyyy, HH:mm' }}<ng-container *ngIf="job.finishedAt"> · chiuso il {{ job.finishedAt | date: 'dd MMM, HH:mm' }}</ng-container></p>
+            </div>
+            <button type="button" class="pill-btn" (click)="closeDetail()">Chiudi</button>
+          </div>
+          <p *ngIf="job.preview" class="wa-detail-text">{{ job.preview }}</p>
+          <div class="wa-bar" aria-hidden="true"><span [style.width.%]="broadcastPercent(job)"></span></div>
+          <dl class="wa-detail-counts">
+            <div><dt>Inviati</dt><dd>{{ job.sent }}</dd></div>
+            <div><dt>Da inviare</dt><dd>{{ job.pending }}</dd></div>
+            <div><dt>Non riusciti</dt><dd>{{ job.failed }}</dd></div>
+            <div><dt>Saltati</dt><dd>{{ job.skipped }}</dd></div>
+          </dl>
+          <p *ngIf="job.error" class="wa-feedback">{{ job.error }}</p>
+          <p *ngIf="detailFeedback" role="alert" class="wa-feedback">{{ detailFeedback }}</p>
+          <div *ngIf="job.status === 'running' || job.status === 'paused'" class="wa-actions">
+            <button type="button" class="pill-btn" [disabled]="busy" (click)="broadcastAction('cancel')">Annulla l’invio</button>
+            <button *ngIf="job.status === 'paused'" type="button" class="primary-btn" [disabled]="busy" (click)="broadcastAction('resume')">Riprendi</button>
+          </div>
+          <h3 class="wa-detail-section">Passaggi</h3>
+          <p *ngIf="!job.events.length" class="wa-muted">Passaggi registrati da questo aggiornamento in poi.</p>
+          <ol class="wa-timeline">
+            <li *ngFor="let event of job.events" [class]="'wa-event-' + event.kind">
+              <time>{{ event.at | date: 'dd MMM, HH:mm:ss' }}</time>
+              <span>{{ eventLabel(event) }}</span>
+              <small *ngIf="event.note && event.kind !== 'waiting' && event.kind !== 'busy'">{{ event.note }}</small>
+            </li>
+          </ol>
+          <h3 class="wa-detail-section">Destinatari ({{ job.recipients.length }})</h3>
+          <ol class="wa-recipients">
+            <li *ngFor="let row of job.recipients">
+              <span><strong>{{ row.name || row.recipient }}</strong><small *ngIf="row.name">{{ row.recipient }}</small></span>
+              <span class="wa-recipient-state" [class]="'is-' + row.state">
+                {{ row.state === 'sent' ? (deliveryOf(row.outboxId) || 'Inviato') : row.state === 'failed' ? 'Non riuscito' : 'Da inviare' }}
+                <small *ngIf="row.sentAt">{{ row.sentAt | date: 'HH:mm' }}</small>
+                <small *ngIf="row.state !== 'sent' && row.error">{{ row.error }}</small>
+              </span>
+            </li>
+          </ol>
+        </ng-container>
+      </ng-container>
+      <ng-container *ngIf="detail.kind === 'single'">
+        <ng-container *ngIf="detail.item as item">
+          <div class="wa-detail-head">
+            <div>
+              <p class="eyebrow text-[var(--accent)]">Messaggio singolo</p>
+              <h2 id="wa-detail-title" class="font-display text-2xl">{{ item.recipientName || 'Destinatario' }}</h2>
+              <p class="wa-muted">{{ item.createdAt | date: 'dd MMM yyyy, HH:mm' }}</p>
+            </div>
+            <button type="button" class="pill-btn" (click)="closeDetail()">Chiudi</button>
+          </div>
+          <dl class="wa-detail-list">
+            <div><dt>Stato</dt><dd><span class="wa-status" [class.online]="item.state === 'sent'">{{ stateLabel(item.state) }}</span></dd></div>
+            <div *ngIf="item.recipient"><dt>Numero</dt><dd>{{ item.recipient }}</dd></div>
+            <div><dt>Tipo</dt><dd>{{ item.kind === 'image' ? 'Foto' : 'Testo' }}</dd></div>
+          </dl>
+          <p *ngIf="item.preview" class="wa-detail-text">{{ item.kind === 'image' ? '📷 ' : '' }}{{ item.preview }}</p>
+          <p *ngIf="item.problem" class="wa-feedback">{{ item.problem }}</p>
+          <p class="wa-muted">Se WhatsApp non conferma l’invio, ALORA non lo ripete da solo: controlla sul telefono.</p>
+        </ng-container>
+      </ng-container>
+    </article>
+  </div>
 </ui-page>

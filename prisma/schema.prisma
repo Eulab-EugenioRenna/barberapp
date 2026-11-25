@@ -1393,6 +1393,7 @@ model WhatsAppBroadcast {
   updatedAt        DateTime                     @updatedAt
   finishedAt       DateTime?
   recipients       WhatsAppBroadcastRecipient[]
+  events           WhatsAppBroadcastEvent[]
 
   @@unique([tenantId, userId, idempotencyKey])
   @@index([status, nextRunAt])
@@ -1412,9 +1413,27 @@ model WhatsAppBroadcastRecipient {
   attempts    Int               @default(0)
   error       String?
   outboxId    String?
+  sentAt      DateTime?
   updatedAt   DateTime          @updatedAt
 
   @@index([broadcastId, state, position])
+  @@index([outboxId])
+}
+
+/// What happened to a «Messaggio a tutti», step by step, for its detail card.
+model WhatsAppBroadcastEvent {
+  id          String            @id @default(uuid())
+  broadcastId String
+  broadcast   WhatsAppBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  /// queued | step | waiting | busy | paused | resumed | cancelled | done
+  kind        String
+  sent        Int               @default(0)
+  failed      Int               @default(0)
+  pending     Int               @default(0)
+  note        String?
+  at          DateTime          @default(now())
+
+  @@index([broadcastId, at])
 }
 
 /// Display name of a WhatsApp chat (the contact's WhatsApp profile name).

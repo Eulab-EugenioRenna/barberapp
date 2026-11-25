@@ -74,6 +74,7 @@ describe("WhatsApp: each account manages only the connection it created", () => 
         }),
       },
       whatsAppSend: { findMany: jest.fn(async () => sends), upsert: jest.fn(async ({ create }: any) => { sends.push(create); return create; }) },
+      whatsAppBroadcastRecipient: { findMany: jest.fn(async () => []) },
       whatsAppChat: {
         findMany: jest.fn(async () => chats), findFirst: jest.fn(async () => null),
         upsert: jest.fn(async ({ create }: any) => { chats.push({ ...create, updatedAt: new Date() }); return create; }),

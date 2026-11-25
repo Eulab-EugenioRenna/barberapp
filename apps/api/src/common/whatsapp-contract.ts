@@ -25,6 +25,10 @@ export interface WhatsAppOutboxView {
   problem: string | null;
   /** From ALORA's own record of the send; null for sends made elsewhere. */
   recipientName: string | null; preview: string | null; kind: string | null;
+  /** Number written to, from ALORA's record. */
+  recipient: string | null;
+  /** The «Messaggio a tutti» this message belongs to, if any. */
+  broadcastId: string | null;
 }
 /** Image attached to a message: data URL (JPEG, PNG or WebP), caption is the text. */
 export interface WhatsAppImageInput { data: string; filename: string }
@@ -39,6 +43,20 @@ export interface WhatsAppBroadcastInput {
   image?: WhatsAppImageInput;
 }
 /** «Messaggio a tutti», sent in the background a step at a time. */
+/** One moment in the life of a «Messaggio a tutti». */
+export interface WhatsAppBroadcastEventView {
+  kind: "queued" | "step" | "waiting" | "busy" | "paused" | "resumed" | "cancelled" | "done";
+  sent: number; failed: number; pending: number; note: string | null; at: string;
+}
+export interface WhatsAppBroadcastRecipientView {
+  name: string | null; recipient: string; state: "pending" | "sent" | "failed";
+  attempts: number; error: string | null; outboxId: string | null; sentAt: string | null;
+}
+/** Detail card: the queue, its steps and every recipient. */
+export interface WhatsAppBroadcastDetail extends WhatsAppBroadcastView {
+  events: WhatsAppBroadcastEventView[];
+  recipients: WhatsAppBroadcastRecipientView[];
+}
 export interface WhatsAppBroadcastView {
   id: string;
   /** running: in progress · paused: waits for «Riprendi» · done · cancelled */

@@ -16,6 +16,7 @@ import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection,
   WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
   WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastView, WhatsAppImageInput,
+  WhatsAppBroadcastDetail, WhatsAppBroadcastEventView, WhatsAppBroadcastRecipientView,
 } from "../../common/whatsapp-contract";
 import { appointmentPhone } from "../notifications/appointment-automation-state";
 
@@ -414,11 +415,18 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         select: { outboxId: true, recipientName: true, recipient: true, preview: true, kind: true },
       });
       const byId = new Map(records.map((r) => [r.outboxId, r]));
+      // Messages of a «Messaggio a tutti» are grouped under it in «Invii».
+      const grouped = await this.prisma.whatsAppBroadcastRecipient.findMany({
+        where: { outboxId: { in: items.map((o) => o.id) }, broadcast: { tenantId: actor.tenantId } },
+        select: { outboxId: true, broadcastId: true },
+      });
+      const broadcastOf = new Map(grouped.map((r) => [r.outboxId, r.broadcastId]));
       return items.map(o => {
         const state = text(o.state, 80), record = byId.get(o.id);
         return { id: id(o.id), sessionId: id(o.session_id), state, createdAt: date(o.created_at), hasError: o.error != null,
           problem: sendProblem(state, o.error), recipientName: record ? record.recipientName || record.recipient : null,
-          preview: record?.preview ?? null, kind: record?.kind ?? null };
+          preview: record?.preview ?? null, kind: record?.kind ?? null, recipient: record?.recipient ?? null,
+          broadcastId: broadcastOf.get(o.id) ?? null };
       });
     });
   }
@@ -574,6 +582,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         },
       });
       this.logger.log(`${job.id}: in coda ${targets.length} destinatari, ${skipped} saltati`);
+      await this.event(job.id, "queued", { pending: targets.length, note: skipped ? `${skipped} saltati` : null });
       setTimeout(() => void this.tick(), 100);
       return this.broadcastView(job);
     });
@@ -589,6 +598,43 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   }
   async broadcastStatus(auth: string | undefined, id: string): Promise<WhatsAppBroadcastView> {
     return this.broadcastView((await this.ownBroadcast(auth, id)).job);
+  }
+  /** Recent «Messaggio a tutti» of this account, newest first, for «Invii». */
+  async listBroadcasts(auth: string | undefined): Promise<WhatsAppBroadcastView[]> {
+    const session = await resolveRequestSession(this.prisma, auth);
+    const user = requireUser(session), tenantId = requireTenantId(session);
+    const jobs = await this.prisma.whatsAppBroadcast.findMany({
+      where: { tenantId, userId: user.id }, orderBy: { createdAt: "desc" }, take: 30,
+    });
+    return jobs.map((job) => this.broadcastView(job));
+  }
+  /** Detail card of one queue: its steps and every recipient. */
+  async broadcastDetail(auth: string | undefined, id: string): Promise<WhatsAppBroadcastDetail> {
+    const { job } = await this.ownBroadcast(auth, id);
+    const [events, recipients] = await Promise.all([
+      this.prisma.whatsAppBroadcastEvent.findMany({ where: { broadcastId: id }, orderBy: { at: "asc" }, take: 500 }),
+      this.prisma.whatsAppBroadcastRecipient.findMany({ where: { broadcastId: id }, orderBy: { position: "asc" } }),
+    ]);
+    return {
+      ...this.broadcastView(job),
+      events: events.map((e) => ({
+        kind: e.kind as WhatsAppBroadcastEventView["kind"], sent: e.sent, failed: e.failed, pending: e.pending,
+        note: e.note, at: e.at.toISOString(),
+      })),
+      recipients: recipients.map((r) => ({
+        name: r.name, recipient: r.recipient, state: r.state as WhatsAppBroadcastRecipientView["state"],
+        attempts: r.attempts, error: r.error, outboxId: r.outboxId, sentAt: r.sentAt?.toISOString() ?? null,
+      })),
+    };
+  }
+  /** Best effort: the detail card must never stop a send. */
+  private async event(broadcastId: string, kind: WhatsAppBroadcastEventView["kind"],
+    data: { sent?: number; failed?: number; pending?: number; note?: string | null } = {}) {
+    try {
+      await this.prisma.whatsAppBroadcastEvent.create({ data: { broadcastId, kind, ...data } });
+    } catch (error) {
+      this.logger.warn(`${broadcastId}: passo non registrato – ${error instanceof Error ? error.message : error}`);
+    }
   }
   /** Queues still running or paused, oldest first: each has its own progress. */
   async activeBroadcasts(auth: string | undefined): Promise<WhatsAppBroadcastView[]> {
@@ -616,6 +662,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       where: { id }, data: { status: "cancelled", finishedAt: new Date(), image: Prisma.DbNull },
     });
     this.logger.log(`${id}: annullato (${updated.sent} inviati)`);
+    await this.event(id, "cancelled", { sent: updated.sent, failed: updated.failed, pending: Math.max(0, updated.total - updated.sent - updated.failed) });
     return this.broadcastView(updated);
   }
   /** Resumes a paused job with the credentials of the current sign-in. */
@@ -627,6 +674,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       where: { id },
       data: { status: "running", error: null, nextRunAt: new Date(), connectSessionId: session.connectSessionId },
     });
+    await this.event(id, "resumed", { sent: updated.sent, failed: updated.failed, pending: Math.max(0, updated.total - updated.sent - updated.failed) });
     setTimeout(() => void this.tick(), 100);
     return this.broadcastView(updated);
   }
@@ -689,6 +737,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         },
       });
       this.logger.log(`${id}: ${pending} numeri aspettano il messaggio precedente`);
+      if (job.error !== `${pending} numeri aspettano che parta il messaggio precedente`)
+        await this.event(id, "waiting", { sent: job.sent, failed: job.failed, pending, note: "Aspettano che parta il messaggio precedente" });
       return;
     }
     const input = {
@@ -697,8 +747,9 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     };
     let sent = 0, failed = 0, busy = false;
     const pause = async (error: string) => {
-      await this.prisma.whatsAppBroadcast.update({ where: { id }, data: { status: "paused", error } });
+      const paused = await this.prisma.whatsAppBroadcast.update({ where: { id }, data: { status: "paused", error } });
       this.logger.warn(`${id}: in pausa – ${error}`);
+      await this.event(id, "paused", { sent: paused.sent, failed: paused.failed, note: error });
     };
     try {
       await this.withConnect(job.tenantId, job.userId, job.connectSessionId, async (wa, actor) => {
@@ -710,7 +761,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
               { to: target.recipient, customerId: target.customerId, name: target.name }, input,
               actorKey([job.tenantId, job.userId, job.idempotencyKey, target.customerId]));
             await this.prisma.whatsAppBroadcastRecipient.update({
-              where: { id: target.id }, data: { state: "sent", outboxId: result.id, attempts: { increment: 1 }, error: null },
+              where: { id: target.id }, data: { state: "sent", outboxId: result.id, attempts: { increment: 1 }, error: null, sentAt: new Date() },
             });
             sent++;
           } catch (error) {
@@ -748,6 +799,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     });
     const pending = await this.prisma.whatsAppBroadcastRecipient.count({ where: { broadcastId: id, state: "pending" } });
     this.logger.log(`${id}: passo +${sent} inviati, +${failed} non riusciti, ${pending} da inviare (totale ${updated.sent}/${updated.total})${busy ? ", Connect occupato" : ""}`);
+    if (sent || failed) await this.event(id, "step", { sent, failed, pending });
+    if (busy && job.error !== "WhatsApp occupato: riprovo tra un minuto") await this.event(id, "busy", { pending, note: "WhatsApp occupato: riprovo tra un minuto" });
     if (updated.status !== "running") return;
     if (!pending) return this.finish(id);
     await this.prisma.whatsAppBroadcast.update({
@@ -764,5 +817,6 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       where: { id }, data: { status: "done", finishedAt: new Date(), error: null, image: Prisma.DbNull },
     });
     this.logger.log(`${id}: completato, ${job.sent} inviati, ${job.failed} non riusciti, ${job.skipped} saltati`);
+    await this.event(id, "done", { sent: job.sent, failed: job.failed, note: job.skipped ? `${job.skipped} saltati` : null });
   }
 }

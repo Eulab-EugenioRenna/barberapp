@@ -101,3 +101,37 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 .wa-sender { display: block; font-size: 0.75rem; color: var(--accent); }
 .wa-outbox li > p { margin: 0.25rem 0 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* «Invii»: one row per «Messaggio a tutti» or message, each opens its card. */
+.wa-send-row { display: grid; gap: 0.3rem; width: 100%; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer; }
+.wa-send-row > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; font-size: 0.875rem; }
+.wa-send-row p { margin: 0; }
+.wa-send-row:hover strong { text-decoration: underline; }
+.wa-status.wa-running { border-color: #e6d49b; background: #fbf3d9; color: #6b5310; }
+.wa-bar { height: 0.4rem; border-radius: 999px; background: var(--line); overflow: hidden; }
+.wa-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.4s; }
+.wa-detail { display: grid; gap: 0.9rem; width: min(40rem, 100%); max-height: 88dvh; overflow-y: auto; }
+.wa-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.wa-detail-text { margin: 0; padding: 0.8rem 1rem; border-radius: 1rem; background: #e2eddf; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.9rem; }
+.wa-detail-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; margin: 0; }
+.wa-detail-counts div, .wa-detail-list div { padding: 0.6rem 0.75rem; border: 1px solid var(--line); border-radius: 0.9rem; }
+.wa-detail-counts dt, .wa-detail-list dt { font-size: 0.7rem; color: var(--muted); }
+.wa-detail-counts dd { margin: 0; font-size: 1.3rem; font-weight: 700; }
+.wa-detail-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.5rem; margin: 0; }
+.wa-detail-list dd { margin: 0.2rem 0 0; font-weight: 600; }
+.wa-detail-section { margin: 0.4rem 0 0; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.wa-timeline, .wa-recipients { margin: 0; padding: 0; list-style: none; }
+.wa-timeline li { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 0.2rem 0.75rem; padding: 0.45rem 0; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
+.wa-timeline time { color: var(--muted); font-size: 0.75rem; }
+.wa-timeline small { grid-column: 2; color: var(--muted); }
+.wa-timeline .wa-event-paused span, .wa-timeline .wa-event-cancelled span { color: #8a3b24; font-weight: 600; }
+.wa-timeline .wa-event-done span { color: #215a3f; font-weight: 700; }
+.wa-recipients { max-height: 18rem; overflow-y: auto; }
+.wa-recipients li { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.45rem 0; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
+.wa-recipients small { display: block; color: var(--muted); font-size: 0.72rem; }
+.wa-recipient-state { text-align: right; }
+.wa-recipient-state.is-sent { color: #215a3f; }
+.wa-recipient-state.is-failed { color: #8a3b24; }
+@media (max-width: 40rem) {
+  .wa-detail-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

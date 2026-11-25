@@ -5,7 +5,7 @@ export const WHATSAPP_TOUR: TourDefinition = {
   id: "whatsapp",
   navKey: "whatsapp",
   title: "Messaggi WhatsApp",
-  version: 2,
+  version: 3,
   when: (ctx) => ctx.canView("whatsapp"),
   steps: (ctx) => [
     {
@@ -53,7 +53,8 @@ export const WHATSAPP_TOUR: TourDefinition = {
     {
       target: "tab-outbox",
       title: "Invii",
-      body: "Lo stato di ogni invio dal tuo numero. «Inviato al canale» non significa letto; gli esiti da verificare non vengono mai reinviati in automatico.",
+      body: "Lo stato di ogni invio dal tuo numero. Ogni «Messaggio a tutti» è una riga sola: aprila per vedere i passaggi, se è in esecuzione o completato e ogni destinatario. " +
+        "Anche i messaggi singoli si aprono nel dettaglio. «Inviato al canale» non significa letto; gli esiti da verificare non vengono mai reinviati in automatico.",
     },
     {
       target: "whatsapp-refresh",

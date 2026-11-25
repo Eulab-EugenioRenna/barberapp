@@ -21,6 +21,7 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
   const jobs: any[] = [];
   const recipients: any[] = [];
   const sends: any[] = alreadySent.map((recipient) => ({ recipient }));
+  const events: any[] = [];
   const match = (row: any, where: any = {}) =>
     Object.entries(where).every(([key, value]: [string, any]) =>
       value && typeof value === "object" && !(value instanceof Date)
@@ -64,6 +65,10 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
         found.forEach((j) => apply(j, data));
         return { count: found.length };
       }),
+    },
+    whatsAppBroadcastEvent: {
+      create: jest.fn(async ({ data }: any) => { events.push({ note: null, sent: 0, failed: 0, pending: 0, at: new Date(), ...data }); return data; }),
+      findMany: jest.fn(async ({ where }: any) => events.filter((e) => e.broadcastId === where.broadcastId)),
     },
     whatsAppBroadcastRecipient: {
       findMany: jest.fn(async ({ where, take }: any) => {
@@ -195,6 +200,26 @@ describe("«Messaggio a tutti» in the background", () => {
     await service.cancelBroadcast("auth", jobs[0].id);
     await runJob(jobs[1].id);
     expect(jobs[1]).toMatchObject({ status: "done", sent: 1 });
+  });
+
+  it("keeps the steps and every recipient for the detail card", async () => {
+    const customers = Array.from({ length: 35 }, (_, i) => ({ id: "c" + i, phone: "333" + String(1000000 + i) }));
+    const { service, jobs, runJob } = setup(customers);
+    await service.broadcast("auth", SESSION, input);
+    await runJob(jobs[0].id);
+    await runJob(jobs[0].id);
+    const detail = await service.broadcastDetail("auth", jobs[0].id);
+    expect(detail).toMatchObject({ status: "done", sent: 35, preview: "Promo di Natale" });
+    expect(detail.events.map((e) => [e.kind, e.sent, e.pending])).toEqual([
+      ["queued", 0, 35],
+      ["step", 30, 5],
+      ["step", 5, 0],
+      ["done", 35, 0],
+    ]);
+    expect(detail.recipients).toHaveLength(35);
+    expect(detail.recipients[0]).toMatchObject({ state: "sent", recipient: "+393331000000" });
+    expect(detail.recipients[0].sentAt).toEqual(expect.any(String));
+    expect((await service.listBroadcasts("auth")).map((job) => job.id)).toEqual([jobs[0].id]);
   });
 
   it("does not queue the same text twice", async () => {
