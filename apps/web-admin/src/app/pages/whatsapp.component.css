@@ -132,6 +132,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 .wa-recipient-state { text-align: right; }
 .wa-recipient-state.is-sent { color: #215a3f; }
 .wa-recipient-state.is-failed { color: #8a3b24; }
+.wa-recipient-state.is-skipped { color: #7a6a4f; }
+.wa-recipient-reason { display: block; max-width: 22rem; white-space: normal; text-align: right; }
 @media (max-width: 40rem) {
   .wa-detail-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

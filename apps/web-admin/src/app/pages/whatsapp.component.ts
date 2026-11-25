@@ -3,7 +3,7 @@ import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import type {
   WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView,
-  WhatsAppImageInput, WhatsAppBroadcastView, WhatsAppBroadcastDetail, WhatsAppBroadcastEventView,
+  WhatsAppImageInput, WhatsAppBroadcastView, WhatsAppBroadcastDetail, WhatsAppBroadcastEventView, WhatsAppBroadcastRecipientView,
 } from "@barber/shared/whatsapp";
 import { prepareWhatsAppImage } from "../shared/whatsapp-image";
 import { SessionStore } from "../core/session.store";
@@ -131,6 +131,17 @@ export class WhatsAppComponent implements OnInit, OnDestroy {
   deliveryOf(outboxId: string | null) {
     const item = outboxId ? this.outbox.find((row) => row.id === outboxId) : undefined;
     return item ? this.stateLabel(item.state) : "";
+  }
+  /** What happened to one recipient and, when it did not arrive, why. */
+  recipientOutcome(row: WhatsAppBroadcastRecipientView): { label: string; reason: string | null } {
+    if (row.state === "skipped") return { label: "Saltato", reason: row.error };
+    if (row.state === "failed") return { label: "Non riuscito", reason: row.error };
+    if (row.state === "pending") return { label: "Da inviare", reason: row.error ? `Ultimo tentativo: ${row.error}` : null };
+    const item = row.outboxId ? this.outbox.find((o) => o.id === row.outboxId) : undefined;
+    return { label: item ? this.stateLabel(item.state) : "Inviato", reason: item?.problem ?? null };
+  }
+  recipientCounts(rows: WhatsAppBroadcastRecipientView[]) {
+    return { queued: rows.filter((r) => r.state !== "skipped").length, skipped: rows.filter((r) => r.state === "skipped").length };
   }
   async openBroadcast(job: WhatsAppBroadcastView) {
     this.detailFeedback = "";

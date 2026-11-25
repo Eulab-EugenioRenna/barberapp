@@ -49,7 +49,7 @@ export interface WhatsAppBroadcastEventView {
   sent: number; failed: number; pending: number; note: string | null; at: string;
 }
 export interface WhatsAppBroadcastRecipientView {
-  name: string | null; recipient: string; state: "pending" | "sent" | "failed";
+  name: string | null; recipient: string; state: "pending" | "sent" | "failed" | "skipped";
   attempts: number; error: string | null; outboxId: string | null; sentAt: string | null;
 }
 /** Detail card: the queue, its steps and every recipient. */

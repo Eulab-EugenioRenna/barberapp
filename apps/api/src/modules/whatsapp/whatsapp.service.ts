@@ -74,15 +74,33 @@ export function chatPhone(chatId: string): string | null {
 }
 /** Readable outcome for «Invii»: what happened and what to do, never «check in Connect». */
 export function sendProblem(state: string, error: string | null | undefined): string | null {
-  if (state === "uncertain")
-    return "WhatsApp non ha confermato l’invio: controlla sul telefono se il messaggio è arrivato prima di inviarlo di nuovo.";
+  if (state === "uncertain") {
+    if (error?.startsWith("Runner interrotto"))
+      return "Il servizio WhatsApp si è riavviato proprio mentre inviava: controlla sul telefono se il messaggio è arrivato prima di inviarlo di nuovo.";
+    return "WhatsApp non ha confermato l’invio. Di solito il numero non ha WhatsApp, oppure il telefono del salone era scollegato o senza rete: controlla sul telefono se il messaggio è arrivato prima di inviarlo di nuovo.";
+  }
   if (state === "cancelled") {
-    if (error === "explicit_disconnect") return "Annullato: il numero è stato disconnesso prima dell’invio.";
-    if (error === "authorization_revoked") return "Annullato: il numero non era connesso o il permesso di invio non è più attivo.";
-    return "Invio annullato.";
+    if (error === "explicit_disconnect") return "Non inviato: il numero WhatsApp del salone è stato disconnesso prima dell’invio.";
+    if (error === "authorization_revoked")
+      return "Non inviato: al momento dell’invio il numero WhatsApp del salone non era connesso, oppure il tuo permesso di invio non era più attivo. Ricollega WhatsApp e riprova.";
+    if (error === "delegation_revoked") return "Non inviato: l’autorizzazione agli invii automatici è stata revocata.";
+    if (error === "command_withdrawn") return "Non inviato: l’invio è stato ritirato prima di partire.";
+    if (error === "bot_configuration_changed") return "Non inviato: la risposta automatica è stata modificata prima dell’invio.";
+    return "Invio annullato prima di partire.";
   }
   if (state === "failed") return "Invio non riuscito. Verifica che il numero sia connesso e riprova.";
   return error ? "Invio non confermato: controlla sul telefono se il messaggio è arrivato." : null;
+}
+/** Why Connect refused one recipient of a «Messaggio a tutti», in words the salon understands. */
+export function recipientProblem(error: unknown, attempts: number): string {
+  const status = errorStatus(error);
+  const tries = attempts > 1 ? ` (dopo ${attempts} tentativi)` : "";
+  if (status === 400 || status === 422) return "Numero o messaggio rifiutato da WhatsApp: controlla il numero nella scheda cliente.";
+  if (status === 404) return "Collegamento WhatsApp non trovato: ricollega il numero del salone.";
+  if (status === 409) return "Messaggio già in invio per questo cliente.";
+  if (status === 413) return "Foto troppo grande da inviare.";
+  if (status === 429) return `WhatsApp ha chiesto di rallentare e non ha accettato il messaggio${tries}.`;
+  return `Connect non raggiungibile${tries}: il messaggio non è partito.`;
 }
 /** Data URL from Connect («data:audio/ogg; codecs=opus;base64,…») → bytes. */
 export function decodeDataUrl(value: string): { mimetype: string; data: Buffer } | null {
@@ -556,16 +574,25 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         })).map((row) => row.recipient),
       );
       const rows = await this.broadcastCustomers(actor.tenantId);
-      const seen = new Set<string>();
+      const seen = new Map<string, string>();
       const targets: Array<{ customerId: string; recipient: string; name: string | null }> = [];
-      let skipped = 0;
+      // Who is left out stays in the detail card, with the reason.
+      const left: Array<{ customerId: string; recipient: string; name: string | null; error: string }> = [];
       for (const row of rows) {
-        const to = customerWhatsAppNumber(row.phone);
+        const to = customerWhatsAppNumber(row.phone), name = customerName(row);
+        const raw = (row.phone ?? "").trim().slice(0, 40);
+        if (!to) {
+          left.push({ customerId: row.id, recipient: raw, name,
+            error: raw ? "Numero non leggibile: senza prefisso valgono solo i numeri italiani" : "Nessun numero di telefono" });
+          continue;
+        }
         // Same number on two customer cards, or already reached with this text: one message only.
-        if (!to || seen.has(to) || already.has(to)) { skipped++; continue; }
-        seen.add(to);
-        targets.push({ customerId: row.id, recipient: to, name: customerName(row) });
+        if (seen.has(to)) { left.push({ customerId: row.id, recipient: to, name, error: `Stesso numero di ${seen.get(to)}: riceve un solo messaggio` }); continue; }
+        if (already.has(to)) { left.push({ customerId: row.id, recipient: to, name, error: "Ha già ricevuto questo messaggio nelle ultime 48 ore" }); continue; }
+        seen.set(to, name || to);
+        targets.push({ customerId: row.id, recipient: to, name });
       }
+      const skipped = left.length;
       if (!targets.length)
         throw new BadRequestException(already.size
           ? "Tutti i clienti con telefono hanno già ricevuto questo messaggio"
@@ -578,7 +605,10 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
           idempotencyKey: input.idempotencyKey, text: input.text?.trim() ? input.text : null,
           image: input.image ? ({ data: input.image.data, filename: input.image.filename } as Prisma.InputJsonValue) : undefined,
           total: targets.length, skipped,
-          recipients: { create: targets.map((target, position) => ({ ...target, position })) },
+          recipients: { create: [
+            ...targets.map((target, position) => ({ ...target, position })),
+            ...left.map((target, index) => ({ ...target, state: "skipped", position: targets.length + index })),
+          ] },
         },
       });
       this.logger.log(`${job.id}: in coda ${targets.length} destinatari, ${skipped} saltati`);
@@ -773,7 +803,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
               where: { id: target.id },
               data: {
                 attempts: { increment: 1 }, state: giveUp ? "failed" : "pending",
-                error: (error instanceof Error ? error.message : String(error)).slice(0, 300),
+                error: recipientProblem(error, target.attempts + 1),
               },
             });
             if (giveUp) failed++;

@@ -1408,7 +1408,7 @@ model WhatsAppBroadcastRecipient {
   recipient   String
   name        String?
   position    Int
-  /// pending | sent | failed
+  /// pending | sent | failed | skipped (left out at queue time, reason in error)
   state       String            @default("pending")
   attempts    Int               @default(0)
   error       String?

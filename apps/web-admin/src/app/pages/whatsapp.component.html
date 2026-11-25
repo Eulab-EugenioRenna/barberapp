@@ -274,14 +274,16 @@
               <small *ngIf="event.note && event.kind !== 'waiting' && event.kind !== 'busy'">{{ event.note }}</small>
             </li>
           </ol>
-          <h3 class="wa-detail-section">Destinatari ({{ job.recipients.length }})</h3>
+          <h3 class="wa-detail-section" *ngIf="recipientCounts(job.recipients) as counts">
+            Destinatari ({{ counts.queued }})<ng-container *ngIf="counts.skipped"> · {{ counts.skipped }} saltati</ng-container>
+          </h3>
           <ol class="wa-recipients">
             <li *ngFor="let row of job.recipients">
-              <span><strong>{{ row.name || row.recipient }}</strong><small *ngIf="row.name">{{ row.recipient }}</small></span>
-              <span class="wa-recipient-state" [class]="'is-' + row.state">
-                {{ row.state === 'sent' ? (deliveryOf(row.outboxId) || 'Inviato') : row.state === 'failed' ? 'Non riuscito' : 'Da inviare' }}
+              <span><strong>{{ row.name || row.recipient || 'Cliente' }}</strong><small *ngIf="row.name && row.recipient">{{ row.recipient }}</small></span>
+              <span class="wa-recipient-state" [class]="'is-' + row.state" *ngIf="recipientOutcome(row) as outcome">
+                {{ outcome.label }}
                 <small *ngIf="row.sentAt">{{ row.sentAt | date: 'HH:mm' }}</small>
-                <small *ngIf="row.state !== 'sent' && row.error">{{ row.error }}</small>
+                <small *ngIf="outcome.reason" class="wa-recipient-reason">{{ outcome.reason }}</small>
               </span>
             </li>
           </ol>

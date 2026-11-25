@@ -126,7 +126,7 @@ describe("«Messaggio a tutti» in the background", () => {
   });
 
   it("skips duplicates, unreadable numbers and who already got the same text", async () => {
-    const { service } = setup(
+    const { service, recipients } = setup(
       [
         { id: "a", phone: "333 1111111" },
         { id: "b", phone: "+39 333 1111111" },
@@ -137,6 +137,22 @@ describe("«Messaggio a tutti» in the background", () => {
       ["+393332222222"],
     );
     expect(await service.broadcast("auth", SESSION, input)).toMatchObject({ total: 2, skipped: 3 });
+    // Who is left out stays visible in the detail card, with the reason.
+    expect(recipients.filter((r) => r.state === "skipped").map((r) => [r.customerId, r.error])).toEqual([
+      ["b", "Stesso numero di a: riceve un solo messaggio"],
+      ["c", "Numero non leggibile: senza prefisso valgono solo i numeri italiani"],
+      ["d", "Ha già ricevuto questo messaggio nelle ultime 48 ore"],
+    ]);
+    expect(recipients.filter((r) => r.state === "pending").map((r) => r.customerId)).toEqual(["a", "e"]);
+  });
+
+  it("says in plain words why a recipient failed", async () => {
+    const { service, recipients, jobs, run } = setup([{ id: "a", phone: "3331111111" }]);
+    await service.broadcast("auth", SESSION, input);
+    wa.sendText.mockRejectedValueOnce(Object.assign(new Error("Bad Request"), { status: 400 }));
+    await run();
+    expect(recipients[0]).toMatchObject({ state: "failed", error: "Numero o messaggio rifiutato da WhatsApp: controlla il numero nella scheda cliente." });
+    expect(jobs[0]).toMatchObject({ status: "done", failed: 1 });
   });
 
   it("keeps recipients pending when Connect is busy (503) and retries later", async () => {
@@ -226,5 +242,16 @@ describe("«Messaggio a tutti» in the background", () => {
     const { service } = setup([{ id: "a", phone: "3331111111" }]);
     await service.broadcast("auth", SESSION, input);
     await expect(service.broadcast("auth", SESSION, { ...input, idempotencyKey: "other-12345" })).rejects.toThrow("già in coda");
+  });
+});
+
+describe("sendProblem", () => {
+  it("names the reason Connect gave", () => {
+    const { sendProblem } = jest.requireActual("./whatsapp.service");
+    expect(sendProblem("cancelled", "authorization_revoked")).toMatch(/non era connesso/);
+    expect(sendProblem("cancelled", "explicit_disconnect")).toMatch(/disconnesso/);
+    expect(sendProblem("uncertain", "Runner interrotto durante invio; verifica manuale necessaria")).toMatch(/riavviato/);
+    expect(sendProblem("uncertain", "Esito provider non confermato; nessun reinvio automatico")).toMatch(/non ha WhatsApp/);
+    expect(sendProblem("sent", null)).toBeNull();
   });
 });
