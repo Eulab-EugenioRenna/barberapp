@@ -1,3 +1,4 @@
+import { TimeSelectComponent } from "../shared/time-select.component";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { RouterLink } from "@angular/router";
 import { SectorPickerComponent } from "../shared/sector-picker.component";
@@ -14,7 +15,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
 @Component({
   selector: "barber-admin-collaborators-page",
   standalone: true,
-  imports: [
+  imports: [TimeSelectComponent, 
     CalendarInputComponent,
     RouterLink,
     SectorPickerComponent,
@@ -248,18 +249,18 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                       />
                       <span>Lavora</span>
                     </label>
-                    <input
-                      [(ngModel)]="schedule.startTime"
-                      [name]="'weeklyStart' + i"
-                      type="time"
+                    <alora-time-select
+                      label="Inizio turno"
+                      [value]="schedule.startTime"
+                      (valueChange)="schedule.startTime = $event"
                       [disabled]="!schedule.isWorkingDay"
-                    />
-                    <input
-                      [(ngModel)]="schedule.endTime"
-                      [name]="'weeklyEnd' + i"
-                      type="time"
+                    ></alora-time-select>
+                    <alora-time-select
+                      label="Fine turno"
+                      [value]="schedule.endTime"
+                      (valueChange)="schedule.endTime = $event"
                       [disabled]="!schedule.isWorkingDay"
-                    />
+                    ></alora-time-select>
                   </div>
                 </article>
               </div>
@@ -315,18 +316,18 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                       />
                       <span>Disponibile</span>
                     </label>
-                    <input
-                      [(ngModel)]="override.startTime"
-                      [name]="'overrideStart' + i"
-                      type="time"
+                    <alora-time-select
+                      label="Inizio"
+                      [value]="override.startTime"
+                      (valueChange)="override.startTime = $event"
                       [disabled]="!override.isWorkingDay"
-                    />
-                    <input
-                      [(ngModel)]="override.endTime"
-                      [name]="'overrideEnd' + i"
-                      type="time"
+                    ></alora-time-select>
+                    <alora-time-select
+                      label="Fine"
+                      [value]="override.endTime"
+                      (valueChange)="override.endTime = $event"
                       [disabled]="!override.isWorkingDay"
-                    />
+                    ></alora-time-select>
                     <button
                       aloraFunction="collaborators.manage"
                       type="button"

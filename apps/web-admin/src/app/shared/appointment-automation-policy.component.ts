@@ -1,3 +1,4 @@
+import { TimeSelectComponent } from "./time-select.component";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { Component, LOCALE_ID, OnInit, inject } from "@angular/core";
 import { RouterLink } from "@angular/router";
@@ -22,7 +23,7 @@ import { DurationFieldComponent, splitMinutes } from "./duration-field.component
 @Component({
   selector: "app-appointment-automation-policy",
   standalone: true,
-  imports: [CalendarInputComponent, CommonModule, FormsModule, RouterLink, UiSelectComponent, SetupStepComponent, DurationFieldComponent],
+  imports: [TimeSelectComponent, CalendarInputComponent, CommonModule, FormsModule, RouterLink, UiSelectComponent, SetupStepComponent, DurationFieldComponent],
   template: ` <section class="policy" aria-label="Promemoria automatici">
     <header>
       <div>
@@ -167,8 +168,8 @@ import { DurationFieldComponent, splitMinutes } from "./duration-field.component
         [summary]="'Dalle ' + draft.deliveryStart + ' alle ' + draft.deliveryEnd + ', solo quando la sede è aperta.'"
       >
         <div class="fields">
-          <label class="field">Dalle<input type="time" name="from" [(ngModel)]="draft.deliveryStart" (ngModelChange)="edited()" required /></label>
-          <label class="field">Alle<input type="time" name="until" [(ngModel)]="draft.deliveryEnd" (ngModelChange)="edited()" required /></label>
+          <div class="field"><span>Dalle</span><alora-time-select label="Dalle" [value]="draft.deliveryStart" (valueChange)="draft.deliveryStart = $event; edited()"></alora-time-select></div>
+          <div class="field"><span>Alle</span><alora-time-select label="Alle" [value]="draft.deliveryEnd" (valueChange)="draft.deliveryEnd = $event; edited()"></alora-time-select></div>
         </div>
         <p *ngIf="windowInvalid" class="error">L’orario di fine deve essere dopo quello di inizio.</p>
         <p class="muted">ALORA non scrive mai fuori da questi orari né quando la sede è chiusa o festiva: in quel caso anticipa il messaggio all’ultimo orario utile. Gli orari della sede si cambiano in <a routerLink="/locations">Sedi</a>.</p>

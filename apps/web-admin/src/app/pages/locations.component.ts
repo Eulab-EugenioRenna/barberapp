@@ -1,3 +1,4 @@
+import { TimeSelectComponent } from "../shared/time-select.component";
 import { Component, OnInit, HostListener, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -11,7 +12,7 @@ import { OperationalContextService } from "../core/operational-context.service";
 import { ActivitiesService } from "../core/activities.service";
 @Component({
   standalone: true,
-  imports: [CommonModule, FormsModule, UiPageComponent, UiTabsComponent, AdminPageHeaderComponent],
+  imports: [TimeSelectComponent, CommonModule, FormsModule, UiPageComponent, UiTabsComponent, AdminPageHeaderComponent],
   template: ` <ui-page class="locations-shell">
     <alora-page-header navKey="locations">
       <button
@@ -465,19 +466,18 @@ import { ActivitiesService } from "../core/activities.service";
                 [(ngModel)]="day.isWorkingDay"
                 [name]="'day-' + day.weekday"
               />{{ weekdays[day.weekday] }}</label
-            ><input
-              type="time"
-              [(ngModel)]="day.startTime"
-              [name]="'start-' + day.weekday"
+            ><alora-time-select
+              [label]="'Apertura ' + weekdays[day.weekday]"
+              [value]="day.startTime"
+              (valueChange)="day.startTime = $event"
               [disabled]="!day.isWorkingDay"
-              [attr.aria-label]="'Apertura ' + weekdays[day.weekday]"
-            /><input
-              type="time"
-              [(ngModel)]="day.endTime"
-              [name]="'end-' + day.weekday"
+            ></alora-time-select
+            ><alora-time-select
+              [label]="'Chiusura ' + weekdays[day.weekday]"
+              [value]="day.endTime"
+              (valueChange)="day.endTime = $event"
               [disabled]="!day.isWorkingDay"
-              [attr.aria-label]="'Chiusura ' + weekdays[day.weekday]"
-            />
+            ></alora-time-select>
           </div>
         </fieldset>
         <label
