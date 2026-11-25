@@ -41,6 +41,32 @@ import { ProductBrandsService } from "../core/product-brands.service";
     AutofocusFirstDirective,
     UiIconComponent,
   ],
+  styles: [
+    `
+      .catalog-dialog {
+        width: min(60rem, 100%);
+      }
+      .catalog-form {
+        display: grid;
+        gap: 1rem;
+      }
+      .catalog-col {
+        display: grid;
+        align-content: start;
+        gap: 1rem;
+        min-width: 0;
+      }
+      @media (min-width: 900px) {
+        .catalog-form {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          column-gap: 1.5rem;
+        }
+        .catalog-actions {
+          grid-column: 1 / -1;
+        }
+      }
+    `,
+  ],
   template: `
     <section class="grid gap-4 xl:grid-cols-2">
       <article
@@ -256,7 +282,7 @@ import { ProductBrandsService } from "../core/product-brands.service";
       ></button>
       <article
         barberAutofocusFirst
-        class="confirm-dialog panel max-h-[85vh] overflow-auto"
+        class="confirm-dialog catalog-dialog panel max-h-[85vh] overflow-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="service-form-title"
@@ -280,7 +306,8 @@ import { ProductBrandsService } from "../core/product-brands.service";
           </button>
         </div>
 
-        <form class="mt-4 grid gap-4" (ngSubmit)="submitService()">
+        <form class="catalog-form mt-4" (ngSubmit)="submitService()">
+          <div class="catalog-col">
           <label class="field">
             <span
               >Nome <em class="required-mark" aria-hidden="true">*</em></span
@@ -364,6 +391,8 @@ import { ProductBrandsService } from "../core/product-brands.service";
               </label>
             </div>
           </div>
+          </div>
+          <div class="catalog-col">
           <p *ngIf="!serviceForm.id" class="field-hint">Prodotti collegati: salva prima il servizio, poi potrai collegare i prodotti che usa o che consigli.</p>
           <p *ngIf="serviceForm.id && !products.length" class="field-hint">Prodotti collegati: per collegarli serve prima creare i prodotti nella scheda «Prodotti».</p>
           <div *ngIf="serviceForm.id && products.length" class="field">
@@ -461,7 +490,8 @@ import { ProductBrandsService } from "../core/product-brands.service";
               </button>
             </div>
           </div>
-          <div class="flex flex-wrap gap-3">
+          </div>
+          <div class="catalog-actions flex flex-wrap gap-3">
             <button
               aloraFunction="services.manage"
               type="submit"
@@ -502,7 +532,7 @@ import { ProductBrandsService } from "../core/product-brands.service";
       ></button>
       <article
         barberAutofocusFirst
-        class="confirm-dialog panel max-h-[85vh] overflow-auto"
+        class="confirm-dialog catalog-dialog panel max-h-[85vh] overflow-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-form-title"
@@ -526,8 +556,8 @@ import { ProductBrandsService } from "../core/product-brands.service";
           </button>
         </div>
 
-        <form class="mt-4 grid gap-3" (ngSubmit)="submitProduct()">
-          <alora-price-settings kind="product" [value]="productForm"></alora-price-settings>
+        <form class="catalog-form mt-4" (ngSubmit)="submitProduct()">
+          <div class="catalog-col">
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="field"
               ><span
@@ -588,7 +618,11 @@ import { ProductBrandsService } from "../core/product-brands.service";
               [(ngModel)]="productForm.description"
               name="productDescription"
           /></label>
-          <div class="flex flex-wrap gap-2">
+          </div>
+          <div class="catalog-col">
+            <alora-price-settings kind="product" [value]="productForm"></alora-price-settings>
+          </div>
+          <div class="catalog-actions flex flex-wrap gap-2">
             <button
               aloraFunction="services.manage"
               type="submit"

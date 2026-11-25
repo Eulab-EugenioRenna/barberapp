@@ -81,6 +81,11 @@ import { UiSelectComponent, type UiOption } from "@alora/ui";
           />
           Traccia le giacenze per sede</label
         >
+        <small class="tracking-hint" *ngIf="session.can('inventory.manage')"
+          >Conta quanti pezzi hai in ogni sede: le vendite e i consumi dei
+          servizi li scalano da soli, i carichi li registri in Magazzino.
+          Lascialo spento se il prodotto lo vendi e basta.</small
+        >
       </ng-container>
     </div>
     <label *ngIf="value.id"
