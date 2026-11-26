@@ -28,7 +28,7 @@ export const broadcastTiming = {
   messageGapMs: 600, stepPauseMs: 20_000, busyPauseMs: 60_000,
   /** Each message waits for its outcome on Connect before the next one. */
   /** Connect verifies each message on the phone (up to about 2½ minutes); retries then go on without blocking the queue. */
-  outcomePollMs: 1_500, outcomeTimeoutMs: 180_000, stepBudgetMs: 4 * 60_000, syncPauseMs: 20_000,
+  outcomePollMs: 2_500, outcomeTimeoutMs: 180_000, stepBudgetMs: 4 * 60_000, syncPauseMs: 20_000,
 };
 /** Photos of closed queues are kept this long so «Completa e riprova» works for them too. */
 const BROADCAST_IMAGE_KEEP_MS = 7 * 24 * 3600_000;
@@ -79,6 +79,8 @@ export function chatPhone(chatId: string): string | null {
   const match = /^(\d{7,15})@c\.us$/.exec(chatId);
   return match ? `+${match[1]}` : null;
 }
+/** One short Connect call with the queue owner's session (see step). */
+type Connected = <T>(fn: (wa: Client, actor: Actor) => Promise<T>) => Promise<T>;
 const syncModeOf = (value: unknown) => (value === "update" || value === "full" ? value : null);
 /** Chat of a sent message: WhatsApp's message ID is «true_<chat>_<id>» (chat «…@c.us», «…@lid» or «…@g.us»). */
 export function providerChat(providerId: unknown): string | null {
@@ -1006,10 +1008,11 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
    * Waits for Connect's verified outcome of one message. Connect sends it, checks the phone and
    * retries by itself: once a retry is scheduled the queue moves on and the outcome is read later.
    */
-  private async outcome(wa: Client, outboxId: string): Promise<{ state: "sent" | "failed" | "uncertain" | "sending"; error: string | null }> {
+  private async outcome(connect: Connected, outboxId: string): Promise<{ state: "sent" | "failed" | "uncertain" | "sending"; error: string | null }> {
     const until = Date.now() + broadcastTiming.outcomeTimeoutMs;
     for (;;) {
-      const row = (await this.connectStates(wa, [outboxId])).get(outboxId);
+      // A failed read is just read again: the message is already on Connect.
+      const row = (await connect((wa) => this.connectStates(wa, [outboxId])).catch(() => new Map<string, never>())).get(outboxId);
       const state = row?.state ?? "queued";
       if (state === "sent") return { state: "sent", error: null };
       if (state === "failed" || state === "cancelled") return { state: "failed", error: sendProblem(state, row?.error ?? null) };
@@ -1135,8 +1138,12 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       await this.event(id, "paused", { sent: paused.sent, failed: paused.failed, note: error });
     };
     try {
-      await this.withConnect(job.tenantId, job.userId, job.connectSessionId, async (wa, actor) => {
-        await this.syncOutcomes(wa, id);
+      // Each Connect call is short and separate: the SDK keeps the user's Connect session
+      // locked during a call, so waiting for outcomes inside one would hold up every other
+      // request of that user (pages, notifications) until they time out.
+      const connect: Connected = (fn) => this.withConnect(job.tenantId, job.userId, job.connectSessionId, fn);
+      await (async () => {
+        await connect((wa) => this.syncOutcomes(wa, id));
         for (const [index, target] of batch.entries()) {
           const current = await this.prisma.whatsAppBroadcast.findUnique({ where: { id }, select: { status: true } });
           if (current?.status !== "running") return;
@@ -1144,11 +1151,11 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
           if (Date.now() - started > broadcastTiming.stepBudgetMs) return;
           let queued: { id: string } | null = null;
           try {
-            const result = await this.deliver(wa, actor, job.sessionId,
+            const result = await connect((wa, actor) => this.deliver(wa, actor, job.sessionId,
               { to: target.recipient, customerId: target.customerId, name: target.name }, input,
               actorKey(target.round
                 ? [job.tenantId, job.userId, job.idempotencyKey, target.customerId, target.round]
-                : [job.tenantId, job.userId, job.idempotencyKey, target.customerId]));
+                : [job.tenantId, job.userId, job.idempotencyKey, target.customerId])));
             queued = result;
             // Taken by Connect: from here on it is never sent again by ALORA.
             await this.prisma.whatsAppBroadcastRecipient.update({
@@ -1156,7 +1163,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
             });
             // One at a time: the next message leaves only after this one has its verified outcome
             // (or Connect has scheduled its own retry). Cancelled by hand meanwhile: left as it is.
-            const outcome = await this.outcome(wa, result.id);
+            const outcome = await this.outcome(connect, result.id);
             const stored = await this.prisma.whatsAppBroadcastRecipient.updateMany({
               where: { id: target.id, state: "sending" },
               data: { state: outcome.state, error: outcome.error, sentAt: outcome.state === "sent" ? new Date() : null },
@@ -1189,7 +1196,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
           }
           if (index < batch.length - 1) await sleep(broadcastTiming.messageGapMs);
         }
-      });
+      })();
     } catch (error) {
       const status = errorStatus(error);
       if (error instanceof UnauthorizedException || status === 401)
