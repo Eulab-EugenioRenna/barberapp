@@ -2440,6 +2440,22 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     try {
       const appointmentId = String(payload["appointmentId"] ?? "");
       const isEditing = Boolean(this.quickOrderSale?.id);
+      const customerId = String(payload["customerId"] ?? "");
+      if (
+        this.quickOrderSale?.id &&
+        customerId &&
+        customerId !== (this.quickOrderSale.customerId || this.quickOrderSale.customer?.id || "")
+      ) {
+        const changed = await firstValueFrom(
+          this.adminApi.changeSaleCustomer(
+            this.quickOrderSale.id,
+            customerId,
+            Number(payload["revision"] ?? this.quickOrderSale.revision ?? 0),
+          ),
+        );
+        this.quickOrderSale = { ...this.quickOrderSale, ...changed };
+        payload = { ...payload, revision: changed.revision };
+      }
       await firstValueFrom(
         this.quickOrderSale?.id
           ? this.adminApi.updateSale(this.quickOrderSale.id, payload)
@@ -2642,7 +2658,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     if (!sale?.id) return;
     this.openDeleteDialog(
       "Elimina vendita",
-      "La vendita e tutte le sue voci verranno eliminate. L'appuntamento collegato resterà disponibile.",
+      sale.appointmentId || sale.paymentStatus === "paid"
+        ? "Se hai solo sbagliato cliente non serve eliminarla: apri il conto, scegli il cliente giusto e salva. Un conto con prenotazioni o incassi non si elimina, si annulla dall'agenda."
+        : "La vendita e tutte le sue voci verranno eliminate. L'appuntamento collegato resterà disponibile.",
       "Elimina vendita",
       async () => {
         this.loading = true;

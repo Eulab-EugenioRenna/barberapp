@@ -213,6 +213,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "sales.manage",
   },
+  "SalesController.changeCustomer": {
+    kind: "function",
+    key: "sales.manage",
+  },
   "SalesController.linkAppointment": {
     kind: "function",
     key: "sales.manage",

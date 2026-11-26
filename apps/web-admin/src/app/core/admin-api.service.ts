@@ -477,6 +477,19 @@ export class AdminApiService {
     return defer(() => this.creations.retry("sale-update", id));
   }
 
+  /** Corregge il cliente del conto e delle sue prenotazioni; importi e incassi restano. */
+  changeSaleCustomer(
+    id: string,
+    customerId: string,
+    revision: number,
+  ): Observable<any> {
+    return this.http.post(`${ADMIN_API_URL}/sales/${id}/customer`, {
+      customerId,
+      revision,
+      idempotencyKey: `sale-customer:${id}:${revision}:${customerId}`,
+    });
+  }
+
   deleteSale(id: string): Observable<any> {
     return this.http.delete(`${ADMIN_API_URL}/sales/${id}`);
   }

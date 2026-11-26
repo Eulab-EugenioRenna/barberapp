@@ -1069,6 +1069,115 @@ export class SalesController {
     return updated;
   }
 
+  /** Corregge il cliente sbagliato: conto e prenotazioni cambiano insieme, importi e incassi restano. */
+  @Post(":id/customer")
+  async changeCustomer(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const customerId =
+      typeof body["customerId"] === "string" ? body["customerId"] : "";
+    if (!customerId) throw new BadRequestException("Scegli il cliente giusto");
+    const actorId = requireUser(session).id;
+    const command = this.commands.command(
+      { tenantId, actorId, source: "internal", scope },
+      "update_sale",
+      body["idempotencyKey"],
+      { saleId: id, changeCustomer: customerId },
+    );
+    const outcome = await this.prisma.$transaction(
+      async (transaction) => {
+        await this.orders.lock(transaction, tenantId);
+        await setOperationalActor(transaction, actorId);
+        const replay = await this.commands.replay(transaction, command);
+        if (replay)
+          return { result: replay.result, previous: null, customerId: null };
+        const sale = await transaction.sale.findFirst({
+          where: { id, tenantId, ...saleFilter(scope) },
+          select: { id: true, customerId: true, orderStatus: true, revision: true },
+        });
+        if (!sale) throw new NotFoundException("Vendita non trovata");
+        this.orders.assertRevision(sale, body["revision"] ?? sale.revision);
+        if (sale.orderStatus === "cancelled")
+          throw new ConflictException(
+            "Il conto annullato conserva il suo cliente",
+          );
+        if (sale.customerId === customerId)
+          throw new BadRequestException("Il conto è già di questo cliente");
+        const customer = await transaction.customer.findFirst({
+          where: { id: customerId, tenantId, isActive: true },
+          select: { id: true },
+        });
+        if (!customer) throw new BadRequestException("Cliente non valido");
+        if (
+          await transaction.appointmentAutomationRun.count({
+            where: { tenantId, orderId: id, status: "waiting" },
+          })
+        )
+          throw new ConflictException(
+            "C'è un promemoria WhatsApp in attesa per il cliente attuale: annulla e ricrea la prenotazione",
+          );
+        const recordEvents = await beginAppointmentEvents(
+          transaction,
+          command.context,
+          { orderItem: { saleId: id } },
+        );
+        await transaction.appointment.updateMany({
+          where: { tenantId, orderItem: { saleId: id } },
+          data: { customerId },
+        });
+        await transaction.sale.update({
+          where: { id, tenantId },
+          data: { customerId, revision: { increment: 1 } },
+        });
+        const current = await transaction.sale.findUniqueOrThrow({
+          where: { id },
+          include: SALE_COMMAND_INCLUDE,
+        });
+        const result = saleCommandResult(current);
+        const operation = await this.commands.save(
+          transaction,
+          command,
+          id,
+          result,
+        );
+        await recordEvents({ orderItem: { saleId: id } }, operation.id);
+        await transaction.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+        return { result, previous: sale.customerId, customerId };
+      },
+      { timeout: 15000 },
+    );
+    await Promise.all([
+      this.cacheInvalidationService.invalidateSales(tenantId),
+      this.cacheInvalidationService.invalidateDashboard(tenantId),
+      this.cacheInvalidationService.invalidateCustomers(tenantId),
+      this.cacheInvalidationService.invalidateAppointments(tenantId),
+      ...[outcome.previous, outcome.customerId].flatMap((customer) =>
+        customer
+          ? [
+              this.customersAlignmentService.queueCustomerRefresh(
+                tenantId,
+                customer,
+                "sale_created",
+              ),
+            ]
+          : [],
+      ),
+    ]);
+    return outcome.result;
+  }
+
   @Patch(":id/link-appointment")
   async linkAppointment(
     @Req() request: { headers: { authorization?: string } },
