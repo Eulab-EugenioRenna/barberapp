@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import { Prisma, PrismaClient, UserRole } from "@prisma/client";
 import { hash } from "bcrypt";
+import { createHash, randomUUID } from "node:crypto";
 
 try {
   // Load .env when running outside the container (local / CI).
@@ -63,35 +64,28 @@ function buildAutoTags(input: {
   return tags;
 }
 
-async function removeTenantTree(
-  prisma: PrismaClient,
-  tenantId: string,
-): Promise<void> {
+/** Old demo out of sight: inactive, not public, slug, domain and logins freed for the new one. */
+async function archiveTenant(prisma: PrismaClient, tenantId: string, stamp: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
-    await tx.collaboratorWeeklySchedule.deleteMany({
-      where: { collaborator: { tenantId } },
+    const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { slug: true, notes: true } });
+    await tx.tenant.update({
+      where: { id: tenantId },
+      data: {
+        slug: `${tenant.slug}-archivio-${stamp}-${tenantId.slice(0, 6)}`.slice(0, 120), publicDomain: null,
+        isActive: false, publicEnabled: false,
+        notes: `${tenant.notes ?? ""}\nArchiviato dal reset demo del ${stamp}.`.trim(),
+      },
     });
-    await tx.saleItem.deleteMany({ where: { sale: { tenantId } } });
-    await tx.sale.deleteMany({ where: { tenantId } });
-    await tx.appointmentCancellation.deleteMany({
-      where: { appointment: { tenantId } },
-    });
-    await tx.appointment.deleteMany({ where: { tenantId } });
-    await tx.serviceProduct.deleteMany({ where: { service: { tenantId } } });
-    await tx.notificationHistory.deleteMany({ where: { tenantId } });
-    await tx.notificationInbox.deleteMany({ where: { tenantId } });
-    await tx.notificationPreferenceUser.deleteMany({ where: { tenantId } });
-    await tx.notificationPreferenceTenant.deleteMany({ where: { tenantId } });
-    await tx.notificationTemplate.deleteMany({ where: { tenantId } });
-    await tx.notificationProviderConfig.deleteMany({ where: { tenantId } });
-    await tx.product.deleteMany({ where: { tenantId } });
-    await tx.service.deleteMany({ where: { tenantId } });
-    await tx.customer.deleteMany({ where: { tenantId } });
-    await tx.collaborator.deleteMany({ where: { tenantId } });
-    await tx.auditLog.deleteMany({ where: { tenantId } });
-    await tx.tenantSubscription.deleteMany({ where: { tenantId } });
-    await tx.user.deleteMany({ where: { tenantId } });
-    await tx.tenant.delete({ where: { id: tenantId } });
+    for (const user of await tx.user.findMany({ where: { tenantId }, select: { id: true } }))
+      await archiveUser(tx, user.id, stamp);
+  });
+}
+async function archiveUser(db: Prisma.TransactionClient | PrismaClient, userId: string, stamp: string): Promise<void> {
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true } });
+  const [local, domain] = user.email.split("@");
+  await db.user.update({
+    where: { id: userId },
+    data: { email: `${local}+archivio-${stamp}-${userId.slice(0, 6)}@${domain ?? "archivio.invalid"}`, isActive: false },
   });
 }
 
@@ -117,6 +111,34 @@ async function ensureDemoPlan(prisma: PrismaClient) {
       },
     },
   });
+}
+
+/**
+ * Incasso integrale di una vendita demo, come lo registra la cassa: operazione
+ * «receive» con un movimento «receipt». Senza, il trigger di riconciliazione
+ * annulla l'intera transazione al commit.
+ */
+async function recordDemoPayment(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  actorUserId: string,
+  sale: { id: string; total: Prisma.Decimal; paymentMethod: string | null; soldAt: Date; revision: number },
+) {
+  const operationId = randomUUID();
+  const amount = sale.total.toFixed(2);
+  const method = sale.paymentMethod ?? "cash";
+  const entry = { id: randomUUID(), tenantId, saleId: sale.id, operationId, kind: "receipt", amount, method, receivedAt: sale.soldAt };
+  await tx.paymentOperation.create({
+    data: {
+      id: operationId, tenantId, saleId: sale.id, actorUserId,
+      idempotencyKey: `demo:${sale.id}`,
+      fingerprint: createHash("sha256").update(JSON.stringify(["receive", sale.id, amount, method])).digest("hex"),
+      kind: "receive", expectedRevision: sale.revision, reason: "Incasso demo",
+      result: { operationId, saleId: sale.id, revision: sale.revision + 1, entries: [{ ...entry, receivedAt: sale.soldAt.toISOString() }] },
+    },
+  });
+  await tx.paymentEntry.create({ data: entry });
+  await tx.sale.update({ where: { id: sale.id }, data: { paymentBasis: "ledger", revision: { increment: 1 } } });
 }
 
 async function createDemoData(
@@ -526,7 +548,7 @@ async function createDemoData(
   );
 
   // Ordini: due collegati ad appuntamento, due vendite retail libere.
-  await Promise.all([
+  const demoSales = await Promise.all([
     tx.sale.create({
       data: {
         tenantId,
@@ -653,6 +675,8 @@ async function createDemoData(
       },
     }),
   ]);
+  // «Pagato» vale solo con l'incasso nel registro: il database lo verifica al commit.
+  for (const sale of demoSales) await recordDemoPayment(tx, tenantId, owner.id, sale);
 
   const customerSummaries = [
     { id: luca.id, visitsCount: 3, completedVisitsCount: 3, totalSpent: 242 },
@@ -721,7 +745,7 @@ async function clearPublicLookupCache(slug: string): Promise<void> {
 export async function ensureDemoAccount(prisma: PrismaClient): Promise<void> {
   if (args.has("--help") || args.has("-h")) {
     console.log(`
-Crea un account demo completo e NON distruttivo.
+Crea un account demo completo e NON distruttivo (il reset archivia la demo precedente, non cancella nulla).
 
 Variabili d'ambiente:
   DEMO_TENANT_NAME      Nome tenant            (default: ALORA Demo Studio)
@@ -734,7 +758,7 @@ Variabili d'ambiente:
   DEMO_TIMEZONE         Timezone tenant        (default: Europe/Rome)
 
 Opzioni:
-  --reset   Ricrea il tenant demo (richiede DEMO_RESET_CONFIRM=yes o --yes)
+  --reset   Archivia la demo esistente e ne crea una nuova (richiede DEMO_RESET_CONFIRM=yes o --yes)
   --help    Mostra questo messaggio
 `);
     return;
@@ -773,14 +797,18 @@ Opzioni:
   if (RESET) {
     if (!RESET_CONFIRMED) {
       throw new Error(
-        "Reset bloccato: imposta DEMO_RESET_CONFIRM=yes (o passa --yes) per cancellare e ricreare il tenant demo.",
+        "Reset bloccato: imposta DEMO_RESET_CONFIRM=yes (o passa --yes) per archiviare e ricreare il tenant demo.",
       );
     }
+    // The old demo is archived, not deleted: payments and stock are append-only
+    // records, and nothing of a real tenant can be touched by a name mismatch.
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
     if (existingTenant) {
-      console.log(`Reset: rimuovo il tenant demo "${config.tenantSlug}"...`);
-      await removeTenantTree(prisma, existingTenant.id);
+      console.log(`Reset: archivio il tenant demo "${config.tenantSlug}"...`);
+      await archiveTenant(prisma, existingTenant.id, stamp);
     }
-    await prisma.user.deleteMany({ where: { email: config.ownerEmail } });
+    const leftover = await prisma.user.findUnique({ where: { email: config.ownerEmail }, select: { id: true, tenantId: true } });
+    if (leftover) await archiveUser(prisma, leftover.id, stamp);
   }
 
   const plan = await ensureDemoPlan(prisma);
@@ -853,6 +881,10 @@ Opzioni:
     },
     { timeout: 120_000, maxWait: 20_000 },
   );
+
+  // Prisma 5 does not always report an error raised at COMMIT (deferred checks): verify the result.
+  if (!(await prisma.tenant.findUnique({ where: { id: tenant.id }, select: { id: true } })))
+    throw new Error("Il database ha annullato la creazione della demo (controlli al commit): nessun dato salvato");
 
   const publicUrl = config.publicDomain
     ? `http://${config.publicDomain}`
