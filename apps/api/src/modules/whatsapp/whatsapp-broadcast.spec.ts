@@ -15,7 +15,7 @@ jest.mock("../../common/connect-application", () => ({
   })),
 }));
 import { Prisma } from "@prisma/client";
-import { BROADCAST_STEP, WhatsAppService, broadcastTiming } from "./whatsapp.service";
+import { BROADCAST_STEP, WhatsAppService, broadcastTiming, providerChat } from "./whatsapp.service";
 
 const SESSION = "00000000-0000-4000-8000-000000000001";
 /** Every service of a test is stopped at its end: a late worker must not consume the next test's mocks. */
@@ -408,5 +408,15 @@ describe("inlineThumbnail", () => {
     expect(inlineThumbnail("AAAA".repeat(100))).toBe("");
     expect(inlineThumbnail("Ciao, ci vediamo domani alle 10")).toBeNull();
     expect(inlineThumbnail(null)).toBeNull();
+  });
+});
+
+describe("providerChat", () => {
+  it("reads the chat of a verified message from its WhatsApp ID", () => {
+    expect(providerChat("true_393331234567@c.us_3EB0ABC")).toBe("393331234567@c.us");
+    expect(providerChat("true_27682913@lid_3EB0ABC")).toBe("27682913@lid");
+    expect(providerChat("false_1203630@g.us_ABC_39333@c.us")).toBe("1203630@g.us");
+    expect(providerChat(null)).toBeNull();
+    expect(providerChat("synthetic-id")).toBeNull();
   });
 });

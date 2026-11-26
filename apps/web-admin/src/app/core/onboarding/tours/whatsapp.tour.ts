@@ -27,7 +27,7 @@ export const WHATSAPP_TOUR: TourDefinition = {
       title: "Collega e gestisci il numero",
       body:
         "«Collega il tuo numero» mostra un QR da inquadrare dal telefono in Dispositivi collegati. " +
-        "«Riconnetti» riprende un collegamento interrotto; «Disconnetti» lo ferma conservando lo storico, «Elimina collegamento» lo rimuove per crearne uno nuovo.",
+        "«Riconnetti» riprende un collegamento interrotto; «Disconnetti» lo ferma e ti permette di collegare un altro numero. Lo storico di ogni numero resta sempre: ricollegandolo si aggiorna con i soli messaggi nuovi.",
       when: (c) => c.can("whatsapp.manage"),
     },
     {

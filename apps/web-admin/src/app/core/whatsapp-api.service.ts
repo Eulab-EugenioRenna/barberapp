@@ -38,7 +38,6 @@ export class WhatsAppApiService {
   action(id: string, action: "reconnect" | "disconnect") {
     return firstValueFrom(this.http.post<WhatsAppAcknowledgement>(`${this.root}/sessions/${encodeURIComponent(id)}/${action}`, {}));
   }
-  remove(id: string) { return firstValueFrom(this.http.delete<WhatsAppAcknowledgement>(`${this.root}/sessions/${encodeURIComponent(id)}`)); }
   qr(id: string) {
     return firstValueFrom(this.http.get<{ state: string; qr: string | null; linkCode: string | null; method: "qr" | "phone" }>(`${this.root}/sessions/${encodeURIComponent(id)}/qr`));
   }

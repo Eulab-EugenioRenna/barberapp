@@ -65,7 +65,7 @@ describe("WhatsApp: each account manages only the connection it created", () => 
       connectSession: { findFirst: jest.fn(async () => ({ sdkSessionCipher: "cipher", installationId: "i1" })) },
       whatsAppLink: {
         findMany: jest.fn(async ({ where }: any) =>
-          links.filter((l) => l.tenantId === where.tenantId && l.userId === where.userId && !l.removedAt)),
+          links.filter((l) => l.tenantId === where.tenantId && l.userId === where.userId && (!("removedAt" in where) || !l.removedAt))),
         create: jest.fn(async ({ data }: any) => { links.push({ ...data, removedAt: null }); return data; }),
         updateMany: jest.fn(async ({ where, data }: any) => {
           const ids: string[] = where.sessionId?.in ?? [where.sessionId];
@@ -100,7 +100,6 @@ describe("WhatsApp: each account manages only the connection it created", () => 
     current = "colleague";
     await expect(service.qr("Bearer x", uuid(1))).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.disconnect("Bearer x", uuid(1))).rejects.toBeInstanceOf(NotFoundException);
-    await expect(service.remove("Bearer x", uuid(1))).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.send("Bearer x", uuid(1), { to: "+39", text: "ciao", idempotencyKey: uuid(9) } as any)).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.conversations("Bearer x", uuid(101))).rejects.toBeInstanceOf(NotFoundException);
     expect(wa.disconnect).not.toHaveBeenCalled();
@@ -164,11 +163,21 @@ describe("WhatsApp: each account manages only the connection it created", () => 
     expect(links.find((l) => l.sessionId === uuid(1))?.removedAt).toBeInstanceOf(Date);
   });
 
-  it("removes the caller's own connection", async () => {
-    wa.deleteConnection.mockResolvedValue({ removed: true, state: "deleted" });
-    expect(await service.remove("Bearer x", uuid(1))).toEqual({ id: uuid(1), state: "deleted" });
-    expect(wa.deleteConnection).toHaveBeenCalledWith(uuid(1));
-    expect(links.find((l) => l.sessionId === uuid(1))?.removedAt).toBeInstanceOf(Date);
+  it("keeps the history of every number the account linked: A, then B, then A again", async () => {
+    // A (session 1) ended and was replaced by B (session 6, another number and archive).
+    links.find((l) => l.sessionId === uuid(1))!.removedAt = new Date();
+    links.push({ tenantId: "t1", userId: "owner", sessionId: uuid(6), removedAt: null });
+    wa.sessions.mockResolvedValue([raw(1, { state: "disconnected", closed_at: "2026-11-20T08:00:00.000Z" }), raw(2), raw(6)]);
+    wa.archives.mockResolvedValue([1, 2, 6].map((n) => ({ id: uuid(100 + n), number: `+39 00${n}` })));
+    expect((await service.archives("Bearer x")).map((a) => a.id).sort()).toEqual([uuid(101), uuid(106)]);
+    wa.conversations.mockResolvedValue([]);
+    await expect(service.conversations("Bearer x", uuid(101))).resolves.toEqual([]);
+    // A colleague's archive stays out of reach.
+    await expect(service.conversations("Bearer x", uuid(102))).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("has no way to delete WhatsApp history from ALORA", () => {
+    expect((service as any).remove).toBeUndefined();
   });
 
   it("removes a connection unlinked from the phone and frees it in Connect", async () => {

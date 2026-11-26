@@ -3,6 +3,8 @@ export interface WhatsAppConnection {
   id: string; number: string | null; state: string; archiveId: string | null;
   runnerOnline: boolean; createdAt: string; closedAt: string | null;
   syncStatus: string; syncCount: number;
+  /** full: first reading of this number on the licence · update: same number linked again, only what is new. */
+  syncMode: "full" | "update" | null;
 }
 export interface WhatsAppArchiveView { id: string; number: string }
 export interface WhatsAppConversationView {
@@ -33,6 +35,8 @@ export interface WhatsAppOutboxView {
   broadcastId: string | null;
   /** Automatic attempts already verified as not sent on the phone. */
   attempts: number;
+  /** Chat the message went to, once WhatsApp confirmed it (from its message ID). */
+  chatId: string | null;
 }
 /** Image attached to a message: data URL (JPEG, PNG or WebP), caption is the text. */
 export interface WhatsAppImageInput { data: string; filename: string }

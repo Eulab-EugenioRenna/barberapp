@@ -94,7 +94,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   media = new Map<string, { state: "loading" | "queued" | "error" } | { state: "ready"; url: string; type: string }>();
   feedback = ""; connectionFeedback = ""; sendFeedback = ""; updatedAt: Date | null = null;
   loading = true; refreshing = false; busy = false; sending = false; loadingMessages = false;
-  fresh = false; hasOlder = false; disconnectId = ""; removeId = "";
+  fresh = false; hasOlder = false; disconnectId = "";
   section: "connection" | "chats" | "compose" | "outbox" = "connection";
   readonly tabs: UiTab[] = [
     { key: "connection", label: "Collegamento" },
@@ -150,6 +150,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   ngOnDestroy() {
     this.destroyed = true; this.selection++; clearInterval(this.timer); this.stopQr(); this.qr = null; this.clearMedia();
     if (this.detailTimer) clearTimeout(this.detailTimer);
+    if (this.draftTimer) clearTimeout(this.draftTimer);
   }
 
   /** «Invii» filter: everything, queues, single messages, or only what needs a look. */
@@ -376,9 +377,11 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.connections = connections; this.archives = archives; this.outbox = outbox; this.broadcasts = broadcasts;
       this.fresh = true; this.feedback = ""; this.updatedAt = new Date();
       if (!archives.some(a => a.id === this.archiveId)) {
-        this.archiveId = archives[0]?.id || ""; this.chatId = ""; this.messages = []; this.selection++;
+        // The history of the number connected now first; the others stay selectable.
+        this.archiveId = archives.find(a => a.id === this.active?.archiveId)?.id || archives[0]?.id || ""; this.chatId = ""; this.messages = []; this.selection++;
       }
       await this.loadConversations();
+      this.followDraft();
       if (this.active?.state === "pairing" && this.canManage) {
         const result = await this.api.qr(this.active.id);
         if (!this.destroyed) { this.qr = result.qr; this.linkCode = result.linkCode; this.linkMethod = result.method; }
@@ -431,7 +434,32 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   /** A number typed in the search box: offer to write to it. */
   get searchedNumber() { return this.canSend ? whatsAppNumber(this.chatQuery) : null; }
   /** New chat not on WhatsApp yet: to a customer of the salon or to a number. */
-  draft: { customerId?: string; to?: string; label: string; detail: string } | null = null;
+  draft: { customerId?: string; to?: string; label: string; detail: string; outboxId?: string } | null = null;
+  /** Name of the new chat, kept until WhatsApp's conversation list knows it. */
+  private draftLabel = "";
+  private draftTimer?: ReturnType<typeof setTimeout>;
+  /**
+   * After the first message of a new chat: once WhatsApp verified it, its message ID
+   * names the chat (a number or a private «@lid» one): the real conversation opens.
+   */
+  private followDraft() {
+    const draft = this.draft;
+    if (!draft?.outboxId) return;
+    const item = this.outbox.find((o) => o.id === draft.outboxId);
+    if (item?.state === "sent" && item.chatId) {
+      const chatId = item.chatId, chat = this.conversations.find((c) => c.chatId === chatId);
+      this.draftLabel = draft.label; this.draft = null; this.replyFeedback = "";
+      if (chat) { void this.selectChat(chat); return; }
+      this.selection++; this.chatId = chatId; this.messages = []; this.hasOlder = false;
+      void this.loadMessages().catch(() => undefined);
+      return;
+    }
+    if (item && (item.state === "failed" || item.state === "cancelled")) this.replyFeedback = item.problem || "Messaggio non partito.";
+    else if (item && sendStatus(item).tone === "progress") this.replyFeedback = item.problem || "In verifica su WhatsApp: la conversazione si apre appena il telefono conferma.";
+    // Faster while waiting for the verified outcome.
+    if (this.draftTimer) clearTimeout(this.draftTimer);
+    if (!item || sendStatus(item).tone === "progress") this.draftTimer = setTimeout(() => { if (!this.destroyed) void this.refresh(); }, 3000);
+  }
   newChatOpen = false; newChatMode: "customer" | "number" = "customer"; newChatNumber = ""; newChatFeedback = "";
   openNewChat() {
     this.newChatOpen = true; this.newChatFeedback = ""; this.newChatNumber = ""; this.chatId = ""; this.draft = null;
@@ -559,16 +587,14 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (!this.linkCode) return;
     try { await navigator.clipboard.writeText(this.linkCode.replace(/-/g, "")); this.connectionFeedback = "Codice copiato."; } catch { /* manual copy */ }
   }
-  async connectionAction(action: "connect" | "reconnect" | "disconnect" | "remove", id = "") {
+  async connectionAction(action: "connect" | "reconnect" | "disconnect", id = "") {
     if (this.busy || !this.fresh) return;
-    this.busy = true; this.qr = null; this.disconnectId = ""; this.removeId = ""; this.connectionFeedback = "";
+    this.busy = true; this.qr = null; this.disconnectId = ""; this.connectionFeedback = "";
     try {
       if (action === "connect") await this.api.connect();
-      else if (action === "remove") await this.api.remove(id);
       else await this.api.action(id, action);
       this.connectionFeedback = action === "connect"
         ? "Collegamento creato. Inquadra il QR con il telefono."
-        : action === "remove" ? "Collegamento eliminato. Lo storico dei messaggi resta conservato."
         : "Richiesta registrata. Attendi l’aggiornamento dello stato.";
     } catch (error) { this.connectionFeedback = this.error(error); }
     finally { this.busy = false; this.fresh = false; }
@@ -610,13 +636,17 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.sending = true; this.replyFeedback = "";
     try {
       const target = draft ? (draft.to ? { to: draft.to } : { customerId: draft.customerId! }) : { to: chatId };
-      await this.api.send(this.connected.id, {
+      const ack = await this.api.send(this.connected.id, {
         ...target, text: this.reply, ...(this.replyImage ? { image: this.replyImage } : {}), recipientAuthorized: true,
       });
       this.reply = ""; this.replyImage = null;
       if (this.replyBox) this.replyBox.nativeElement.style.height = "";
       this.scrollToEnd = true;
       this.replyFeedback = "Messaggio affidato a WhatsApp. Compare nella conversazione appena il telefono lo conferma.";
+      if (draft && this.draft === draft) {
+        this.draft = { ...draft, outboxId: ack.id };
+        this.replyFeedback = "In verifica su WhatsApp: la conversazione si apre appena il telefono conferma.";
+      }
       await this.refresh();
     } catch (error) { this.replyFeedback = this.error(error); }
     finally { this.sending = false; }
@@ -632,7 +662,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   /** Name first; a phone only when WhatsApp gives one; never the internal «@lid» id. */
   chatLabel(chat: WhatsAppConversationView) { return chat.name || chat.phone || (chat.isGroup ? "Gruppo WhatsApp" : "Contatto senza nome"); }
   get currentChat() { return this.conversations.find(c => c.chatId === this.chatId); }
-  chatName() { if (this.draft) return this.draft.label; const chat = this.currentChat; return chat ? this.chatLabel(chat) : "Conversazione"; }
+  chatName() { if (this.draft) return this.draft.label; const chat = this.currentChat; return chat ? this.chatLabel(chat) : this.draftLabel || "Conversazione"; }
   trackId(_index: number, item: { id: string }) { return item.id; }
   trackChat(_index: number, item: WhatsAppConversationView) { return item.chatId; }
 }

@@ -26,7 +26,9 @@
       </p>
       <p *ngIf="active?.archiveId" class="wa-muted">
         Cronologia: {{ active?.syncCount }} messaggi acquisiti ·
-        {{ active?.syncStatus === 'complete' ? 'sincronizzazione completa' : 'sincronizzazione in corso' }}.
+        {{ active?.syncStatus === 'available_history_synced' || active?.syncStatus === 'complete'
+          ? (active?.syncMode === 'update' ? 'storico aggiornato con i messaggi nuovi' : 'storico completo acquisito')
+          : (active?.syncMode === 'update' ? 'aggiornamento in corso (solo i messaggi nuovi)' : 'prima lettura completa in corso') }}.
       </p>
 
       <div *ngIf="canManage" class="wa-actions" data-tour="whatsapp-actions">
@@ -36,27 +38,17 @@
         <button *ngIf="active?.state === 'failed' || active?.state === 'disconnected'" type="button" class="primary-btn" [disabled]="busy || !fresh" (click)="connectionAction('reconnect', active!.id)">
           Riconnetti
         </button>
-        <button *ngIf="active && active.state !== 'disconnecting' && active.state !== 'disconnected'" type="button" class="secondary-btn" [disabled]="busy || !fresh" (click)="disconnectId = active.id; removeId = ''">
+        <button *ngIf="active && active.state !== 'disconnecting' && active.state !== 'disconnected'" type="button" class="secondary-btn" [disabled]="busy || !fresh" (click)="disconnectId = active.id">
           Disconnetti
-        </button>
-        <button *ngIf="active" type="button" class="danger-btn" [disabled]="busy || !fresh" (click)="removeId = active.id; disconnectId = ''">
-          Elimina collegamento
         </button>
       </div>
       <p *ngIf="!canManage" class="wa-muted">Per collegare un numero serve il permesso di gestione WhatsApp.</p>
 
       <div *ngIf="disconnectId" class="wa-confirm" role="alert">
-        <p>Disconnettere il numero? Lo storico resta consultabile; gli invii ancora in coda verranno annullati.</p>
+        <p>Disconnettere il numero? Lo storico resta conservato per questo numero: se lo ricolleghi riprende da dove era, con i soli messaggi nuovi. Gli invii ancora in coda verranno annullati.</p>
         <div class="wa-actions">
           <button type="button" class="primary-btn" [disabled]="busy" (click)="connectionAction('disconnect', disconnectId)">Conferma disconnessione</button>
           <button type="button" class="secondary-btn" [disabled]="busy" (click)="disconnectId = ''">Annulla</button>
-        </div>
-      </div>
-      <div *ngIf="removeId" class="wa-confirm" role="alert">
-        <p>Eliminare il collegamento? Il numero viene scollegato da ALORA e da Connect; potrai crearne uno nuovo con un altro QR.</p>
-        <div class="wa-actions">
-          <button type="button" class="danger-btn" [disabled]="busy" (click)="connectionAction('remove', removeId)">Elimina definitivamente</button>
-          <button type="button" class="secondary-btn" [disabled]="busy" (click)="removeId = ''">Annulla</button>
         </div>
       </div>
       <p *ngIf="connectionFeedback" class="wa-feedback" role="status">{{ connectionFeedback }}</p>

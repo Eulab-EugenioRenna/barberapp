@@ -79,6 +79,12 @@ export function chatPhone(chatId: string): string | null {
   const match = /^(\d{7,15})@c\.us$/.exec(chatId);
   return match ? `+${match[1]}` : null;
 }
+const syncModeOf = (value: unknown) => (value === "update" || value === "full" ? value : null);
+/** Chat of a sent message: WhatsApp's message ID is «true_<chat>_<id>» (chat «…@c.us», «…@lid» or «…@g.us»). */
+export function providerChat(providerId: unknown): string | null {
+  const match = typeof providerId === "string" ? /^(?:true|false)_([^_]+@(?:c\.us|lid|g\.us))_/.exec(providerId) : null;
+  return match && match[1].length <= 100 ? match[1] : null;
+}
 /** Outcome text of a number without WhatsApp: such recipients are not retried. */
 export const NO_WHATSAPP = "Il numero non ha WhatsApp.";
 /** Recipient withdrawn with «Annulla»: «Riprova» puts it back. */
@@ -280,15 +286,31 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     return session;
   }
 
+  /**
+   * Histories of this account: one per number it ever linked on this licence, also
+   * numbers not connected now (history stays in Connect per licence and number).
+   */
+  private async myArchiveIds(wa: Client, actor: Actor): Promise<Set<string>> {
+    await this.mine(wa, actor);
+    const links = await this.prisma.whatsAppLink.findMany({
+      where: { tenantId: actor.tenantId, userId: actor.userId }, select: { sessionId: true },
+    });
+    const sessions = new Set(links.map((link) => link.sessionId));
+    return new Set(rows(await wa.sessions())
+      .filter((item) => sessions.has(item.id) && item.archive_id)
+      .map((item) => String(item.archive_id)));
+  }
   private async ownedArchive(wa: Client, actor: Actor, archiveId: string): Promise<void> {
-    if (!(await this.mine(wa, actor)).some((item) => item.archive_id === archiveId)) throw notMine();
+    if (!(await this.myArchiveIds(wa, actor)).has(archiveId)) throw notMine();
   }
 
   private view(s: RawSession): WhatsAppConnection {
     if (typeof s.runner_online !== "boolean" || !Number.isSafeInteger(s.sync_count) || s.sync_count < 0) return invalid();
     return { id: id(s.id), number: nullable(s.number, 100), state: text(s.state, 80), archiveId: s.archive_id == null ? null : id(s.archive_id),
       runnerOnline: s.runner_online, createdAt: date(s.created_at), closedAt: s.closed_at == null ? null : date(s.closed_at),
-      syncStatus: text(s.sync_status, 80), syncCount: s.sync_count };
+      syncStatus: text(s.sync_status, 80), syncCount: s.sync_count,
+      // sync_mode from Connect 0.14 (older SDK types do not list it yet).
+      syncMode: syncModeOf((s as { sync_mode?: unknown }).sync_mode) };
   }
 
   sessions(auth?: string): Promise<WhatsAppConnection[]> {
@@ -321,7 +343,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     return this.run(auth, "whatsapp.manage", async (wa, actor) => {
       const session = await this.ownedSession(wa, actor, sessionId);
       if (!["queued", "pairing"].includes(String(session.state)))
-        throw new ConflictException("Il numero è già collegato: per cambiarlo eliminalo e collegalo di nuovo");
+        throw new ConflictException("Il numero è già collegato: per cambiarlo scollegalo e collega l’altro; lo storico di ogni numero resta");
       const result = await wa.deleteConnection(sessionId);
       if (typeof result?.removed !== "boolean") return invalid();
       await this.prisma.whatsAppLink.updateMany({ where: { sessionId }, data: { removedAt: new Date() } });
@@ -363,16 +385,6 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       return ack(await wa.disconnect(sessionId));
     });
   }
-  /** Removes the connection in Connect; the message archive is kept. */
-  remove(auth: string | undefined, sessionId: string) {
-    return this.run(auth, "whatsapp.manage", async (wa, actor) => {
-      await this.ownedSession(wa, actor, sessionId);
-      const result = await wa.deleteConnection(sessionId);
-      if (typeof result?.removed !== "boolean") return invalid();
-      await this.prisma.whatsAppLink.updateMany({ where: { sessionId }, data: { removedAt: new Date() } });
-      return { id: sessionId, state: text(result.state, 80) };
-    });
-  }
   qr(auth: string | undefined, sessionId: string) {
     return this.run(auth, "whatsapp.manage", async (wa, actor) => {
       await this.ownedSession(wa, actor, sessionId);
@@ -385,7 +397,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   }
   archives(auth?: string): Promise<WhatsAppArchiveView[]> {
     return this.run(auth, "whatsapp.read", async (wa, actor) => {
-      const archiveIds = new Set((await this.mine(wa, actor)).map((item) => item.archive_id).filter(Boolean));
+      const archiveIds = await this.myArchiveIds(wa, actor);
       if (!archiveIds.size) return [];
       return rows(await wa.archives())
         .filter((a) => archiveIds.has(a.id))
@@ -522,7 +534,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         return { id: id(o.id), sessionId: id(o.session_id), state, createdAt: date(o.created_at), hasError: o.error != null,
           problem: sendProblem(state, o.error), recipientName: record ? record.recipientName || record.recipient : null,
           preview: record?.preview ?? null, kind: record?.kind ?? null, recipient: record?.recipient ?? null,
-          broadcastId: broadcastOf.get(o.id) ?? null, attempts: Number((o as { attempts?: unknown }).attempts ?? 0) || 0 };
+          broadcastId: broadcastOf.get(o.id) ?? null, attempts: Number((o as { attempts?: unknown }).attempts ?? 0) || 0,
+          chatId: providerChat(o.provider_id) };
       });
     });
   }
