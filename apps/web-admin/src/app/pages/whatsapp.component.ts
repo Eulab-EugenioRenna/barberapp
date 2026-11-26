@@ -438,18 +438,32 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.recipientAuthorized = false; this.clearMedia();
     if (this.canSend) void this.customerDirectory.load();
   }
-  startChatWithCustomer(id: string) {
-    const c = this.customerDirectory.find(id);
-    if (!c) return;
-    this.openDraft({ customerId: id, label: `${c.firstName} ${c.lastName}`.trim() || "Cliente", detail: "Cliente del salone · numero dalla scheda" });
+  /** A customer: their number from the card, then the same path as a number typed by hand. */
+  async startChatWithCustomer(id: string) {
+    if (!id) return;
+    this.newChatFeedback = "";
+    try {
+      const found = await this.api.customerNumber(id);
+      if (!found.to || found.issue === "landline") {
+        this.newChatOpen = true;
+        this.newChatFeedback = found.issue === "landline"
+          ? `${found.name}: in scheda c’è un numero fisso, WhatsApp non lo raggiunge.`
+          : `${found.name}: il numero in scheda non è leggibile. Correggilo nella scheda cliente.`;
+        return;
+      }
+      this.startChatWithNumber(found.to, found.name, found.customerId);
+    } catch (error) { this.newChatOpen = true; this.newChatFeedback = this.error(error); }
   }
-  startChatWithNumber(value = this.newChatNumber) {
+  startChatWithNumber(value = this.newChatNumber, name?: string, customerId?: string) {
     const to = whatsAppNumber(value);
     if (!to) { this.newChatFeedback = "Numero non valido: scrivi il prefisso internazionale (es. +39) oppure un cellulare italiano."; return; }
     const digits = to.slice(1);
     const existing = this.conversations.find((c) => (c.phone ?? "").replace(/\D/g, "") === digits);
     if (existing) { this.newChatOpen = false; this.chatQuery = ""; void this.selectChat(existing); return; }
-    this.openDraft({ to, label: to.replace(/^(\+\d{2})(\d{3})(\d+)$/, "$1 $2 $3"), detail: "Nuovo numero" });
+    const pretty = to.replace(/^(\+\d{2})(\d{3})(\d+)$/, "$1 $2 $3");
+    this.openDraft(name
+      ? { to, customerId, label: name, detail: `${pretty} · cliente del salone` }
+      : { to, label: pretty, detail: "Nuovo numero" });
   }
   private openDraft(draft: NonNullable<WhatsAppComponent["draft"]>) {
     this.selection++; this.chatId = ""; this.messages = []; this.hasOlder = false; this.clearMedia();
@@ -595,7 +609,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (draft && !this.recipientAuthorized) { this.replyFeedback = "Conferma che il destinatario ha accettato di ricevere messaggi."; return; }
     this.sending = true; this.replyFeedback = "";
     try {
-      const target = draft ? (draft.customerId ? { customerId: draft.customerId } : { to: draft.to! }) : { to: chatId };
+      const target = draft ? (draft.to ? { to: draft.to } : { customerId: draft.customerId! }) : { to: chatId };
       await this.api.send(this.connected.id, {
         ...target, text: this.reply, ...(this.replyImage ? { image: this.replyImage } : {}), recipientAuthorized: true,
       });

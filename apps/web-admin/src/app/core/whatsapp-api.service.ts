@@ -57,6 +57,10 @@ export class WhatsAppApiService {
   customers() {
     return firstValueFrom(this.http.get<Array<{ id: string; firstName: string; lastName: string; hasPhone: boolean }>>(`${ADMIN_API_URL}/customers/options`));
   }
+  /** WhatsApp number of one customer (needs the send permission), to open or start its chat. */
+  customerNumber(customerId: string) {
+    return firstValueFrom(this.http.get<{ customerId: string; name: string; to: string | null; issue: string | null }>(`${this.root}/customers/${encodeURIComponent(customerId)}/number`));
+  }
   audience() { return firstValueFrom(this.http.get<WhatsAppAudienceView>(this.root + "/audience")); }
   /** Same key for a repeated request: customers already reached are not messaged again. */
   broadcast(sessionId: string, input: WhatsAppBroadcastInput) {

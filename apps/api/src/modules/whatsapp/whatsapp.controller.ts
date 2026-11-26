@@ -49,6 +49,10 @@ export class WhatsAppController {
   send(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() body: SendWhatsAppTextDto) {
     connectBrowser(r); return this.whatsapp.send(r.headers.authorization, id, body);
   }
+  @Get("customers/:customerId/number") @Header("Cache-Control", "no-store")
+  customerNumber(@Req() r: ConnectRequest, @Param("customerId", new ParseUUIDPipe()) customerId: string) {
+    return this.whatsapp.customerNumber(r.headers.authorization, customerId);
+  }
   @Get("audience") @Header("Cache-Control", "no-store")
   audience(@Req() r: ConnectRequest) { return this.whatsapp.audience(r.headers.authorization); }
   @Post("sessions/:id/broadcast")

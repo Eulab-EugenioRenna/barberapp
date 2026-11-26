@@ -584,6 +584,19 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       orderBy: { id: "asc" },
     });
   }
+  /** WhatsApp number of one customer, to open its chat (or start one) from «Conversazioni». */
+  async customerNumber(auth: string | undefined, customerId: string): Promise<{ customerId: string; name: string; to: string | null; issue: PhoneIssue | null }> {
+    const session = await resolveRequestSession(this.prisma, auth);
+    const user = requireUser(session), tenantId = requireTenantId(session);
+    if (user.technicalAccess || user.role === "platform_admin" || !canUseLocalFunction(user, "whatsapp.send"))
+      throw new ForbiddenException("Permesso WhatsApp esplicito richiesto");
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, tenantId }, select: { id: true, firstName: true, lastName: true, phone: true },
+    });
+    if (!customer) throw new NotFoundException("Cliente non trovato");
+    const { to, issue } = checkCustomerPhone(customer.phone);
+    return { customerId: customer.id, name: customerName(customer) ?? "Cliente", to, issue };
+  }
   async audience(auth?: string): Promise<WhatsAppAudienceView> {
     const session = await resolveRequestSession(this.prisma, auth);
     const user = requireUser(session), tenantId = requireTenantId(session);

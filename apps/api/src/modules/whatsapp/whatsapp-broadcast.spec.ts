@@ -51,6 +51,10 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
     },
     customer: {
       findMany: jest.fn(async () => customers.map((c) => ({ ...c, firstName: c.id, lastName: null }))),
+      findFirst: jest.fn(async ({ where }: any) => {
+        const c = customers.find((row) => row.id === where.id);
+        return c && where.tenantId === "t1" ? { ...c, firstName: c.id, lastName: null } : null;
+      }),
     },
     whatsAppBroadcast: {
       findUnique: jest.fn(async ({ where }: any) => jobs.find((j) => j.id === where.id || (where.tenantId_userId_idempotencyKey && j.idempotencyKey === where.tenantId_userId_idempotencyKey.idempotencyKey)) ?? null),
@@ -231,6 +235,13 @@ describe("«Messaggio a tutti» in the background", () => {
     expect(recipients.map((r) => r.state)).toEqual(["failed", "sent", "sent"]);
     expect(jobs[0]).toMatchObject({ status: "done", sent: 2, failed: 1, uncertain: 0 });
     await expect(service.cancelRecipient("auth", jobs[0].id, recipients[1].id)).rejects.toThrow(/non ha ancora ricevuto/);
+  });
+
+  it("gives the WhatsApp number of one customer for «Conversazioni»", async () => {
+    const { service } = setup([{ id: "a", phone: "333 111 2222" }, { id: "b", phone: "06 1234567" }]);
+    await expect(service.customerNumber("auth", "a")).resolves.toEqual({ customerId: "a", name: "a", to: "+393331112222", issue: "prefix_added" });
+    await expect(service.customerNumber("auth", "b")).resolves.toMatchObject({ to: "+39061234567", issue: "landline" });
+    await expect(service.customerNumber("auth", "zz")).rejects.toThrow(/Cliente non trovato/);
   });
 
   it("a different photo is not «already received»", async () => {
