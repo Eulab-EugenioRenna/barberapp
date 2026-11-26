@@ -31,7 +31,7 @@ import { AdminApiService } from "../core/admin-api.service";
     AdminPageHeaderComponent,
   ],
   template: ` <ui-page class="inventory-shell">
-    <alora-page-header navKey="inventory">
+    <alora-page-header navKey="inventory" [refreshing]="loading" (refresh)="load()">
       <a
         uiPageActions
         *ngIf="session.can('services.read')"

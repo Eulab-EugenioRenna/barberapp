@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, Input, inject } from "@angular/core";
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { UiIconComponent, UiPageHeaderComponent } from "@alora/ui";
 import { TourService } from "../core/onboarding/tour.service";
+import { NotificationsBellComponent } from "./notifications-bell.component";
 import {
   findNavEntry,
   navGroupLabel,
@@ -15,7 +16,7 @@ import {
 @Component({
   selector: "alora-page-header",
   standalone: true,
-  imports: [UiPageHeaderComponent, UiIconComponent],
+  imports: [UiPageHeaderComponent, UiIconComponent, NotificationsBellComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<ui-page-header
     [eyebrow]="eyebrow"
@@ -24,18 +25,22 @@ import {
   >
     <div uiPageActions class="actions">
       <ng-content select="[uiPageActions]"></ng-content>
-      @if (tour.hasTour(navKey)) {
-        <button
-          type="button"
-          class="ghost-btn guide-btn"
-          data-tour="page-guide"
-          aria-label="Guida passo passo di questa pagina"
-          (click)="tour.start(navKey)"
-        >
-          <ui-icon name="help"></ui-icon>
-          <span>Guida</span>
-        </button>
-      }
+      <!-- Same three icons on every page: refresh, notifications, guide. -->
+      <span class="tools">
+        @if (refresh.observed) {
+          <button type="button" class="icon-btn" [attr.data-tour]="refreshTour" [disabled]="refreshing"
+            [class.spinning]="refreshing" aria-label="Aggiorna i dati" data-tip="Aggiorna" (click)="refresh.emit()">
+            <ui-icon name="refresh"></ui-icon>
+          </button>
+        }
+        <alora-notifications-bell></alora-notifications-bell>
+        @if (tour.hasTour(navKey)) {
+          <button type="button" class="icon-btn" data-tour="page-guide"
+            aria-label="Guida passo passo di questa pagina" data-tip="Guida" (click)="tour.start(navKey)">
+            <ui-icon name="help"></ui-icon>
+          </button>
+        }
+      </span>
     </div>
   </ui-page-header>`,
   styles: [
@@ -46,10 +51,16 @@ import {
       .actions {
         display: contents;
       }
-      .guide-btn {
+      .tools {
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
+        gap: 0.35rem;
+      }
+      .spinning ui-icon {
+        animation: header-spin 0.9s linear infinite;
+      }
+      @keyframes header-spin {
+        to { transform: rotate(360deg); }
       }
     `,
   ],
@@ -57,6 +68,11 @@ import {
 export class AdminPageHeaderComponent {
   readonly tour = inject(TourService);
   @Input({ required: true }) navKey!: AdminNavKey;
+  /** Shows the refresh icon when bound; `refreshing` disables it and turns it. */
+  @Output() readonly refresh = new EventEmitter<void>();
+  @Input() refreshing = false;
+  /** Anchor used by the page guide. */
+  @Input() refreshTour = "page-refresh";
   /** Overrides the configured title (e.g. a selected team member's agenda). */
   @Input() titleOverride = "";
 

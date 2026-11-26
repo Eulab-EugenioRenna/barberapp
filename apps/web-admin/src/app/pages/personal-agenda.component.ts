@@ -17,7 +17,7 @@ import { PersonalBookingComponent } from "./personal-booking.component";
   imports: [CalendarInputComponent, CommonModule, FormsModule, RouterLink, PersonalBookingComponent, UiPageComponent, UiSelectComponent, AdminPageHeaderComponent],
   template: `<ui-page>
     <alora-page-header
-      navKey="my-agenda"
+      navKey="my-agenda" refreshTour="my-agenda-refresh" [refreshing]="loading" (refresh)="load()"
       [titleOverride]="collaboratorId ? (data ? 'Agenda di ' + data.professional.firstName + ' ' + data.professional.lastName : 'Agenda del profilo') : ''"
     >
       <a uiPageActions *ngIf="collaboratorId && canOpenCompany" class="secondary-btn" data-tour="my-agenda-back" [routerLink]="companyRoute">Torna alla squadra</a>
@@ -31,7 +31,6 @@ import { PersonalBookingComponent } from "./personal-booking.component";
         <div class="field"><span>Data di riferimento</span><barber-calendar-input compact label="Data di riferimento" [value]="referenceDate" (valueChange)="referenceDate = $event" [disabled]="loading || !!updatingId"></barber-calendar-input></div>
         <button class="primary-btn" type="submit" [disabled]="loading || !!updatingId">Mostra</button>
         <button class="secondary-btn" type="button" data-tour="my-agenda-today" [disabled]="loading || !!updatingId" (click)="today()">Oggi</button>
-        <button class="secondary-btn" type="button" data-tour="my-agenda-refresh" [disabled]="loading || !!updatingId" (click)="load()">Aggiorna</button>
       </form>
       <p *ngIf="loading" class="mt-4 text-sm" role="status">Caricamento delle attività…</p>
       <p *ngIf="feedback" class="mt-4 text-sm" role="status" aria-live="polite">{{ feedback }}</p>

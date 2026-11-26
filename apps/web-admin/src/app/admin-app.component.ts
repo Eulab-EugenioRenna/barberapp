@@ -172,18 +172,7 @@ type ViewKey =
       <barber-admin-auth-panel *ngIf="!sessionToken"></barber-admin-auth-panel>
 
       <ng-container *ngIf="sessionToken">
-        <alora-page-header [navKey]="headerNavKey">
-          <button
-            uiPageActions
-            type="button"
-            class="icon-btn"
-            data-tour="header-refresh"
-            (click)="refreshCurrentView()"
-            aria-label="Aggiorna i dati"
-            title="Aggiorna i dati"
-          >
-            <barber-ui-icon name="refresh"></barber-ui-icon>
-          </button>
+        <alora-page-header [navKey]="headerNavKey" refreshTour="header-refresh" [refreshing]="loading" (refresh)="refreshCurrentView()">
           <div
             uiPageActions
             *ngIf="canCreateSomething && (activeView === 'sales' || activeView === 'dashboard' || activeView === 'appointments')"

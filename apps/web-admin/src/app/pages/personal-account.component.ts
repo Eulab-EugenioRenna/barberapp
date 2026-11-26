@@ -28,8 +28,8 @@ import { AmountsPrivacyToggleComponent } from "../shared/amounts-privacy-toggle.
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, UiPageComponent, AdminPageHeaderComponent, AutofocusFirstDirective, AmountsPrivacyToggleComponent],
   template: `<ui-page>
-    <alora-page-header navKey="account">
-      <button uiPageActions type="button" class="secondary-btn" data-tour="account-refresh" [disabled]="loading || busy" (click)="load()">{{ loading ? 'Aggiornamento…' : 'Aggiorna stato' }}</button>
+    <alora-page-header navKey="account" refreshTour="account-refresh" [refreshing]="loading || busy" (refresh)="load()">
+      
     </alora-page-header>
     <p *ngIf="feedback" class="panel rounded-2xl px-4 py-3 text-sm" role="status" aria-live="polite">{{ feedback }}</p>
     <section class="grid gap-5 md:grid-cols-2">

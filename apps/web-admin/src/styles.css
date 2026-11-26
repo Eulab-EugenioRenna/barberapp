@@ -1461,3 +1461,15 @@ button:disabled {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Tooltip for icon-only buttons: data-tip="…" (the name also goes in aria-label). */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip); position: absolute; top: calc(100% + 0.4rem); left: 50%; z-index: 70;
+  padding: 0.25rem 0.55rem; border-radius: 0.45rem; background: #1f2a22; color: #fff;
+  font-size: 0.72rem; font-weight: 600; line-height: 1.2; white-space: nowrap; pointer-events: none;
+  opacity: 0; transform: translate(-50%, -0.2rem); transition: opacity 0.12s, transform 0.12s;
+}
+[data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+@media (hover: none) { [data-tip]:hover::after { opacity: 0; } }
+[data-tip][aria-expanded="true"]::after { display: none; }

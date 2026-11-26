@@ -14,7 +14,7 @@ import { ActivitiesService } from "../core/activities.service";
   standalone: true,
   imports: [TimeSelectComponent, CommonModule, FormsModule, UiPageComponent, UiTabsComponent, AdminPageHeaderComponent],
   template: ` <ui-page class="locations-shell">
-    <alora-page-header navKey="locations">
+    <alora-page-header navKey="locations" [refreshing]="loading" (refresh)="load()">
       <button
         uiPageActions
         *ngIf="canEdit && section === 'structure'"
