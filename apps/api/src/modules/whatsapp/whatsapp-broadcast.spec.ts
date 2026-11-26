@@ -18,6 +18,9 @@ import { Prisma } from "@prisma/client";
 import { BROADCAST_STEP, WhatsAppService, broadcastTiming } from "./whatsapp.service";
 
 const SESSION = "00000000-0000-4000-8000-000000000001";
+/** Every service of a test is stopped at its end: a late worker must not consume the next test's mocks. */
+const services: WhatsAppService[] = [];
+afterEach(() => { services.splice(0).forEach((s) => s.onModuleDestroy()); });
 function setup(customers: Array<{ id: string; phone: string | null }>, alreadySent: string[] = []) {
   const jobs: any[] = [];
   const recipients: any[] = [];
@@ -111,6 +114,7 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
     $transaction: jest.fn(async (fn: any) => fn(prisma)),
   };
   const service = new WhatsAppService(prisma);
+  services.push(service);
   const run = async () => {
     for (const job of jobs) job.nextRunAt = new Date(0);
     await service.tick();

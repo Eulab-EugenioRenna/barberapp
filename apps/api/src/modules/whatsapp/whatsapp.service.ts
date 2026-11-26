@@ -170,6 +170,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger("WhatsAppBroadcast");
   private timer?: ReturnType<typeof setInterval>;
   private working = false;
+  private stopped = false;
   constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit() {
@@ -177,8 +178,11 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     this.timer = setInterval(() => void this.tick(), 5000);
   }
   onModuleDestroy() {
+    this.stopped = true;
     if (this.timer) clearInterval(this.timer);
   }
+  /** Starts the worker soon, unless the app is shutting down. */
+  private kick() { setTimeout(() => { if (!this.stopped) void this.tick(); }, 100); }
 
   /** Opens Connect with the stored credentials of one ALORA sign-in. */
   private async withConnect<T>(tenantId: string, userId: string, connectSessionId: string,
@@ -661,7 +665,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       });
       this.logger.log(`${job.id}: in coda ${targets.length} destinatari, ${skipped} saltati`);
       await this.event(job.id, "queued", { pending: targets.length, note: skipped ? `${skipped} saltati` : null });
-      setTimeout(() => void this.tick(), 100);
+      this.kick();
       return this.broadcastView(job);
     });
   }
@@ -753,7 +757,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       data: { status: "running", error: null, nextRunAt: new Date(), connectSessionId: session.connectSessionId },
     });
     await this.event(id, "resumed", { sent: updated.sent, failed: updated.failed, pending: Math.max(0, updated.total - updated.sent - updated.failed) });
-    setTimeout(() => void this.tick(), 100);
+    this.kick();
     return this.broadcastView(updated);
   }
   /**
@@ -835,7 +839,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         .filter(Boolean).join(" · ");
       this.logger.log(`${id}: completa e riprova – ${note}`);
       await this.event(id, "retried", { sent: updated.sent, failed: updated.failed, pending: retry.length + added.length, note });
-      setTimeout(() => void this.tick(), 100);
+      this.kick();
       return this.broadcastView(updated);
     });
   }
@@ -895,7 +899,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
 
   /** Background worker: one step of one due job at a time. */
   async tick(): Promise<void> {
-    if (this.working) return;
+    if (this.working || this.stopped) return;
     this.working = true;
     try {
       await this.prisma.whatsAppBroadcast.updateMany({
