@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { canUseLocalFunction } from "../../common/function-catalog";
 import { Prisma } from "@prisma/client";
 import { FinancialReportService } from "./financial-report.service";
@@ -43,11 +44,34 @@ export class DashboardController {
       session,
       request.headers,
     );
-    return this.financialReport.read(
-      scope,
-      filters,
-      !!request.headers["x-alora-sector"],
-      !!session.user && canUseLocalFunction(session.user, "inventory.read"),
+    const sectorSelected = !!request.headers["x-alora-sector"];
+    const canReadInventory =
+      !!session.user && canUseLocalFunction(session.user, "inventory.read");
+    // Ogni cambio di pagina e ogni salvataggio rileggono il riepilogo: lo teniamo
+    // in cache finché una scrittura non invalida il dashboard (o per 90 s).
+    const variant = createHash("sha256")
+      .update(
+        JSON.stringify({
+          filters,
+          sectorSelected,
+          canReadInventory,
+          locations: scope.locationIds,
+          sectors: scope.sectorIds,
+          allowed: scope.allowedSectorIds,
+        }),
+      )
+      .digest("hex")
+      .slice(0, 24);
+    return this.cacheService.getOrSet(
+      cacheKeys.dashboardRevenue(scope.tenantId, variant),
+      CACHE_TTL_SECONDS.dashboard,
+      () =>
+        this.financialReport.read(
+          scope,
+          filters,
+          sectorSelected,
+          canReadInventory,
+        ),
     );
   }
 
