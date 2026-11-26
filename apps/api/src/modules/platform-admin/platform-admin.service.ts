@@ -1,6 +1,6 @@
 import { validateTenantImport } from "../../common/validate-tenant-import";
 import { publicUserSelect } from "../../common/local-sessions";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import {
   Prisma,
   BillingInterval,
@@ -13,6 +13,19 @@ import { AppCacheService } from "../../cache/cache.service";
 import { PrismaService } from "../../prisma/prisma.service";
 
 type ImportMode = "replace" | "merge";
+
+/**
+ * «Azzera dati» and import «sostituisci» keep who can sign in, the subscription,
+ * how the business is organised, WhatsApp history and automation authorisations;
+ * catalogue, customers, team, agenda, accounts, stock and their records go.
+ */
+export const TENANT_RESET_KEEP = [
+  "User", "TenantSubscription", "ConnectTenantBinding", "TeamAccountIntent", "AuditLog",
+  "Location", "Sector", "Activity", "TenantHoliday",
+  "WhatsAppLink", "WhatsAppChat", "WhatsAppMedia", "WhatsAppSend", "WhatsAppBroadcast",
+  "NotificationAutomationGrant", "NotificationAutomationWebhook", "NotificationAutomationWebhookEvent",
+  "NotificationAutomationCommand", "NotificationDomainEvent", "AppointmentAutomationPolicy",
+];
 
 @Injectable()
 export class PlatformAdminService {
@@ -421,34 +434,25 @@ export class PlatformAdminService {
     return tenant;
   }
 
+  /**
+   * Operational data of a tenant goes; accounts and structure stay. The database
+   * function follows the current foreign keys and the append-only ledgers
+   * (payments, stock, price history) let go only inside it.
+   */
   private async clearTenantData(
     tx: Prisma.TransactionClient,
     tenantId: string,
   ): Promise<void> {
-    await tx.saleItem.deleteMany({ where: { sale: { tenantId } } });
-    await tx.sale.deleteMany({ where: { tenantId } });
-    await tx.appointmentCancellation.deleteMany({
-      where: { appointment: { tenantId } },
-    });
-    await tx.appointment.deleteMany({ where: { tenantId } });
-    await tx.serviceProduct.deleteMany({ where: { service: { tenantId } } });
-    await tx.notificationHistory.deleteMany({ where: { tenantId } });
-    await tx.notificationInbox.deleteMany({ where: { tenantId } });
-    await tx.notificationPreferenceUser.deleteMany({ where: { tenantId } });
-    await tx.notificationPreferenceTenant.deleteMany({ where: { tenantId } });
-    await tx.notificationTemplate.deleteMany({ where: { tenantId } });
-    await tx.notificationProviderConfig.deleteMany({ where: { tenantId } });
-    await tx.product.deleteMany({ where: { tenantId } });
-    await tx.room.deleteMany({ where: { tenantId } });
-    await tx.service.deleteMany({ where: { tenantId } });
-    await tx.customer.deleteMany({ where: { tenantId } });
-    await tx.collaborator.deleteMany({ where: { tenantId } });
+    await tx.$queryRaw`SELECT alora_purge_tenant(${tenantId}, ${TENANT_RESET_KEEP}::text[])::text AS removed`;
   }
 
   async resetTenantData(tenantId: string): Promise<unknown> {
-    await this.prisma.$transaction(async (tx) => {
-      await this.clearTenantData(tx, tenantId);
-    });
+    await this.prisma.$transaction(
+      async (tx) => {
+        await this.clearTenantData(tx, tenantId);
+      },
+      { timeout: 120_000, maxWait: 20_000 },
+    );
 
     await this.cacheInvalidationService.invalidatePlatformAdminTenants();
     await this.cacheInvalidationService.invalidateBookingReadModels(tenantId);
@@ -467,12 +471,23 @@ export class PlatformAdminService {
     });
     if (!tenant) throw new NotFoundException("Attività non trovata");
 
-    await this.resetTenantData(tenantId);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.tenantSubscription.deleteMany({ where: { tenantId } });
-      await tx.user.deleteMany({ where: { tenantId } });
-      await tx.tenant.delete({ where: { id: tenantId } });
-    });
+    // One transaction: everything of the tenant goes, or nothing does.
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT alora_purge_tenant(${tenantId})::text AS removed`;
+        await tx.$executeRaw`DELETE FROM "Tenant" WHERE id = ${tenantId}`;
+      },
+      { timeout: 120_000, maxWait: 20_000 },
+    );
+    // Prisma 5 may not report a failure raised at COMMIT: check the outcome.
+    if (await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } }))
+      throw new ConflictException("Eliminazione non completata: nessun dato è stato rimosso");
+    await this.cacheInvalidationService.invalidateBookingReadModels(tenantId);
+    await this.cacheInvalidationService.invalidateServices(tenantId);
+    await this.cacheInvalidationService.invalidateCollaborators(tenantId);
+    await this.cacheInvalidationService.invalidateProducts(tenantId);
+    await this.cacheInvalidationService.invalidatePublicServices(tenantId);
+    await this.cacheInvalidationService.invalidatePublicAvailability(tenantId);
     await this.cacheInvalidationService.invalidatePlatformAdminTenants();
     await this.cacheInvalidationService.invalidatePublicTenantLookups();
     return { id: tenantId, removed: true };
