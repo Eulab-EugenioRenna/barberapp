@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Header, Param, ParseUUIDPipe, Post, Query, Req, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { WhatsAppService } from "./whatsapp.service";
-import { BroadcastWhatsAppTextDto, SendWhatsAppTextDto, WhatsAppLinkDto, WhatsAppMessageQueryDto } from "./whatsapp.dto";
+import { BroadcastWhatsAppTextDto, SendWhatsAppTextDto, WhatsAppLinkDto, WhatsAppRecipientRetryDto, WhatsAppMessageQueryDto } from "./whatsapp.dto";
 import { type ConnectRequest, connectBrowser } from "../../common/connect-http";
 @Controller("whatsapp")
 export class WhatsAppController {
@@ -80,5 +80,15 @@ export class WhatsAppController {
   @Post("broadcasts/:id/retry")
   retryBroadcast(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string) {
     connectBrowser(r); return this.whatsapp.retryBroadcast(r.headers.authorization, id);
+  }
+  @Post("broadcasts/:id/recipients/:recipientId/retry")
+  retryRecipient(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string,
+    @Param("recipientId", new ParseUUIDPipe()) recipientId: string, @Body() body: WhatsAppRecipientRetryDto) {
+    connectBrowser(r); return this.whatsapp.retryRecipient(r.headers.authorization, id, recipientId, body?.confirm === true);
+  }
+  @Post("broadcasts/:id/recipients/:recipientId/cancel")
+  cancelRecipient(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string,
+    @Param("recipientId", new ParseUUIDPipe()) recipientId: string) {
+    connectBrowser(r); return this.whatsapp.cancelRecipient(r.headers.authorization, id, recipientId);
   }
 }

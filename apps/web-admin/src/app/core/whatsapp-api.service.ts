@@ -78,6 +78,14 @@ export class WhatsAppApiService {
   retryBroadcast(id: string) {
     return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/broadcasts/${encodeURIComponent(id)}/retry`, {}));
   }
+  /** «Riprova» on one recipient; confirm when it may already have arrived. */
+  retryRecipient(id: string, recipientId: string, confirm = false) {
+    return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/broadcasts/${encodeURIComponent(id)}/recipients/${encodeURIComponent(recipientId)}/retry`, confirm ? { confirm: true } : {}));
+  }
+  /** «Annulla» on one recipient not yet reached. */
+  cancelRecipient(id: string, recipientId: string) {
+    return firstValueFrom(this.http.post<WhatsAppBroadcastView>(`${this.root}/broadcasts/${encodeURIComponent(id)}/recipients/${encodeURIComponent(recipientId)}/cancel`, {}));
+  }
   async send(sessionId: string, input: Omit<WhatsAppSendInput, "idempotencyKey">) {
     const key = this.key();
     let command: PendingCommand;

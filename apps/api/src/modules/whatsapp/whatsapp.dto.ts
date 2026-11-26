@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { Equals, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, ValidateNested } from "class-validator";
+import { Equals, IsBoolean, IsOptional, IsString, IsUUID, Length, Matches, MaxLength, ValidateNested } from "class-validator";
 export class WhatsAppMessageQueryDto {
   @IsOptional() @IsUUID() before?: string;
   @IsOptional() @IsString() @MaxLength(100) chat?: string;
@@ -27,6 +27,10 @@ export class BroadcastWhatsAppTextDto {
 }
 
 /** Link by phone number (code typed on the phone) instead of the QR; no phone = QR. */
+/** «Riprova» on one recipient; confirm: resend one that may already have arrived. */
+export class WhatsAppRecipientRetryDto {
+  @IsOptional() @IsBoolean() confirm?: boolean;
+}
 export class WhatsAppLinkDto {
   @IsOptional() @IsString() @MaxLength(30) phone?: string;
 }

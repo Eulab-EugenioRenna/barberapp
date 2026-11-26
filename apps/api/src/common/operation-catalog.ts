@@ -33,6 +33,8 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "WhatsAppController.cancelBroadcast": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.resumeBroadcast": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.retryBroadcast": { kind: "function", key: "whatsapp.send" },
+  "WhatsAppController.retryRecipient": { kind: "function", key: "whatsapp.send" },
+  "WhatsAppController.cancelRecipient": { kind: "function", key: "whatsapp.send" },
   "LocationsController.context": { kind: "session" },
   "LocationsController.totals": {
     kind: "function",

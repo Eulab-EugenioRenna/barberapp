@@ -168,3 +168,66 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 .wa-link-code { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; padding: 1rem; border-radius: 1rem; background: #fff;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 2rem; font-weight: 700; letter-spacing: 0.2em; user-select: all; }
 .wa-code-wait { min-height: 5rem; }
+
+/* «Invii» 2: verified outcomes, colours by tone, filters and per-recipient actions. */
+.wa-outbox { display: grid; gap: 0.9rem; }
+.wa-outbox-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.wa-outbox-title { margin: 0 0 0.2rem; font-size: 1.15rem; font-weight: 800; }
+.wa-outbox-head .wa-muted { margin: 0; max-width: 48rem; }
+.wa-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; margin: 0; }
+.wa-summary div { display: grid; gap: 0.1rem; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-left-width: 4px; border-radius: 0.9rem; background: var(--surface); }
+.wa-summary dt { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+.wa-summary dd { margin: 0; font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+.wa-summary small { font-size: 0.7rem; color: var(--muted); }
+.tone-ok { --tone: #2f7a52; --tone-bg: #e4f0e8; --tone-fg: #215a3f; }
+.tone-progress { --tone: #2f62a3; --tone-bg: #e3ecf8; --tone-fg: #24456e; }
+.tone-error { --tone: #b4432a; --tone-bg: #f8e4dd; --tone-fg: #8a3b24; }
+.tone-warn { --tone: #c08a12; --tone-bg: #fbf0d6; --tone-fg: #6b5310; }
+.tone-muted { --tone: #8c8a80; --tone-bg: rgba(30, 52, 37, 0.06); --tone-fg: #5f5d55; }
+.wa-summary div[class*="tone-"], .wa-detail-counts div[class*="tone-"] { border-left-color: var(--tone); }
+.wa-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.wa-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border: 1px solid var(--line); border-radius: 999px; background: transparent; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.wa-chip span { min-width: 1.3rem; padding: 0 0.35rem; border-radius: 999px; background: rgba(30, 52, 37, 0.08); font-size: 0.7rem; text-align: center; }
+.wa-chip.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.wa-chip.active span { background: rgba(255, 255, 255, 0.25); }
+.wa-send-list { display: grid; gap: 0.5rem; }
+.wa-outbox .wa-send-list li { padding: 0; border: 0; }
+.wa-send-row { display: flex; gap: 0.8rem; align-items: flex-start; padding: 0.8rem 0.9rem; border: 1px solid var(--line); border-left: 4px solid var(--tone, var(--line)); border-radius: 0.9rem; background: var(--surface); transition: box-shadow 0.15s, transform 0.15s; }
+.wa-send-row:hover { box-shadow: 0 6px 18px rgba(20, 30, 24, 0.08); }
+.wa-send-row:hover strong { text-decoration: none; }
+.wa-send-icon { flex: none; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 0.7rem; background: var(--tone-bg, rgba(30, 52, 37, 0.06)); font-size: 1rem; }
+.wa-send-main { display: grid; flex: 1; gap: 0.3rem; min-width: 0; }
+.wa-send-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+.wa-send-top time { margin-left: auto; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+.wa-send-main .wa-preview { overflow: hidden; color: var(--muted); font-size: 0.82rem; text-overflow: ellipsis; white-space: nowrap; }
+.wa-send-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem; font-size: 0.8rem; color: var(--muted); }
+.wa-send-meta b { font-weight: 700; }
+.wa-send-note { font-size: 0.78rem; color: var(--tone-fg, var(--muted)); }
+.wa-percent { margin-left: auto; font-weight: 800; color: var(--ink, inherit); font-size: 0.85em; }
+.c-ok { color: #215a3f; } .c-progress { color: #24456e; } .c-error { color: #8a3b24; } .c-warn { color: #6b5310; }
+.wa-pill { display: inline-flex; align-items: center; padding: 0.15rem 0.6rem; border-radius: 999px; background: var(--tone-bg, rgba(30, 52, 37, 0.06)); color: var(--tone-fg, inherit); font-size: 0.72rem; font-weight: 800; white-space: nowrap; }
+.wa-pill.tone-progress::before { content: ""; width: 0.45rem; height: 0.45rem; margin-right: 0.35rem; border-radius: 50%; background: currentColor; animation: wa-blink 1.2s ease-in-out infinite; }
+@keyframes wa-blink { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .wa-pill.tone-progress::before { animation: none; } }
+.wa-seg { display: flex; height: 0.45rem; overflow: hidden; border-radius: 999px; background: var(--line); }
+.wa-seg-lg { height: 0.7rem; }
+.wa-seg i { display: block; height: 100%; transition: width 0.4s; }
+.s-ok { background: #2f7a52; } .s-progress { background: #2f62a3; } .s-error { background: #b4432a; } .s-warn { background: #c08a12; }
+.wa-detail { width: min(46rem, 100%); }
+.wa-detail-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wa-detail-counts div { border-left-width: 4px; }
+.wa-search { width: 100%; padding: 0.5rem 0.8rem; border: 1px solid var(--line); border-radius: 0.8rem; background: var(--surface); font: inherit; font-size: 0.85rem; }
+.wa-recipients { max-height: 22rem; }
+.wa-recipients li { align-items: flex-start; padding: 0.55rem 0.2rem; }
+.wa-recipient-who { display: grid; min-width: 0; }
+.wa-recipient-state { display: grid; justify-items: end; gap: 0.2rem; }
+.wa-recipient-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.3rem; margin-top: 0.15rem; }
+.wa-recipient-actions .pill-btn { min-height: 0; height: auto; padding: 0.25rem 0.7rem; font-size: 0.75rem; line-height: 1.2; }
+.wa-recipient-actions .pill-btn.danger { border-color: #b4432a; color: #8a3b24; }
+.wa-steps summary { cursor: pointer; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.wa-steps .wa-timeline { margin-top: 0.5rem; }
+@media (max-width: 720px) {
+  .wa-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wa-detail-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wa-send-top time { margin-left: 0; width: 100%; }
+}

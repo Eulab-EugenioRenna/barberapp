@@ -12,6 +12,8 @@ import { UiPageComponent, UiSelectComponent, UiTabsComponent, type UiOption, typ
 import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { CustomerDirectoryService } from "../core/customer-directory.service";
 import { CustomerSelectComponent } from "../shared/customer-select.component";
+import { ActivatedRoute, Router } from "@angular/router";
+import { broadcastShares, recipientStatus, sendStatus, SEND_ATTEMPTS, type SendStatus } from "../core/whatsapp-send-status";
 @Component({
   standalone: true, imports: [CommonModule, FormsModule, CustomerSelectComponent, UiPageComponent, UiTabsComponent, UiSelectComponent, AdminPageHeaderComponent],
   templateUrl: "./whatsapp.component.html", styleUrl: "./whatsapp.component.css",
@@ -129,9 +131,20 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     };
   }
   get draftLocked() { return this.sending || this.pending.kind !== "empty"; }
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   async ngOnInit() {
     if (this.canSend) void this.customerDirectory.load();
     await this.refresh();
+    // Opened from the notifications: straight to that send.
+    this.route.queryParamMap.subscribe((params) => {
+      const invio = params.get("invio"), messaggio = params.get("messaggio");
+      if (!invio && !messaggio) return;
+      this.section = "outbox";
+      if (invio) void this.openBroadcast({ id: invio } as WhatsAppBroadcastView);
+      else { const item = this.outbox.find((o) => o.id === messaggio); if (item) this.openSingle(item); }
+      void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    });
     if (!this.destroyed) this.timer = setInterval(() => { if (!document.hidden) void this.refresh(); }, 8000);
   }
   ngOnDestroy() {
@@ -139,34 +152,131 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (this.detailTimer) clearTimeout(this.detailTimer);
   }
 
+  /** «Invii» filter: everything, queues, single messages, or only what needs a look. */
+  sendFilter: "all" | "broadcast" | "single" | "attention" = "all";
+  readonly sendFilters = [
+    { key: "all", label: "Tutti" }, { key: "broadcast", label: "Messaggi a tutti" },
+    { key: "single", label: "Singoli" }, { key: "attention", label: "Da controllare" },
+  ] as const;
+  readonly sendStatus = sendStatus;
+  readonly recipientStatus = recipientStatus;
+  readonly shares = broadcastShares;
+  readonly attempts = SEND_ATTEMPTS;
   /** «Invii»: each «Messaggio a tutti» is one row, single messages one row each, newest first. */
-  get sendRows(): Array<{ key: string; at: string; job?: WhatsAppBroadcastView; item?: WhatsAppOutboxView }> {
+  get allSendRows(): Array<{ key: string; at: string; job?: WhatsAppBroadcastView; item?: WhatsAppOutboxView }> {
     const known = new Set(this.broadcasts.map((job) => job.id));
     return [
       ...this.broadcasts.map((job) => ({ key: "b:" + job.id, at: job.createdAt, job })),
       ...this.outbox
         .filter((item) => !item.broadcastId || !known.has(item.broadcastId))
         .map((item) => ({ key: "m:" + item.id, at: item.createdAt, item })),
-    ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 80);
+    ].sort((a, b) => b.at.localeCompare(a.at));
   }
+  private needsLook(row: { job?: WhatsAppBroadcastView; item?: WhatsAppOutboxView }) {
+    if (row.job) return row.job.status === "paused" || row.job.failed > 0 || (row.job.uncertain ?? 0) > 0;
+    const tone = row.item ? sendStatus(row.item).tone : "ok";
+    return tone === "error" || tone === "warn";
+  }
+  get sendRows() {
+    const rows = this.allSendRows;
+    const filtered = this.sendFilter === "broadcast" ? rows.filter((r) => r.job)
+      : this.sendFilter === "single" ? rows.filter((r) => r.item)
+        : this.sendFilter === "attention" ? rows.filter((r) => this.needsLook(r)) : rows;
+    return filtered.slice(0, 80);
+  }
+  filterCount(key: string) {
+    const rows = this.allSendRows;
+    return key === "broadcast" ? rows.filter((r) => r.job).length : key === "single" ? rows.filter((r) => r.item).length
+      : key === "attention" ? rows.filter((r) => this.needsLook(r)).length : rows.length;
+  }
+  /** Today at a glance: in progress, arrived, being verified, to check. */
+  get sendSummary() {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const today = (at: string | null | undefined) => !!at && Date.parse(at) >= start.getTime();
+    const singles = this.outbox.filter((o) => !o.broadcastId && today(o.createdAt));
+    const jobs = this.broadcasts.filter((j) => today(j.createdAt) || j.status === "running" || j.status === "paused");
+    const tone = (t: string) => singles.filter((o) => sendStatus(o).tone === t).length;
+    return {
+      running: this.broadcasts.filter((j) => j.status === "running" || j.status === "paused").length,
+      sent: tone("ok") + jobs.reduce((n, j) => n + j.sent, 0),
+      verifying: tone("progress") + jobs.reduce((n, j) => n + (j.sending ?? 0), 0),
+      attention: tone("error") + tone("warn") + jobs.reduce((n, j) => n + j.failed + (j.uncertain ?? 0), 0),
+    };
+  }
+  /** Recipients of the open queue: filter by outcome and search by name or number. */
+  recipientFilter: "all" | "sent" | "progress" | "error" | "warn" | "pending" | "muted" = "all";
+  recipientQuery = "";
+  readonly recipientFilters = [
+    { key: "all", label: "Tutti" }, { key: "sent", label: "Inviati" }, { key: "progress", label: "In verifica" },
+    { key: "error", label: "Non partiti" }, { key: "warn", label: "Da verificare" }, { key: "pending", label: "Da inviare" },
+    { key: "muted", label: "Saltati e annullati" },
+  ] as const;
+  private recipientGroup(row: WhatsAppBroadcastRecipientView) {
+    if (row.state === "pending") return "pending";
+    const tone = recipientStatus(row).tone;
+    return tone === "ok" ? "sent" : tone;
+  }
+  recipientTotal(rows: WhatsAppBroadcastRecipientView[], key: string) {
+    return key === "all" ? rows.length : rows.filter((r) => this.recipientGroup(r) === key).length;
+  }
+  visibleRecipients(rows: WhatsAppBroadcastRecipientView[]) {
+    const query = this.recipientQuery.trim().toLowerCase();
+    return rows.filter((r) => (this.recipientFilter === "all" || this.recipientGroup(r) === this.recipientFilter)
+      && (!query || (r.name ?? "").toLowerCase().includes(query) || r.recipient.includes(query.replace(/\s/g, ""))));
+  }
+  trackRecipient(_index: number, row: WhatsAppBroadcastRecipientView) { return row.id; }
+  canRetryRecipient(row: WhatsAppBroadcastRecipientView) {
+    return this.canSend && ((row.state === "failed" && row.error !== "Il numero non ha WhatsApp.") || row.state === "uncertain"
+      || (row.state === "skipped" && row.error === "Annullato a mano"));
+  }
+  canCancelRecipient(row: WhatsAppBroadcastRecipientView) {
+    return this.canSend && (row.state === "pending" || (row.state === "sending" && /^Tentativo/.test(row.error ?? "")));
+  }
+  /** Recipient waiting for «Conferma»: it may already have arrived. */
+  confirmRecipient = "";
+  recipientBusy = "";
+  async recipientAction(row: WhatsAppBroadcastRecipientView, action: "retry" | "cancel") {
+    if (this.detail?.kind !== "broadcast") return;
+    if (action === "retry" && row.state === "uncertain" && this.confirmRecipient !== row.id) { this.confirmRecipient = row.id; return; }
+    const id = this.detail.job.id;
+    this.recipientBusy = row.id; this.detailFeedback = "";
+    try {
+      if (action === "retry") await this.api.retryRecipient(id, row.id, row.state === "uncertain");
+      else await this.api.cancelRecipient(id, row.id);
+      this.confirmRecipient = "";
+      const full = await this.api.broadcastDetail(id);
+      this.detail = { kind: "broadcast", job: full };
+      this.broadcasts = this.broadcasts.map((job) => (job.id === full.id ? full : job));
+      this.scheduleDetail();
+    } catch (error) {
+      this.detailFeedback = this.error(error);
+    } finally { this.recipientBusy = ""; }
+  }
+  statusOf(item: WhatsAppOutboxView): SendStatus { return sendStatus(item); }
   trackKey(_index: number, row: { key: string }) { return row.key; }
   broadcastStatus(status: string) {
     return ({ running: "In esecuzione", paused: "In pausa", done: "Completato", cancelled: "Annullato" } as Record<string, string>)[status] ?? status;
   }
-  broadcastPercent(job: WhatsAppBroadcastView) {
-    return job.total ? Math.round(((job.sent + job.failed + (job.uncertain ?? 0)) / job.total) * 100) : 0;
+  broadcastPercent(job: WhatsAppBroadcastView) { return broadcastShares(job).done; }
+  broadcastTone(job: WhatsAppBroadcastView) {
+    if (job.status === "running") return "progress";
+    if (job.status === "paused") return "warn";
+    if (job.status === "cancelled") return "muted";
+    return job.failed ? "error" : job.uncertain ? "warn" : "ok";
   }
   eventLabel(event: WhatsAppBroadcastEventView) {
     switch (event.kind) {
       case "queued": return `Messo in coda: ${event.pending} destinatari`;
-      case "step": return `Gruppo concluso: ${event.sent} consegnati a WhatsApp${event.failed ? `, ${event.failed} non riusciti` : ""}${event.note ? `, ${event.note}` : ""} · ${event.pending} da inviare`;
+      case "step": return event.note === "Esiti verificati dopo i tentativi automatici"
+        ? `Esiti verificati dopo i tentativi automatici: ${event.sent} inviati${event.failed ? `, ${event.failed} non partiti` : ""}`
+        : `Gruppo concluso: ${event.sent} inviati e verificati${event.failed ? `, ${event.failed} non partiti` : ""}${event.note ? `, ${event.note}` : ""} · ${event.pending} da inviare`;
       case "waiting": return `${event.pending} numeri aspettano il messaggio precedente`;
       case "busy": return "WhatsApp occupato: nuovo tentativo dopo un minuto";
       case "paused": return "In pausa";
       case "resumed": return "Ripreso";
       case "cancelled": return `Annullato (${event.sent} già inviati)`;
       case "done": return `Completato: ${event.sent} inviati${event.failed ? `, ${event.failed} non riusciti` : ""}`;
-      case "retried": return `Completa e riprova: ${event.note || `${event.pending} da inviare`}`;
+      case "retried": return event.note?.endsWith(": nuovo invio") ? `Riprova: ${event.note}` : `Completa e riprova: ${event.note || `${event.pending} da inviare`}`;
     }
   }
   /** Delivery state reported by WhatsApp for one message of a queue, when still listed. */
@@ -175,19 +285,17 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     return item ? this.stateLabel(item.state) : "";
   }
   /** What happened to one recipient and, when it did not arrive, why. */
-  recipientOutcome(row: WhatsAppBroadcastRecipientView): { label: string; reason: string | null } {
-    if (row.state === "skipped") return { label: "Saltato", reason: row.error };
-    if (row.state === "failed") return { label: "Non riuscito", reason: row.error };
-    if (row.state === "uncertain") return { label: row.error === "In invio" ? "In invio…" : "Non confermato", reason: row.error === "In invio" ? null : row.error };
-    if (row.state === "pending") return { label: "Da inviare", reason: row.error ? `Ultimo tentativo: ${row.error}` : null };
-    const item = row.outboxId ? this.outbox.find((o) => o.id === row.outboxId) : undefined;
-    return { label: item ? this.stateLabel(item.state) : "Inviato", reason: item?.problem ?? null };
+  recipientOutcome(row: WhatsAppBroadcastRecipientView): { label: string; tone: string; reason: string | null } {
+    const status = recipientStatus(row);
+    const reason = row.state === "sent" || row.error === "In invio" || row.error === "In verifica su WhatsApp" ? null
+      : row.state === "pending" && row.error ? `Ultimo tentativo: ${row.error}` : row.error;
+    return { ...status, reason };
   }
   recipientCounts(rows: WhatsAppBroadcastRecipientView[]) {
     return { queued: rows.filter((r) => r.state !== "skipped").length, skipped: rows.filter((r) => r.state === "skipped").length };
   }
   async openBroadcast(job: WhatsAppBroadcastView) {
-    this.detailFeedback = "";
+    this.detailFeedback = ""; this.recipientFilter = "all"; this.recipientQuery = ""; this.confirmRecipient = "";
     this.detailLoading = true;
     try {
       const full = await this.api.broadcastDetail(job.id);
@@ -210,7 +318,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   private scheduleDetail() {
     if (this.detailTimer) clearTimeout(this.detailTimer);
     const open = this.detail;
-    if (open?.kind !== "broadcast" || open.job.status !== "running") return;
+    if (open?.kind !== "broadcast" || (open.job.status !== "running" && !open.job.sending)) return;
     this.detailTimer = setTimeout(async () => {
       if (this.detail?.kind !== "broadcast" || this.detail.job.id !== open.job.id) return;
       try {

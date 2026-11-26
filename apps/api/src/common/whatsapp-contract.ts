@@ -31,6 +31,8 @@ export interface WhatsAppOutboxView {
   recipient: string | null;
   /** The «Messaggio a tutti» this message belongs to, if any. */
   broadcastId: string | null;
+  /** Automatic attempts already verified as not sent on the phone. */
+  attempts: number;
 }
 /** Image attached to a message: data URL (JPEG, PNG or WebP), caption is the text. */
 export interface WhatsAppImageInput { data: string; filename: string }
@@ -51,7 +53,9 @@ export interface WhatsAppBroadcastEventView {
   sent: number; failed: number; pending: number; note: string | null; at: string;
 }
 export interface WhatsAppBroadcastRecipientView {
-  name: string | null; recipient: string; state: "pending" | "sent" | "failed" | "uncertain" | "skipped";
+  id: string;
+  /** sending: on Connect, being verified or between automatic attempts; uncertain: on the phone without WhatsApp's confirmation. */
+  name: string | null; recipient: string; state: "pending" | "sending" | "sent" | "failed" | "uncertain" | "skipped";
   attempts: number; error: string | null; outboxId: string | null; sentAt: string | null;
 }
 /** Detail card: the queue, its steps and every recipient. */
@@ -69,8 +73,10 @@ export interface WhatsAppBroadcastView {
   failed: number;
   /** Duplicates, unreadable numbers, or already reached with the same text. */
   skipped: number;
-  /** Taken by WhatsApp without a confirmation: maybe delivered, never resent. */
+  /** On the phone without WhatsApp's confirmation: maybe delivered, never resent automatically. */
   uncertain: number;
+  /** On Connect right now: being verified, or waiting for the next automatic attempt. */
+  sending: number;
   pending: number;
   error: string | null;
   /** Start of the text («Foto» for a photo alone), to tell queues apart. */

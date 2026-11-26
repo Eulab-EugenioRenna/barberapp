@@ -100,6 +100,7 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
         return rows.sort((a, b) => a.position - b.position).slice(0, take);
       }),
       update: jest.fn(async ({ where, data }: any) => apply(recipients.find((r) => r.id === where.id), data)),
+      findFirst: jest.fn(async ({ where }: any) => recipients.find((r) => match(r, where)) ?? null),
       count: jest.fn(async ({ where }: any) => recipients.filter((r) => match(r, where)).length),
       updateMany: jest.fn(async ({ where, data }: any) => {
         const found = recipients.filter((r) => match(r, where));
@@ -187,6 +188,49 @@ describe("«Messaggio a tutti» in the background", () => {
     expect(recipients.map((r) => r.state)).toEqual(["uncertain", "sent"]);
     expect(jobs[0]).toMatchObject({ status: "done", sent: 1, uncertain: 1, failed: 0 });
     await expect(service.retryBroadcast("auth", jobs[0].id)).rejects.toThrow(/Niente da completare/);
+  });
+
+  it("Connect retries by itself: the queue moves on and closes only with the verified outcome", async () => {
+    const { service, jobs, recipients, run } = setup([{ id: "a", phone: "3331111111" }, { id: "b", phone: "3332222222" }]);
+    await service.broadcast("auth", SESSION, input);
+    const real = wa.outbox.getMockImplementation()!;
+    let retrying = true;
+    wa.outbox.mockImplementation(async () => (await real()).map((o: any, i: number) => (i === 0 && retrying
+      ? { ...o, state: "queued", attempts: 1, error: "retrying: tentativo 1 di 6 non partito (NOT_ON_PHONE), nuovo tentativo tra 20 secondi" } : o)));
+    await run();
+    expect(recipients.map((r) => r.state)).toEqual(["sending", "sent"]);
+    expect(recipients[0].error).toBe("Tentativo 1 di 6 non partito (verificato sul telefono): nuovo tentativo tra 20 secondi.");
+    expect(jobs[0]).toMatchObject({ status: "running", sent: 1, uncertain: 0, error: "1 messaggio in verifica su WhatsApp" });
+    expect((await service.listBroadcasts("auth"))[0]).toMatchObject({ sending: 1, pending: 1 });
+    retrying = false;
+    await run();
+    wa.outbox.mockImplementation(real);
+    expect(recipients.map((r) => r.state)).toEqual(["sent", "sent"]);
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 2, failed: 0, uncertain: 0 });
+    expect(wa.sendText).toHaveBeenCalledTimes(2);
+  });
+
+  it("«Riprova» and «Annulla» on one recipient", async () => {
+    const { service, jobs, recipients, run } = setup([{ id: "a", phone: "3331111111" }, { id: "b", phone: "3332222222" }, { id: "c", phone: "3333333333" }]);
+    await service.broadcast("auth", SESSION, input);
+    // Withdrawn before it leaves.
+    expect(await service.cancelRecipient("auth", jobs[0].id, recipients[2].id)).toMatchObject({ total: 2, skipped: 1 });
+    expect(recipients[2]).toMatchObject({ state: "skipped", error: "Annullato a mano" });
+    const real = wa.outbox.getMockImplementation()!;
+    wa.outbox.mockImplementation(async () => (await real()).map((o: any, i: number) =>
+      i === 0 ? { ...o, state: "failed", error: "not_on_whatsapp" } : { ...o, state: "uncertain", error: "Esito provider non confermato; nessun reinvio automatico (WHATSAPP_NO_ACK)" }));
+    await run();
+    wa.outbox.mockImplementation(real);
+    expect(jobs[0]).toMatchObject({ status: "done", failed: 1, uncertain: 1 });
+    // No WhatsApp: nothing to retry. Maybe arrived: only with confirmation.
+    await expect(service.retryRecipient("auth", jobs[0].id, recipients[0].id)).rejects.toThrow(/non ha WhatsApp/);
+    await expect(service.retryRecipient("auth", jobs[0].id, recipients[1].id)).rejects.toThrow(/conferma/);
+    expect(await service.retryRecipient("auth", jobs[0].id, recipients[1].id, true)).toMatchObject({ status: "running", uncertain: 0 });
+    expect(await service.retryRecipient("auth", jobs[0].id, recipients[2].id)).toMatchObject({ total: 3, skipped: 0 });
+    await run();
+    expect(recipients.map((r) => r.state)).toEqual(["failed", "sent", "sent"]);
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 2, failed: 1, uncertain: 0 });
+    await expect(service.cancelRecipient("auth", jobs[0].id, recipients[1].id)).rejects.toThrow(/non ha ancora ricevuto/);
   });
 
   it("a different photo is not «already received»", async () => {
@@ -333,7 +377,14 @@ describe("sendProblem", () => {
     expect(sendProblem("cancelled", "authorization_revoked")).toMatch(/non era connesso/);
     expect(sendProblem("cancelled", "explicit_disconnect")).toMatch(/disconnesso/);
     expect(sendProblem("uncertain", "Runner interrotto durante invio; verifica manuale necessaria")).toMatch(/riavviato/);
-    expect(sendProblem("uncertain", "Esito provider non confermato; nessun reinvio automatico")).toMatch(/non ha WhatsApp/);
+    expect(sendProblem("uncertain", "Esito provider non confermato; nessun reinvio automatico (WHATSAPP_NO_ACK)")).toMatch(/sul telefono.*ricontrolliamo/);
+    expect(sendProblem("uncertain", "Esito provider non confermato; nessun reinvio automatico")).toMatch(/non verificabile/);
+    expect(sendProblem("failed", "not_on_whatsapp")).toBe("Il numero non ha WhatsApp.");
+    expect(sendProblem("failed", "not_sent: non partito dopo 6 tentativi (NOT_ON_PHONE)")).toMatch(/dopo 6 tentativi verificati sul telefono/);
+    expect(sendProblem("queued", "retrying: tentativo 2 di 6 non partito (NOT_ON_PHONE), nuovo tentativo tra 60 secondi"))
+      .toBe("Tentativo 2 di 6 non partito (verificato sul telefono): nuovo tentativo tra 1 minuto.");
+    expect(sendProblem("cancelled", "cancelled_by_user")).toMatch(/Annullato a mano/);
+    expect(sendProblem("queued", null)).toBeNull();
     expect(sendProblem("sent", null)).toBeNull();
   });
 });
