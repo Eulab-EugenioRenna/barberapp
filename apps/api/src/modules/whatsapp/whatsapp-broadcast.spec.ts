@@ -203,7 +203,7 @@ describe("«Messaggio a tutti» in the background", () => {
       ? { ...o, state: "queued", attempts: 1, error: "retrying: tentativo 1 di 6 non partito (NOT_ON_PHONE), nuovo tentativo tra 20 secondi" } : o)));
     await run();
     expect(recipients.map((r) => r.state)).toEqual(["sending", "sent"]);
-    expect(recipients[0].error).toBe("Tentativo 1 di 6 non partito (verificato sul telefono): nuovo tentativo tra 20 secondi.");
+    expect(recipients[0].error).toBe("Tentativo 1 di 6 non partito: il messaggio non è comparso sul telefono del salone (telefono senza rete o WhatsApp chiuso). Nuovo tentativo tra 20 secondi.");
     expect(jobs[0]).toMatchObject({ status: "running", sent: 1, uncertain: 0, error: "1 messaggio in verifica su WhatsApp" });
     expect((await service.listBroadcasts("auth"))[0]).toMatchObject({ sending: 1, pending: 1 });
     retrying = false;
@@ -391,9 +391,13 @@ describe("sendProblem", () => {
     expect(sendProblem("uncertain", "Esito provider non confermato; nessun reinvio automatico (WHATSAPP_NO_ACK)")).toMatch(/sul telefono.*ricontrolliamo/);
     expect(sendProblem("uncertain", "Esito provider non confermato; nessun reinvio automatico")).toMatch(/non verificabile/);
     expect(sendProblem("failed", "not_on_whatsapp")).toBe("Il numero non ha WhatsApp.");
-    expect(sendProblem("failed", "not_sent: non partito dopo 6 tentativi (NOT_ON_PHONE)")).toMatch(/dopo 6 tentativi verificati sul telefono/);
+    expect(sendProblem("failed", "not_sent: non partito dopo 6 tentativi (NOT_ON_PHONE)")).toBe(
+      "Non partito dopo 6 tentativi: il messaggio non è comparso sul telefono del salone (telefono senza rete o WhatsApp chiuso). Premi «Riprova».");
+    expect(sendProblem("failed", "not_sent: non partito dopo 6 tentativi (ERROR: Start a chat with sendText with this contact before trying to send media)"))
+      .toMatch(/non ha aperto la chat con questo numero per mandare la foto/);
+    expect(sendProblem("failed", "not_sent: non partito dopo 1 tentativi (ARCHIVE_CHECK)")).toMatch(/^Non partito dopo 1 tentativo: verificato sull’archivio/);
     expect(sendProblem("queued", "retrying: tentativo 2 di 6 non partito (NOT_ON_PHONE), nuovo tentativo tra 60 secondi"))
-      .toBe("Tentativo 2 di 6 non partito (verificato sul telefono): nuovo tentativo tra 1 minuto.");
+      .toBe("Tentativo 2 di 6 non partito: il messaggio non è comparso sul telefono del salone (telefono senza rete o WhatsApp chiuso). Nuovo tentativo tra 1 minuto.");
     expect(sendProblem("cancelled", "cancelled_by_user")).toMatch(/Annullato a mano/);
     expect(sendProblem("queued", null)).toBeNull();
     expect(sendProblem("sent", null)).toBeNull();

@@ -92,11 +92,22 @@ export const NO_WHATSAPP = "Il numero non ha WhatsApp.";
 /** Recipient withdrawn with «Annulla»: «Riprova» puts it back. */
 export const CANCELLED_BY_HAND = "Annullato a mano";
 const seconds = (value: number) => value < 60 ? `${value} secondi` : value < 120 ? "1 minuto" : `${Math.round(value / 60)} minuti`;
+/** Why WhatsApp did not take a message, from the reason Connect saved (in brackets). */
+function notSentCause(error: string | null | undefined): string {
+  const reason = /\(([^)]*)\)/.exec(error ?? "")?.[1] ?? "";
+  if (/start a chat/i.test(reason))
+    return "WhatsApp non ha aperto la chat con questo numero per mandare la foto (nessuna conversazione precedente)";
+  if (/NOT_ON_PHONE/.test(reason)) return "il messaggio non è comparso sul telefono del salone (telefono senza rete o WhatsApp chiuso)";
+  if (/WHATSAPP_ACK_ERROR/.test(reason)) return "WhatsApp ha segnalato un errore sul messaggio";
+  if (/ARCHIVE_CHECK/.test(reason)) return "verificato sull’archivio del telefono: nessun messaggio uscito";
+  if (/TIMEOUT/.test(reason)) return "WhatsApp non ha risposto in tempo";
+  return "il telefono del salone non l’ha inviato (senza rete o WhatsApp chiuso)";
+}
 /** Readable outcome for «Invii»: what happened and what to do, never «check in Connect». */
 export function sendProblem(state: string, error: string | null | undefined): string | null {
   if (state === "queued" || state === "sending") {
     const retry = /^retrying: tentativo (\d+) di (\d+) non partito.*?tra (\d+) secondi/.exec(error ?? "");
-    if (retry) return `Tentativo ${retry[1]} di ${retry[2]} non partito (verificato sul telefono): nuovo tentativo tra ${seconds(Number(retry[3]))}.`;
+    if (retry) return `Tentativo ${retry[1]} di ${retry[2]} non partito: ${notSentCause(error)}. Nuovo tentativo tra ${seconds(Number(retry[3]))}.`;
     return null;
   }
   if (state === "uncertain") {
@@ -120,7 +131,7 @@ export function sendProblem(state: string, error: string | null | undefined): st
     if (error === "not_on_whatsapp") return NO_WHATSAPP;
     if (error === "provider_rejected") return "WhatsApp ha rifiutato l’invio a questo numero.";
     const tries = /^not_sent: non partito dopo (\d+) tentativi/.exec(error ?? "");
-    if (tries) return `Non partito dopo ${tries[1]} tentativi verificati sul telefono (telefono del salone senza rete o WhatsApp chiuso): premi «Riprova».`;
+    if (tries) return `Non partito dopo ${tries[1]} ${tries[1] === "1" ? "tentativo" : "tentativi"}: ${notSentCause(error)}. Premi «Riprova».`;
     return "Invio non riuscito. Verifica che il numero sia connesso e riprova.";
   }
   return null;
