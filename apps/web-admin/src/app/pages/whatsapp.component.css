@@ -231,3 +231,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
   .wa-detail-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wa-send-top time { margin-left: 0; width: 100%; }
 }
+
+/* «Conversazioni»: search, new chat and customers to write to. */
+.wa-chat-tools { display: flex; gap: 0.4rem; align-items: center; margin-bottom: 0.5rem; }
+.wa-chat-tools .wa-search { flex: 1; }
+.wa-chat-tools .icon-btn { flex: none; font-size: 1.1rem; font-weight: 700; }
+.wa-chat-tools .icon-btn.active { background: var(--accent); color: #fff; }
+.wa-chat-group { margin: 0.6rem 0.5rem 0.2rem; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.wa-chat-new .wa-chat-name { color: var(--accent); }
+.wa-new-chat { display: grid; gap: 0.75rem; padding: 1rem 1.25rem; max-width: 30rem; }
+.wa-new-number { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; }
+.wa-new-number .field { flex: 1; min-width: 12rem; }

@@ -406,11 +406,56 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     try { await this.loadConversations(); } catch (error) { this.feedback = this.error(error); }
   }
   async selectChat(chat: WhatsAppConversationView) {
+    this.draft = null; this.newChatOpen = false;
     if (chat.chatId !== this.chatId) { this.reply = ""; this.replyImage = null; this.replyFeedback = ""; this.clearMedia(); }
     this.selection++; this.chatId = chat.chatId; this.messages = []; this.hasOlder = false;
     try { await this.loadMessages(); } catch (error) { this.feedback = this.error(error); }
   }
-  closeChat() { this.chatId = ""; this.clearMedia(); }
+  closeChat() { this.chatId = ""; this.draft = null; this.newChatOpen = false; this.clearMedia(); }
+
+  /** «Conversazioni»: search by name, number or text, and customers to start a chat with. */
+  chatQuery = "";
+  get filteredConversations() {
+    const q = this.chatQuery.trim().toLowerCase(), digits = q.replace(/\D/g, "");
+    if (!q) return this.conversations;
+    return this.conversations.filter((c) => this.chatLabel(c).toLowerCase().includes(q)
+      || (digits.length >= 3 && (c.phone ?? "").replace(/\D/g, "").includes(digits))
+      || (c.preview ?? "").toLowerCase().includes(q));
+  }
+  /** Customers matching the search that can be written to (they have a phone). */
+  get customerMatches() {
+    const q = this.chatQuery.trim().toLowerCase();
+    if (q.length < 2 || !this.canSend) return [];
+    return this.customers.filter((c) => c.hasPhone && `${c.firstName} ${c.lastName}`.toLowerCase().includes(q)).slice(0, 6);
+  }
+  /** A number typed in the search box: offer to write to it. */
+  get searchedNumber() { return this.canSend ? whatsAppNumber(this.chatQuery) : null; }
+  /** New chat not on WhatsApp yet: to a customer of the salon or to a number. */
+  draft: { customerId?: string; to?: string; label: string; detail: string } | null = null;
+  newChatOpen = false; newChatMode: "customer" | "number" = "customer"; newChatNumber = ""; newChatFeedback = "";
+  openNewChat() {
+    this.newChatOpen = true; this.newChatFeedback = ""; this.newChatNumber = ""; this.chatId = ""; this.draft = null;
+    this.recipientAuthorized = false; this.clearMedia();
+    if (this.canSend) void this.customerDirectory.load();
+  }
+  startChatWithCustomer(id: string) {
+    const c = this.customerDirectory.find(id);
+    if (!c) return;
+    this.openDraft({ customerId: id, label: `${c.firstName} ${c.lastName}`.trim() || "Cliente", detail: "Cliente del salone · numero dalla scheda" });
+  }
+  startChatWithNumber(value = this.newChatNumber) {
+    const to = whatsAppNumber(value);
+    if (!to) { this.newChatFeedback = "Numero non valido: scrivi il prefisso internazionale (es. +39) oppure un cellulare italiano."; return; }
+    const digits = to.slice(1);
+    const existing = this.conversations.find((c) => (c.phone ?? "").replace(/\D/g, "") === digits);
+    if (existing) { this.newChatOpen = false; this.chatQuery = ""; void this.selectChat(existing); return; }
+    this.openDraft({ to, label: to.replace(/^(\+\d{2})(\d{3})(\d+)$/, "$1 $2 $3"), detail: "Nuovo numero" });
+  }
+  private openDraft(draft: NonNullable<WhatsAppComponent["draft"]>) {
+    this.selection++; this.chatId = ""; this.messages = []; this.hasOlder = false; this.clearMedia();
+    this.draft = draft; this.newChatOpen = false; this.chatQuery = ""; this.newChatFeedback = "";
+    this.reply = ""; this.replyImage = null; this.replyFeedback = ""; this.recipientAuthorized = false;
+  }
   private clearMedia() {
     for (const item of this.media.values()) if (item.state === "ready") URL.revokeObjectURL(item.url);
     this.media = new Map();
@@ -544,12 +589,15 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
   /** The person wrote in this chat: replying there is expected, no extra confirmation. */
   async sendReply() {
-    const chatId = this.chatId;
-    if (this.sending || !this.canSend || !this.connected || !chatId || (!this.reply.trim() && !this.replyImage)) return;
+    const chatId = this.chatId, draft = this.draft;
+    if (this.sending || !this.canSend || !this.connected || (!chatId && !draft) || (!this.reply.trim() && !this.replyImage)) return;
+    // Writing first to someone: the same confirmation as «Nuovo messaggio».
+    if (draft && !this.recipientAuthorized) { this.replyFeedback = "Conferma che il destinatario ha accettato di ricevere messaggi."; return; }
     this.sending = true; this.replyFeedback = "";
     try {
+      const target = draft ? (draft.customerId ? { customerId: draft.customerId } : { to: draft.to! }) : { to: chatId };
       await this.api.send(this.connected.id, {
-        to: chatId, text: this.reply, ...(this.replyImage ? { image: this.replyImage } : {}), recipientAuthorized: true,
+        ...target, text: this.reply, ...(this.replyImage ? { image: this.replyImage } : {}), recipientAuthorized: true,
       });
       this.reply = ""; this.replyImage = null;
       if (this.replyBox) this.replyBox.nativeElement.style.height = "";
@@ -570,7 +618,18 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   /** Name first; a phone only when WhatsApp gives one; never the internal «@lid» id. */
   chatLabel(chat: WhatsAppConversationView) { return chat.name || chat.phone || (chat.isGroup ? "Gruppo WhatsApp" : "Contatto senza nome"); }
   get currentChat() { return this.conversations.find(c => c.chatId === this.chatId); }
-  chatName() { const chat = this.currentChat; return chat ? this.chatLabel(chat) : "Conversazione"; }
+  chatName() { if (this.draft) return this.draft.label; const chat = this.currentChat; return chat ? this.chatLabel(chat) : "Conversazione"; }
   trackId(_index: number, item: { id: string }) { return item.id; }
   trackChat(_index: number, item: WhatsAppConversationView) { return item.chatId; }
+}
+
+/** A typed number as WhatsApp wants it: «+39…»; Italian mobiles may skip the prefix. Null when not a number. */
+export function whatsAppNumber(value: string): string | null {
+  const compact = value.trim().replace(/[\s()./-]/g, "");
+  if (!/^(\+|00)?\d{6,15}$/.test(compact)) return null;
+  if (compact.startsWith("+")) return compact.length >= 9 ? compact : null;
+  if (compact.startsWith("00")) return compact.length >= 10 ? "+" + compact.slice(2) : null;
+  if (/^3\d{8,9}$/.test(compact)) return "+39" + compact;
+  if (/^39\d{9,10}$/.test(compact)) return "+" + compact;
+  return null;
 }

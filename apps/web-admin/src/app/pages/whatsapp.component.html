@@ -108,7 +108,7 @@
   <section
     *ngIf="section === 'chats'"
     role="tabpanel" id="ui-tabpanel-chats" aria-labelledby="ui-tab-chats"
-    class="panel wa-workspace" [class.wa-has-chat]="!!chatId" #workspace
+    class="panel wa-workspace" [class.wa-has-chat]="!!chatId || !!draft || newChatOpen" #workspace
   >
     <aside class="wa-chats">
       <div *ngIf="archives.length > 1" class="wa-label">
@@ -119,21 +119,57 @@
         <p>Per vedere le conversazioni serve prima collegare il tuo numero.</p>
         <button type="button" class="secondary-btn" (click)="section = 'connection'">Vai al collegamento</button>
       </div>
+      <div *ngIf="archiveId" class="wa-chat-tools">
+        <input class="wa-search" type="search" name="chatQuery" [(ngModel)]="chatQuery" placeholder="Cerca nome, numero o testo" aria-label="Cerca conversazione" />
+        <button *ngIf="canSend" type="button" class="icon-btn" data-tip="Nuova chat" aria-label="Nuova chat" [class.active]="newChatOpen" (click)="openNewChat()">＋</button>
+      </div>
       <p *ngIf="archiveId && !conversations.length" class="wa-empty">Nessuna conversazione acquisita.</p>
+      <p *ngIf="archiveId && conversations.length && chatQuery && !filteredConversations.length && !customerMatches.length && !searchedNumber" class="wa-empty">Nessun risultato per «{{ chatQuery }}».</p>
       <div class="wa-chat-list">
-        <button *ngFor="let chat of conversations; trackBy: trackChat" type="button" class="wa-chat" [class.selected]="chat.chatId === chatId" [attr.aria-pressed]="chat.chatId === chatId" (click)="selectChat(chat)">
+        <button *ngIf="searchedNumber as number" type="button" class="wa-chat wa-chat-new" (click)="startChatWithNumber(chatQuery)">
+          <span class="wa-chat-name">Scrivi a {{ number }}</span>
+          <span class="wa-muted wa-preview">Nuova chat con questo numero</span>
+        </button>
+        <button *ngFor="let chat of filteredConversations; trackBy: trackChat" type="button" class="wa-chat" [class.selected]="chat.chatId === chatId" [attr.aria-pressed]="chat.chatId === chatId" (click)="selectChat(chat)">
           <span class="wa-chat-name">{{ chatLabel(chat) }}</span>
           <span class="wa-muted wa-preview">{{ chat.preview || 'Messaggio ' + chat.kind }}</span>
           <time>{{ chat.lastMessageAt | date: 'dd MMM, HH:mm' }}</time>
         </button>
+        <ng-container *ngIf="customerMatches.length">
+          <p class="wa-chat-group">Clienti</p>
+          <button *ngFor="let c of customerMatches" type="button" class="wa-chat wa-chat-new" (click)="startChatWithCustomer(c.id)">
+            <span class="wa-chat-name">{{ c.firstName }} {{ c.lastName }}</span>
+            <span class="wa-muted wa-preview">Nuova chat · numero dalla scheda cliente</span>
+          </button>
+        </ng-container>
       </div>
     </aside>
     <div class="wa-thread">
       <div class="wa-thread-heading">
-        <button *ngIf="chatId" type="button" class="secondary-btn wa-back" (click)="closeChat()">‹ Conversazioni</button>
-        <h2>{{ chatId ? chatName() : 'Scegli una conversazione' }}</h2>
-        <p *ngIf="currentChat?.phone && currentChat?.name" class="wa-muted">{{ currentChat?.phone }}</p>
+        <button *ngIf="chatId || draft || newChatOpen" type="button" class="secondary-btn wa-back" (click)="closeChat()">‹ Conversazioni</button>
+        <h2>{{ newChatOpen ? 'Nuova chat' : chatId || draft ? chatName() : 'Scegli una conversazione' }}</h2>
+        <p *ngIf="!draft && currentChat?.phone && currentChat?.name" class="wa-muted">{{ currentChat?.phone }}</p>
+        <p *ngIf="draft" class="wa-muted">{{ draft.detail }}</p>
       </div>
+      <div *ngIf="newChatOpen" class="wa-new-chat">
+        <div class="wa-chips" role="group" aria-label="A chi scrivere">
+          <button type="button" class="wa-chip" [class.active]="newChatMode === 'customer'" [attr.aria-pressed]="newChatMode === 'customer'" (click)="newChatMode = 'customer'">Cliente</button>
+          <button type="button" class="wa-chip" [class.active]="newChatMode === 'number'" [attr.aria-pressed]="newChatMode === 'number'" (click)="newChatMode = 'number'">Numero</button>
+        </div>
+        <ng-container *ngIf="newChatMode === 'customer'">
+          <alora-customer-select label="Cliente" placeholder="Cerca il cliente per nome" [withPhoneOnly]="true" (valueChange)="startChatWithCustomer($event)"></alora-customer-select>
+          <p class="wa-muted">Compaiono solo i clienti con un numero in scheda.</p>
+        </ng-container>
+        <form *ngIf="newChatMode === 'number'" class="wa-new-number" (ngSubmit)="startChatWithNumber()">
+          <label class="field"><span>Numero WhatsApp</span>
+            <input name="newChatNumber" type="tel" inputmode="tel" autocomplete="off" [(ngModel)]="newChatNumber" placeholder="+39 333 123 4567" />
+          </label>
+          <button class="primary-btn" [disabled]="!newChatNumber.trim()">Apri chat</button>
+        </form>
+        <p *ngIf="newChatFeedback" class="wa-feedback" role="alert">{{ newChatFeedback }}</p>
+        <p class="wa-muted">Se con quel numero c’è già una conversazione, si apre quella.</p>
+      </div>
+      <p *ngIf="draft" class="wa-thread-empty">Nessun messaggio ancora: scrivi qui sotto il primo.</p>
       <div *ngIf="chatId" class="wa-messages" aria-live="polite" #messagesBox>
         <button *ngIf="hasOlder" type="button" class="secondary-btn wa-older" [disabled]="loadingMessages" (click)="olderMessages()">Carica messaggi precedenti</button>
         <p *ngIf="loadingMessages && !messages.length" role="status">Caricamento dei messaggi…</p>
@@ -166,8 +202,8 @@
           <time>{{ item.occurredAt | date: 'dd MMM, HH:mm' }}</time>
         </article>
       </div>
-      <p *ngIf="!chatId" class="wa-thread-empty">I messaggi della conversazione scelta compaiono qui.</p>
-      <form *ngIf="chatId && canSend" class="wa-reply" (ngSubmit)="sendReply()" data-tour="whatsapp-reply">
+      <p *ngIf="!chatId && !draft && !newChatOpen" class="wa-thread-empty">I messaggi della conversazione scelta compaiono qui.</p>
+      <form *ngIf="(chatId || draft) && canSend" class="wa-reply" (ngSubmit)="sendReply()" data-tour="whatsapp-reply">
         <p *ngIf="!connected" class="wa-muted">Per rispondere il tuo numero deve risultare connesso.</p>
         <div *ngIf="replyImage" class="wa-attachment">
           <img [src]="replyImage.data" alt="Foto da inviare" />
@@ -183,6 +219,7 @@
             [placeholder]="'Scrivi a ' + chatName() + (replyImage ? ' (didascalia facoltativa)' : '')"></textarea>
           <button class="primary-btn" [disabled]="sending || !connected || pending.kind !== 'empty' || (!reply.trim() && !replyImage)">{{ sending ? 'Invio…' : 'Invia' }}</button>
         </div>
+        <label *ngIf="draft" class="wa-consent"><input type="checkbox" name="draftConsent" [(ngModel)]="recipientAuthorized" />Ho verificato destinatario e autorizzazione a ricevere messaggi.</label>
         <p class="wa-reply-hint">Invio per mandare · Maiusc+Invio per andare a capo</p>
         <p *ngIf="pending.kind !== 'empty'" class="wa-muted">C’è un invio da verificare in «Nuovo messaggio»: completalo prima di scrivere ancora.</p>
         <p *ngIf="replyFeedback" class="wa-muted" role="status">{{ replyFeedback }}</p>
