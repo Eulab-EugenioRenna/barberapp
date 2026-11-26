@@ -309,8 +309,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     return { id: id(s.id), number: nullable(s.number, 100), state: text(s.state, 80), archiveId: s.archive_id == null ? null : id(s.archive_id),
       runnerOnline: s.runner_online, createdAt: date(s.created_at), closedAt: s.closed_at == null ? null : date(s.closed_at),
       syncStatus: text(s.sync_status, 80), syncCount: s.sync_count,
-      // sync_mode from Connect 0.14 (older SDK types do not list it yet).
-      syncMode: syncModeOf((s as { sync_mode?: unknown }).sync_mode) };
+      syncMode: syncModeOf(s.sync_mode) };
   }
 
   sessions(auth?: string): Promise<WhatsAppConnection[]> {
@@ -534,7 +533,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         return { id: id(o.id), sessionId: id(o.session_id), state, createdAt: date(o.created_at), hasError: o.error != null,
           problem: sendProblem(state, o.error), recipientName: record ? record.recipientName || record.recipient : null,
           preview: record?.preview ?? null, kind: record?.kind ?? null, recipient: record?.recipient ?? null,
-          broadcastId: broadcastOf.get(o.id) ?? null, attempts: Number((o as { attempts?: unknown }).attempts ?? 0) || 0,
+          broadcastId: broadcastOf.get(o.id) ?? null, attempts: Number(o.attempts ?? 0) || 0,
           chatId: providerChat(o.provider_id) };
       });
     });
@@ -943,9 +942,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     if (r.state === "sending" && r.outboxId) {
       const outboxId = r.outboxId;
       const state = await this.run(auth, "whatsapp.send", async (wa) => {
-        const cancel = (wa as unknown as { cancelMessage?: (id: string) => Promise<{ state: string }> }).cancelMessage;
-        if (!cancel) throw new BadRequestException("Annullare un messaggio già affidato a WhatsApp richiede l’aggiornamento di Connect");
-        return (await cancel(outboxId)).state;
+        return (await wa.cancelMessage(outboxId)).state;
       });
       if (state !== "cancelled") {
         if (state === "sending") throw new ConflictException("Sta partendo proprio ora: non si può più annullare");
@@ -996,14 +993,13 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       where: { tenantId, status: { in: ["running", "paused"] }, contentHash: this.contentHash(input), ...(except ? { id: { not: except } } : {}) },
     });
   }
-  /** State of Connect messages: the latest list, and one by one for older ones (SDK 0.14). */
+  /** State of Connect messages: the latest list, and one by one for older ones. */
   private async connectStates(wa: Client, ids: string[]) {
     const states = new Map<string, { state: string; error: string | null; attempts: number }>();
     const put = (o: { id?: unknown; state?: unknown; error?: unknown; attempts?: unknown }) =>
       states.set(String(o.id), { state: String(o.state), error: o.error == null ? null : String(o.error), attempts: Number(o.attempts ?? 0) || 0 });
     for (const o of rows(await wa.outbox())) put(o);
-    const single = (wa as unknown as { outboxItem?: (id: string) => Promise<{ id: string; state: string; error: string | null; attempts?: number }> }).outboxItem;
-    if (single) for (const id of ids) if (!states.has(id)) await single(id).then(put, () => undefined);
+    for (const id of ids) if (!states.has(id)) await wa.outboxItem(id).then(put, () => undefined);
     return states;
   }
   /**
