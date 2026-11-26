@@ -309,10 +309,9 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   }
   private async createLink(wa: Client, actor: Actor, linkPhone: string | undefined) {
       let created: WhatsAppAcknowledgement;
-      // SDK 0.13: with a phone WhatsApp gives a code to type on the phone instead of the QR.
-      const connect = wa.connect as unknown as (options?: { phone?: string }) => Promise<WhatsAppAcknowledgement>;
       try {
-        created = ack(await connect(linkPhone ? { phone: linkPhone } : {}));
+        // With a phone WhatsApp gives a code to type on the phone instead of the QR.
+        created = ack(await wa.connect(linkPhone ? { phone: linkPhone } : {}));
       } catch (error) {
         // Connect allows one open WhatsApp connection per activity.
         if (error && typeof error === "object" && "status" in error && error.status === 409)
@@ -356,7 +355,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   qr(auth: string | undefined, sessionId: string) {
     return this.run(auth, "whatsapp.manage", async (wa, actor) => {
       await this.ownedSession(wa, actor, sessionId);
-      const value = await wa.qr(sessionId) as { state: unknown; qr: unknown; linkCode?: unknown; method?: unknown };
+      const value = await wa.qr(sessionId);
       const state = text(value?.state, 80), qr = nullable(value?.qr, 500000), linkCode = nullable(value?.linkCode ?? null, 20);
       if (qr !== null && (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(qr) || state !== "pairing")) return invalid();
       if (linkCode !== null && (!/^[A-Z0-9-]{8,9}$/.test(linkCode) || state !== "pairing")) return invalid();
