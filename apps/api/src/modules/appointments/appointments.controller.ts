@@ -87,6 +87,7 @@ export const AGENDA_APPOINTMENT_SELECT = {
   customerNotes: true,
   internalNotes: true,
   orderItemId: true,
+  orderIssue: true,
   customer: {
     select: {
       id: true,
@@ -97,7 +98,16 @@ export const AGENDA_APPOINTMENT_SELECT = {
     },
   },
   service: {
-    select: { id: true, name: true, color: true, durationMinutes: true },
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      durationMinutes: true,
+      sectorId: true,
+      basePrice: true,
+      priceMode: true,
+      vatRate: true,
+    },
   },
   collaborator: {
     select: { id: true, firstName: true, lastName: true, calendarColor: true },

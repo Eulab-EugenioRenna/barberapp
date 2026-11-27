@@ -9,6 +9,7 @@ import {
 import { CalendarInputComponent } from "../calendar-input.component";
 import { UiSelectComponent } from "@alora/ui";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
+import { parseLocalBookingTime } from "./booking-local-time";
 
 @Component({
   selector: "barber-admin-appointments-quick-reschedule-modal",
@@ -123,6 +124,16 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
             [showLabel]="true"
           ></ui-select>
 
+          <label class="field">
+            <span>Oppure scrivi l'ora</span>
+            <input
+              type="time"
+              name="quickRescheduleTypedTime"
+              [value]="typedTime()"
+              (change)="typeTime($any($event.target).value)"
+            />
+          </label>
+
           <p *ngIf="loadingSlots" role="status">
             Verifica disponibilità sul server…
           </p>
@@ -130,8 +141,14 @@ import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
             *ngIf="!loadingSlots && !slotOptions.length"
             class="text-sm text-amber-800"
           >
-            Nessun orario disponibile. Prova un'altra data o un altro
-            professionista.
+            Nessun orario suggerito: puoi scrivere l'ora a mano.
+          </p>
+          <p
+            *ngIf="state?.startsAt && !suggested()"
+            class="text-sm text-amber-800"
+          >
+            Orario scritto a mano: si controlla solo che il professionista sia
+            libero.
           </p>
         </div>
       </fieldset>
@@ -178,6 +195,25 @@ export class AdminAppointmentsQuickRescheduleModalComponent {
   @HostListener("document:keydown.escape")
   closeOnEscape(): void {
     if (!this.busy) this.cancel.emit();
+  }
+
+  /** HH:MM of the chosen instant, in local time. */
+  typedTime(): string {
+    const at = this.state?.startsAt ? new Date(this.state.startsAt) : null;
+    if (!at || !Number.isFinite(at.getTime())) return "";
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  }
+
+  suggested(): boolean {
+    return this.slotOptions.some((row) => row.value === this.state?.startsAt);
+  }
+
+  typeTime(time: string): void {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || !this.state?.targetDate)
+      return;
+    const at = parseLocalBookingTime(`${this.state.targetDate}T${time}`);
+    if (at) this.fieldChange.emit({ key: "startsAt", value: at.toISOString() });
   }
 
   originalTimeLabel(): string {

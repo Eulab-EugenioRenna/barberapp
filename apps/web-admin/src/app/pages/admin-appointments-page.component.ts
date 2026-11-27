@@ -346,10 +346,22 @@ import { appointmentStatusLabel } from "../shared/presentation-copy";
                   availabilityLoading
                     ? 'Verifica degli orari...'
                     : appointmentSlots.length
-                      ? 'Seleziona orario'
-                      : 'Nessun orario disponibile'
+                      ? 'Orari suggeriti'
+                      : 'Nessun orario suggerito'
                 "
               ></ui-select>
+              <label class="field mt-2">
+                <span>Oppure scrivi l'ora</span>
+                <input
+                  type="time"
+                  name="appointmentTypedTime"
+                  [value]="typedTime"
+                  (change)="typeTime($any($event.target).value)"
+                />
+              </label>
+              <p *ngIf="timeNote" class="text-sm text-amber-800">
+                {{ timeNote }}
+              </p>
             </div>
           </div>
           <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
@@ -501,6 +513,36 @@ export class AdminAppointmentsPageComponent {
       this.appointmentForm.serviceId &&
       this.appointmentForm.startsAt,
     );
+  }
+
+  /** HH:MM part of the chosen local time. */
+  get typedTime(): string {
+    const match = /T(\d{2}:\d{2})/.exec(String(this.appointmentForm?.startsAt || ""));
+    return match ? match[1] : "";
+  }
+
+  /** The slot list is only a suggestion: staff may write any time. */
+  typeTime(time: string): void {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || !this.appointmentSelectedDate)
+      return;
+    this.appointmentValueChange.emit({
+      key: "startsAt",
+      value: `${this.appointmentSelectedDate}T${time}`,
+    });
+  }
+
+  get timeNote(): string {
+    const startsAt = this.appointmentForm?.startsAt;
+    if (!startsAt || this.availabilityLoading) return "";
+    const slot = this.appointmentSlots.find(
+      (row: { startsAt: string; outsideHours?: boolean }) =>
+        row.startsAt === startsAt,
+    ) as { outsideHours?: boolean } | undefined;
+    if (!slot)
+      return "Orario scritto a mano: si controlla solo che il professionista sia libero.";
+    return slot.outsideHours
+      ? "Attenzione: fuori dall'orario di apertura o di lavoro."
+      : "";
   }
 
   formatDateTime(value: string): string {
