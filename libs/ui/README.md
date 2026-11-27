@@ -28,9 +28,31 @@ Si scrive sempre lo stile mobile e lo si arricchisce verso l'alto. Niente
 | `ui-page-header`  | Unico titolo della pagina: gruppo › titolo › cosa si fa qui › azioni. |
 | `ui-tabs`         | Divide una pagina lunga in sezioni mostrate una alla volta.          |
 | `ui-icon`         | Icone 24px a tratto; nuova icona = nuova voce nella mappa `ICONS`.    |
+| `ui-sheet`        | Foglio unico per editor e moduli, modellato sulla cassa (vedi sotto). |
+| `ui-confirm`      | Unica finestrella rimasta: conferma di azioni distruttive. `UiConfirmService.ask()` sostituisce `window.confirm`. |
+| `ui-more-menu`    | Pulsante «…» con le azioni secondarie di una riga.                    |
 
 Le classi interne hanno prefisso `ui-` per non collidere con il CSS globale
 legacy (`.sidebar`, `.topbar`, `.eyebrow`, ...).
+
+## Fogli (`ui-sheet`)
+
+Modello: la cassa (`apps/web-admin/src/app/quick-order`). Sfondo sfocato,
+transizione 220ms (ridotta con `prefers-reduced-motion`), titolo grande con
+sottotitolo, barra scura fissa in basso con **una** azione principale. Sotto
+820px una colonna sola, intestazione e barra appiccicate, safe-area.
+
+- `size`: `lg` (fino a 1180×780, come la cassa), `md` (moduli, fino a 880),
+  `sm` (aggiunte veloci). `split` = due colonne `ui-sheet-col` con scroll
+  proprio. `layer` alza lo z-index per un foglio aperto sopra un altro.
+- Slot: contenuto, `[uiSheetHead]` (azioni accanto a «Chiudi»),
+  `[uiSheetBar]` (barra; un `type="submit"` usa `form="id-del-form"`).
+- Utilità globali (`sheet/ui-sheet.css`, caricato da `angular.json`):
+  `ui-step` («1 · Persona»), `ui-steps` (avanzamento di una procedura),
+  `ui-section`, `touch-grid`/`touch-card` (schede grandi, `aria-pressed` per
+  la scelta), `ui-advanced` (`<details>` chiuso per i campi avanzati),
+  `ui-warn`/`ui-error` (avvisi in linea che non bloccano), `ui-bar-start`,
+  `ui-bar-info`.
 
 ## Come si progetta una pagina
 
