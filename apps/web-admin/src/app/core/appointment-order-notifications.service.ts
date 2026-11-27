@@ -35,6 +35,18 @@ export class AppointmentOrderNotificationsService {
     void this.consumeStream(token, controller);
   }
 
+  /**
+   * Opened once by the shell for the whole session: a stream already open (or
+   * waiting to reconnect) is left alone, even when the access token rotates.
+   */
+  ensureConnected(token: string): void {
+    if (this.controller || this.reconnectTimer) {
+      if (!this.store.can("sales.read")) this.stop();
+      return;
+    }
+    this.connect(token);
+  }
+
   dismiss(appointmentId: string): void {
     this.appointments.update((items) =>
       items.filter((appointment) => appointment.id !== appointmentId),

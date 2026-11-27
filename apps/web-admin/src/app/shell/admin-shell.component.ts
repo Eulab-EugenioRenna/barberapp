@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnInit, computed, effect, inject, signal } from "@angular/core";
+import { Component, OnInit, computed, effect, inject, signal, untracked } from "@angular/core";
 import { NavigationEnd, Router, RouterOutlet } from "@angular/router";
 import { filter } from "rxjs";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
@@ -27,6 +27,8 @@ import { OperationalSelectorComponent } from "../shared/operational-selector.com
 import { OperationalContextService } from "../core/operational-context.service";
 import { TourOverlayComponent } from "../shared/tour-overlay.component";
 import { TourService } from "../core/onboarding/tour.service";
+import { NotificationsFeedService } from "../core/notifications-feed.service";
+import { AdminPwaService } from "../core/pwa.service";
 
 const COLLAPSED_KEY = "alora.sidebar-collapsed";
 /** Views rendered by AdminAppComponent, which loads the tenant itself. */
@@ -256,6 +258,8 @@ export class AdminShellComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly tour = inject(TourService);
   private readonly operational = inject(OperationalContextService);
+  private readonly feed = inject(NotificationsFeedService);
+  private readonly pwa = inject(AdminPwaService);
 
   readonly drawerOpen = signal(false);
   private currentPath = this.router.url.split("?")[0];
@@ -289,8 +293,10 @@ export class AdminShellComponent implements OnInit {
       this.operational.hasChoice &&
       this.activeKey() !== "dashboard",
   );
-  // The PWA banner renders nothing when not needed; the scope bar decides.
-  readonly showTopbar = computed(() => this.showScope());
+  // The PWA banners (offline, install, new version) or the scope bar.
+  readonly showTopbar = computed(
+    () => this.showScope() || this.pwa.updateAvailable() || this.pwa.offline() || this.pwa.showInstallBanner(),
+  );
   readonly tenantName = computed(() =>
     this.isPlatformAdmin()
       ? "Gestione aziende"
@@ -308,8 +314,20 @@ export class AdminShellComponent implements OnInit {
     effect(() => {
       if (this.session.token() || this.loggingOut) return;
       this.orderAlerts.stop();
+      this.feed.stop();
       this.session.rememberRequestedUrl(this.router.url);
       void this.router.navigate(["/login"]);
+    });
+    // Live «conti da chiudere» and WhatsApp sends: opened once here for every
+    // page (old and new ones), never closed by a page change.
+    effect(() => {
+      const token = this.session.token();
+      const user = this.user();
+      if (!token || !user || this.isPlatformAdmin()) return;
+      untracked(() => {
+        if (this.session.can("sales.read")) this.orderAlerts.ensureConnected(token);
+        if (this.session.can("whatsapp.read")) this.feed.start();
+      });
     });
     this.router.events
       .pipe(
@@ -322,7 +340,7 @@ export class AdminShellComponent implements OnInit {
         if (path !== this.currentPath) this.drawerOpen.set(false);
         this.currentPath = path;
         this.activeKey.set(navKeyFromUrl(event.urlAfterRedirects));
-        // First visit of a page opens its guide (personalised per account).
+        // A page never seen gets a quiet hint next to «Guida» (no tour starts by itself).
         this.tour.scheduleAuto(this.activeKey());
       });
   }
@@ -363,6 +381,7 @@ export class AdminShellComponent implements OnInit {
     this.loggingOut = true;
     this.facade.clearSession();
     this.orderAlerts.stop();
+    this.feed.stop();
     void this.router.navigate(["/login"]);
   }
 }

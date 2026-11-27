@@ -8,6 +8,8 @@ import type {
 import { prepareWhatsAppImage } from "../shared/whatsapp-image";
 import { SessionStore } from "../core/session.store";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
+import { NotificationsFeedService } from "../core/notifications-feed.service";
+import { humanError } from "../core/human-error";
 import { UiPageComponent, UiSelectComponent, UiTabsComponent, type UiOption, type UiTab } from "@alora/ui";
 import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { CustomerDirectoryService } from "../core/customer-directory.service";
@@ -66,9 +68,13 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   archives: WhatsAppArchiveView[] = [];
   conversations: WhatsAppConversationView[] = [];
   messages: WhatsAppMessageView[] = [];
-  outbox: WhatsAppOutboxView[] = [];
+  /** Sends come from the feed shared with the notifications bell: one request for both. */
+  private readonly feed = inject(NotificationsFeedService);
+  get outbox(): WhatsAppOutboxView[] { return this.feed.singles(); }
+  set outbox(value: WhatsAppOutboxView[]) { this.feed.singles.set(value); }
   /** «Messaggio a tutti» of this account: one row each in «Invii». */
-  broadcasts: WhatsAppBroadcastView[] = [];
+  get broadcasts(): WhatsAppBroadcastView[] { return this.feed.recent(); }
+  set broadcasts(value: WhatsAppBroadcastView[]) { this.feed.recent.set(value); }
   /** Detail card open in «Invii»: a whole queue or one message. */
   detail: { kind: "broadcast"; job: WhatsAppBroadcastDetail } | { kind: "single"; item: WhatsAppOutboxView } | null = null;
   detailLoading = false; detailFeedback = "";
@@ -110,7 +116,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     return this.archiveOptionsCache.value;
   }
   private destroyed = false;
-  private timer?: ReturnType<typeof setInterval>;
+  private timer?: ReturnType<typeof setTimeout>;
   private selection = 0;
   private loadingSelection = -1;
   get canManage() { return this.session.can("whatsapp.manage"); }
@@ -145,10 +151,43 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
       else { const item = this.outbox.find((o) => o.id === messaggio); if (item) this.openSingle(item); }
       void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
     });
-    if (!this.destroyed) this.timer = setInterval(() => { if (!document.hidden) void this.refresh(); }, 8000);
+    this.schedulePoll();
+  }
+  /** Tab change: fresh data for that tab only, then its own pace. */
+  selectSection(section: "connection" | "chats" | "compose" | "outbox") {
+    if (this.section === section) return;
+    this.section = section;
+    void this.pollSection().catch((error) => { this.feedback = this.error(error); });
+    this.schedulePoll();
+  }
+  /** Conversations every 8 s, «Invii» every 15 s (shared feed), the link state every 20 s. */
+  private schedulePoll() {
+    if (this.timer) clearTimeout(this.timer);
+    if (this.destroyed) return;
+    const delay = this.section === "chats" ? 8_000 : this.section === "outbox" ? 15_000 : 20_000;
+    this.timer = setTimeout(async () => {
+      if (!document.hidden && !this.refreshing) {
+        try { await this.pollSection(); this.feedback = ""; } catch (error) { this.feedback = this.error(error); }
+      }
+      this.schedulePoll();
+    }, delay);
+  }
+  private async pollSection() {
+    if (this.destroyed) return;
+    if (this.section === "chats") {
+      await this.loadConversations();
+      this.followDraft();
+    } else if (this.section === "outbox") {
+      await this.feed.refresh(5_000);
+    } else {
+      const connections = await this.api.sessions();
+      if (this.destroyed) return;
+      this.connections = connections; this.updatedAt = new Date();
+      this.syncQrPolling();
+    }
   }
   ngOnDestroy() {
-    this.destroyed = true; this.selection++; clearInterval(this.timer); this.stopQr(); this.qr = null; this.clearMedia();
+    this.destroyed = true; this.selection++; clearTimeout(this.timer); this.stopQr(); this.qr = null; this.clearMedia();
     if (this.detailTimer) clearTimeout(this.detailTimer);
     if (this.draftTimer) clearTimeout(this.draftTimer);
   }
@@ -364,17 +403,16 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
       if (result.state !== "pairing") { this.stopQr(); await this.refresh(); }
     } catch { /* the 8s refresh reports errors */ }
   }
-  private error(error: any): string { return error?.error?.message || error?.message || "WhatsApp non disponibile. Aggiorna lo stato."; }
+  private error(error: unknown): string { return humanError(error, "WhatsApp non disponibile. Aggiorna lo stato."); }
   async refresh() {
     if (this.refreshing || this.destroyed) return;
     this.refreshing = true;
     try {
-      const [connections, archives, outbox, broadcasts] = await Promise.all([
-        this.api.sessions(), this.api.archives(), this.api.outbox(),
-        this.canSend ? this.api.listBroadcasts().catch(() => this.broadcasts) : Promise.resolve([]),
+      const [connections, archives] = await Promise.all([
+        this.api.sessions(), this.api.archives(), this.feed.refresh(),
       ]);
       if (this.destroyed) return;
-      this.connections = connections; this.archives = archives; this.outbox = outbox; this.broadcasts = broadcasts;
+      this.connections = connections; this.archives = archives;
       this.fresh = true; this.feedback = ""; this.updatedAt = new Date();
       if (!archives.some(a => a.id === this.archiveId)) {
         // The history of the number connected now first; the others stay selectable.
@@ -458,7 +496,9 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
     else if (item && sendStatus(item).tone === "progress") this.replyFeedback = item.problem || "In verifica su WhatsApp: la conversazione si apre appena il telefono conferma.";
     // Faster while waiting for the verified outcome.
     if (this.draftTimer) clearTimeout(this.draftTimer);
-    if (!item || sendStatus(item).tone === "progress") this.draftTimer = setTimeout(() => { if (!this.destroyed) void this.refresh(); }, 3000);
+    if (!item || sendStatus(item).tone === "progress") this.draftTimer = setTimeout(() => {
+      if (!this.destroyed) void this.feed.refresh().then(() => this.followDraft());
+    }, 3000);
   }
   newChatOpen = false; newChatMode: "customer" | "number" = "customer"; newChatNumber = ""; newChatFeedback = "";
   openNewChat() {
