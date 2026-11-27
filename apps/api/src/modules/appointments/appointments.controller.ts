@@ -37,7 +37,6 @@ import { personalBookingInput } from "../../common/personal-booking";
 import {
   BadRequestException,
   ForbiddenException,
-  ConflictException,
   NotFoundException,
   Body,
   Controller,
@@ -68,6 +67,59 @@ import {
 import { CustomersAlignmentService } from "../customers/customers-alignment.service";
 
 type AppointmentPayload = Record<string, unknown>;
+
+/** Lean agenda projection: names, colors, status, account link and price. */
+export const AGENDA_APPOINTMENT_SELECT = {
+  id: true,
+  tenantId: true,
+  locationId: true,
+  sectorId: true,
+  customerId: true,
+  serviceId: true,
+  collaboratorId: true,
+  roomId: true,
+  startsAt: true,
+  endsAt: true,
+  status: true,
+  source: true,
+  estimatedPrice: true,
+  finalPrice: true,
+  customerNotes: true,
+  internalNotes: true,
+  orderItemId: true,
+  orderIssue: true,
+  customer: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      email: true,
+    },
+  },
+  service: {
+    select: {
+      id: true,
+      name: true,
+      color: true,
+      durationMinutes: true,
+      sectorId: true,
+      basePrice: true,
+      priceMode: true,
+      vatRate: true,
+    },
+  },
+  collaborator: {
+    select: { id: true, firstName: true, lastName: true, calendarColor: true },
+  },
+  room: { select: { id: true, name: true } },
+  orderItem: {
+    select: {
+      saleId: true,
+      sale: { select: { revision: true, orderStatus: true } },
+    },
+  },
+} as const;
 
 @Controller("appointments")
 export class AppointmentsController {
@@ -259,6 +311,8 @@ export class AppointmentsController {
         : {}),
     };
     const paginated = isPaginationRequested(query);
+    // `view=agenda`: only what the calendar draws (backward compatible when omitted).
+    const lean = query["view"] === "agenda";
     const { page, pageSize, skip, take } = parsePagination(query, {
       defaultPageSize: 50,
     });
@@ -267,14 +321,16 @@ export class AppointmentsController {
       : `:range:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`;
 
     return this.cacheService.getOrSet(
-      `${cacheKeys.appointmentsList(tenantId)}:${ownCollaboratorId ? "ownv2:" + ownCollaboratorId : "allv10"}${cacheSuffix}:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`,
+      `${cacheKeys.appointmentsList(tenantId)}:${ownCollaboratorId ? "ownv2:" + ownCollaboratorId : lean ? "agendav1" : "allv10"}${cacheSuffix}:${from?.toISOString() ?? ""}:${to?.toISOString() ?? ""}`,
       CACHE_TTL_SECONDS.appointments,
       async () => {
         const findAppointments = (args: Prisma.AppointmentFindManyArgs) =>
           this.prisma.appointment.findMany(args);
         const projection = personal
           ? { select: PERSONAL_APPOINTMENT_SELECT }
-          : {
+          : lean
+            ? { select: AGENDA_APPOINTMENT_SELECT }
+            : {
               include: {
                 customer: true,
                 service: true,
@@ -527,33 +583,33 @@ export class AppointmentsController {
     @Param("id") id: string,
     @Body() body: LegacyWriteDto,
   ): Promise<unknown> {
-    if (body.status === AppointmentStatus.Cancelled) {
-      if (
-        Object.keys(body).some(
-          (key) =>
-            body[key] !== undefined &&
-            !["status", "reason", "revision", "idempotencyKey"].includes(key),
-        )
-      )
-        throw new BadRequestException(
-          "Annulla il servizio separatamente dalle altre modifiche",
-        );
-      return this.cancel(request, id, body);
-    }
+    // One save: status (cancellation included), time, people, notes and customer together.
     const context = await this.mutationContext(request);
     const outcome = await this.mutations.reviseLine(context, id, body);
-    await this.cacheInvalidationService.invalidateBookingReadModels(
-      context.tenantId,
-    );
-    if (!outcome.replayed) {
-      if (typeof outcome.customerId === "string")
-        await this.customersAlignmentService.queueCustomerRefresh(
-          context.tenantId,
-          outcome.customerId,
-          "appointment_created",
-        );
-    }
+    await this.afterLineRevision(context.tenantId, outcome);
     return outcome.result;
+  }
+
+  private async afterLineRevision(
+    tenantId: string,
+    outcome: {
+      replayed: boolean;
+      customerId: string | null;
+      previousCustomerId: string | null;
+    },
+  ) {
+    await this.cacheInvalidationService.invalidateBookingReadModels(tenantId);
+    if (outcome.replayed) return;
+    for (const customerId of new Set(
+      [outcome.customerId, outcome.previousCustomerId].filter(
+        (value): value is string => typeof value === "string",
+      ),
+    ))
+      await this.customersAlignmentService.queueCustomerRefresh(
+        tenantId,
+        customerId,
+        "appointment_created",
+      );
   }
 
   @Delete(":id")
@@ -561,9 +617,7 @@ export class AppointmentsController {
     @Req() request: { headers: { authorization?: string } },
     @Param("id") id: string,
   ): Promise<unknown> {
-    return this.cancel(request, id, {
-      reason: "Annullato dalla direzione del salone",
-    });
+    return this.cancel(request, id, {});
   }
 
   @Post(":id/status")
@@ -621,10 +675,19 @@ export class AppointmentsController {
         );
       previousStatus = current.status as AppointmentStatus;
     }
-    if (!personal && body.status === AppointmentStatus.Cancelled)
-      return this.cancel(request, id, {
-        reason: "Annullato dalla direzione del salone",
+    if (!personal) {
+      // Staff correct any status (reactivation included) through the same path as the form.
+      const context = await this.mutationContext(request);
+      const outcome = await this.mutations.reviseLine(context, id, {
+        status: body.status,
       });
+      await this.afterLineRevision(context.tenantId, outcome);
+      return {
+        ...(typeof outcome.result === "object" ? outcome.result : {}),
+        id,
+        status: body.status,
+      };
+    }
     const updated = await this.prisma.$transaction(async (tx) => {
       await lockOperationalTenant(tx, tenantId);
       await setOperationalActor(tx, user.id);
@@ -638,13 +701,6 @@ export class AppointmentsController {
         select: { status: true },
       });
       if (!current) throw new NotFoundException("Appuntamento non accessibile");
-      if (
-        ["completed", "cancelled", "no_show"].includes(current.status) &&
-        current.status !== body.status
-      )
-        throw new ConflictException(
-          "Lo stato storico non si riapre: pianifica un nuovo servizio dal conto",
-        );
       const updated = await tx.appointment.update({
         where: {
           ...appointmentScope,
@@ -686,13 +742,10 @@ export class AppointmentsController {
       context,
       id,
       {
-        idempotencyKey:
-          body.idempotencyKey || `legacy-cancel:${context.actorId}:${id}`,
+        // A fixed key would replay an old cancellation after a reactivation.
+        idempotencyKey: body.idempotencyKey,
         revision: body.revision ?? null,
-        reason:
-          typeof body.reason === "string"
-            ? body.reason
-            : "Annullato dalla direzione del salone",
+        reason: typeof body.reason === "string" ? body.reason : null,
       },
       "line",
     );

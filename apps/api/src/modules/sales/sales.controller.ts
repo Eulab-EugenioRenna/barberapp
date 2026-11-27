@@ -2,6 +2,7 @@ import { beginAppointmentEvents } from "../notifications/appointment-events";
 import { SaleFulfilmentService } from "./sale-fulfilment.service";
 import { randomUUID } from "node:crypto";
 import { OrderCommandService } from "../orders/order-command.service";
+import { changeAccountCustomer } from "../orders/account-customer";
 import { saleCommandResult, SALE_COMMAND_INCLUDE } from "./sale-command-result";
 import { PaymentsService } from "../payments/payments.service";
 import { settledStatus } from "../payments/payment-balance";
@@ -1099,37 +1100,15 @@ export class SalesController {
         });
         if (!sale) throw new NotFoundException("Vendita non trovata");
         this.orders.assertRevision(sale, body["revision"] ?? sale.revision);
-        if (sale.orderStatus === "cancelled")
-          throw new ConflictException(
-            "Il conto annullato conserva il suo cliente",
-          );
-        if (sale.customerId === customerId)
-          throw new BadRequestException("Il conto è già di questo cliente");
-        const customer = await transaction.customer.findFirst({
-          where: { id: customerId, tenantId, isActive: true },
-          select: { id: true },
-        });
-        if (!customer) throw new BadRequestException("Cliente non valido");
-        if (
-          await transaction.appointmentAutomationRun.count({
-            where: { tenantId, orderId: id, status: "waiting" },
-          })
-        )
-          throw new ConflictException(
-            "C'è un promemoria WhatsApp in attesa per il cliente attuale: annulla e ricrea la prenotazione",
-          );
         const recordEvents = await beginAppointmentEvents(
           transaction,
           command.context,
           { orderItem: { saleId: id } },
         );
-        await transaction.appointment.updateMany({
-          where: { tenantId, orderItem: { saleId: id } },
-          data: { customerId },
-        });
-        await transaction.sale.update({
-          where: { id, tenantId },
-          data: { customerId, revision: { increment: 1 } },
+        await changeAccountCustomer(transaction, {
+          tenantId,
+          saleId: id,
+          customerId,
         });
         const current = await transaction.sale.findUniqueOrThrow({
           where: { id },

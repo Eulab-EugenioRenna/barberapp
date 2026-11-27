@@ -142,7 +142,7 @@ describe("transaction-bound booking resource planner", () => {
     ]);
     expect(buffered.map((row) => row.collaboratorId)).toEqual(["B", "A"]);
   });
-  it("does not claim availability when an overlapping legacy booking has unknown resources", async () => {
+  it("never blocks on an overlapping legacy booking with unknown resources", async () => {
     const { calendar, plan } = fixture();
     calendar.appointment.findMany.mockResolvedValue([
       {
@@ -159,8 +159,34 @@ describe("transaction-bound booking resource planner", () => {
         },
       },
     ]);
-    await expect(plan()).rejects.toMatchObject({
-      response: { code: "LEGACY_RESOURCES_UNKNOWN" },
+    const result = await plan();
+    expect(result.map((row) => row.collaboratorId)).toEqual(["B", "A"]);
+  });
+  it("explains a busy chosen professional in plain words", async () => {
+    const { calendar, services, plan } = fixture();
+    calendar.service.findMany.mockResolvedValue([services[0]]);
+    calendar.appointment.findMany.mockResolvedValue([
+      {
+        startsAt: at("09:00"),
+        endsAt: at("09:30"),
+        sectorId: "sector-0",
+        collaboratorId: "B",
+        roomId: null,
+        service: {
+          requiresCollaborator: true,
+          requiresRoom: false,
+          bufferBeforeMinutes: 0,
+          bufferAfterMinutes: 0,
+        },
+      },
+    ]);
+    await expect(
+      plan([{ serviceId: "one", startsAt: at("09:15"), collaboratorId: "B" }] as never),
+    ).rejects.toMatchObject({
+      response: {
+        code: "RESOURCES_UNAVAILABLE",
+        message: "Il professionista ha già un appuntamento in quell'orario",
+      },
     });
   });
   it("allows exact peak room capacity across successive existing reservations", async () => {

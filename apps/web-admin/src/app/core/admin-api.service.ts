@@ -134,6 +134,20 @@ export class AdminApiService {
     );
   }
 
+  /** Agenda window only, lean projection: what the calendar draws. */
+  loadAgendaAppointments(range: { from: Date; to: Date }): Observable<any[]> {
+    const query = new URLSearchParams({
+      from: range.from.toISOString(),
+      to: range.to.toISOString(),
+      view: "agenda",
+    });
+    return this.allowed<any[]>(
+      "appointments.read.all",
+      () => this.http.get<any[]>(`${ADMIN_API_URL}/appointments?${query}`),
+      [],
+    );
+  }
+
   loadCustomerOptions(): Observable<any[]> {
     return this.allowed<any[]>(
       PICK_LIST_ACCESS.customers,
@@ -243,10 +257,15 @@ export class AdminApiService {
     });
   }
 
-  loadAppointmentsViewData(): Observable<Record<string, unknown>> {
+  loadAppointmentsViewData(range?: {
+    from: Date;
+    to: Date;
+  }): Observable<Record<string, unknown>> {
     return forkJoin({
       tenant: this.loadTenantContext(),
-      appointments: this.loadAppointments(),
+      appointments: range
+        ? this.loadAgendaAppointments(range)
+        : this.loadAppointments(),
       context: this.loadAgendaContext(),
       customers: this.loadCustomersPage(1),
     }).pipe(

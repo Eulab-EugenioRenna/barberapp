@@ -32,7 +32,9 @@ export class AppointmentsService {
     if (form.id) {
       return firstValueFrom(
         this.adminApi.updateAppointment(form.id, {
-          revision: form.orderRevision,
+          revision: Number.isInteger(form.orderRevision)
+            ? form.orderRevision
+            : undefined,
           customerId: form.customerId || undefined,
           serviceId: form.serviceId,
           collaboratorId: form.collaboratorId || null,
@@ -56,9 +58,8 @@ export class AppointmentsService {
 
   async cancelAppointment(id: string): Promise<void> {
     await firstValueFrom(
-      this.adminApi.cancelAppointment(id, {
-        reason: "Annullato dalla direzione del salone",
-      }),
+      // The server records «Annullato dall'agenda»: no reason to type.
+      this.adminApi.cancelAppointment(id, {}),
     );
   }
 
@@ -70,7 +71,8 @@ export class AppointmentsService {
     id: string;
     collaboratorId: string;
     startsAt: string;
-    revision: number;
+    /** Sent when known; the server checks it only for price changes. */
+    revision?: number;
   }): Promise<void> {
     await firstValueFrom(
       this.adminApi.updateAppointment(input.id, {

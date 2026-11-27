@@ -1,5 +1,10 @@
 import { slotOptions } from "../core/slot-options";
-import { bookingInstant, localBookingTime } from "./booking-local-time";
+import {
+  bookingInstant,
+  localBookingTime,
+  parseLocalBookingTime,
+} from "./booking-local-time";
+import { agendaWindow, windowCovers } from "./agenda-window";
 import { CreateRecoveryService } from "../core/create-recovery.service";
 import { Injectable, computed, signal, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
@@ -525,7 +530,10 @@ export class AppointmentsFacade {
     this.servicesState.set(services.items);
     this.customersState.set(customers.items);
     this.tenantState.set(input.tenant || null);
-    this.adminFacade.setCoreData(input);
+    this.adminFacade.setCoreData({
+      ...input,
+      appointments: this.mergeWithShared(input.appointments || []),
+    });
     this.filteredAppointmentCustomers.set([...customers.items]);
 
     if (!this.appointmentForm().serviceId && services.items[0]) {
@@ -536,13 +544,70 @@ export class AppointmentsFacade {
     }
   }
 
+  /** Calendar window on screen, widened by a week on each side. */
+  agendaWindow(): { from: Date; to: Date } {
+    return agendaWindow(
+      this.calendarView(),
+      this.calendarDate(),
+      this.listFilterDate(),
+    );
+  }
+  private loadedWindow: { from: number; to: number } | null = null;
+  private windowRequest = 0;
+
+  /** Other pages keep their bookings outside the agenda window. */
+  private mergeWithShared(rows: any[]): any[] {
+    const range = this.loadedWindow;
+    if (!range) return rows;
+    const outside = this.adminFacade.appointments().filter((row: any) => {
+      const at = Date.parse(row?.startsAt);
+      return !(at >= range.from && at <= range.to);
+    });
+    return [...outside, ...rows];
+  }
+
+  /** Reload only the bookings when the calendar moves out of the loaded window. */
+  async ensureWindow(): Promise<void> {
+    const wanted = this.agendaWindow();
+    if (windowCovers(this.loadedWindow, wanted)) return;
+    const request = ++this.windowRequest;
+    try {
+      const rows = await firstValueFrom(
+        this.adminApi.loadAgendaAppointments(wanted),
+      );
+      if (request !== this.windowRequest) return;
+      this.loadedWindow = {
+        from: wanted.from.getTime(),
+        to: wanted.to.getTime(),
+      };
+      this.appointmentsState.set(rows || []);
+      const shared = this.mergeWithShared(rows || []);
+      this.adminFacade.appointments.set(shared);
+      this.adminFacade.dashboardAppointments.set(shared);
+    } catch (error: any) {
+      if (request === this.windowRequest)
+        this.feedback.set(
+          error?.error?.message ||
+            error?.message ||
+            "Non riusciamo a caricare gli appuntamenti",
+        );
+    }
+  }
+
   async loadViewData(): Promise<void> {
     this.loading.set(true);
     this.feedback.set("");
+    const range = this.agendaWindow();
+    const request = ++this.windowRequest;
     try {
       const response: any = await firstValueFrom(
-        this.adminApi.loadAppointmentsViewData(),
+        this.adminApi.loadAppointmentsViewData(range),
       );
+      if (request === this.windowRequest)
+        this.loadedWindow = {
+          from: range.from.getTime(),
+          to: range.to.getTime(),
+        };
       this.replaceSourceData({
         appointments: response.appointments || [],
         collaborators: response.collaborators || [],
@@ -572,6 +637,7 @@ export class AppointmentsFacade {
 
   setCalendarView(view: CalendarView): void {
     this.calendarView.set(view);
+    void this.ensureWindow();
   }
 
   shiftCalendar(direction: -1 | 1): void {
@@ -585,14 +651,17 @@ export class AppointmentsFacade {
       next.setMonth(next.getMonth() + direction);
     }
     this.calendarDate.set(next);
+    void this.ensureWindow();
   }
 
   goToToday(): void {
     this.calendarDate.set(new Date());
+    void this.ensureWindow();
   }
 
   setCalendarDate(date: Date): void {
     this.calendarDate.set(new Date(date));
+    void this.ensureWindow();
   }
 
   setSelectedCollaboratorIds(value: string[]): void {
@@ -622,21 +691,15 @@ export class AppointmentsFacade {
 
   applyListFilterDate(date: string): void {
     this.listFilterDate.set(date);
+    void this.ensureWindow();
   }
 
   openQuickReschedule(input: QuickRescheduleState): void {
     const appointment = this.appointments().find(
       (row) => row.id === input.appointmentId,
     );
-    if (
-      this.appointmentUpdateState().kind !== "empty" ||
-      !appointment ||
-      appointment.orderItem?.sale?.orderStatus !== "open" ||
-      ["completed", "cancelled", "no_show"].includes(appointment.status)
-    ) {
-      this.feedback.set(
-        "Recupera l'invio precedente oppure apri un servizio attivo di un conto aperto",
-      );
+    if (this.appointmentUpdateState().kind !== "empty" || !appointment) {
+      this.feedback.set("Recupera prima lo spostamento precedente");
       return;
     }
     const startsAt =
@@ -644,7 +707,7 @@ export class AppointmentsFacade {
     this.quickRescheduleState.set({
       ...input,
       startsAt,
-      revision: input.revision ?? appointment.orderItem.sale.revision,
+      revision: input.revision ?? appointment.orderItem?.sale?.revision,
     });
     void this.updateQuickRescheduleSlots();
   }
@@ -835,24 +898,18 @@ export class AppointmentsFacade {
         }),
       );
       if (request !== this.availabilityRequest) return;
-      if (response.orderRevision !== form.orderRevision)
-        throw new Error(
-          "Il conto è cambiato. Riapri la prenotazione prima di modificarla",
-        );
+      // Last write wins: a newer account copy only refreshes the revision.
+      if (Number.isInteger(response.orderRevision))
+        this.appointmentForm.update((current) => ({
+          ...current,
+          orderRevision: response.orderRevision,
+        }));
       const slots = (response.slots || []).map((slot: any) => ({
         ...slot,
         startsAt: localBookingTime(slot.startsAt),
       }));
       this.appointmentSlots.set(slots);
-      if (
-        !slots.some(
-          (slot: any) => slot.startsAt === this.appointmentForm().startsAt,
-        )
-      )
-        this.appointmentForm.update((current) => ({
-          ...current,
-          startsAt: "",
-        }));
+      this.keepTypedTime(slots);
     } catch (error: any) {
       if (request === this.availabilityRequest)
         this.feedback.set(
@@ -925,15 +982,7 @@ export class AppointmentsFacade {
         startsAt: this.toLocalDateTimeValue(new Date(slot.startsAt)),
       }));
       this.appointmentSlots.set(slots);
-      if (
-        !slots.some(
-          (slot: any) => slot.startsAt === this.appointmentForm().startsAt,
-        )
-      )
-        this.appointmentForm.update((current) => ({
-          ...current,
-          startsAt: "",
-        }));
+      this.keepTypedTime(slots);
     } catch (error: any) {
       if (request !== this.availabilityRequest) return;
       this.feedback.set(
@@ -941,7 +990,7 @@ export class AppointmentsFacade {
           ? error.error.message
           : "Disponibilità non consultabile. Riprova.",
       );
-      this.appointmentForm.update((current) => ({ ...current, startsAt: "" }));
+      this.keepTypedTime([]);
     } finally {
       if (request === this.availabilityRequest)
         this.availabilityLoading.set(false);
@@ -954,14 +1003,10 @@ export class AppointmentsFacade {
     try {
       if (this.availabilityLoading())
         throw new Error("Attendi la verifica degli orari prima di salvare");
-      if (
-        !this.appointmentForm().id &&
-        (this.availabilityLoading() ||
-          !this.appointmentSlots().some(
-            (row) => row.startsAt === this.appointmentForm().startsAt,
-          ))
-      )
-        throw new Error("Scegli un orario disponibile per tutti i servizi");
+      // The slot list is a suggestion: any typed time is accepted and the
+      // server only refuses a professional who is already busy.
+      if (!this.appointmentForm().startsAt)
+        throw new Error("Scegli o scrivi l'orario");
       const saved = await this.appointmentsService.saveAppointment(
         { ...this.appointmentForm(), locationId: this.bookingLocationId() },
         this.additionalServices().map((row) => ({
@@ -1040,10 +1085,7 @@ export class AppointmentsFacade {
       );
       const startsAt = this.instantForAppointment(input.startsAt, appointment);
       const revision = input.revision ?? appointment?.orderItem?.sale?.revision;
-      if (!startsAt || !Number.isInteger(revision))
-        throw new Error(
-          "Riapri una prenotazione riconciliata e scegli un orario valido",
-        );
+      if (!startsAt) throw new Error("Scegli un orario valido");
       await this.appointmentsService.moveAppointment({
         id: input.appointmentId,
         collaboratorId: input.collaboratorId,
@@ -1079,14 +1121,8 @@ export class AppointmentsFacade {
 
   async confirmQuickReschedule(): Promise<string> {
     const state = this.quickRescheduleState();
-    if (
-      !state ||
-      this.quickRescheduleLoading() ||
-      !this.quickRescheduleSlots().some(
-        (slot) => slot.startsAt === state.startsAt,
-      )
-    ) {
-      throw new Error("Scegli un orario verificato dal server");
+    if (!state || this.quickRescheduleLoading() || !state.startsAt) {
+      throw new Error("Scegli o scrivi l'orario");
     }
     await this.moveAppointment({
       appointmentId: state.appointmentId,
@@ -1107,6 +1143,15 @@ export class AppointmentsFacade {
       return;
     }
     const next = { ...current, [key]: value };
+    if (key === "targetDate" && current.startsAt) {
+      // Same time on the new day: a typed time is never carried to the old date.
+      const at = new Date(current.startsAt),
+        pad = (number: number) => String(number).padStart(2, "0");
+      next.startsAt =
+        parseLocalBookingTime(
+          `${value}T${pad(at.getHours())}:${pad(at.getMinutes())}`,
+        )?.toISOString() || "";
+    }
     this.quickRescheduleState.set(next);
     if (key !== "startsAt") {
       this.updateQuickRescheduleSlots();
@@ -1229,9 +1274,9 @@ export class AppointmentsFacade {
         }),
       );
       if (request !== this.quickAvailabilityRequest) return;
-      if (response.orderRevision !== state.revision)
-        throw new Error(
-          "Il conto è cambiato. Riapri la prenotazione prima di spostarla",
+      if (Number.isInteger(response.orderRevision))
+        this.quickRescheduleState.update((current) =>
+          current ? { ...current, revision: response.orderRevision } : null,
         );
       const slots = (response.slots || []).map((slot: any) => ({
         startsAt: slot.startsAt,
@@ -1239,15 +1284,6 @@ export class AppointmentsFacade {
         outsideHours: !!slot.outsideHours,
       }));
       this.quickRescheduleSlots.set(slots);
-      if (
-        !slots.some(
-          (slot: any) =>
-            slot.startsAt === this.quickRescheduleState()?.startsAt,
-        )
-      )
-        this.quickRescheduleState.update((current) =>
-          current ? { ...current, startsAt: "" } : null,
-        );
       this.feedback.set("");
     } catch (error: any) {
       if (request === this.quickAvailabilityRequest) {
@@ -1255,9 +1291,6 @@ export class AppointmentsFacade {
           error?.error?.message ||
             error?.message ||
             "Disponibilità non consultabile",
-        );
-        this.quickRescheduleState.update((current) =>
-          current ? { ...current, startsAt: "" } : null,
         );
       }
     } finally {
@@ -1385,6 +1418,33 @@ export class AppointmentsFacade {
     const month = String(value.getMonth() + 1).padStart(2, "0");
     const day = String(value.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+  }
+
+  /** The chosen time survives a slot refresh; on another day it keeps its HH:MM. */
+  private keepTypedTime(slots: Array<{ startsAt: string }>): void {
+    const current = String(this.appointmentForm().startsAt || ""),
+      day = this.appointmentSelectedDate();
+    if (
+      !current ||
+      !day ||
+      slots.some((slot) => slot.startsAt === current) ||
+      current.startsWith(day + "T")
+    )
+      return;
+    const time = /T(\d{2}:\d{2})/.exec(current)?.[1];
+    this.appointmentForm.update((form) => ({
+      ...form,
+      startsAt: time ? `${day}T${time}` : "",
+    }));
+  }
+
+  /** Free time typed by staff (HH:MM) on the selected day. */
+  setTypedTime(time: string): void {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
+    this.setAppointmentValue(
+      "startsAt",
+      `${this.appointmentSelectedDate()}T${time}`,
+    );
   }
 
   private toLocalDateTimeValue(value: Date): string {

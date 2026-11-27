@@ -218,7 +218,7 @@ type Action = "revise" | "cancel_all" | "cancel_line";
       </div>
       <fieldset [disabled]="loading || busy || pendingState().kind !== 'empty'">
         <ng-container
-          *ngIf="account.orderStatus === 'open'; else closedAccount"
+          *ngIf="account.orderStatus !== 'cancelled'; else closedAccount"
         >
           <div class="drafts">
             <article
@@ -268,7 +268,7 @@ type Action = "revise" | "cancel_all" | "cancel_line";
                   </button></label
                 >
               </div>
-              <details>
+              <details *ngIf="account.orderStatus === 'open'">
                 <summary>Prezzo concordato facoltativo</summary>
                 <div class="fields mt-3">
                   <label class="field"
@@ -307,7 +307,6 @@ type Action = "revise" | "cancel_all" | "cancel_line";
                   *ngIf="row.appointmentId"
                   type="button"
                   class="pill-btn"
-                  [disabled]="reason.trim().length < 3"
                   (click)="cancel('cancel_line', row.appointmentId)"
                 >
                   Annulla solo questo servizio
@@ -315,8 +314,12 @@ type Action = "revise" | "cancel_all" | "cancel_line";
               </div>
             </article>
           </div>
+          <p *ngIf="account.orderStatus !== 'open'" class="muted">
+            Conto già chiuso: orari e professionisti si spostano liberamente;
+            prezzi e servizi si cambiano dalla cassa.
+          </p>
           <ui-select
-            *ngIf="rows.length < 20"
+            *ngIf="rows.length < 20 && account.orderStatus === 'open'"
             [disabled]="loading || busy || invalidTime"
             value=""
             label="Aggiungi un servizio alla prenotazione"
@@ -409,7 +412,7 @@ type Action = "revise" | "cancel_all" | "cancel_line";
           ><p class="notice">
             {{
               account.orderStatus === "cancelled"
-                ? "Prenotazione annullata: lo storico è conservato."
+                ? "Prenotazione annullata: lo storico è conservato. Per riattivarla torna al servizio e cambia lo stato."
                 : "Conto già registrato: i servizi eseguiti si conservano nello storico."
             }}
           </p></ng-template
@@ -424,7 +427,7 @@ type Action = "revise" | "cancel_all" | "cancel_line";
           aria-label="Annullamento prenotazione"
         >
           <label class="field"
-            ><span>Motivo dell’annullamento</span
+            ><span>Motivo dell’annullamento (facoltativo)</span
             ><input
               aria-label="Motivo annullamento prenotazione"
               [(ngModel)]="reason"
@@ -438,7 +441,6 @@ type Action = "revise" | "cancel_all" | "cancel_line";
           <button
             type="button"
             class="secondary-btn"
-            [disabled]="reason.trim().length < 3"
             (click)="cancel('cancel_all')"
           >
             Annulla tutta la prenotazione
@@ -502,7 +504,8 @@ export class BookingOrderEditorComponent implements OnInit {
       this.catalog = context.services || [];
       this.people = context.collaborators || [];
       this.rows = this.account.appointments
-        .filter((row: any) => !this.stopped(row.status))
+        // Executed services can still be re-timed or reassigned (last write wins).
+        .filter((row: any) => !this.dormant(row.status))
         .map((row: any) => ({
           appointmentId: row.id,
           orderItemId: row.orderItemId,
@@ -524,9 +527,12 @@ export class BookingOrderEditorComponent implements OnInit {
   private stopped(status: string) {
     return ["cancelled", "no_show", "completed"].includes(status);
   }
+  private dormant(status: string) {
+    return ["cancelled", "no_show"].includes(status);
+  }
   get historicalRows() {
     return (this.account?.appointments || []).filter((row: any) =>
-      this.stopped(row.status),
+      this.dormant(row.status),
     );
   }
   get hasActive() {
@@ -712,10 +718,9 @@ export class BookingOrderEditorComponent implements OnInit {
     await this.begin("revise", this.appointmentId, this.payload());
   }
   async cancel(action: "cancel_all" | "cancel_line", id = this.appointmentId) {
-    if (this.reason.trim().length < 3) return;
     await this.begin(action, id, {
       revision: this.account.revision,
-      reason: this.reason.trim(),
+      ...(this.reason.trim() ? { reason: this.reason.trim() } : {}),
     });
   }
   private async begin(

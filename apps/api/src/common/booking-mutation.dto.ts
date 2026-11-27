@@ -9,7 +9,6 @@ import {
   Matches,
   MaxLength,
   Min,
-  MinLength,
   ValidateNested,
 } from "class-validator";
 import { BookingLineDto } from "./booking-write.dto";
@@ -30,6 +29,8 @@ export class BookingRevisionDto {
 }
 export class BookingCancellationDto {
   @IsString() @Matches(/^[A-Za-z0-9._:-]{8,128}$/) idempotencyKey!: string;
-  @IsInt() @Min(0) revision!: number;
-  @IsString() @MinLength(3) @MaxLength(2000) reason!: string;
+  /** Optional: a cancellation never waits for a fresh copy of the account. */
+  @IsOptional() @IsInt() @Min(0) revision?: number;
+  /** Optional: defaults to «Annullato dall'agenda». */
+  @IsOptional() @IsString() @MaxLength(2000) reason?: string;
 }

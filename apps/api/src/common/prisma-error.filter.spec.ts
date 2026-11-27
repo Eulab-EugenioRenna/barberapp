@@ -72,4 +72,27 @@ describe("Database scope/concurrency error response", () => {
     expect(JSON.stringify(result.json.mock.calls)).not.toContain("StockBalance");
     expect(JSON.stringify(result.json.mock.calls)).toContain("Aggiorna e riprova");
   });
+  it("names the double booking in plain Italian, for both Prisma error shapes", () => {
+    const unknown = response(
+      'ConnectorError { kind: QueryError(PostgresError { code: "23514", message: "Conflitto appuntamento" }) }',
+    );
+    expect(unknown.json).toHaveBeenCalledWith({
+      statusCode: 409,
+      message: "Il professionista ha già un appuntamento in quell'orario",
+    });
+    const json = jest.fn(),
+      status = jest.fn(() => ({ json }));
+    new PrismaErrorFilter().catch(
+      new Prisma.PrismaClientKnownRequestError("raw query failed", {
+        code: "P2010",
+        clientVersion: "5.22.0",
+        meta: { code: "23514", message: "ERROR: Conflitto appuntamento" },
+      }),
+      { switchToHttp: () => ({ getResponse: () => ({ status }) }) } as never,
+    );
+    expect(json).toHaveBeenCalledWith({
+      statusCode: 409,
+      message: "Il professionista ha già un appuntamento in quell'orario",
+    });
+  });
 });

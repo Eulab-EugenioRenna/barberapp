@@ -202,32 +202,25 @@ export class BookingAvailabilityService {
           });
           if (!existing)
             throw new NotFoundException("Appuntamento non accessibile");
-          if (
-            body.lines.length !== 1 ||
-            !existing.orderItem ||
-            existing.orderIssue
-          )
-            throw new ConflictException(
-              "Riconcilia il conto prima di riprogrammare il servizio",
+          if (body.lines.length !== 1)
+            throw new BadRequestException(
+              "Indica il servizio da riprogrammare",
             );
-          const account = await tx.sale.findFirst({
-            where: {
-              id: existing.orderItem.saleId,
-              tenantId: context.tenantId,
-              ...saleFilter(context.scope),
-            },
-            select: { id: true },
-          });
-          if (!account)
+          // Any booking can be moved (closed accounts and historical rows too):
+          // a missing account row is created when the move is saved.
+          const account = existing.orderItem
+            ? await tx.sale.findFirst({
+                where: {
+                  id: existing.orderItem.saleId,
+                  tenantId: context.tenantId,
+                  ...saleFilter(context.scope),
+                },
+                select: { id: true },
+              })
+            : null;
+          if (existing.orderItem && !account)
             throw new NotFoundException(
               "Serve accesso a tutti i settori del conto",
-            );
-          if (
-            existing.orderItem.sale.orderStatus !== "open" ||
-            ["cancelled", "no_show", "completed"].includes(existing.status)
-          )
-            throw new ConflictException(
-              "Solo un servizio attivo di un conto aperto può essere riprogrammato",
             );
           if (
             services[0].sector.locationId !== existing.locationId ||
@@ -237,8 +230,8 @@ export class BookingAvailabilityService {
             throw new ConflictException(
               "Lo spostamento conserva la sede e il settore storico del servizio",
             );
-          orderId = account.id;
-          orderRevision = existing.orderItem.sale.revision;
+          orderId = account?.id;
+          orderRevision = existing.orderItem?.sale.revision;
           if (existing.serviceId === body.lines[0].serviceId)
             heldDuration =
               existing.endsAt.getTime() - existing.startsAt.getTime();

@@ -81,14 +81,26 @@ export class PrismaErrorFilter implements ExceptionFilter {
     // stays generic and never exposes query text.
     const database = databaseError(error);
     const guard = database && GUARD_CODES.includes(database.code);
+    // The double-booking guard is the one check staff meet daily: say it plainly.
+    const doubleBooking =
+      guard &&
+      /Conflitto appuntamento/.test(
+        `${(error as Error).message} ${
+          error instanceof Prisma.PrismaClientKnownRequestError
+            ? String(error.meta?.["message"] ?? "")
+            : ""
+        }`,
+      );
     const [statusCode, message] =
       error instanceof Prisma.PrismaClientValidationError
         ? [400, "Dati non validi"]
-        : guard
-          ? [409, database.message ?? GENERIC_CONFLICT]
-          : error instanceof Prisma.PrismaClientKnownRequestError &&
-              codes[error.code]
-            ? codes[error.code]
+        : doubleBooking
+          ? [409, "Il professionista ha già un appuntamento in quell'orario"]
+          : guard
+            ? [409, database.message ?? GENERIC_CONFLICT]
+            : error instanceof Prisma.PrismaClientKnownRequestError &&
+                codes[error.code]
+              ? codes[error.code]
             : [500, "Operazione non riuscita"];
     host
       .switchToHttp()
