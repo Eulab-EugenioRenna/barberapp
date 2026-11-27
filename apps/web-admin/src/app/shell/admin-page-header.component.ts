@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { UiIconComponent, UiPageHeaderComponent } from "@alora/ui";
 import { TourService } from "../core/onboarding/tour.service";
+import { SessionIdentityService } from "../core/session-identity.service";
 import { NotificationsBellComponent } from "./notifications-bell.component";
 import {
   findNavEntry,
@@ -29,7 +30,7 @@ import {
       <span class="tools">
         @if (refresh.observed) {
           <button type="button" class="icon-btn" [attr.data-tour]="refreshTour" [disabled]="refreshing"
-            [class.spinning]="refreshing" aria-label="Aggiorna i dati" data-tip="Aggiorna" (click)="refresh.emit()">
+            [class.spinning]="refreshing" aria-label="Aggiorna i dati" data-tip="Aggiorna" (click)="refreshAll()">
             <ui-icon name="refresh"></ui-icon>
           </button>
         }
@@ -67,10 +68,17 @@ import {
 })
 export class AdminPageHeaderComponent {
   readonly tour = inject(TourService);
+  private readonly identity = inject(SessionIdentityService);
   @Input({ required: true }) navKey!: AdminNavKey;
   /** Shows the refresh icon when bound; `refreshing` disables it and turns it. */
   @Output() readonly refresh = new EventEmitter<void>();
   @Input() refreshing = false;
+
+  /** Explicit «Aggiorna»: page data plus, in background, the session profile. */
+  refreshAll(): void {
+    void this.identity.revalidate(true);
+    this.refresh.emit();
+  }
   /** Anchor used by the page guide. */
   @Input() refreshTour = "page-refresh";
   /** Overrides the configured title (e.g. a selected team member's agenda). */

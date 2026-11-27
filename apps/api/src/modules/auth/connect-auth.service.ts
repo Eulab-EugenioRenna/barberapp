@@ -21,10 +21,13 @@ import {
   tokenHash,
 } from "../../common/local-sessions";
 import {
+  connectFunctionKeys,
   connectReturnUrl,
   openConnect,
+  readConnectAccess,
   sealConnect,
 } from "../../common/connect-runtime";
+import { connectSnapshot } from "../../common/session-snapshot";
 export type { AuthResponse } from "../../common/connect-http";
 export const MIGRATION_CONSENT_VERSION = "2026-10-21-mandatory-v1";
 
@@ -240,6 +243,9 @@ export class ConnectAuthService implements OnModuleDestroy {
       const result = await (
         await connectApplication(this.prisma)
       ).auth.exchange(handoff, connectBrowser(request));
+      // Full check, once, at login: the Connect functions become the session
+      // snapshot. Requests never ask Connect again; changes apply at next login.
+      const access = await readConnectAccess(this.prisma, result.session.sessionId);
       // Compatibility adapter: ALORA access/refresh remain distinct opaque handles. Provider state belongs only to the SDK.
       const tokens = await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.findUnique({
@@ -254,6 +260,11 @@ export class ConnectAuthService implements OnModuleDestroy {
           !user.connectInstallationId
         )
           return connectHttpError({ code: "provision_conflict" });
+        const functions = connectFunctionKeys(access, {
+          localUserId: user.id,
+          subject: user.connectSubject,
+          installationId: user.connectInstallationId,
+        });
         const linked = await tx.connectSession.create({
           data: {
             userId: user.id,
@@ -269,6 +280,8 @@ export class ConnectAuthService implements OnModuleDestroy {
           undefined,
           new Date(result.session.expiresAt),
           linked.id,
+          null,
+          connectSnapshot(functions),
         );
         await tx.auditLog.create({
           data: {

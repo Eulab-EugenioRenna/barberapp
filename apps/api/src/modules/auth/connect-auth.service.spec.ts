@@ -246,4 +246,38 @@ describe("ALORA SDK HTTP orchestration", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(cookie).not.toHaveBeenCalled();
   });
+  it("takes the Connect snapshot once at login and stores it with the session", async () => {
+    const services = jest.fn(async () => ({
+      localUserId: "u1", subject: "subject-1", installationId: "i1",
+      functions: [{ key: "sales.read" }, { key: "services.read" }],
+    }));
+    jest.mocked(connectApplication).mockResolvedValue({
+      auth: { exchange }, services,
+    } as unknown as ConnectApplication);
+    exchange.mockResolvedValue({
+      status: "authenticated",
+      session: { sessionId: "sdk-1", subject: "subject-1", expiresAt: Date.now() + 3_600_000, profile: { localUserId: "u1", localTenantId: "t1" } },
+      cookies: [],
+    });
+    const created: Array<{ data: Record<string, unknown> }> = [];
+    const tx = {
+      $executeRaw: jest.fn(),
+      user: { findUnique: jest.fn(async () => ({
+        id: "u1", tenantId: "t1", role: "owner", isActive: true, connectSubject: "subject-1",
+        connectInstallationId: "i1", tenant: { id: "t1", isActive: true, isSuspended: false },
+      })) },
+      connectSession: { create: jest.fn(async () => ({ id: "cs1" })) },
+      localSession: { create: jest.fn(async (args: { data: Record<string, unknown> }) => created.push(args)) },
+      auditLog: { create: jest.fn() },
+    };
+    service = new ConnectAuthService({
+      user: { findUnique },
+      $transaction: (run: (client: typeof tx) => unknown) => run(tx),
+    } as unknown as PrismaService);
+    const tokens = await service.exchange("h".repeat(43), request, response);
+    expect(tokens).toHaveProperty("accessToken");
+    expect(services).toHaveBeenCalledTimes(1);
+    expect(created[0].data["connectSnapshot"]).toMatchObject({ v: 1, functions: ["sales.read", "services.read"] });
+    expect(created[0].data).not.toHaveProperty("localSnapshot");
+  });
 });

@@ -4,6 +4,10 @@ import { createHash } from "node:crypto";
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { RequestSession } from "../../common/request-session";
+import {
+  allowedSectors,
+  persistLocalSnapshot,
+} from "../../common/session-snapshot";
 
 export interface OperationalScope {
   tenantId: string;
@@ -42,24 +46,17 @@ export async function resolveOperationalScope(
     (sectorId && sectorId.length > 100)
   )
     throw new BadRequestException("Ambito non valido");
-  const allowed = await prisma.sector.findMany({
-    where: {
-      tenantId,
-
-      ...(["owner", "collaborator"].includes(session.user.role)
-        ? {}
-        : { access: { some: { userId: session.user.id } } }),
-      ...(session.user.role === "collaborator"
-        ? {
-            collaborators: {
-              some: { collaboratorId: session.user.collaboratorId || "" },
-            },
-          }
-        : {}),
-    },
-    select: { id: true, locationId: true },
-    orderBy: { id: "asc" },
-  });
+  // Memberships come from the session snapshot (filled once, cleared by triggers
+  // on change); a location/sector header only filters them, in memory.
+  const snapshot = session.snapshot;
+  let allowed = snapshot?.local.sectors;
+  if (!allowed) {
+    allowed = await allowedSectors(prisma, tenantId, session.user);
+    if (snapshot) {
+      snapshot.local = { ...snapshot.local, sectors: allowed };
+      await persistLocalSnapshot(prisma, snapshot.sessionId, snapshot.version, snapshot.local);
+    }
+  }
   const sectors = allowed.filter(
     (sector) =>
       (!locationId || sector.locationId === locationId) &&

@@ -1,4 +1,4 @@
-import { resolveConnectPermissions } from "./connect-runtime";
+import { refreshConnectSession } from "./connect-runtime";
 import { UnauthorizedException } from "@nestjs/common";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
@@ -50,6 +50,8 @@ export async function createLocalSession(
   refreshExpiresAt = new Date(Date.now() + REFRESH_TTL_MS),
   connectSessionId: string | null = null,
   technicalAccess: { id: string; expiresAt: Date } | null = null,
+  /** Connect functions read at login (connectSnapshot()); copied as-is on refresh. */
+  connectSnapshot: Prisma.InputJsonValue | null = null,
 ) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${"user:" + userId}, 0))`;
   const user = await tx.user.findUnique({
@@ -82,6 +84,8 @@ export async function createLocalSession(
       refreshExpiresAt: technicalAccess
         ? technicalAccess.expiresAt
         : refreshExpiresAt,
+      // The local part is rebuilt (version-guarded) by the first request.
+      ...(connectSnapshot && connectSessionId ? { connectSnapshot } : {}),
     },
   });
   return {
@@ -107,11 +111,12 @@ export async function rotateLocalSession(
     !providerSession.usedAt &&
     !providerSession.revokedAt
   ) {
-    await resolveConnectPermissions(
+    // Cheap liveness only (SSO token refresh): permissions are never re-read here,
+    // the snapshot taken at login is carried over to the rotated session.
+    await refreshConnectSession(
       prisma,
       providerSession.connectSessionId,
       providerSession.user,
-      true,
     );
   }
   const result = await prisma.$transaction(async (tx) => {
@@ -191,6 +196,8 @@ export async function rotateLocalSession(
       current.familyId,
       current.refreshExpiresAt,
       current.connectSessionId,
+      null,
+      (current.connectSnapshot as Prisma.InputJsonValue | null) ?? null,
     );
   });
   if (!result) throw new UnauthorizedException("Sessione scaduta o revocata");
