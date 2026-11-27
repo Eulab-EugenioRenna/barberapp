@@ -139,7 +139,7 @@ type ViewKey =
         <alora-page-header [navKey]="headerNavKey" refreshTour="header-refresh" [refreshing]="loading" (refresh)="refreshCurrentView()">
           <div
             uiPageActions
-            *ngIf="canCreateSomething && (activeView === 'sales' || activeView === 'dashboard' || activeView === 'appointments')"
+            *ngIf="canCreateSomething && (activeView === 'dashboard' || activeView === 'appointments')"
             class="new-menu"
           >
             <button
@@ -256,6 +256,7 @@ type ViewKey =
               (closeAccount)="closeAccount($event)"
               (linkOrder)="linkPendingOrder($event)"
               (cancelAppointment)="cancelPendingAppointment($event)"
+              (openQuickOrder)="openQuickOrder()"
             ></barber-admin-sales-page>
 
             <barber-admin-customers-page
