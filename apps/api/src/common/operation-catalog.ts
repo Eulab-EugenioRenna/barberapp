@@ -221,6 +221,10 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
     kind: "function",
     key: "sales.manage",
   },
+  "SalesController.cancel": {
+    kind: "function",
+    key: "sales.manage",
+  },
   "AppointmentsController.findAll": {
     kind: "function",
     key: "appointments.read.all",

@@ -4,13 +4,16 @@ import { randomUUID } from "node:crypto";
 import { OrderCommandService } from "../orders/order-command.service";
 import { saleCommandResult, SALE_COMMAND_INCLUDE } from "./sale-command-result";
 import { PaymentsService } from "../payments/payments.service";
-import { paymentBalance } from "../payments/payment-balance";
+import { settledStatus } from "../payments/payment-balance";
+import { applyBookingCancellation } from "../orders/booking-cancellation";
 import { setOperationalActor } from "../../common/operational-lock";
 import { InventoryService } from "../inventory/inventory.service";
 import { sumPricedLines, decimalInput } from "../pricing/money";
 import { OperationalOrderService } from "../orders/operational-order.service";
 import { attributeOrder } from "../locations/order-attribution";
+import type { Prisma } from "@prisma/client";
 import {
+  type OperationalScope,
   resolveOperationalScope,
   saleFilter,
   sectorFilter,
@@ -453,6 +456,7 @@ export class SalesController {
             result: previous.result,
             replayed: true,
             customerId: previous.sale.customerId,
+            warnings: [] as string[],
           };
         const recordEvents = await beginAppointmentEvents(
           transaction,
@@ -661,7 +665,11 @@ export class SalesController {
           servicesStartAt,
         });
 
-        await this.inventory.postOrder(transaction, createdSale.id, user.id);
+        const warnings = await this.inventory.postOrder(
+          transaction,
+          createdSale.id,
+          user.id,
+        );
         await this.payments.cashierDeclaration(
           transaction,
           scope,
@@ -687,7 +695,12 @@ export class SalesController {
         );
         await recordEvents({ orderItem: { saleId: current.id } }, operation.id);
         await transaction.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
-        return { result, replayed: false, customerId: current.customerId };
+        return {
+          result,
+          replayed: false,
+          customerId: current.customerId,
+          warnings,
+        };
       },
       { timeout: 15000 },
     );
@@ -706,7 +719,9 @@ export class SalesController {
           ]
         : []),
     ]);
-    return outcome.result;
+    return outcome.warnings.length
+      ? { ...(outcome.result as object), warnings: outcome.warnings }
+      : outcome.result;
   }
 
   @Patch(":id")
@@ -850,27 +865,8 @@ export class SalesController {
             "Il professionista scelto per una nuova prestazione non è valido",
           );
         }
-        for (const row of attribution.items) {
-          const retained = sale.items.some(
-            (old) =>
-              old.id === row.id &&
-              old.serviceId === (row.serviceId ?? null) &&
-              old.productId === (row.productId ?? null),
-          );
-          if (
-            !retained &&
-            ((row.serviceId &&
-              services.find((service) => service.id === row.serviceId)
-                ?.isActive === false) ||
-              (row.productId &&
-                products.find((product) => product.id === row.productId)
-                  ?.isActive === false))
-          )
-            throw new BadRequestException(
-              "Un articolo disattivato si conserva soltanto sulla sua riga storica",
-            );
-        }
-
+        // A deactivated article can still be sold or moved between rows of an
+        // existing account: deactivation only hides it from the catalogue.
         const { subtotal, discountTotal, taxTotal, total } =
           this.totals(normalizedItems);
 
@@ -885,17 +881,11 @@ export class SalesController {
           | "refunded"
           | undefined;
         if (fresh.paymentBasis === "ledger") {
+          // A total below what was paid is refunded by cashierDeclaration below.
           const receipts = await transaction.paymentEntry.findMany({
             where: { saleId: id, tenantId },
           });
-          try {
-            ledgerStatus = paymentBalance(total, "ledger", receipts)
-              .status as typeof ledgerStatus;
-          } catch (error) {
-            throw new ConflictException(
-              error instanceof Error ? error.message : "Incassi non coerenti",
-            );
-          }
+          ledgerStatus = settledStatus(total, receipts);
         }
         const booked = await transaction.appointment.findMany({
           where: { tenantId, orderItem: { saleId: id } },
@@ -1030,7 +1020,7 @@ export class SalesController {
             servicesStartAt: parseServicesStartAt(body["servicesStartAt"]),
           },
         );
-        await this.inventory.postOrder(
+        const warnings = await this.inventory.postOrder(
           transaction,
           updatedSale.id,
           requireUser(session).id,
@@ -1055,7 +1045,7 @@ export class SalesController {
         );
         await recordEvents({ orderItem: { saleId: id } }, operation.id);
         await transaction.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
-        return result;
+        return warnings.length ? { ...result, warnings } : result;
       },
       { timeout: 15000 },
     );
@@ -1226,6 +1216,11 @@ export class SalesController {
     return resolveSaleLabels(updated);
   }
 
+  /**
+   * «Elimina vendita»: a sale without stock movements (and without reminders
+   * already sent) disappears with everything it created. Otherwise it is
+   * cancelled instead, and the response says so.
+   */
   @Delete(":id")
   async remove(
     @Req() request: { headers: { authorization?: string } },
@@ -1241,66 +1236,212 @@ export class SalesController {
       session,
       request.headers,
     );
+    const actorId = requireUser(session).id;
     const sale = await this.prisma.sale.findFirst({
       where: { id, tenantId, ...saleFilter(scope) },
-      include: { items: true },
+      select: { id: true, customerId: true },
     });
     if (!sale) {
       throw new NotFoundException("Vendita non trovata");
     }
 
-    await this.prisma.$transaction(async (transaction) => {
-      await this.orders.lock(transaction, tenantId);
-      await setOperationalActor(transaction, requireUser(session).id);
-      if (
-        await transaction.appointment.count({
-          where: { tenantId, orderItem: { saleId: id } },
-        })
-      )
-        throw new ConflictException(
-          "Il conto contiene prenotazioni: conserva il conto e gestisci lo stato delle operazioni",
-        );
-      if (
-        await transaction.stockMovement.count({
-          where: { tenantId, saleId: id },
-        })
-      )
-        throw new ConflictException(
-          "Il conto ha movimenti di magazzino: registra una rettifica o un reso",
-        );
-      if (
-        await transaction.orderOperation.count({
-          where: { saleId: id, tenantId },
-        })
-      )
-        throw new ConflictException(
-          "Conserva il conto dell'operazione: usa l'annullamento esplicito",
-        );
-      if (
-        await transaction.paymentOperation.count({
-          where: { saleId: id, tenantId },
-        })
-      )
-        throw new ConflictException(
-          "Il conto ha movimenti finanziari: conserva lo storico",
-        );
-      await transaction.sale.delete({ where: { id, tenantId } });
-      if (sale.appointmentId) {
-        await transaction.appointment.update({
-          where: { id: sale.appointmentId, tenantId },
-          data: { finalPrice: null },
-        });
-      }
-    });
+    const keep = await this.prisma.$transaction(
+      async (transaction) => {
+        await this.orders.lock(transaction, tenantId);
+        await setOperationalActor(transaction, actorId);
+        const reason = await this.deletionBlocker(transaction, tenantId, id);
+        if (reason) return reason;
+        await transaction.$queryRaw`SELECT alora_purge_sale(${tenantId}, ${id})::int AS purged`;
+        await transaction.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+        return null;
+      },
+      { timeout: 15000 },
+    );
+    if (keep) {
+      const cancelled = await this.cancelSale(
+        tenantId,
+        scope,
+        actorId,
+        id,
+        "Annullata dalla cassa",
+      );
+      return {
+        deleted: false,
+        cancelled: true,
+        message: `${keep}: la vendita è stata annullata invece che eliminata. Incassi rimborsati e prodotti rientrati in magazzino.`,
+        sale: cancelled,
+      };
+    }
+    // Prisma can swallow a deferred database error at commit: check the outcome.
+    if (await this.prisma.sale.count({ where: { id } }))
+      throw new ConflictException("La vendita non è stata eliminata. Riprova.");
+    await this.afterSaleChange(tenantId, sale.customerId);
+    return { deleted: true };
+  }
+
+  /** Why a sale must be cancelled rather than deleted, or null. */
+  private async deletionBlocker(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    id: string,
+  ) {
+    if (await tx.stockMovement.count({ where: { tenantId, saleId: id } }))
+      return "Ha movimenti di magazzino";
+    if (
+      await tx.appointmentAutomationDelivery.count({
+        where: {
+          run: { tenantId, orderId: id },
+          history: { status: { in: ["sent", "dispatching", "uncertain"] } },
+        },
+      })
+    )
+      return "Al cliente sono già partiti dei messaggi";
+    return null;
+  }
+
+  private async afterSaleChange(tenantId: string, customerId: string | null) {
     await Promise.all([
       this.cacheInvalidationService.invalidateSales(tenantId),
       this.cacheInvalidationService.invalidateDashboard(tenantId),
       this.cacheInvalidationService.invalidateCustomers(tenantId),
-      ...(sale.appointmentId
-        ? [this.cacheInvalidationService.invalidateAppointments(tenantId)]
+      this.cacheInvalidationService.invalidateAppointments(tenantId),
+      ...(customerId
+        ? [
+            this.customersAlignmentService
+              .queueCustomerRefresh(tenantId, customerId, "sale_created")
+              .catch(() => undefined),
+          ]
         : []),
     ]);
-    return { deleted: true };
+  }
+
+  /** «Annulla vendita»: refunds, stock back, bookings cancelled, account cancelled. */
+  @Post(":id/cancel")
+  async cancel(
+    @Req() request: { headers: { authorization?: string } },
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown> = {},
+  ): Promise<unknown> {
+    const session = await resolveRequestSession(
+      this.prisma,
+      request.headers.authorization,
+    );
+    const tenantId = requireTenantId(session);
+    const scope = await resolveOperationalScope(
+      this.prisma,
+      session,
+      request.headers,
+    );
+    const text =
+      typeof body?.["reason"] === "string" ? body["reason"].trim() : "";
+    return this.cancelSale(
+      tenantId,
+      scope,
+      requireUser(session).id,
+      id,
+      text.length >= 3 ? text.slice(0, 500) : "Annullata dalla cassa",
+      body?.["idempotencyKey"],
+    );
+  }
+
+  private async cancelSale(
+    tenantId: string,
+    scope: OperationalScope,
+    actorId: string,
+    id: string,
+    reason: string,
+    key?: unknown,
+  ) {
+    const command = this.commands.command(
+      { tenantId, actorId, source: "internal", scope },
+      "cancel_sale",
+      typeof key === "string" ? key : `cancel-sale:${id}`,
+      { saleId: id },
+    );
+    const outcome = await this.prisma.$transaction(
+      async (tx) => {
+        await this.orders.lock(tx, tenantId);
+        await setOperationalActor(tx, actorId);
+        const replay = await this.commands.replay(tx, command);
+        if (replay)
+          return { result: replay.result, customerId: replay.sale.customerId };
+        const sale = await tx.sale.findFirst({
+          where: { id, tenantId, ...saleFilter(scope) },
+          include: {
+            items: {
+              include: { booking: { select: { id: true, status: true } } },
+            },
+          },
+        });
+        if (!sale) throw new NotFoundException("Vendita non trovata");
+        if (sale.orderStatus === "superseded")
+          throw new ConflictException(
+            "Questo conto è già stato sostituito da un altro",
+          );
+        if (sale.orderStatus === "cancelled") {
+          const current = await tx.sale.findUniqueOrThrow({
+            where: { id },
+            include: SALE_COMMAND_INCLUDE,
+          });
+          return {
+            result: saleCommandResult(current),
+            customerId: sale.customerId,
+          };
+        }
+        // Performed services stay in the agenda as history; the rest is cancelled.
+        const active = sale.items.flatMap((row) =>
+          row.booking &&
+          !["cancelled", "no_show", "completed"].includes(row.booking.status)
+            ? [row.booking.id]
+            : [],
+        );
+        const recordEvents = await beginAppointmentEvents(
+          tx,
+          { tenantId, actorId, source: "internal" },
+          { id: { in: active } },
+        );
+        await this.payments.refundAll(tx, scope, actorId, id, reason);
+        const returned = await this.inventory.reverseOrder(
+          tx,
+          id,
+          actorId,
+          reason,
+        );
+        await applyBookingCancellation(tx, {
+          orderId: id,
+          appointmentIds: active,
+          allStopped: true,
+          actorId,
+          cancelledByType: "staff",
+          cancelledById: actorId,
+          reason,
+          policyResult: "operator_recorded",
+        });
+        const current = await tx.sale.findUniqueOrThrow({
+          where: { id },
+          include: SALE_COMMAND_INCLUDE,
+        });
+        const result = {
+          ...saleCommandResult(current),
+          cancelledAppointmentIds: active,
+          stockReturned: returned > 0,
+        };
+        const operation = await this.commands.save(tx, command, id, result);
+        await recordEvents({ id: { in: active } }, operation.id);
+        await tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+        return { result, customerId: sale.customerId };
+      },
+      { timeout: 15000 },
+    );
+    // Prisma can swallow a deferred database error at commit: check the outcome.
+    const check = await this.prisma.sale.findUnique({
+      where: { id },
+      select: { orderStatus: true },
+    });
+    if (check?.orderStatus !== "cancelled")
+      throw new ConflictException("La vendita non è stata annullata. Riprova.");
+    await this.afterSaleChange(tenantId, outcome.customerId);
+    return outcome.result;
   }
 
   @Get(":id/price-history")

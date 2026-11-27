@@ -24,6 +24,7 @@ export interface OrderCommand {
     | "update_booking"
     | "update_sale"
     | "cancel_booking"
+    | "cancel_sale"
     | "confirm_booking"
     | "request_booking_change"
     | "authorize_booking_contact";
