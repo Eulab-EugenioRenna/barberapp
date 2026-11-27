@@ -13,11 +13,21 @@ import {
 import { UserRole } from "./domain-types";
 import { PrismaService } from "../prisma/prisma.service";
 
-import { bearerToken, tokenHash, sessionUserSelect } from "./local-sessions";
+import { bearerToken, tokenHash } from "./local-sessions";
+import {
+  buildLocalSnapshot,
+  persistConnectSnapshot,
+  persistLocalSnapshot,
+  readConnectSnapshot,
+  readLocalSnapshot,
+  SessionSnapshotRef,
+} from "./session-snapshot";
 
 export interface RequestSession {
   operationalScope?: import("../modules/locations/operational-scope").OperationalScope;
   connectSessionId?: string | null;
+  /** Non-enumerable; present only for sessions resolved from a token row. */
+  snapshot?: SessionSnapshotRef;
   user: {
     id: string;
     tenantId: string | null;
@@ -86,26 +96,28 @@ async function loadRequestSession(prisma: PrismaService, authorization?: string)
       throw error;
     }
   }
-  const user = await prisma.user.findUnique({
-    where: { id: stored.userId },
-    select: {
-      ...sessionUserSelect,
-      collaborator: { select: { id: true, tenantId: true, isActive: true } },
-    },
-  });
+  // Per request: token validity above (one row) + the snapshot stored with it.
+  // No Connect call and no profile query while the snapshot is valid.
+  const version = typeof stored.snapshotVersion === "number" ? stored.snapshotVersion : 0;
+  let local = readLocalSnapshot(stored.localSnapshot);
+  if (!local) {
+    local = await buildLocalSnapshot(prisma, stored.userId);
+    if (local) await persistLocalSnapshot(prisma, stored.id, version, local);
+  }
+  const user = local?.user;
 
-  if (!user || !user.isActive) {
+  if (!local || !user || !user.isActive) {
     throw new UnauthorizedException("Accedi per continuare");
   }
 
   if (user.role !== UserRole.PlatformAdmin) {
-    if (!user.tenantId || !user.tenant) {
+    if (!user.tenantId || !local.tenant) {
       throw new ForbiddenException(
         "Il tuo account non è associato a un'attività attiva",
       );
     }
 
-    if (!user.tenant.isActive || user.tenant.isSuspended) {
+    if (!local.tenant.isActive || local.tenant.isSuspended) {
       throw new ForbiddenException("L'accesso a questa attività è sospeso");
     }
   }
@@ -116,12 +128,22 @@ async function loadRequestSession(prisma: PrismaService, authorization?: string)
     !stored.technicalAccessId
   )
     throw new UnauthorizedException("Accedi tramite Connect");
-  const connectFunctions =
-    stored.connectSessionId && !stored.technicalAccessId
-      ? await resolveConnectPermissions(prisma, stored.connectSessionId, user)
-      : undefined;
+  let connectFunctions: string[] | undefined;
+  if (stored.connectSessionId && !stored.technicalAccessId) {
+    // Taken at login; Connect changes apply at the next login (session-snapshot.ts).
+    connectFunctions = readConnectSnapshot(stored.connectSnapshot) ?? undefined;
+    if (!connectFunctions) {
+      // Session opened before snapshots existed: read once, then keep it.
+      connectFunctions = await resolveConnectPermissions(
+        prisma,
+        stored.connectSessionId,
+        user,
+      );
+      await persistConnectSnapshot(prisma, stored.id, connectFunctions);
+    }
+  }
 
-  return {
+  const session: RequestSession = {
     connectSessionId: stored.connectSessionId,
     user: {
       id: user.id,
@@ -134,14 +156,18 @@ async function loadRequestSession(prisma: PrismaService, authorization?: string)
       permissionsConfigured: user.permissionsConfigured,
       ...(connectFunctions ? { connectFunctions } : {}),
       ...(stored.technicalAccessId ? { technicalAccess: true } : {}),
-      collaboratorId:
-        user.collaborator?.isActive &&
-        user.collaborator.tenantId === user.tenantId
-          ? user.collaborator.id
-          : null,
+      collaboratorId: user.collaboratorId,
     },
     tenantId: user.tenantId,
   };
+  // Internal: lets the operational scope complete the snapshot without leaking
+  // into JSON responses (/auth/me returns only `user`).
+  Object.defineProperty(session, "snapshot", {
+    value: { sessionId: stored.id, version, local } satisfies SessionSnapshotRef,
+    enumerable: false,
+    writable: true,
+  });
+  return session;
 }
 
 export function requireTenantId(session: RequestSession): string {

@@ -1,6 +1,6 @@
 import { canUseLocalFunction } from "./function-catalog";
-import { connectConfig, openConnect, sealConnect, resolveConnectPermissions, forgetConnectPermissions, PERMISSIONS_TTL_MS } from "./connect-runtime";
-import { UnauthorizedException, ServiceUnavailableException } from "@nestjs/common";
+import { connectConfig, openConnect, sealConnect, resolveConnectPermissions, refreshConnectSession, connectFunctionKeys } from "./connect-runtime";
+import { ForbiddenException, UnauthorizedException, ServiceUnavailableException } from "@nestjs/common";
 import type { PrismaClient } from "@prisma/client";
 import { connectApplication } from "./connect-application";
 jest.mock("./connect-application", () => ({ connectApplication: jest.fn() }));
@@ -110,51 +110,43 @@ describe("Connect boundary", () => {
     services.mockRejectedValue({ code: "provider_unavailable" });
     await expect(resolveConnectPermissions(prisma, "s1", { id: "u1", tenantId: "t1", connectSubject: "subject" })).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
-  describe("permissions cache", () => {
+  describe("permissions only at session creation", () => {
     const user = { id: "u1", tenantId: "t1", connectSubject: "subject" };
     const granted = { localUserId: "u1", subject: "subject", installationId: "i1", functions: [{ key: "sales.read" }] };
     let row: Record<string, unknown>;
     let prisma: PrismaClient;
     let services: jest.Mock;
+    let refresh: jest.Mock;
     beforeEach(() => {
-      forgetConnectPermissions();
       row = { userId: "u1", installationId: "i1", sdkSessionCipher: sealConnect("private-handle"), expiresAt: new Date(Date.now() + 60000), revokedAt: null };
       prisma = { connectSession: { findUnique: jest.fn(async () => row) } } as unknown as PrismaClient;
       services = jest.fn(async () => granted);
-      jest.mocked(connectApplication).mockResolvedValue({ services, auth: { refresh: jest.fn() } } as unknown as Awaited<ReturnType<typeof connectApplication>>);
-    });
-    afterEach(() => jest.useRealTimers());
-
-    it("asks Connect once for concurrent and repeated requests of the same session", async () => {
-      const results = await Promise.all([1, 2, 3, 4, 5].map(() => resolveConnectPermissions(prisma, "s1", user)));
-      await resolveConnectPermissions(prisma, "s1", user);
-      expect(results.every((keys) => keys.join() === "sales.read")).toBe(true);
-      expect(services).toHaveBeenCalledTimes(1);
+      refresh = jest.fn(async () => undefined);
+      jest.mocked(connectApplication).mockResolvedValue({ services, auth: { refresh } } as unknown as Awaited<ReturnType<typeof connectApplication>>);
     });
 
-    it("still enforces local revocation on every request", async () => {
-      await resolveConnectPermissions(prisma, "s1", user);
+    it("reads the functions of the exact local user, subject and installation", async () => {
+      await expect(resolveConnectPermissions(prisma, "s1", user)).resolves.toEqual(["sales.read"]);
+      expect(() => connectFunctionKeys(granted, { localUserId: "u2", subject: "subject", installationId: "i1" })).toThrow(ForbiddenException);
+      expect(() => connectFunctionKeys(granted, { localUserId: "u1", subject: "subject", installationId: "i2" })).toThrow(ForbiddenException);
+    });
+
+    it("refuses a locally revoked or expired Connect session before calling Connect", async () => {
       row["revokedAt"] = new Date();
       await expect(resolveConnectPermissions(prisma, "s1", user)).rejects.toBeInstanceOf(UnauthorizedException);
+      await expect(refreshConnectSession(prisma, "s1", user)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(services).not.toHaveBeenCalled();
+      expect(refresh).not.toHaveBeenCalled();
     });
 
-    it("asks again after the TTL, on forced refresh and after a failure", async () => {
-      jest.useFakeTimers({ now: Date.now() });
-      await resolveConnectPermissions(prisma, "s1", user);
-      jest.setSystemTime(Date.now() + PERMISSIONS_TTL_MS + 1);
-      await resolveConnectPermissions(prisma, "s1", user);
-      await resolveConnectPermissions(prisma, "s1", user, true);
-      expect(services).toHaveBeenCalledTimes(3);
-      services.mockRejectedValueOnce({ code: "provider_unavailable" });
-      await expect(resolveConnectPermissions(prisma, "s1", user, true)).rejects.toBeInstanceOf(ServiceUnavailableException);
-      await resolveConnectPermissions(prisma, "s1", user);
-      expect(services).toHaveBeenCalledTimes(5);
-    });
-
-    it("never shares results between sessions or users", async () => {
-      await resolveConnectPermissions(prisma, "s1", user);
-      await resolveConnectPermissions(prisma, "s2", user);
-      expect(services).toHaveBeenCalledTimes(2);
+    it("token refresh keeps the SSO session alive without reading permissions", async () => {
+      await refreshConnectSession(prisma, "s1", user);
+      expect(refresh).toHaveBeenCalledWith("private-handle");
+      expect(services).not.toHaveBeenCalled();
+      refresh.mockRejectedValueOnce({ code: "access_denied" });
+      await expect(refreshConnectSession(prisma, "s1", user)).rejects.toBeInstanceOf(UnauthorizedException);
+      refresh.mockRejectedValueOnce({ code: "provider_unavailable" });
+      await expect(refreshConnectSession(prisma, "s1", user)).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
 });

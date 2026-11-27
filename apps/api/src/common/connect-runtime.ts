@@ -207,86 +207,111 @@ export function openConnect(value: string): string {
   }
 }
 /**
- * Granted functions per Connect session, kept briefly. Every request still
- * re-validates the local session row (revocation, expiry, owner); only the
- * remote permissions call is shared. A function withdrawn in Connect takes
- * effect within PERMISSIONS_TTL_MS. Concurrent requests share one call.
+ * Connect functions are read ONLY when a session is created (login / Connect
+ * exchange) and kept in the LocalSession snapshot (see session-snapshot.ts).
+ * Requests never call Connect for permissions: a function granted or withdrawn on
+ * Connect takes effect at the next login. ALORA revocation stays immediate.
  */
-export const PERMISSIONS_TTL_MS = 15_000;
-const permissionsCache = new Map<
-  string,
-  { expires: number; value: Promise<string[]> }
->();
+type ConnectAccess = {
+  localUserId: string | null;
+  subject: string | null;
+  installationId: string;
+  functions: { key: string }[];
+};
 
-export function forgetConnectPermissions(sessionId?: string): void {
-  if (!sessionId) return permissionsCache.clear();
-  for (const key of permissionsCache.keys())
-    if (key.startsWith(`${sessionId}|`)) permissionsCache.delete(key);
+/** One remote call with the SDK session handle; maps a definitive denial to 401. */
+export async function readConnectAccess(
+  prisma: PrismaClient,
+  handle: string,
+): Promise<ConnectAccess> {
+  const { connectApplication } = await import("./connect-application");
+  const { connectHttpError } = await import("./connect-http");
+  try {
+    const application = await connectApplication(prisma);
+    return (await application.services(handle, (server, token) =>
+      server.permissions(token),
+    )) as ConnectAccess;
+  } catch (error) {
+    // At this boundary the SDK validates the session itself and invalidates it on
+    // definitive access_denied. Business permission checks run after resolution.
+    if (isAccessDenied(error))
+      throw new UnauthorizedException("Sessione Connect revocata o non più autorizzata");
+    return connectHttpError(error);
+  }
 }
 
-/** Provider protocol, refresh serialization and revocation belong exclusively to ConnectApplication. */
-export async function resolveConnectPermissions(
-  prisma: PrismaClient,
-  sessionId: string,
-  user: { id: string; tenantId: string | null; connectSubject: string | null },
-  forceRefresh = false,
-) {
+/** The grant must belong to exactly this local user, subject and installation. */
+export function connectFunctionKeys(
+  access: ConnectAccess,
+  expected: { localUserId: string; subject: string | null; installationId: string | null },
+): string[] {
+  if (
+    access.localUserId !== expected.localUserId ||
+    access.subject !== expected.subject ||
+    access.installationId !== expected.installationId ||
+    !Array.isArray(access.functions) ||
+    access.functions.some((item) => typeof item?.key !== "string")
+  )
+    throw new ForbiddenException("Collegamento Connect non valido");
+  return access.functions.map((item) => item.key);
+}
+
+async function liveConnectSession(prisma: PrismaClient, sessionId: string, userId: string) {
   const session = await prisma.connectSession.findUnique({
     where: { id: sessionId },
   });
   if (
     !session ||
-    session.userId !== user.id ||
+    session.userId !== userId ||
     session.revokedAt ||
     !session.sdkSessionCipher ||
     session.expiresAt <= new Date()
   )
     throw new UnauthorizedException("Ripeti l’accesso Connect");
-  const key = `${sessionId}|${user.id}|${user.connectSubject}|${session.installationId}`;
-  const cached = permissionsCache.get(key);
-  if (!forceRefresh && cached && cached.expires > Date.now()) return cached.value;
-  const value = fetchConnectPermissions(prisma, session, user, forceRefresh);
-  permissionsCache.set(key, { expires: Date.now() + PERMISSIONS_TTL_MS, value });
-  // Failures are never cached: the next request asks Connect again.
-  value.catch(() => {
-    if (permissionsCache.get(key)?.value === value) permissionsCache.delete(key);
-  });
-  if (permissionsCache.size > 5000) {
-    const now = Date.now();
-    for (const [k, entry] of permissionsCache) if (entry.expires <= now) permissionsCache.delete(k);
-  }
-  return value;
+  return session as typeof session & { sdkSessionCipher: string };
 }
 
-async function fetchConnectPermissions(
+/**
+ * Full Connect permission read for an existing Connect session. Used only for
+ * sessions created before snapshots existed (once, then persisted).
+ */
+export async function resolveConnectPermissions(
   prisma: PrismaClient,
-  session: { sdkSessionCipher: string | null; installationId: string },
-  user: { id: string; connectSubject: string | null },
-  forceRefresh: boolean,
+  sessionId: string,
+  user: { id: string; tenantId: string | null; connectSubject: string | null },
 ): Promise<string[]> {
+  const session = await liveConnectSession(prisma, sessionId, user.id);
+  const access = await readConnectAccess(prisma, openConnect(session.sdkSessionCipher));
+  return connectFunctionKeys(access, {
+    localUserId: user.id,
+    subject: user.connectSubject,
+    installationId: session.installationId,
+  });
+}
+
+/**
+ * Token refresh keeps the Connect SSO session alive and notices a definitive
+ * revocation on Connect. It is one SSO token grant and never reads permissions.
+ */
+export async function refreshConnectSession(
+  prisma: PrismaClient,
+  sessionId: string,
+  user: { id: string },
+): Promise<void> {
+  const session = await liveConnectSession(prisma, sessionId, user.id);
   const { connectApplication } = await import("./connect-application");
   const { connectHttpError } = await import("./connect-http");
   try {
-    const application = await connectApplication(prisma),
-      handle = openConnect(session.sdkSessionCipher!);
-    if (forceRefresh) await application.auth.refresh(handle);
-    const access = await application.services(handle, (server, token) =>
-      server.permissions(token),
+    await (await connectApplication(prisma)).auth.refresh(
+      openConnect(session.sdkSessionCipher),
     );
-    if (
-      access.localUserId !== user.id ||
-      access.subject !== user.connectSubject ||
-      access.installationId !== session.installationId ||
-      !Array.isArray(access.functions) ||
-      access.functions.some((item) => typeof item?.key !== "string")
-    )
-      throw new ForbiddenException("Collegamento Connect non valido");
-    return access.functions.map((item) => item.key);
   } catch (error) {
-    // At this boundary the SDK validates the session itself and invalidates it on
-    // definitive access_denied. Business permission checks run after resolution.
-    if (error && typeof error === "object" && "code" in error && error.code === "access_denied")
+    if (isAccessDenied(error))
       throw new UnauthorizedException("Sessione Connect revocata o non più autorizzata");
     return connectHttpError(error);
   }
+}
+
+function isAccessDenied(error: unknown): boolean {
+  return !!error && typeof error === "object" && "code" in error && error.code === "access_denied";
 }

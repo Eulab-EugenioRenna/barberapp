@@ -994,6 +994,11 @@ model LocalSession {
   usedAt           DateTime?
   revokedAt        DateTime?
   createdAt        DateTime @default(now())
+  /// Connect functions taken at login only (see common/session-snapshot.ts).
+  connectSnapshot  Json?
+  /// ALORA profile and sector memberships; cleared by database triggers on change.
+  localSnapshot    Json?
+  snapshotVersion  Int      @default(0)
 
   @@index([familyId])
   @@index([userId])

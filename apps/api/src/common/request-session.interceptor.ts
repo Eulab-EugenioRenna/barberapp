@@ -16,7 +16,7 @@ import { runRequestSessionScope } from "./request-session-scope";
 export class RequestSessionInterceptor implements NestInterceptor {
   constructor(private readonly prisma: PrismaService) {}
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    // Each event-stream tick must continue to recheck revocations and current permissions.
+    // Each event-stream tick must re-validate its token row (revocation, expiry, snapshot).
     if (Reflect.getMetadata(SSE_METADATA, context.getHandler()))
       return next.handle();
     const request = context.switchToHttp().getRequest<{
