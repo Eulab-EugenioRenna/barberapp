@@ -4,10 +4,10 @@ import { HttpClient } from "@angular/common/http";
 import { RouterLink } from "@angular/router";
 import { firstValueFrom } from "rxjs";
 import { ADMIN_API_URL } from "../core/api-config";
+import { canAccessLocalView } from "@barber/shared/functions";
+import { SessionStore } from "../core/session.store";
+import { visibleSetup, type SetupKey as Key, type SetupStatus as Status } from "./setup-checklist.logic";
 
-type Key = "location" | "services" | "team" | "customers" | "whatsapp" | "reminders" | "online";
-interface Step { key: Key; done: boolean; blockedBy: Key | null; optional: boolean; detail: string | null }
-interface Status { steps: Step[]; completed: number; total: number }
 
 /** What each step is, where it is done and what it unlocks, in plain words. */
 const COPY: Record<Key, { title: string; why: string; link: string; action: string }> = {
@@ -20,6 +20,8 @@ const COPY: Record<Key, { title: string; why: string; link: string; action: stri
   online: { title: "Apri le prenotazioni online", why: "I clienti prenotano da soli dalla tua pagina.", link: "/settings", action: "Vai a Profilo" },
 };
 const HIDDEN_KEY = "alora.setup-checklist.hidden";
+const CACHE_MS = 60_000;
+let cached: { at: number; status: Status } | null = null;
 
 /**
  * «Primi passi» on Panoramica: the real setup order. A step that depends on
@@ -79,14 +81,23 @@ const HIDDEN_KEY = "alora.setup-checklist.hidden";
 })
 export class SetupChecklistComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly session = inject(SessionStore);
   readonly copy = COPY;
-  status: Status | null = null;
+  status: Status | null = cached && Date.now() - cached.at < CACHE_MS ? this.visible(cached.status) : null;
   hidden = localStorage.getItem(HIDDEN_KEY) === "1";
 
   async ngOnInit() {
-    if (this.hidden) return;
-    try { this.status = await firstValueFrom(this.http.get<Status>(`${ADMIN_API_URL}/tenant/setup-status`)); }
-    catch { this.status = null; }
+    // Coming back to the Panoramica within a minute reuses the last answer.
+    if (this.hidden || (cached && Date.now() - cached.at < CACHE_MS)) return;
+    try {
+      const status = await firstValueFrom(this.http.get<Status>(`${ADMIN_API_URL}/tenant/setup-status`));
+      cached = { at: Date.now(), status };
+      this.status = this.visible(status);
+    } catch { this.status = null; }
+  }
+  private visible(status: Status): Status | null {
+    const user = this.session.currentUser();
+    return visibleSetup(status, (view) => canAccessLocalView(user, view));
   }
   hide() { this.hidden = true; localStorage.setItem(HIDDEN_KEY, "1"); }
 }
