@@ -203,17 +203,16 @@ export function normalizeOrderItems(input: {
       ) !== 0;
     const changedMode =
       mode !== (old?.priceMode ?? catalog?.priceMode ?? "legacy");
-    // A price typed at the till is audited with an automatic reason; VAT and
-    // price-mode changes still need one written by a person.
-    if (!changedRate && !changedMode && mode !== "legacy" && changedPrice && (!reason || reason.length < 3))
-      reason = "Prezzo modificato in cassa";
+    // Price, VAT or price-mode changes typed at the till are audited with an
+    // automatic reason when the operator does not write one.
     if (
       (changedRate || changedMode || (mode !== "legacy" && changedPrice)) &&
       (!reason || reason.length < 3)
     )
-      throw Error(
-        `Riga ${index + 1}: indica il motivo della modifica a prezzo o IVA`,
-      );
+      reason =
+        changedRate || changedMode
+          ? "Prezzo o IVA modificati in cassa"
+          : "Prezzo modificato in cassa";
     if (reason && reason.length > 500)
       throw Error(`Riga ${index + 1}: motivazione troppo lunga`);
     const chargeReason = item["nonPerformanceChargeReason"];
