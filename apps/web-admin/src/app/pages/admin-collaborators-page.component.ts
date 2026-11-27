@@ -11,6 +11,7 @@ import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import { UiSheetComponent } from "@alora/ui";
 
 @Component({
   selector: "barber-admin-collaborators-page",
@@ -26,6 +27,7 @@ import { UiIconComponent } from "../shared/ui-icon.component";
     InfiniteScrollDirective,
     AutofocusFirstDirective,
     UiIconComponent,
+    UiSheetComponent,
   ],
   template: `
     <alora-admin-team-page
@@ -115,42 +117,36 @@ import { UiIconComponent } from "../shared/ui-icon.component";
       </article>
     </section>
 
-    <div *ngIf="formOpen" class="confirm-overlay">
-      <button
-        type="button"
-        class="confirm-backdrop"
-        (click)="formOpen = false"
-        aria-label="Chiudi scheda professionista"
-      ></button>
-      <article
-        barberAutofocusFirst
-        class="confirm-dialog panel max-h-[85vh] overflow-auto !w-[min(64rem,100%)]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="collaborator-form-title"
-      >
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="eyebrow text-[var(--accent)]">Squadra</p>
-            <h2
-              id="collaborator-form-title"
-              class="mt-2 font-display text-2xl sm:text-3xl"
-            >
-              <barber-ui-icon name="save"></barber-ui-icon>
-              {{
-                collaboratorForm.id
-                  ? "Modifica collaboratore"
-                  : "Nuovo collaboratore"
-              }}
-            </h2>
-          </div>
-          <button type="button" class="pill-btn" (click)="formOpen = false">
-            Chiudi
+    <ui-sheet
+      *ngIf="formOpen"
+      size="lg"
+      eyebrow="Squadra"
+      [title]="collaboratorForm.id ? 'Modifica collaboratore' : 'Nuovo collaboratore'"
+      subtitle="Dati della persona, orario settimanale ed eccezioni: salva quando hai finito."
+      closeLabel="Chiudi scheda professionista"
+      (close)="formOpen = false"
+    >
+      <ol class="ui-steps" aria-label="Sezioni della scheda">
+        <li
+          *ngFor="let section of editorSections; let n = index"
+          [class.ui-step-on]="editorSection === section.key"
+        >
+          <button
+            type="button"
+            [attr.aria-current]="editorSection === section.key ? 'step' : null"
+            (click)="editorSection = section.key"
+          >
+            {{ n + 1 }} · {{ section.label }}
           </button>
-        </div>
-
-        <form class="mt-4 grid gap-4 lg:grid-cols-2" (ngSubmit)="submit()">
-          <div class="grid content-start gap-4">
+        </li>
+      </ol>
+      <form
+        barberAutofocusFirst
+        id="collaborator-form"
+        class="grid content-start gap-4"
+        (ngSubmit)="submit()"
+      >
+        <section *ngIf="editorSection === 'data'" class="grid content-start gap-4">
             <alora-sector-picker
               *ngIf="!collaboratorForm.id"
               [(value)]="collaboratorForm.sectorId"
@@ -225,10 +221,9 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                 <span>Prenotabile dai clienti online</span>
               </label>
             </div>
-          </div>
-          <div class="grid content-start gap-4">
-            <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
-              <p class="text-sm font-semibold">Orario settimanale</p>
+        </section>
+        <section *ngIf="editorSection === 'hours'" class="ui-section">
+          <p class="ui-step">Orario settimanale</p>
               <div class="mt-4 grid gap-3">
                 <article
                   *ngFor="
@@ -264,19 +259,19 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                   </div>
                 </article>
               </div>
-            </div>
-            <div class="rounded-[1.4rem] border border-[var(--line)] p-4">
-              <div class="flex items-center justify-between gap-3">
-                <p class="text-sm font-semibold">Eccezioni giornaliere</p>
-                <button
-                  aloraFunction="collaborators.manage"
-                  type="button"
-                  class="pill-btn"
-                  (click)="addDayOverride()"
-                >
-                  Aggiungi giorno
-                </button>
-              </div>
+        </section>
+        <section *ngIf="editorSection === 'exceptions'" class="ui-section">
+          <div class="flex items-center justify-between gap-3">
+            <p class="ui-step">Eccezioni giornaliere</p>
+            <button
+              aloraFunction="collaborators.manage"
+              type="button"
+              class="pill-btn"
+              (click)="addDayOverride()"
+            >
+              Aggiungi giorno
+            </button>
+          </div>
               <div class="mt-4 grid gap-3">
                 <article
                   *ngFor="
@@ -353,67 +348,51 @@ import { UiIconComponent } from "../shared/ui-icon.component";
                   Nessuna eccezione configurata.
                 </p>
               </div>
-            </div>
-          </div>
-          <div class="flex flex-wrap gap-3 lg:col-span-2">
-            <button
-              aloraFunction="collaborators.manage"
-              type="submit"
-              class="primary-btn"
-              [disabled]="loading || !formValid"
-            >
-              {{
-                collaboratorForm.id
-                  ? "Salva professionista"
-                  : "Aggiungi professionista"
-              }}
-            </button>
-            <button
-              aloraFunction="settings.manage"
-              *ngIf="
-                collaboratorForm.id &&
-                !isDefaultCollaborator(collaboratorForm.id)
-              "
-              type="button"
-              class="secondary-btn"
-              [disabled]="loading"
-              (click)="setDefault.emit(collaboratorForm.id)"
-            >
-              Imposta come riferimento
-            </button>
-            <button
-              aloraFunction="collaborators.manage"
-              *ngIf="collaboratorForm.id"
-              type="button"
-              class="pill-btn"
-              [disabled]="isDefaultCollaborator(collaboratorForm.id)"
-              (click)="removeCollaborator()"
-            >
-              <barber-ui-icon name="trash"></barber-ui-icon> Elimina
-            </button>
-            <span
-              *ngIf="
-                collaboratorForm.id &&
-                isDefaultCollaborator(collaboratorForm.id)
-              "
-              class="status-pill status-pill-amber"
-            >
-              Professionista di riferimento: scegline un altro prima di
-              eliminarlo
-            </span>
-            <button
-              aloraFunction="collaborators.manage"
-              type="button"
-              class="secondary-btn"
-              [disabled]="loading"
-              (click)="openNew()"
-            >
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo collaboratore
-            </button>
-          </div>
-        </form>
-      </article>
-    </div>
+        </section>
+      </form>
+      <ng-container ngProjectAs="[uiSheetBar]">
+        <button
+          aloraFunction="collaborators.manage"
+          *ngIf="collaboratorForm.id"
+          type="button"
+          class="danger-btn ui-bar-start"
+          [disabled]="isDefaultCollaborator(collaboratorForm.id)"
+          [attr.title]="
+            isDefaultCollaborator(collaboratorForm.id)
+              ? 'Professionista di riferimento: scegline un altro prima di eliminarlo'
+              : null
+          "
+          (click)="removeCollaborator()"
+        >
+          <barber-ui-icon name="trash"></barber-ui-icon> Elimina
+        </button>
+        <span
+          *ngIf="collaboratorForm.id && isDefaultCollaborator(collaboratorForm.id)"
+          class="ui-bar-info"
+          >Professionista di riferimento</span
+        >
+        <button
+          aloraFunction="settings.manage"
+          *ngIf="collaboratorForm.id && !isDefaultCollaborator(collaboratorForm.id)"
+          type="button"
+          class="pill-btn"
+          [disabled]="loading"
+          (click)="setDefault.emit(collaboratorForm.id)"
+        >
+          Imposta come riferimento
+        </button>
+        <button
+          aloraFunction="collaborators.manage"
+          type="submit"
+          form="collaborator-form"
+          class="primary-btn"
+          [disabled]="loading || !formValid"
+        >
+          <barber-ui-icon name="save"></barber-ui-icon>
+          {{ collaboratorForm.id ? "Salva professionista" : "Aggiungi professionista" }}
+        </button>
+      </ng-container>
+    </ui-sheet>
   `,
 })
 export class AdminCollaboratorsPageComponent {
@@ -436,6 +415,13 @@ export class AdminCollaboratorsPageComponent {
 
   formOpen = false;
   collaboratorQuery = "";
+  /** Editor sections, shown one at a time: 1 · Dati, 2 · Orari, 3 · Eccezioni. */
+  readonly editorSections = [
+    { key: "data", label: "Dati" },
+    { key: "hours", label: "Orari" },
+    { key: "exceptions", label: "Eccezioni" },
+  ] as const;
+  editorSection: "data" | "hours" | "exceptions" = "data";
 
   get filteredCollaborators(): any[] {
     const query = this.collaboratorQuery.trim().toLowerCase();
@@ -458,11 +444,13 @@ export class AdminCollaboratorsPageComponent {
 
   openEdit(collaborator: any): void {
     this.edit.emit(collaborator);
+    this.editorSection = "data";
     this.formOpen = true;
   }
 
   openNew(): void {
     this.reset.emit();
+    this.editorSection = "data";
     this.formOpen = true;
   }
 
