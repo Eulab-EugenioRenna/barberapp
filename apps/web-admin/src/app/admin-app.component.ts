@@ -294,6 +294,7 @@ const SALE_CHANGED: readonly AdminDataset[] = ["sales", "stats", "products", "cu
               (loadMore)="loadMoreSales()"
               (editOrder)="openQuickOrder(null, $event)"
               (deleteOrder)="deleteSale($event)"
+              (cancelOrder)="cancelSale($event)"
               (closeAccount)="closeAccount($event)"
               (linkOrder)="linkPendingOrder($event)"
               (cancelAppointment)="cancelPendingAppointment($event)"
@@ -2622,19 +2623,44 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     if (!sale?.id) return;
     this.openDeleteDialog(
       "Elimina vendita",
-      sale.appointmentId || sale.paymentStatus === "paid"
-        ? "Se hai solo sbagliato cliente non serve eliminarla: apri il conto, scegli il cliente giusto e salva. Un conto con prenotazioni o incassi non si elimina, si annulla dall'agenda."
-        : "La vendita e tutte le sue voci verranno eliminate. L'appuntamento collegato resterà disponibile.",
+      "La vendita sparisce con incassi e appuntamenti del conto. Se ha già scaricato prodotti dal magazzino viene annullata: incassi rimborsati e prodotti rientrati. Se hai solo sbagliato cliente, apri il conto e scegli quello giusto.",
       "Elimina vendita",
       async () => {
         this.busy = true;
         try {
-          await firstValueFrom(this.adminApi.deleteSale(sale.id));
-          this.feedback = "Vendita eliminata";
+          const result: any = await firstValueFrom(
+            this.adminApi.deleteSale(sale.id),
+          );
+          this.feedback = result?.message || "Vendita eliminata";
           await this.changed(["sales", "stats"]);
         } catch (error: any) {
           this.feedback =
             humanError(error, "Eliminazione della vendita non riuscita");
+          throw error;
+        } finally {
+          this.busy = false;
+        }
+      },
+    );
+  }
+
+  cancelSale(sale: any): void {
+    if (!sale?.id) return;
+    this.openDeleteDialog(
+      "Annulla vendita",
+      "Gli incassi vengono rimborsati, i prodotti rientrano in magazzino e gli appuntamenti ancora da fare vengono annullati. La vendita resta nello storico come annullata.",
+      "Annulla vendita",
+      async () => {
+        this.busy = true;
+        try {
+          await firstValueFrom(this.adminApi.cancelSale(sale.id));
+          this.feedback = "Vendita annullata";
+          await this.changed(["sales", "stats"]);
+        } catch (error: any) {
+          this.feedback = humanError(
+            error,
+            "Annullamento della vendita non riuscito",
+          );
           throw error;
         } finally {
           this.busy = false;

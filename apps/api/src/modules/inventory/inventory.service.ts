@@ -14,6 +14,14 @@ import { quoteReceipt, valueStockChange } from "./stock-valuation";
 import type { InventoryCommandDto } from "./inventory-command.dto";
 
 type Tx = Prisma.TransactionClient;
+const INVENTORY_REASONS: Record<InventoryCommandDto["kind"], string> = {
+  opening: "Giacenza iniziale",
+  receipt: "Carico di magazzino",
+  issue: "Scarico di magazzino",
+  adjust: "Rettifica inventario",
+  transfer: "Trasferimento tra sedi",
+  return: "Reso a magazzino",
+};
 type MovementInput = {
   locationId: string;
   productId: string;
@@ -136,9 +144,58 @@ export class InventoryService {
     };
   }
 
-  /** Called inside a tenant-locked transaction. Movement and balance always commit together. */
-  async movement(tx: Tx, operation: InventoryOperation, input: MovementInput) {
-    const balance = await tx.stockBalance.upsert({
+  /** Net unit cost of the latest load, then the product cost, then zero. */
+  private async lastUnitCost(
+    tx: Tx,
+    tenantId: string,
+    locationId: string,
+    productId: string,
+  ) {
+    const last = await tx.stockMovement.findFirst({
+      where: {
+        tenantId,
+        productId,
+        locationId,
+        quantityDelta: { gt: 0 },
+        kind: { in: ["opening", "receipt", "adjust_in", "transfer_in"] },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    if (last && last.quantityDelta.greaterThan(0))
+      return last.valueDelta
+        .dividedBy(last.quantityDelta)
+        .toDecimalPlaces(6, Prisma.Decimal.ROUND_HALF_UP)
+        .toFixed(6);
+    const product = await tx.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { cost: true },
+    });
+    return (product?.cost ?? new Prisma.Decimal(0)).toFixed(6);
+  }
+
+  private async productName(tx: Tx, productId: string) {
+    return (
+      (
+        await tx.product.findUnique({
+          where: { id: productId },
+          select: { name: true },
+        })
+      )?.name ?? "Prodotto"
+    );
+  }
+
+  /**
+   * Called inside a tenant-locked transaction. Movement and balance always commit together.
+   * Never blocks a sale: an unknown balance starts from zero and an issue above the
+   * stock takes what is there (warning in `warnings`). Returns null when nothing moved.
+   */
+  async movement(
+    tx: Tx,
+    operation: InventoryOperation,
+    input: MovementInput,
+    warnings: string[] = [],
+  ) {
+    let balance = await tx.stockBalance.upsert({
       where: {
         locationId_productId: {
           locationId: input.locationId,
@@ -152,6 +209,35 @@ export class InventoryService {
       },
       update: {},
     });
+    if (!balance.initialized && !input.opening) {
+      // No opening recorded yet: the balance starts from zero.
+      await this.movement(tx, operation, {
+        locationId: input.locationId,
+        productId: input.productId,
+        kind: "opening",
+        direction: "in",
+        quantity: "0.000",
+        incomingValue: "0.000000",
+        opening: true,
+      });
+      balance = await tx.stockBalance.findUniqueOrThrow({
+        where: { id: balance.id },
+      });
+    }
+    if (input.direction === "out") {
+      const wanted = new Prisma.Decimal(input.quantity);
+      if (wanted.greaterThan(balance.quantity)) {
+        const name = await this.productName(tx, input.productId);
+        const available = balance.quantity;
+        warnings.push(
+          available.isZero()
+            ? `${name}: giacenza esaurita, scarico di ${wanted.toFixed(0)} non registrato`
+            : `${name}: giacenza insufficiente, scaricate ${available.toFixed(0)} unità su ${wanted.toFixed(0)}`,
+        );
+        if (available.lte(0)) return null;
+        input = { ...input, quantity: available.toFixed(3) };
+      }
+    }
     let valued: ReturnType<typeof valueStockChange>;
     try {
       valued = valueStockChange(
@@ -199,20 +285,92 @@ export class InventoryService {
     return record;
   }
 
+  /** «Annulla vendita»: every unit still out for the sale comes back as a return. */
+  async reverseOrder(
+    tx: Tx,
+    saleId: string,
+    actorUserId: string,
+    reason: string,
+  ) {
+    const sale = await tx.sale.findUniqueOrThrow({ where: { id: saleId } });
+    const movements = await tx.stockMovement.findMany({
+      where: { tenantId: sale.tenantId, saleId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    const open = movements.flatMap((source) => {
+      if (!source.quantityDelta.isNegative()) return [];
+      const returns = movements.filter((row) => row.returnOfId === source.id);
+      const quantity = source.quantityDelta
+        .abs()
+        .minus(
+          returns.reduce((sum, row) => sum.plus(row.quantityDelta), new Prisma.Decimal(0)),
+        );
+      const value = source.valueDelta
+        .abs()
+        .minus(
+          returns.reduce((sum, row) => sum.plus(row.valueDelta), new Prisma.Decimal(0)),
+        );
+      return quantity.greaterThan(0) ? [{ source, quantity, value }] : [];
+    });
+    if (!open.length) return 0;
+    const key = `order:${saleId}:cancel:${sale.revision}`;
+    const operation = await tx.inventoryOperation.create({
+      data: {
+        tenantId: sale.tenantId,
+        idempotencyKey: key,
+        fingerprint: this.fingerprint({ saleId, cancel: sale.revision }),
+        kind: "return",
+        actorUserId,
+        reason,
+      },
+    });
+    const records = [];
+    for (const { source, quantity, value } of open)
+      records.push(
+        await this.movement(tx, operation, {
+          locationId: source.locationId,
+          productId: source.productId,
+          sectorId: source.sectorId ?? undefined,
+          saleId,
+          saleItemId: source.saleItemId ?? undefined,
+          kind: "return",
+          direction: "in",
+          quantity: quantity.toFixed(3),
+          incomingValue: Prisma.Decimal.max(value, 0).toFixed(6),
+          returnOfId: source.id,
+          origin: { saleId, cancelled: true },
+        }),
+      );
+    await tx.inventoryOperation.update({
+      where: { id: operation.id },
+      data: {
+        result: {
+          movementIds: records.flatMap((row) => (row ? [row.id] : [])),
+        },
+      },
+    });
+    return records.length;
+  }
+
   /** Same transaction as order confirmation. Legacy rows never create retroactive stock. */
-  async postOrder(tx: Tx, saleId: string, actorUserId: string) {
+  async postOrder(
+    tx: Tx,
+    saleId: string,
+    actorUserId: string,
+  ): Promise<string[]> {
+    const warnings: string[] = [];
     const sale = await tx.sale.findUniqueOrThrow({
       where: { id: saleId },
       include: {
         items: { include: { booking: { select: { status: true } } } },
       },
     });
-    if (sale.orderStatus !== "confirmed") return;
+    if (sale.orderStatus !== "confirmed") return warnings;
     const movements = await tx.stockMovement.findMany({
       where: { tenantId: sale.tenantId, saleId },
     });
     const pending = sale.items.filter((row) => row.stockState !== "legacy");
-    if (!pending.length && !movements.length) return;
+    if (!pending.length && !movements.length) return warnings;
     const key = `order:${saleId}:revision:${sale.revision}`;
     const fingerprint = this.fingerprint({ saleId, revision: sale.revision });
     const prior = await tx.inventoryOperation.findUnique({
@@ -226,13 +384,13 @@ export class InventoryService {
     if (prior) {
       if (prior.fingerprint !== fingerprint)
         throw new ConflictException("Revisione inventario incoerente");
-      return;
+      return warnings;
     }
     if (
       !movements.length &&
       ["cancelled", "refunded"].includes(sale.paymentStatus)
     )
-      return;
+      return warnings;
     const operation = await tx.inventoryOperation.create({
       data: {
         tenantId: sale.tenantId,
@@ -446,10 +604,7 @@ export class InventoryService {
           remaining = remaining.minus(taken);
           if (remaining.isZero()) break;
         }
-        if (!remaining.isZero())
-          throw new ConflictException(
-            "Quantità del conto da riconciliare con gli scarichi originali",
-          );
+        // Units never issued (stock was short) have nothing to come back.
       } else
         changes.push(
           await this.movement(tx, operation, {
@@ -462,17 +617,21 @@ export class InventoryService {
             direction: "out",
             quantity: quantity.toFixed(3),
             origin: { saleId, saleItemId: rowId, revision: sale.revision },
-          }),
+          }, warnings),
         );
     }
     await tx.inventoryOperation.update({
       where: { id: operation.id },
       data: {
         result: JSON.parse(
-          JSON.stringify({ movementIds: changes.map((row) => row.id) }),
+          JSON.stringify({
+            movementIds: changes.flatMap((row) => (row ? [row.id] : [])),
+            ...(warnings.length ? { warnings } : {}),
+          }),
         ) as Prisma.InputJsonValue,
       },
     });
+    return warnings;
   }
 
   async execute(
@@ -480,8 +639,11 @@ export class InventoryService {
     actorUserId: string,
     input: InventoryCommandDto,
   ) {
-    if (input.reason.trim().length < 3)
-      throw new BadRequestException("Indica il motivo dell'operazione");
+    // The reason is optional: each operation has a default text.
+    const reason =
+      (input.reason ?? "").trim().length >= 3
+        ? (input.reason ?? "").trim().slice(0, 500)
+        : INVENTORY_REASONS[input.kind];
     if (input.kind !== "transfer" && input.toLocationId)
       throw new BadRequestException(
         "La destinazione è ammessa solo per i trasferimenti",
@@ -505,7 +667,7 @@ export class InventoryService {
         locationId: input.locationId,
         productId: input.productId,
         quantity,
-        reason: input.reason.trim(),
+        reason,
         toLocationId: input.toLocationId ?? null,
         returnOfId: input.returnOfId ?? null,
         unitCost:
@@ -573,10 +735,34 @@ export class InventoryService {
             fingerprint,
             kind: input.kind,
             actorUserId,
-            reason: input.reason.trim(),
+            reason,
           },
         });
-        const records = [];
+        const warnings: string[] = [];
+        const records: Array<Awaited<ReturnType<InventoryService["movement"]>>> = [];
+        const current = await tx.stockBalance.findUnique({
+          where: {
+            locationId_productId: {
+              locationId: input.locationId,
+              productId: input.productId,
+            },
+          },
+        });
+        // Opening twice becomes a count; a count without opening becomes the opening.
+        let kind: InventoryCommandDto["kind"] = input.kind;
+        if (kind === "opening" && current?.initialized) kind = "adjust";
+        else if (kind === "adjust" && !current?.initialized) kind = "opening";
+        // Load cost is optional: last net unit cost, product cost or zero.
+        const unitCost =
+          input.unitCost ??
+          (["opening", "receipt", "adjust"].includes(kind)
+            ? await this.lastUnitCost(
+                tx,
+                scope.tenantId,
+                input.locationId,
+                input.productId,
+              )
+            : undefined);
         const base = {
           locationId: input.locationId,
           productId: input.productId,
@@ -584,17 +770,25 @@ export class InventoryService {
         const receipt = () =>
           quoteReceipt({
             quantity,
-            unitCost: input.unitCost,
-            purchaseVatRate: input.purchaseVatRate,
-            costMode: input.costMode as "net" | "gross",
+            unitCost,
+            purchaseVatRate:
+              input.purchaseVatRate ??
+              (input.unitCost === undefined
+                ? "0"
+                : (product.purchaseVatRate?.toFixed(2) ?? "0")),
+            costMode:
+              input.costMode ??
+              (input.unitCost !== undefined && product.costMode === "gross"
+                ? "gross"
+                : "net"),
           });
-        if (input.kind === "opening" || input.kind === "receipt") {
+        if (kind === "opening" || kind === "receipt") {
           const quote =
-            input.kind === "opening"
+            kind === "opening"
               ? {
                   netValue: new Prisma.Decimal(quantity).isZero()
                     ? "0.000000"
-                    : decimalInput(input.unitCost, "Costo netto iniziale", 6)
+                    : decimalInput(unitCost, "Costo netto iniziale", 6)
                         .times(quantity)
                         .toFixed(6),
                   purchaseTax: undefined,
@@ -604,46 +798,36 @@ export class InventoryService {
           records.push(
             await this.movement(tx, operation, {
               ...base,
-              kind: input.kind,
+              kind,
               direction: "in",
               quantity,
               incomingValue: quote.netValue,
-              opening: input.kind === "opening",
+              opening: kind === "opening",
               purchaseTax: quote.purchaseTax,
               purchaseVatRate: quote.purchaseVatRate,
             }),
           );
-        } else if (input.kind === "issue") {
+        } else if (kind === "issue") {
           records.push(
-            await this.movement(tx, operation, {
-              ...base,
-              kind: "issue",
-              direction: "out",
-              quantity,
-            }),
-          );
-        } else if (input.kind === "adjust") {
-          const balance = await tx.stockBalance.findUnique({
-            where: {
-              locationId_productId: {
-                locationId: input.locationId,
-                productId: input.productId,
+            await this.movement(
+              tx,
+              operation,
+              {
+                ...base,
+                kind: "issue",
+                direction: "out",
+                quantity,
               },
-            },
-          });
-          if (!balance?.initialized)
-            throw new BadRequestException(
-              "Registra prima la giacenza iniziale",
-            );
+              warnings,
+            ),
+          );
+        } else if (kind === "adjust") {
+          const balance = current!;
           const difference = new Prisma.Decimal(quantity).minus(
             balance.quantity,
           );
           if (!difference.isZero()) {
             const incoming = difference.isPositive();
-            if (incoming && input.unitCost === undefined)
-              throw new BadRequestException(
-                "Indica il costo netto delle quantità aggiunte dalla rettifica",
-              );
             records.push(
               await this.movement(tx, operation, {
                 ...base,
@@ -652,33 +836,40 @@ export class InventoryService {
                 quantity: difference.abs().toFixed(3),
                 ...(incoming
                   ? {
-                      incomingValue: new Prisma.Decimal(input.unitCost!)
+                      incomingValue: new Prisma.Decimal(unitCost ?? 0)
                         .times(difference)
+                        .toDecimalPlaces(6, Prisma.Decimal.ROUND_HALF_UP)
                         .toFixed(6),
                     }
                   : {}),
               }),
             );
           }
-        } else if (input.kind === "transfer") {
-          const outgoing = await this.movement(tx, operation, {
-            ...base,
-            kind: "transfer_out",
-            direction: "out",
-            quantity,
-          });
-          records.push(outgoing);
-          records.push(
-            await this.movement(tx, operation, {
-              locationId: input.toLocationId!,
-              productId: input.productId,
-              kind: "transfer_in",
-              direction: "in",
+        } else if (kind === "transfer") {
+          const outgoing = await this.movement(
+            tx,
+            operation,
+            {
+              ...base,
+              kind: "transfer_out",
+              direction: "out",
               quantity,
-              incomingValue: outgoing.valueDelta.abs().toFixed(6),
-            }),
+            },
+            warnings,
           );
-        } else if (input.kind === "return") {
+          records.push(outgoing);
+          if (outgoing)
+            records.push(
+              await this.movement(tx, operation, {
+                locationId: input.toLocationId!,
+                productId: input.productId,
+                kind: "transfer_in",
+                direction: "in",
+                quantity: outgoing.quantityDelta.abs().toFixed(3),
+                incomingValue: outgoing.valueDelta.abs().toFixed(6),
+              }),
+            );
+        } else if (kind === "return") {
           if (!input.returnOfId)
             throw new BadRequestException(
               "Seleziona il movimento di scarico da restituire",
@@ -766,8 +957,9 @@ export class InventoryService {
         const result = JSON.parse(
           JSON.stringify({
             operationId: operation.id,
-            movements: records,
+            movements: records.filter(Boolean),
             balances,
+            ...(warnings.length ? { warnings } : {}),
           }),
         ) as Prisma.InputJsonValue;
         await tx.inventoryOperation.update({

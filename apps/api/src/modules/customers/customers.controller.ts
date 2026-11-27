@@ -183,57 +183,61 @@ export class CustomersController {
       request.headers.authorization,
     );
     const tenantId = requireTenantId(session);
-    const updated = await this.prisma.$transaction(async (tx) => {
-      await lockOperationalTenant(tx, tenantId);
-      const previous = await tx.customer.findUniqueOrThrow({
-        where: { id, tenantId },
-        select: { phone: true, isActive: true },
-      });
-      const result = await tx.customer.update({
-        where: { id, tenantId },
-        data: {
-          firstName:
-            typeof body["firstName"] === "string"
-              ? body["firstName"]
-              : undefined,
-          lastName:
-            typeof body["lastName"] === "string" ? body["lastName"] : undefined,
-          email: typeof body["email"] === "string" ? body["email"] : undefined,
-          phone: typeof body["phone"] === "string" ? body["phone"] : undefined,
-          notes: typeof body["notes"] === "string" ? body["notes"] : undefined,
-          tags: Array.isArray(body["tags"])
-            ? body["tags"].map(String)
-            : undefined,
-          isActive:
-            typeof body["isActive"] === "boolean"
-              ? body["isActive"]
-              : undefined,
-        },
-      });
-      if (
-        appointmentPhone(previous.phone) !== appointmentPhone(result.phone) ||
-        (previous.isActive && !result.isActive)
-      ) {
-        const runs = await tx.appointmentAutomationRun.findMany({
-          where: { tenantId, customerId: id, status: "waiting" },
-          select: { id: true },
-        });
-        await stopAutomationRuns(
-          tx,
-          tenantId,
-          runs.map((run) => run.id),
-          "superseded",
-          "Recapito cliente cambiato o cliente disabilitato",
-        );
-        await stopAutomationNotices(
-          tx,
-          tenantId,
-          "Recapito cliente cambiato o cliente disabilitato",
-          id,
-        );
-      }
-      return result;
+    const data = {
+      firstName:
+        typeof body["firstName"] === "string" ? body["firstName"] : undefined,
+      lastName:
+        typeof body["lastName"] === "string" ? body["lastName"] : undefined,
+      email: typeof body["email"] === "string" ? body["email"] : undefined,
+      phone: typeof body["phone"] === "string" ? body["phone"] : undefined,
+      notes: typeof body["notes"] === "string" ? body["notes"] : undefined,
+      tags: Array.isArray(body["tags"]) ? body["tags"].map(String) : undefined,
+      isActive:
+        typeof body["isActive"] === "boolean" ? body["isActive"] : undefined,
+    };
+    const current = await this.prisma.customer.findUniqueOrThrow({
+      where: { id, tenantId },
+      select: { phone: true, isActive: true },
     });
+    // Name, notes or tags never touch reminders: the tenant lock and the
+    // automation stop are needed only when the WhatsApp contact really changes.
+    const contactChanges = (previous: { phone: string | null; isActive: boolean }) =>
+      (data.phone !== undefined &&
+        appointmentPhone(previous.phone) !== appointmentPhone(data.phone)) ||
+      (previous.isActive && data.isActive === false);
+    const updated = contactChanges(current)
+      ? await this.prisma.$transaction(async (tx) => {
+          await lockOperationalTenant(tx, tenantId);
+          const previous = await tx.customer.findUniqueOrThrow({
+            where: { id, tenantId },
+            select: { phone: true, isActive: true },
+          });
+          const result = await tx.customer.update({
+            where: { id, tenantId },
+            data,
+          });
+          if (contactChanges(previous)) {
+            const runs = await tx.appointmentAutomationRun.findMany({
+              where: { tenantId, customerId: id, status: "waiting" },
+              select: { id: true },
+            });
+            await stopAutomationRuns(
+              tx,
+              tenantId,
+              runs.map((run) => run.id),
+              "superseded",
+              "Recapito cliente cambiato o cliente disabilitato",
+            );
+            await stopAutomationNotices(
+              tx,
+              tenantId,
+              "Recapito cliente cambiato o cliente disabilitato",
+              id,
+            );
+          }
+          return result;
+        })
+      : await this.prisma.customer.update({ where: { id, tenantId }, data });
     await this.cacheInvalidationService.invalidateDashboard(tenantId);
 
     await this.customersAlignmentService.alignCustomer(tenantId, updated.id);

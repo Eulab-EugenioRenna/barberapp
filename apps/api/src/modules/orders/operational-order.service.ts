@@ -134,7 +134,7 @@ export class OperationalOrderService {
       });
       const rawReason =
         options.priceOverrideReasons?.[index] ?? options.priceOverrideReason;
-      const reason =
+      let reason =
         typeof rawReason === "string" ? rawReason.trim() : undefined;
       if (
         mode !== "legacy" &&
@@ -142,9 +142,7 @@ export class OperationalOrderService {
         !new Prisma.Decimal(line.grossTotal).equals(quote.grossTotal) &&
         (!reason || reason.length < 3)
       )
-        throw new BadRequestException(
-          "Indica il motivo della modifica del prezzo",
-        );
+        reason = "Prezzo modificato in cassa";
       return { line, reason, id: randomUUID() };
     });
     const totals = sumPricedLines(lines.map((row) => row.line));

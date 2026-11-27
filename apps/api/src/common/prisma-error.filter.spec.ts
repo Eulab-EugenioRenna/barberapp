@@ -48,4 +48,28 @@ describe("Database scope/concurrency error response", () => {
     expect(status).toHaveBeenCalledWith(409);
     expect(JSON.stringify(json.mock.calls)).not.toContain("private");
   });
+  it("shows the Italian text written by an ALORA database guard", () => {
+    const result = response(
+      'ConnectorError { kind: QueryError(PostgresError { code: "23514", message: "Il conto annullato non mantiene risorse attive", severity: "ERROR", detail: None }) }',
+    );
+    expect(result.status).toHaveBeenCalledWith(409);
+    expect(result.json).toHaveBeenCalledWith({
+      statusCode: 409,
+      message: "Il conto annullato non mantiene risorse attive",
+    });
+    const raised = response(
+      'ConnectorError { kind: QueryError(PostgresError { code: "P0001", message: "Attività non trovata" }) }',
+    );
+    expect(raised.json).toHaveBeenCalledWith({
+      statusCode: 409,
+      message: "Attività non trovata",
+    });
+  });
+  it("keeps PostgreSQL's own check messages generic", () => {
+    const result = response(
+      'ConnectorError { kind: QueryError(PostgresError { code: "23514", message: "new row for relation \\"StockBalance\\" violates check constraint \\"alora_stock_nonnegative\\"" }) }',
+    );
+    expect(JSON.stringify(result.json.mock.calls)).not.toContain("StockBalance");
+    expect(JSON.stringify(result.json.mock.calls)).toContain("Aggiorna e riprova");
+  });
 });

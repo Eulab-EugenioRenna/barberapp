@@ -11,13 +11,12 @@ describe("normalizeOrderItems", () => {
   ];
   const services = [{ id: "s-cut", name: "Taglio", basePrice: 25 }];
 
-  it("records an automatic reason for a price typed at the till, still asks for VAT changes", () => {
+  it("records an automatic reason for a price typed at the till, and for VAT changes", () => {
     const taxed = [{ id: "s-vat", name: "Taglio", basePrice: 20, priceMode: "gross", vatRate: 22 }] as any;
     const [row] = normalizeOrderItems({ products, services: taxed, items: [{ serviceId: "s-vat", unitPrice: 18 }] });
     expect(row.priceOverrideReason).toBe("Prezzo modificato in cassa");
-    expect(() =>
-      normalizeOrderItems({ products, services: taxed, items: [{ serviceId: "s-vat", vatRate: 10 }] }),
-    ).toThrow("indica il motivo");
+    const [vat] = normalizeOrderItems({ products, services: taxed, items: [{ serviceId: "s-vat", vatRate: 10 }] });
+    expect(vat.priceOverrideReason).toBe("Prezzo o IVA modificati in cassa");
   });
 
   it("crea nello stesso ordine righe servizio e prodotto senza prenotazione", () => {
@@ -222,7 +221,7 @@ describe("priced order snapshots", () => {
       taxTotal: "2.20",
     });
   });
-  it("requires a reason for VAT overrides, records one for price changes, and compares equivalent decimal rates numerically", () => {
+  it("records a default reason for VAT overrides and price changes, and compares equivalent decimal rates numerically", () => {
     expect(
       normalizeOrderItems({
         products: [product],
@@ -230,13 +229,13 @@ describe("priced order snapshots", () => {
         items: [{ productId: "p", unitPrice: "11.00" }],
       })[0].priceOverrideReason,
     ).toBe("Prezzo modificato in cassa");
-    expect(() =>
+    expect(
       normalizeOrderItems({
         products: [product],
         services: [],
         items: [{ productId: "p", vatRate: "4" }],
-      }),
-    ).toThrow("motivo");
+      })[0].priceOverrideReason,
+    ).toBe("Prezzo o IVA modificati in cassa");
     expect(
       normalizeOrderItems({
         products: [product],

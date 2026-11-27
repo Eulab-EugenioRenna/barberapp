@@ -149,8 +149,7 @@ type Attempt = {
           </button>
           <label
             >Motivazione
-            <span *ngIf="kind === 'receive' && data.summary.basis === 'ledger'"
-              >(facoltativa)</span
+            <span>(facoltativa)</span
             ><input
               aria-label="Motivazione incasso"
               maxlength="500"
@@ -550,10 +549,6 @@ export class AccountPaymentsComponent implements OnInit {
         )
       ) {
         this.feedback = "Indica importi validi con al massimo due decimali.";
-        return;
-      }
-      if (kind !== "receive" && this.reason.trim().length < 3) {
-        this.feedback = "Indica la motivazione.";
         return;
       }
       if (kind === "refund" && entries.some((row) => !row.refundOfId)) {

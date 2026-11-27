@@ -494,6 +494,13 @@ export class AdminApiService {
     return this.http.delete(`${ADMIN_API_URL}/sales/${id}`);
   }
 
+  /** Refunds every receipt, returns stock and cancels the bookings still to perform. */
+  cancelSale(id: string, reason?: string): Observable<any> {
+    return this.http.post(`${ADMIN_API_URL}/sales/${id}/cancel`, {
+      ...(reason?.trim() ? { reason: reason.trim() } : {}),
+    });
+  }
+
   linkSaleToAppointment(
     saleId: string,
     appointmentId: string,

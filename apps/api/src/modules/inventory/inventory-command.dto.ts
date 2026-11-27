@@ -27,10 +27,10 @@ export class InventoryCommandDto {
   @MinLength(1)
   @MaxLength(100)
   productId!: string;
+  @IsOptional()
   @IsString()
-  @MinLength(3)
   @MaxLength(500)
-  reason!: string;
+  reason?: string;
   @IsOptional()
   @IsString()
   @MaxLength(100)

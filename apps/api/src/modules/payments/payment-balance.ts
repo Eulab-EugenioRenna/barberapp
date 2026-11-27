@@ -82,3 +82,25 @@ export function paymentBalance(
     status,
   };
 }
+
+/**
+ * Status the ledger will have once automatic corrections run: never throws on a
+ * net above the total (the difference is refunded in the same transaction).
+ */
+export function settledStatus(
+  total: Prisma.Decimal | string,
+  entries: PaymentAmount[],
+): "paid" | "unpaid" | "partial" | "refunded" {
+  const value = decimalInput(total, "Totale conto");
+  let net = new Prisma.Decimal(0),
+    refunds = new Prisma.Decimal(0);
+  for (const row of entries) {
+    const amount = new Prisma.Decimal(row.amount);
+    if (row.kind === "refund") {
+      net = net.minus(amount);
+      refunds = refunds.plus(amount);
+    } else net = net.plus(amount);
+  }
+  if (net.lte(0)) return refunds.greaterThan(0) ? "refunded" : "unpaid";
+  return net.gte(value) ? "paid" : "partial";
+}
