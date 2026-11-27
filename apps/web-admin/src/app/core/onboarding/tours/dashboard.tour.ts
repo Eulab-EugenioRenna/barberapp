@@ -5,7 +5,8 @@ export const DASHBOARD_TOUR: TourDefinition = {
   id: "dashboard",
   navKey: "dashboard",
   title: "Panoramica",
-  version: 5,
+  // v6: only Periodo in view, cliente/professionista under «Filtri».
+  version: 6,
   when: (ctx) => ctx.canView("dashboard"),
   steps: () => [
     {
@@ -25,8 +26,8 @@ export const DASHBOARD_TOUR: TourDefinition = {
       target: "dashboard-filters",
       title: "Scegli cosa analizzare",
       body:
-        "Imposta periodo (giorno, settimana, mese, anno o tutto), data di riferimento, cliente e, se la squadra ha più persone, professionista: " +
-        "i numeri si aggiornano appena cambi un filtro.",
+        "Scegli il periodo (giorno, settimana, mese, anno o tutto) e la data di riferimento. Cliente e, se la squadra ha più persone, professionista sono sotto «Filtri»: " +
+        "i numeri si aggiornano appena cambi qualcosa.",
     },
     {
       target: "dashboard-scope",
@@ -83,7 +84,7 @@ export const DASHBOARD_TOUR: TourDefinition = {
       title: "Nuovo",
       body: (c) =>
         [
-          c.can("sales.manage") && "«Vendi adesso» apre la cassa: prodotti soli, servizi soli o entrambi. I servizi finiscono in agenda, anche con un orario passato.",
+          c.can("sales.manage") && "«Vendi adesso» apre la cassa: prodotti soli, servizi soli o entrambi. I servizi finiscono in agenda come appuntamenti completati.",
           c.can("appointments.create") && "«Prenota» fissa un appuntamento futuro controllando orari e disponibilità; il conto lo chiudi poi in Cassa.",
         ]
           .filter(Boolean)

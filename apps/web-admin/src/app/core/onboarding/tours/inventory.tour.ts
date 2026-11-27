@@ -5,7 +5,8 @@ export const INVENTORY_TOUR: TourDefinition = {
   id: "inventory",
   navKey: "inventory",
   title: "Magazzino",
-  version: 2,
+  // v3: movement sheet with type cards, cost/VAT/reason optional.
+  version: 3,
   when: (ctx) => ctx.canView("inventory"),
   steps: (ctx) => {
     const canManage = ctx.can("inventory.manage");
@@ -27,7 +28,7 @@ export const INVENTORY_TOUR: TourDefinition = {
         body:
           "Scrivi il codice e premi Invio, oppure usa il lettore: funziona anche senza cliccare qui, purché tu non stia scrivendo in un altro campo. " +
           (canManage
-            ? "Il prodotto trovato viene selezionato con quantità 1: ogni nuova scansione dello stesso prodotto aggiunge un pezzo, comodo per il carico merce. Un codice sconosciuto si può creare subito nel Listino."
+            ? "Il prodotto trovato si apre in «Nuovo movimento» con quantità 1: ogni nuova scansione dello stesso prodotto aggiunge un pezzo, comodo per il carico merce. Un codice sconosciuto si può creare subito nel Listino."
             : "Il prodotto trovato viene selezionato e ne vedi il registro."),
       },
       {
@@ -46,10 +47,10 @@ export const INVENTORY_TOUR: TourDefinition = {
         target: "inventory-operation",
         title: "Registra un movimento",
         body:
-          "Scegli l'operazione: inventario iniziale (solo la prima volta), carico acquisto, scarico interno, rettifica sulla giacenza contata, trasferimento o reso. " +
-          "Il motivo è obbligatorio; se l'esito non arriva, «Ripeti la stessa operazione» la reinvia senza duplicarla.",
+          "«Nuovo movimento»: tocca il tipo (Inventario iniziale la prima volta, Carico, Scarico, Rettifica, Trasferimento, Reso), scrivi la quantità e, se vuoi, un motivo. " +
+          "Costo e IVA sono facoltativi: se mancano vale l'ultimo costo noto. Se l'esito non arriva, «Ripeti la stessa operazione» la reinvia senza duplicarla.",
         fallback:
-          "Quando selezioni un prodotto compare qui il modulo «Nuovo movimento»: inventario iniziale, carico acquisto, scarico interno, rettifica, trasferimento o reso, sempre con un motivo.",
+          "Tocca un prodotto delle giacenze: compare il pulsante «Nuovo movimento» per inventario iniziale, carico, scarico, rettifica, trasferimento o reso.",
         when: (c) => c.can("inventory.manage"),
       },
       {
@@ -67,7 +68,7 @@ export const INVENTORY_TOUR: TourDefinition = {
       {
         target: "inventory-catalog-link",
         title: "Anagrafica nel Listino",
-        body: "Prodotti, prezzi e attivazione del tracciamento si gestiscono nel Listino: un prodotto compare qui solo dopo aver attivato «Traccia le giacenze per sede».",
+        body: "Prodotti, prezzi e tracciamento si gestiscono nel Listino: un prodotto compare qui solo dopo aver attivato «Traccia le giacenze per sede», nelle «Avanzate» della sua scheda.",
         when: (c) => c.can("services.read"),
       },
     ];

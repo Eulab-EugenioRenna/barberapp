@@ -10,7 +10,8 @@ export const LOCATIONS_TOUR: TourDefinition = {
   id: "locations",
   navKey: "locations",
   title: "Sedi e attività",
-  version: 3,
+  // v4: list of locations + one detail.
+  version: 4,
   when: (ctx) => ctx.canView("locations"),
   steps: (ctx) => [
     {
@@ -29,15 +30,17 @@ export const LOCATIONS_TOUR: TourDefinition = {
       target: "locations-create",
       tab: "structure",
       title: "Nuova sede",
-      body: "Apre il modulo per creare una sede: inserisci nome e indirizzo e spunta le attività che vi si svolgono.",
+      body: "Crea una sede: nome e indirizzo bastano, poi tocca le attività che vi si svolgono (facoltativo). Orari e risorse li configuri dopo.",
       when: canEdit,
     },
     {
       target: "locations-card",
       tab: "structure",
       title: "La scheda della sede",
-      body: "Ogni scheda mostra se la sede è attiva, se è visibile nelle prenotazioni online e, sotto, le sue attività con i professionisti assegnati e le risorse.",
-      fallback: "Non ci sono ancora sedi: crea la prima con il modulo «Nuova sede».",
+      body:
+        "Con più sedi, a sinistra trovi l'elenco: tocca una sede per aprirla qui. Il dettaglio mostra se è attiva, se è visibile online e i suoi orari; " +
+        "sotto, le attività con i professionisti assegnati e le risorse.",
+      fallback: "Non ci sono ancora sedi: crea la prima con «Nuova sede».",
     },
     {
       target: "locations-configure",

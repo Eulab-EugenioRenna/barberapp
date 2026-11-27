@@ -56,7 +56,9 @@ function teamSteps(ctx: TourContext): TourStep[] {
     {
       target: "collaborators-access",
       title: "Crea un accesso",
-      body: "Crea un account per entrare nel gestionale: nome, email, ruolo e, se serve, il profilo professionista collegato. La password iniziale viene generata per te da consegnare alla persona.",
+      body:
+        "«Nuovo accesso» in tre passaggi: 1 · Persona (nome, cognome, email), 2 · Ruolo (tocca una scheda; il profilo professionista, se serve, anche sotto «Avanzate»), 3 · Conferma. " +
+        "La password iniziale viene generata per te: consegnala alla persona, al primo accesso ne sceglierà una nuova.",
       when: managesTeam,
     },
     {
@@ -110,7 +112,8 @@ export const COLLABORATORS_TOUR: TourDefinition = {
   id: "collaborators",
   navKey: "collaborators",
   title: "Squadra e accessi",
-  version: 1,
+  // v2: «Nuovo accesso» in three steps.
+  version: 2,
   when: (ctx) => ctx.canView("collaborators"),
   steps: (ctx) => (managesAccounts(ctx) ? teamSteps(ctx) : listSteps()),
 };

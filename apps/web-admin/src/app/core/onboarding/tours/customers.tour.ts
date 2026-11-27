@@ -5,7 +5,8 @@ export const CUSTOMERS_TOUR: TourDefinition = {
   id: "customers",
   navKey: "customers",
   title: "Clienti",
-  version: 4,
+  // v5: card in two columns, summary and filters under «Riepilogo e filtri».
+  version: 5,
   when: (ctx) => ctx.canView("customers"),
   steps: (ctx) => {
     const canManage = ctx.can("clients.manage");
@@ -32,13 +33,13 @@ export const CUSTOMERS_TOUR: TourDefinition = {
         target: "customers-list",
         title: "Apri la scheda",
         body: canManage
-          ? "Tocca un cliente: a sinistra l'anagrafica da modificare, a destra lo storico con speso, visite, ultima e prossima visita. Nello storico cerchi per servizio, prodotto, professionista o note e filtri per tipo (appuntamenti o conti) e periodo; tocca una voce per il dettaglio."
-          : "Tocca un cliente: a sinistra l'anagrafica, a destra lo storico con speso, visite, ultima e prossima visita. Nello storico cerchi e filtri per tipo e periodo; tocca una voce per il dettaglio.",
+          ? "Tocca un cliente: a sinistra l'anagrafica da modificare, a destra lo storico. Nello storico cerchi per servizio, prodotto, professionista o note; apri «Riepilogo e filtri» per speso, visite, ultima e prossima visita e per filtrare per tipo e periodo. Tocca una voce per il dettaglio."
+          : "Tocca un cliente: a sinistra l'anagrafica, a destra lo storico. Apri «Riepilogo e filtri» per speso, visite e filtri per tipo e periodo; tocca una voce per il dettaglio.",
       },
       {
         target: "customers-new",
         title: "Nuovo cliente",
-        body: "Apre il modulo di inserimento: nome e cognome sono obbligatori, email, telefono, tag (separati da virgola) e note sono facoltativi.",
+        body: "Apre la scheda vuota: nome e cognome sono obbligatori, telefono, email, tag (separati da virgola) e note puoi aggiungerli dopo. Poi «Crea cliente».",
         when: (c) => c.can("clients.manage"),
       },
       {
@@ -50,7 +51,7 @@ export const CUSTOMERS_TOUR: TourDefinition = {
       {
         title: canManage ? "Modifiche ed eliminazione" : "Tutto pronto",
         body: canManage
-          ? "Dalla scheda aperta salvi le modifiche con «Salva»; «Elimina» chiede sempre conferma prima di cancellare il contatto."
+          ? "In fondo alla scheda aperta salvi con «Salva»; «Elimina» chiede sempre conferma prima di cancellare il contatto."
           : "Per creare o modificare clienti chiedi al titolare di abilitare la gestione clienti sul tuo account.",
       },
     ];

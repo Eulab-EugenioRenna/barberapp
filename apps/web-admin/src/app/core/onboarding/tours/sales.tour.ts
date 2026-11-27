@@ -11,7 +11,8 @@ export const SALES_TOUR: TourDefinition = {
   // v2: "Conti da chiudere" merged into the till.
   // v4: quick sale modal (barcode in the title bar, one row per line, VAT from the price list).
   // v7: «Nuova vendita» in the page head, secondary row actions in «…».
-  version: 7,
+  // v8: no «Eseguito il» in the till, sale detail with Modifica / Annulla / Elimina.
+  version: 8,
   when: (ctx) => ctx.canView("sales"),
   steps: () => [
     {
@@ -49,8 +50,7 @@ export const SALES_TOUR: TourDefinition = {
     {
       title: "Servizi venduti senza prenotazione",
       body:
-        "Nella cassa, quando aggiungi un servizio compare «Eseguito il / alle»: lascialo vuoto se il servizio finisce adesso, " +
-        "oppure scegli un orario passato per registrarlo in ritardo. Alla conferma il servizio va in agenda come appuntamento completato. " +
+        "Nella cassa i servizi venduti senza prenotazione vanno in agenda come appuntamento completato, finito adesso. " +
         "Se il professionista era già occupato o fuori orario vedi un avviso, ma puoi registrare lo stesso.",
       when: (c) => c.can("sales.manage"),
     },
@@ -93,7 +93,8 @@ export const SALES_TOUR: TourDefinition = {
       body: (c) =>
         "Tocca un conto «Registrato» per vederne righe, sconti, totali, pagamento e appuntamento collegato." +
         (c.can("sales.manage")
-          ? " Dal dettaglio puoi modificarlo o eliminarlo (l'appuntamento collegato resta)."
+          ? " In basso trovi «Modifica vendita», «Annulla vendita» (rimborsa gli incassi, rimette i prodotti in magazzino e annulla gli appuntamenti ancora da fare) " +
+            "ed «Elimina vendita» (toglie la vendita con incassi e appuntamenti del conto)."
           : ""),
     },
   ],

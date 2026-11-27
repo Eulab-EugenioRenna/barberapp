@@ -5,7 +5,8 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
   id: "appointments",
   navKey: "appointments",
   title: "Agenda",
-  version: 5,
+  // v6: one appointment editor (cassa style), no «Fuori orario» group.
+  version: 6,
   when: (ctx) => ctx.canView("appointments"),
   steps: () => [
     {
@@ -21,8 +22,9 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
       title: "Nuovo",
       body: (c) =>
         [
-          c.can("sales.manage") && "«Vendi adesso» apre la cassa: prodotti soli, servizi soli o entrambi. I servizi finiscono in agenda, anche con un orario passato.",
-          c.can("appointments.create") && "«Prenota» fissa un appuntamento futuro controllando orari e disponibilità; con più sedi scegli prima la sede e vedi solo i servizi delle attività svolte lì. Gli orari di apertura valgono per le prenotazioni online: qui puoi scegliere anche un orario del gruppo «Fuori orario». Il conto lo chiudi poi in Cassa.",
+          c.can("sales.manage") && "«Vendi adesso» apre la cassa: prodotti soli, servizi soli o entrambi. I servizi finiscono in agenda come appuntamenti completati.",
+          c.can("appointments.create") && "«Prenota» apre l'appuntamento, come la cassa: cliente, sede, uno o più servizi in fila, giorno e ora. Con più sedi vedi solo i servizi delle attività svolte lì. " +
+            "Tocca un orario suggerito o scrivi l'ora: gli orari fuori apertura sono segnati, ma puoi sceglierli. Il conto lo chiudi poi in Cassa.",
         ]
           .filter(Boolean)
           .join(" "),
@@ -82,8 +84,8 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
       title: "Lista appuntamenti",
       body: (c) =>
         c.can("appointments.update.all")
-          ? "Tocca una riga per aprire la prenotazione: puoi modificarla, annullarla o eliminarla" +
-            (c.can("sales.manage") ? " e chiuderne il conto." : ".")
+          ? "Tocca una riga per aprire l'appuntamento: cambi servizi, orari, stato e note, poi «Salva». In basso c'è «Annulla appuntamento»" +
+            (c.can("sales.manage") ? " e «Apri il conto» o «Chiudi il conto»." : ".")
           : "Tocca una riga per vedere i dettagli dell'appuntamento.",
     },
     {

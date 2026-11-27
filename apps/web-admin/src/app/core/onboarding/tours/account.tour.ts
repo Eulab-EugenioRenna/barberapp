@@ -5,7 +5,8 @@ export const ACCOUNT_TOUR: TourDefinition = {
   id: "account",
   navKey: "account",
   title: "Il mio account",
-  version: 2,
+  // v3: guides never autostart, only suggested.
+  version: 3,
   when: (ctx) => !!ctx.user && ctx.role !== "platform_admin" && !ctx.user.technicalAccess,
   steps: () => [
     {
@@ -80,8 +81,8 @@ export const ACCOUNT_TOUR: TourDefinition = {
       target: "account-guides",
       title: "Guide",
       body:
-        "«Rivedi tutte le guide» riparte dal tour generale e riapre ogni guida alla prima visita delle pagine. " +
-        "Togli la spunta se preferisci aprirle solo dal pulsante «Guida».",
+        "«Rivedi tutte le guide» riparte dal tour generale e torna a suggerire la guida di ogni pagina, con un pallino sul pulsante «Guida». " +
+        "Le guide non si aprono mai da sole: togli «Suggerisci le guide nelle pagine nuove» se non vuoi nemmeno il suggerimento.",
     },
   ],
 };

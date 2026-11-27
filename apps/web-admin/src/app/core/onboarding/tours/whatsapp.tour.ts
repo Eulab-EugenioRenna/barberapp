@@ -54,7 +54,7 @@ export const WHATSAPP_TOUR: TourDefinition = {
       target: "tab-outbox",
       title: "Invii",
       body: "Lo stato di ogni invio dal tuo numero. Ogni «Messaggio a tutti» è una riga sola: aprila per vedere i passaggi, se è in esecuzione o completato e ogni destinatario. " +
-        "Anche i messaggi singoli si aprono nel dettaglio. «Inviato al canale» non significa letto; gli esiti da verificare non vengono mai reinviati in automatico.",
+        "Anche i messaggi singoli si aprono nel dettaglio. «Inviato» vuol dire accettato da WhatsApp, non letto; «Da verificare» non viene mai reinviato in automatico.",
     },
     {
       target: "whatsapp-refresh",

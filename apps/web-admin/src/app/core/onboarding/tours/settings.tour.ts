@@ -45,7 +45,7 @@ export const SETTINGS_TOUR: TourDefinition = {
     {
       target: ["settings-logo", "settings-cover"],
       title: "4. Logo e copertina",
-      body: "Scegli un'immagine e premi «Carica». Se salvi con un file scelto ma non caricato, viene caricato in automatico.",
+      body: "Scegli un'immagine e premi «Carica logo» o «Carica copertina». Se salvi con un file scelto ma non caricato, viene caricato in automatico.",
     },
     {
       target: "settings-colors",
