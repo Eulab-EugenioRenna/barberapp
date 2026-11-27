@@ -1,4 +1,5 @@
 import { slotOptions } from "../core/slot-options";
+import { humanError } from "../core/human-error";
 import {
   bookingInstant,
   localBookingTime,
@@ -45,65 +46,11 @@ export class AppointmentsFacade {
   private readonly customersState = signal<any[]>([]);
   private readonly tenantState = signal<any>(null);
 
-  readonly appointmentStatuses = [
-    "requested",
-    "confirmed",
-    "checked_in",
-    "completed",
-    "cancelled",
-    "no_show",
-    "rescheduled",
-  ];
-
-  readonly appointmentForm = signal(this.emptyAppointmentForm());
-  readonly additionalServices = signal<
-    Array<{ serviceId: string; collaboratorId: string }>
-  >([]);
-  readonly availabilityLoading = signal(false);
   readonly quickRescheduleLoading = signal(false);
   readonly appointmentUpdateState = computed(() =>
     this.creations.state("appointment-update"),
   );
   private quickAvailabilityRequest = 0;
-  private availabilityRequest = 0;
-  readonly additionalServiceOptions = computed(() => {
-    const primary = this.services().find(
-      (row) => row.id === this.appointmentForm().serviceId,
-    );
-    const locationId = this.bookingLocationId();
-    return this.services()
-      .filter(
-        (row) =>
-          !!primary &&
-          (locationId
-            ? offeredAt(this.context.sectors, row, locationId)
-            : row.sector?.locationId === primary.sector?.locationId),
-      )
-      .map((row) => ({
-        value: row.id,
-        label: `${row.name} · ${row.durationMinutes} min`,
-      }));
-  });
-  readonly additionalServiceRows = computed(() =>
-    this.additionalServices().map((row) => {
-      const service = this.services().find(
-        (entry) => entry.id === row.serviceId,
-      );
-      return {
-        ...row,
-        name: service?.name || "Servizio",
-        durationMinutes: service?.durationMinutes,
-        requiresCollaborator: service?.requiresCollaborator,
-        options: this.professionalOptions(this.localSectorId(service)),
-      };
-    }),
-  );
-  readonly appointmentCustomerSearch = signal("");
-  readonly filteredAppointmentCustomers = signal<any[]>([]);
-  readonly appointmentSelectedDate = signal(toLocalDateKey(new Date()));
-  readonly appointmentSlots = signal<
-    Array<{ startsAt: string; label: string; outsideHours?: boolean }>
-  >([]);
   readonly calendarView = signal<CalendarView>("week");
   readonly calendarDate = signal(new Date());
   readonly selectedCollaboratorIds = signal<string[]>([]);
@@ -124,12 +71,13 @@ export class AppointmentsFacade {
   readonly customers = computed(() => this.customersState());
   readonly tenant = computed(() => this.tenantState());
 
-  /** Location of the booking: the one of the form, of the scope, or the only one. */
-  readonly bookingLocationId = computed(() => {
-    const form = this.appointmentForm();
-    if (form.locationId) return form.locationId;
+  /** Location of a new booking: the one of the scope, or the only one. */
+  readonly defaultLocationId = computed(() => {
     const locations = this.context.locations();
-    return this.context.selected.locationId || (locations.length === 1 ? locations[0].id : "");
+    return (
+      this.context.selected.locationId ||
+      (locations.length === 1 ? locations[0].id : "")
+    );
   });
 
   /** Locations to choose from when the account has more than one. */
@@ -140,31 +88,39 @@ export class AppointmentsFacade {
       .map((location) => ({ value: location.id, label: location.name })),
   );
 
-  /** Only services whose activity runs at the booking location. */
-  readonly serviceSelectOptions = computed(() => {
-    const locationId = this.bookingLocationId();
-    return this.services()
-      .filter((service) => offeredAt(this.context.sectors, service, locationId))
-      .map((service) => ({
-        value: service.id,
-        label: service.name,
-      }));
-  });
-
-  /** Sector of the service's activity at the booking location. */
-  private localSectorId(service: any): string | undefined {
-    return (
-      sectorForActivity(this.context.sectors, service?.activityId, this.bookingLocationId())?.id ||
-      service?.sectorId
+  /** Only services whose activity runs at the location. */
+  servicesAt(locationId: string): any[] {
+    return this.services().filter((service) =>
+      offeredAt(this.context.sectors, service, locationId),
     );
   }
 
-  readonly appointmentCustomerOptions = computed(() =>
-    this.customers().map((customer) => ({
-      value: customer.id,
-      label: this.appointmentCustomerOptionLabel(customer),
-    })),
-  );
+  /** Sector of the service's activity at the location. */
+  sectorIdAt(service: any, locationId: string): string | undefined {
+    return (
+      sectorForActivity(this.context.sectors, service?.activityId, locationId)
+        ?.id || service?.sectorId
+    );
+  }
+
+  /** Professionals of the service's activity at the location. */
+  professionalOptionsFor(serviceId: string, locationId: string) {
+    const service = this.services().find((row) => row.id === serviceId);
+    return this.professionalOptions(
+      service ? this.sectorIdAt(service, locationId) : undefined,
+    );
+  }
+
+  /** A customer created from the editor is pickable everywhere at once. */
+  addCustomer(entity: any): void {
+    this.customersState.update((items) => [entity, ...items]);
+    this.customerDirectory.add(entity);
+  }
+
+  /** A service created from the editor joins the catalog of the agenda. */
+  addCatalogService(entity: any): void {
+    this.servicesState.update((items) => [...items, entity]);
+  }
 
   readonly collaboratorFilterOptions = computed(() =>
     this.collaborators().map((collaborator) => ({
@@ -173,12 +129,6 @@ export class AppointmentsFacade {
     })),
   );
 
-  readonly appointmentCollaboratorOptions = computed(() => {
-    const service = this.services().find(
-      (row) => row.id === this.appointmentForm().serviceId,
-    );
-    return this.professionalOptions(this.localSectorId(service));
-  });
   private professionalOptions(sectorId: string | undefined) {
     return [
       { value: "", label: "Nessuna preferenza" },
@@ -203,22 +153,6 @@ export class AppointmentsFacade {
     ];
   }
 
-  readonly appointmentSlotOptions = computed(() =>
-    slotOptions(this.appointmentSlots()),
-  );
-
-  readonly appointmentStatusOptions = computed(() =>
-    this.appointmentStatuses
-      .filter(
-        (status) =>
-          this.appointmentForm().id ||
-          !["completed", "cancelled", "no_show"].includes(status),
-      )
-      .map((status) => ({
-        value: status,
-        label: this.formatAppointmentStatus(status),
-      })),
-  );
 
   readonly visibleAppointments = computed(() => {
     const range = this.getVisibleRange();
@@ -534,14 +468,6 @@ export class AppointmentsFacade {
       ...input,
       appointments: this.mergeWithShared(input.appointments || []),
     });
-    this.filteredAppointmentCustomers.set([...customers.items]);
-
-    if (!this.appointmentForm().serviceId && services.items[0]) {
-      this.appointmentForm.update((form) => ({
-        ...form,
-        serviceId: services.items[0].id,
-      }));
-    }
   }
 
   /** Calendar window on screen, widened by a week on each side. */
@@ -587,9 +513,7 @@ export class AppointmentsFacade {
     } catch (error: any) {
       if (request === this.windowRequest)
         this.feedback.set(
-          error?.error?.message ||
-            error?.message ||
-            "Non riusciamo a caricare gli appuntamenti",
+          humanError(error, "Non riusciamo a caricare gli appuntamenti"),
         );
     }
   }
@@ -617,9 +541,7 @@ export class AppointmentsFacade {
       });
     } catch (error: any) {
       this.feedback.set(
-        error?.error?.message ||
-          error?.message ||
-          "Non riusciamo a caricare gli appuntamenti",
+        humanError(error, "Non riusciamo a caricare gli appuntamenti"),
       );
       throw error;
     } finally {
@@ -719,341 +641,19 @@ export class AppointmentsFacade {
     this.quickRescheduleSlots.set([]);
   }
 
-  prepareNewAppointment(): void {
-    this.availabilityRequest++;
-    this.additionalServices.set([]);
-    this.appointmentForm.set(this.emptyAppointmentForm());
-    this.appointmentCustomerSearch.set("");
-    this.filteredAppointmentCustomers.set([...this.customers()]);
-    this.appointmentSelectedDate.set(toLocalDateKey(new Date()));
-    this.appointmentSlots.set([]);
-    const first = this.serviceSelectOptions()[0];
-    if (first) {
-      this.appointmentForm.update((form) => ({
-        ...form,
-        serviceId: first.value,
-      }));
-    }
-    this.updateAppointmentSlots();
-  }
-
-  editAppointment(appointment: any, loadSlots = true): void {
-    this.availabilityRequest++;
-    this.availabilityLoading.set(false);
-    this.additionalServices.set([]);
-    const startsAt = new Date(appointment.startsAt);
-    this.appointmentForm.set({
-      id: appointment.id,
-      orderRevision: appointment.orderItem?.sale?.revision ?? Number.NaN,
-      heldServiceId: appointment.serviceId,
-      heldRoomId: appointment.roomId || "",
-      heldStartsAt: appointment.startsAt,
-      heldLocal: localBookingTime(appointment.startsAt),
-      customerId: appointment.customerId || "",
-      customerName: `${appointment.customer.firstName} ${appointment.customer.lastName}`,
-      email: appointment.customer.email || "",
-      phone: appointment.customer.phone || "",
-      serviceId: appointment.serviceId,
-      locationId: appointment.locationId || "",
-      collaboratorId: appointment.collaboratorId || "",
-      startsAt: this.toLocalDateTimeValue(startsAt),
-      status: appointment.status,
-      customerNotes: appointment.customerNotes || "",
-      appointmentWhatsAppConsent: false,
-    });
-    this.appointmentCustomerSearch.set(
-      this.appointmentCustomerOptionLabel(appointment.customer),
-    );
-    this.filteredAppointmentCustomers.set([...this.customers()]);
-    this.appointmentSelectedDate.set(this.toDateInputValue(startsAt));
-    if (loadSlots) this.updateAppointmentSlots();
-  }
-
-  setAppointmentValue(key: string, value: string): void {
-    this.appointmentForm.update((form) => ({ ...form, [key]: value }));
-    if (key === "locationId") {
-      // Another location runs other activities: keep only what it offers.
-      const offered = new Set(this.serviceSelectOptions().map((row) => row.value));
-      if (!offered.has(this.appointmentForm().serviceId))
-        this.appointmentForm.update((form) => ({
-          ...form,
-          serviceId: this.serviceSelectOptions()[0]?.value || "",
-        }));
-      key = "serviceId";
-    }
-    if (key === "serviceId") {
-      const allowed = new Set(
-        this.additionalServiceOptions().map((row) => row.value),
-      );
-      this.additionalServices.update((rows) =>
-        rows.filter((row) => allowed.has(row.serviceId)),
-      );
-      if (
-        !this.appointmentCollaboratorOptions().some(
-          (option) => option.value === this.appointmentForm().collaboratorId,
-        )
-      )
-        this.appointmentForm.update((form) => ({
-          ...form,
-          collaboratorId: "",
-        }));
-    }
-  }
-
-  setAppointmentSelectedDate(value: string): void {
-    this.appointmentSelectedDate.set(value);
-  }
-
-  handleAppointmentCustomerInput(value: string): void {
-    this.appointmentCustomerSearch.set(value);
-    this.filterAppointmentCustomers();
-
-    const customer = this.customers().find(
-      (entry) => this.appointmentCustomerOptionLabel(entry) === value,
-    );
-
-    if (!customer) {
-      this.appointmentForm.update((form) => ({
-        ...form,
-        customerId: "",
-        customerName: "",
-        email: "",
-        phone: "",
-      }));
-      return;
-    }
-
-    this.appointmentForm.update((form) => ({
-      ...form,
-      customerId: customer.id,
-      customerName: `${customer.firstName} ${customer.lastName}`,
-      email: customer.email || "",
-      phone: customer.phone || "",
-    }));
-    this.appointmentCustomerSearch.set(
-      this.appointmentCustomerOptionLabel(customer),
-    );
-  }
-
-  selectAppointmentCustomer(customerId: string): void {
-    // Any customer of the salon: the picker lists all of them, not only the
-    // page loaded here. The booking needs only the id.
-    const customer =
-      this.customers().find((entry) => entry.id === customerId) ||
-      this.customerDirectory.find(customerId);
-    if (!customer) return;
-    this.appointmentForm.update((form) => ({
-      ...form,
-      customerId: customer.id,
-      customerName: `${customer.firstName} ${customer.lastName}`.trim(),
-      email: (customer as any).email || "",
-      phone: (customer as any).phone || "",
-    }));
-    this.appointmentCustomerSearch.set(
-      `${customer.firstName} ${customer.lastName}`.trim(),
-    );
-  }
-
-  selectQuickCreatedEntity(kind: "customer" | "service", entity: any): void {
-    if (kind === "customer") {
-      this.customersState.update((items) => [entity, ...items]);
-      this.customerDirectory.add(entity);
-      this.selectAppointmentCustomer(entity.id);
-      return;
-    }
-    this.servicesState.update((items) => [...items, entity]);
-    this.setAppointmentValue("serviceId", entity.id);
-    this.updateAppointmentSlots();
-  }
-
-  updateAppointmentSlots(): void {
-    if (!this.appointmentForm().id) void this.loadCreationSlots();
-    else void this.loadEditSlots();
-  }
-  private async loadEditSlots(): Promise<void> {
-    const request = ++this.availabilityRequest,
-      form = this.appointmentForm();
-    this.appointmentSlots.set([]);
-    this.availabilityLoading.set(true);
-    try {
-      const startsAt = bookingInstant(
-        form.startsAt,
-        form.heldStartsAt,
-        form.heldLocal,
-      );
-      const response = await firstValueFrom(
-        this.adminApi.reschedulingAvailability(form.id, {
-          date: this.appointmentSelectedDate(),
-          startsAt: startsAt || undefined,
-          lines: [
-            {
-              serviceId: form.serviceId,
-              collaboratorId: form.collaboratorId || undefined,
-              roomId:
-                form.serviceId === form.heldServiceId
-                  ? form.heldRoomId || undefined
-                  : undefined,
-            },
-          ],
-        }),
-      );
-      if (request !== this.availabilityRequest) return;
-      // Last write wins: a newer account copy only refreshes the revision.
-      if (Number.isInteger(response.orderRevision))
-        this.appointmentForm.update((current) => ({
-          ...current,
-          orderRevision: response.orderRevision,
-        }));
-      const slots = (response.slots || []).map((slot: any) => ({
-        ...slot,
-        startsAt: localBookingTime(slot.startsAt),
-      }));
-      this.appointmentSlots.set(slots);
-      this.keepTypedTime(slots);
-    } catch (error: any) {
-      if (request === this.availabilityRequest)
-        this.feedback.set(
-          error?.error?.message ||
-            error?.message ||
-            "Disponibilità non consultabile",
-        );
-    } finally {
-      if (request === this.availabilityRequest)
-        this.availabilityLoading.set(false);
-    }
-  }
-
-  addService(serviceId: string): void {
-    if (
-      this.appointmentForm().id ||
-      this.additionalServices().length >= 19 ||
-      !this.additionalServiceOptions().some((row) => row.value === serviceId)
-    )
-      return;
-    this.additionalServices.update((rows) => [
-      ...rows,
-      { serviceId, collaboratorId: "" },
-    ]);
-    this.updateAppointmentSlots();
-  }
-  removeService(index: number): void {
-    this.additionalServices.update((rows) =>
-      rows.filter((_row, i) => i !== index),
-    );
-    this.updateAppointmentSlots();
-  }
-  setServiceCollaborator(index: number, collaboratorId: string): void {
-    this.additionalServices.update((rows) =>
-      rows.map((row, i) => (i === index ? { ...row, collaboratorId } : row)),
-    );
-    this.updateAppointmentSlots();
-  }
-  private async loadCreationSlots(): Promise<void> {
-    const request = ++this.availabilityRequest;
-    const form = this.appointmentForm();
-    const date = this.appointmentSelectedDate();
-    this.appointmentSlots.set([]);
-    if (!form.serviceId || !date) {
-      this.availabilityLoading.set(false);
-      return;
-    }
-    this.availabilityLoading.set(true);
-    try {
-      const response = await firstValueFrom(
-        this.adminApi.bookingAvailability({
-          date,
-          ...(this.bookingLocationId() ? { locationId: this.bookingLocationId() } : {}),
-          lines: [
-            {
-              serviceId: form.serviceId,
-              collaboratorId: form.collaboratorId || undefined,
-            },
-            ...this.additionalServices().map((row) => ({
-              serviceId: row.serviceId,
-              collaboratorId: row.collaboratorId || undefined,
-            })),
-          ],
-        }),
-      );
-      if (request !== this.availabilityRequest) return;
-      this.feedback.set("");
-      const slots = (response.slots || []).map((slot: any) => ({
-        ...slot,
-        startsAt: this.toLocalDateTimeValue(new Date(slot.startsAt)),
-      }));
-      this.appointmentSlots.set(slots);
-      this.keepTypedTime(slots);
-    } catch (error: any) {
-      if (request !== this.availabilityRequest) return;
-      this.feedback.set(
-        typeof error?.error?.message === "string"
-          ? error.error.message
-          : "Disponibilità non consultabile. Riprova.",
-      );
-      this.keepTypedTime([]);
-    } finally {
-      if (request === this.availabilityRequest)
-        this.availabilityLoading.set(false);
-    }
-  }
-
-  async saveAppointment(): Promise<any> {
-    this.loading.set(true);
-    this.feedback.set("");
-    try {
-      if (this.availabilityLoading())
-        throw new Error("Attendi la verifica degli orari prima di salvare");
-      // The slot list is a suggestion: any typed time is accepted and the
-      // server only refuses a professional who is already busy.
-      if (!this.appointmentForm().startsAt)
-        throw new Error("Scegli o scrivi l'orario");
-      const saved = await this.appointmentsService.saveAppointment(
-        { ...this.appointmentForm(), locationId: this.bookingLocationId() },
-        this.additionalServices().map((row) => ({
-          serviceId: row.serviceId,
-          collaboratorId: row.collaboratorId || undefined,
-        })),
-      );
-      this.prepareNewAppointment();
-      return saved;
-    } catch (error: any) {
-      this.feedback.set(
-        error?.error?.message || error?.message || "Salvataggio non riuscito",
-      );
-      throw error;
-    } finally {
-      this.loading.set(false);
-    }
-  }
   async retryAppointmentCreation(): Promise<any> {
     this.loading.set(true);
     this.feedback.set("");
     try {
-      const saved = await firstValueFrom(
-        this.adminApi.retryAppointmentCreation(),
-      );
-      this.prepareNewAppointment();
-      return saved;
+      return await firstValueFrom(this.adminApi.retryAppointmentCreation());
     } catch (error: any) {
       this.feedback.set(
-        error?.error?.message || error?.message || "Esito non disponibile",
+        humanError(error, "Esito non disponibile"),
       );
       throw error;
     } finally {
       this.loading.set(false);
     }
-  }
-
-  async cancelAppointment(): Promise<string> {
-    await this.appointmentsService.cancelAppointment(this.appointmentForm().id);
-    this.prepareNewAppointment();
-    return "Appuntamento annullato";
-  }
-
-  async removeAppointment(): Promise<string> {
-    await this.appointmentsService.removeAppointment(this.appointmentForm().id);
-    this.prepareNewAppointment();
-    return "Appuntamento eliminato";
   }
 
   private instantForAppointment(
@@ -1096,7 +696,7 @@ export class AppointmentsFacade {
       return "Appuntamento spostato";
     } catch (error: any) {
       this.feedback.set(
-        error?.error?.message || error?.message || "Spostamento non riuscito",
+        humanError(error, "Spostamento non riuscito"),
       );
       throw error;
     } finally {
@@ -1112,7 +712,7 @@ export class AppointmentsFacade {
       this.feedback.set("Spostamento precedente recuperato");
     } catch (error: any) {
       this.feedback.set(
-        error?.error?.message || error?.message || "Esito non disponibile",
+        humanError(error, "Esito non disponibile"),
       );
     } finally {
       this.loading.set(false);
@@ -1121,7 +721,7 @@ export class AppointmentsFacade {
 
   async confirmQuickReschedule(): Promise<string> {
     const state = this.quickRescheduleState();
-    if (!state || this.quickRescheduleLoading() || !state.startsAt) {
+    if (!state || !state.startsAt) {
       throw new Error("Scegli o scrivi l'orario");
     }
     await this.moveAppointment({
@@ -1158,43 +758,11 @@ export class AppointmentsFacade {
     }
   }
 
-  appointmentCustomerOptionLabel(customer: any): string {
-    const segments = [`${customer.firstName} ${customer.lastName}`.trim()];
-    if (customer.email) {
-      segments.push(customer.email);
-    }
-    if (customer.phone) {
-      segments.push(customer.phone);
-    }
-    return segments.join(" · ");
-  }
 
   formatAppointmentStatus(status: string): string {
     return appointmentStatusLabel(status);
   }
 
-  private filterAppointmentCustomers(): void {
-    const query = this.appointmentCustomerSearch().trim().toLowerCase();
-    if (!query) {
-      this.filteredAppointmentCustomers.set([...this.customers()]);
-      return;
-    }
-
-    this.filteredAppointmentCustomers.set(
-      this.customers().filter((customer) => {
-        const haystack = [
-          customer.firstName,
-          customer.lastName,
-          customer.email,
-          customer.phone,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(query);
-      }),
-    );
-  }
 
   private getVisibleRange(): { start: Date; end: Date } {
     const view = this.calendarView();
@@ -1288,9 +856,7 @@ export class AppointmentsFacade {
     } catch (error: any) {
       if (request === this.quickAvailabilityRequest) {
         this.feedback.set(
-          error?.error?.message ||
-            error?.message ||
-            "Disponibilità non consultabile",
+          humanError(error, "Disponibilità non consultabile"),
         );
       }
     } finally {
@@ -1390,71 +956,6 @@ export class AppointmentsFacade {
     );
   }
 
-  private emptyAppointmentForm() {
-    return {
-      id: "",
-      orderRevision: Number.NaN,
-      heldServiceId: "",
-      heldRoomId: "",
-      heldStartsAt: "",
-      heldLocal: "",
-      customerId: "",
-      customerName: "",
-      email: "",
-      phone: "",
-      serviceId: "",
-      /** Empty: location of the scope (or the only one). */
-      locationId: "",
-      collaboratorId: "",
-      startsAt: "",
-      status: "confirmed",
-      customerNotes: "",
-      appointmentWhatsAppConsent: false,
-    };
-  }
-
-  private toDateInputValue(value: Date): string {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-
-  /** The chosen time survives a slot refresh; on another day it keeps its HH:MM. */
-  private keepTypedTime(slots: Array<{ startsAt: string }>): void {
-    const current = String(this.appointmentForm().startsAt || ""),
-      day = this.appointmentSelectedDate();
-    if (
-      !current ||
-      !day ||
-      slots.some((slot) => slot.startsAt === current) ||
-      current.startsWith(day + "T")
-    )
-      return;
-    const time = /T(\d{2}:\d{2})/.exec(current)?.[1];
-    this.appointmentForm.update((form) => ({
-      ...form,
-      startsAt: time ? `${day}T${time}` : "",
-    }));
-  }
-
-  /** Free time typed by staff (HH:MM) on the selected day. */
-  setTypedTime(time: string): void {
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
-    this.setAppointmentValue(
-      "startsAt",
-      `${this.appointmentSelectedDate()}T${time}`,
-    );
-  }
-
-  private toLocalDateTimeValue(value: Date): string {
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-    const hours = String(value.getHours()).padStart(2, "0");
-    const minutes = String(value.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  }
 }
 
 function unwrapPage(input: any): { items: any[]; hasMore: boolean } {

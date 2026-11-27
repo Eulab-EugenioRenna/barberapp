@@ -156,7 +156,7 @@ import { parseLocalBookingTime } from "./booking-local-time";
         <button
           type="button"
           class="primary-btn"
-          [disabled]="busy || loadingSlots || !state?.startsAt"
+          [disabled]="busy || !state?.startsAt"
           (click)="confirm.emit()"
         >
           Conferma
