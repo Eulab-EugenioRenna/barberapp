@@ -404,6 +404,15 @@ import {
             <barber-ui-icon name="edit"></barber-ui-icon> Modifica vendita
           </button>
           <button
+            *ngIf="selectedSale.orderStatus !== 'cancelled'"
+            aloraFunction="sales.manage"
+            type="button"
+            class="pill-btn"
+            (click)="cancelSelectedSale()"
+          >
+            <barber-ui-icon name="close"></barber-ui-icon> Annulla vendita
+          </button>
+          <button
             aloraFunction="sales.manage"
             type="button"
             class="pill-btn"
@@ -428,6 +437,8 @@ export class AdminSalesPageComponent {
   @Output() loadMore = new EventEmitter<void>();
   @Output() editOrder = new EventEmitter<any>();
   @Output() deleteOrder = new EventEmitter<any>();
+  /** «Annulla vendita»: refunds, stock back, bookings cancelled. */
+  @Output() cancelOrder = new EventEmitter<any>();
   /** Settle an account to close or open: opens the till on that account. */
   @Output() closeAccount = new EventEmitter<{ appointment: any; sale: any }>();
   @Output() linkOrder = new EventEmitter<{ appointment: any; saleId: string }>();
@@ -560,6 +571,13 @@ export class AdminSalesPageComponent {
     const sale = this.selectedSale;
     this.closeSaleDetail();
     this.deleteOrder.emit(sale);
+  }
+
+  cancelSelectedSale(): void {
+    if (!this.selectedSale) return;
+    const sale = this.selectedSale;
+    this.closeSaleDetail();
+    this.cancelOrder.emit(sale);
   }
 
   saleItemLabel(item: any): string {

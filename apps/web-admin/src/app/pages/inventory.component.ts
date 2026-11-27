@@ -177,12 +177,12 @@ import { AdminApiService } from "../core/admin-api.service";
                 ></ui-select>
               </div>
               <p class="hint" *ngIf="form.kind === 'opening'">
-                Inserisci la quantità contata e il costo unitario netto. Non
+                Inserisci la quantità contata; il costo è facoltativo. Non
                 vengono ricostruiti acquisti o IVA passati.
               </p>
               <p class="hint" *ngIf="form.kind === 'adjust'">
                 Inserisci la giacenza contata. Sarà registrata la differenza;
-                per quantità aggiunte indica il costo netto unitario.
+                senza costo si usa l'ultimo costo noto.
               </p>
               <label
                 >{{ form.kind === "adjust" ? "Giacenza contata" : "Quantità"
@@ -203,8 +203,8 @@ import { AdminApiService } from "../core/admin-api.service";
                 "
                 >{{
                   form.kind === "receipt"
-                    ? "Costo unitario di acquisto"
-                    : "Costo netto unitario"
+                    ? "Costo unitario di acquisto (facoltativo)"
+                    : "Costo netto unitario (facoltativo)"
                 }}<input
                   type="number"
                   min="0"
@@ -231,7 +231,6 @@ import { AdminApiService } from "../core/admin-api.service";
                     max="100"
                     step="0.01"
                     [(ngModel)]="form.purchaseVatRate"
-                    required
                 /></label>
               </div>
               <div *ngIf="form.kind === 'transfer'" class="select-field">
@@ -257,12 +256,10 @@ import { AdminApiService } from "../core/admin-api.service";
                 ></ui-select>
               </div>
               <label
-                >Motivo<textarea
+                >Motivo (facoltativo)<textarea
                   [(ngModel)]="form.reason"
                   name="reason"
                   maxlength="500"
-                  minlength="3"
-                  required
                   placeholder="Documento, conteggio o motivo della rettifica"
                 ></textarea>
               </label>
@@ -271,7 +268,7 @@ import { AdminApiService } from "../core/admin-api.service";
               <button
                 type="submit"
                 class="primary-btn"
-                [disabled]="busy || !form.reason.trim() || form.quantity === ''"
+                [disabled]="busy || form.quantity === ''"
               >
                 {{
                   busy
@@ -1024,7 +1021,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
         productId: this.productId,
         quantity: String(this.form.quantity),
         idempotencyKey: this.key,
-        reason: this.form.reason,
+        ...(this.form.reason.trim() ? { reason: this.form.reason.trim() } : {}),
         ...(["opening", "receipt", "adjust"].includes(this.form.kind) &&
         this.form.unitCost !== ""
           ? { unitCost: String(this.form.unitCost) }
@@ -1032,7 +1029,9 @@ export class InventoryComponent implements OnInit, OnDestroy {
         ...(this.form.kind === "receipt"
           ? {
               costMode: this.form.costMode,
-              purchaseVatRate: String(this.form.purchaseVatRate),
+              ...(String(this.form.purchaseVatRate ?? "") !== ""
+                ? { purchaseVatRate: String(this.form.purchaseVatRate) }
+                : {}),
             }
           : {}),
         ...(this.form.kind === "transfer"
@@ -1044,11 +1043,13 @@ export class InventoryComponent implements OnInit, OnDestroy {
       };
     this.attempted = true;
     try {
-      await firstValueFrom(
+      const result: any = await firstValueFrom(
         this.http.post(`${ADMIN_API_URL}/inventory/operations`, this.snapshot),
       );
       this.newOperation();
-      this.feedback = "Movimento registrato e giacenza riconciliata";
+      this.feedback = result?.warnings?.length
+        ? `Movimento registrato. ${result.warnings.join(". ")}`
+        : "Movimento registrato e giacenza riconciliata";
       this.page = 1;
       await this.load();
     } catch (error: any) {

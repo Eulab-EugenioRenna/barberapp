@@ -539,9 +539,48 @@
               (updated)="onPaymentsUpdated($event)"
               (pending)="paymentPending = $event"
             />
+            <div
+              *ngIf="sale?.id && sale.orderStatus !== 'cancelled' && session.can('sales.manage')"
+              class="sale-removal"
+            >
+              <p *ngIf="confirmingRemoval === 'cancel'">
+                Gli incassi vengono rimborsati, i prodotti rientrano e gli
+                appuntamenti ancora da fare vengono annullati.
+              </p>
+              <p *ngIf="confirmingRemoval === 'delete'">
+                La vendita sparisce con incassi e appuntamenti del conto. Se ha
+                scaricato prodotti viene annullata.
+              </p>
+              <p *ngIf="removalFeedback" role="status">{{ removalFeedback }}</p>
+              <button
+                type="button"
+                class="pill-btn"
+                [disabled]="removalBusy || loading"
+                (click)="removeSale('cancel')"
+              >
+                {{ confirmingRemoval === "cancel" ? "Conferma annullamento" : "Annulla vendita" }}
+              </button>
+              <button
+                type="button"
+                class="pill-btn"
+                [disabled]="removalBusy || loading"
+                (click)="removeSale('delete')"
+              >
+                {{ confirmingRemoval === "delete" ? "Conferma eliminazione" : "Elimina vendita" }}
+              </button>
+              <button
+                *ngIf="confirmingRemoval"
+                type="button"
+                class="text-button"
+                [disabled]="removalBusy"
+                (click)="confirmingRemoval = null"
+              >
+                Lascia com'è
+              </button>
+            </div>
           </div>
           <div class="checkout-bar">
-            <ng-container *ngIf="!sale">
+            <ng-container *ngIf="sale?.orderStatus !== 'cancelled'">
               <label class="field">
                 <span>Pagamento</span>
                 <select [(ngModel)]="paymentMethod" name="quickPaymentMethod">

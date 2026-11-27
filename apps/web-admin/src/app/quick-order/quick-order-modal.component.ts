@@ -113,6 +113,13 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   paymentPending = false;
   paymentMethod = "cash";
   paymentStatus = "paid";
+  /** Values loaded from the account: only a change is sent back. */
+  private initialPaymentMethod = "cash";
+  private initialPaymentStatus = "paid";
+  /** «Annulla vendita» / «Elimina vendita» waiting for confirmation. */
+  confirmingRemoval: "cancel" | "delete" | null = null;
+  removalBusy = false;
+  removalFeedback = "";
   items: any[] = [];
   pricePadIndex = -1;
   quickCreateKind: QuickCreateKind | null = null;
@@ -150,6 +157,8 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         this.sale.orderStatus === "open"
           ? "paid"
           : this.sale.paymentStatus || "paid";
+      this.initialPaymentMethod = this.paymentMethod;
+      this.initialPaymentStatus = this.paymentStatus;
       this.items = (this.sale.items || []).map((item: any) => ({
         id: item.id,
         sectorId: item.sectorId,
@@ -196,16 +205,34 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     this.online = false;
   }
 
-  readonly paymentMethodOptions: UiOption[] = [
+  private readonly basePaymentMethods: UiOption[] = [
     { value: "cash", label: "Contanti" },
     { value: "card", label: "Carta" },
     { value: "bank", label: "Bonifico" },
     { value: "other", label: "Altro" },
   ];
-  readonly paymentStatusOptions: UiOption[] = [
+  private readonly basePaymentStatuses: UiOption[] = [
     { value: "paid", label: "Pagato" },
     { value: "unpaid", label: "Da pagare" },
   ];
+  /** The account's current value stays selectable (mixed method, partial, refunded). */
+  get paymentMethodOptions(): UiOption[] {
+    return this.initialPaymentMethod === "mixed"
+      ? [...this.basePaymentMethods, { value: "mixed", label: "Misto" }]
+      : this.basePaymentMethods;
+  }
+  get paymentStatusOptions(): UiOption[] {
+    const extra: Record<string, string> = {
+      partial: "Parziale",
+      refunded: "Rimborsato",
+    };
+    return extra[this.initialPaymentStatus]
+      ? [
+          ...this.basePaymentStatuses,
+          { value: this.initialPaymentStatus, label: extra[this.initialPaymentStatus] },
+        ]
+      : this.basePaymentStatuses;
+  }
   private locationOptionsSource: unknown;
   private locationOptionsCache: UiOption[] = [];
   /** Rebuilt only when the operational context publishes a new list. */
@@ -1175,6 +1202,42 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         ? { paymentStatus: result.summary.status }
         : {}),
     };
+    // A movement recorded from the panel is the new starting point of the selects.
+    if (result.summary.status && this.sale.orderStatus !== "open")
+      this.paymentStatus = this.initialPaymentStatus = result.summary.status;
+  }
+
+  /** «Annulla vendita» or «Elimina vendita» from the open account, after confirmation. */
+  async removeSale(kind: "cancel" | "delete"): Promise<void> {
+    if (!this.sale?.id || this.removalBusy) return;
+    if (this.confirmingRemoval !== kind) {
+      this.confirmingRemoval = kind;
+      this.removalFeedback = "";
+      return;
+    }
+    this.removalBusy = true;
+    try {
+      const result: any = await firstValueFrom(
+        kind === "cancel"
+          ? this.adminApi.cancelSale(this.sale.id)
+          : this.adminApi.deleteSale(this.sale.id),
+      );
+      this.confirmingRemoval = null;
+      this.removalFeedback =
+        result?.message ||
+        (kind === "cancel" ? "Vendita annullata" : "Vendita eliminata");
+      // Reloads lists and agenda (same refresh used after catalogue changes).
+      this.catalogChanged.emit();
+      setTimeout(() => this.close.emit(), result?.message ? 2500 : 600);
+    } catch (error: any) {
+      this.removalFeedback =
+        error?.error?.message ||
+        (kind === "cancel"
+          ? "Annullamento non riuscito. Riprova."
+          : "Eliminazione non riuscita. Riprova.");
+    } finally {
+      this.removalBusy = false;
+    }
   }
 
   submit(keepOpen = false): void {
@@ -1190,12 +1253,22 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       appointmentId: this.appointmentId || undefined,
       revision: this.sale?.revision,
       orderStatus: keepOpen ? "open" : "confirmed",
-      ...(this.sale
-        ? {}
-        : {
+      // Existing account: status and method go back only when registering an
+      // open account or when changed; the server records refunds or receipts.
+      ...(!this.sale
+        ? {
             paymentStatus: keepOpen ? "unpaid" : this.paymentStatus,
             paymentMethod: this.paymentMethod,
-          }),
+          }
+        : !keepOpen &&
+            (this.sale.orderStatus === "open" ||
+              this.paymentStatus !== this.initialPaymentStatus ||
+              this.paymentMethod !== this.initialPaymentMethod)
+          ? {
+              paymentStatus: this.paymentStatus,
+              paymentMethod: this.paymentMethod,
+            }
+          : {}),
       orderDiscount: String(this.orderDiscount || 0),
       items: this.itemPayload(),
       ...(this.hasNewServices && this.performedAt

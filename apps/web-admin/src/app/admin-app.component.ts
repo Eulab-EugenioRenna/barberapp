@@ -289,6 +289,7 @@ type ViewKey =
               (loadMore)="loadMoreSales()"
               (editOrder)="openQuickOrder(null, $event)"
               (deleteOrder)="deleteSale($event)"
+              (cancelOrder)="cancelSale($event)"
               (closeAccount)="closeAccount($event)"
               (linkOrder)="linkPendingOrder($event)"
               (cancelAppointment)="cancelPendingAppointment($event)"
@@ -2642,17 +2643,42 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     if (!sale?.id) return;
     this.openDeleteDialog(
       "Elimina vendita",
-      "La vendita e tutte le sue voci verranno eliminate. L'appuntamento collegato resterà disponibile.",
+      "La vendita sparisce con incassi e appuntamenti del conto. Se ha già scaricato prodotti dal magazzino viene annullata: incassi rimborsati e prodotti rientrati.",
       "Elimina vendita",
       async () => {
         this.loading = true;
         try {
-          await firstValueFrom(this.adminApi.deleteSale(sale.id));
-          this.feedback = "Vendita eliminata";
+          const result: any = await firstValueFrom(
+            this.adminApi.deleteSale(sale.id),
+          );
+          this.feedback = result?.message || "Vendita eliminata";
           await this.refreshAll();
         } catch (error: any) {
           this.feedback =
             error?.error?.message || "Eliminazione della vendita non riuscita";
+          throw error;
+        } finally {
+          this.loading = false;
+        }
+      },
+    );
+  }
+
+  cancelSale(sale: any): void {
+    if (!sale?.id) return;
+    this.openDeleteDialog(
+      "Annulla vendita",
+      "Gli incassi vengono rimborsati, i prodotti rientrano in magazzino e gli appuntamenti ancora da fare vengono annullati. La vendita resta nello storico come annullata.",
+      "Annulla vendita",
+      async () => {
+        this.loading = true;
+        try {
+          await firstValueFrom(this.adminApi.cancelSale(sale.id));
+          this.feedback = "Vendita annullata";
+          await this.refreshAll();
+        } catch (error: any) {
+          this.feedback =
+            error?.error?.message || "Annullamento della vendita non riuscito";
           throw error;
         } finally {
           this.loading = false;
