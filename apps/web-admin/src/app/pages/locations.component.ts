@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { TimeSelectComponent } from "../shared/time-select.component";
 import { Component, OnInit, HostListener, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
@@ -881,7 +882,7 @@ export class LocationsComponent implements OnInit {
       }
       await Promise.all([this.context.load(), this.activities.load(true)]);
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Impossibile caricare le sedi.";
+      this.feedback = humanError(error, "Impossibile caricare le sedi.");
     } finally {
       this.loading = false;
     }
@@ -908,7 +909,7 @@ export class LocationsComponent implements OnInit {
       this.feedback = "Configurazione salvata.";
       return true;
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Salvataggio non riuscito.";
+      this.feedback = humanError(error, "Salvataggio non riuscito.");
       return false;
     } finally {
       this.busy = false;
@@ -959,7 +960,7 @@ export class LocationsComponent implements OnInit {
       await this.load();
       this.feedback = done;
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Salvataggio non riuscito.";
+      this.feedback = humanError(error, "Salvataggio non riuscito.");
     } finally {
       this.busy = false;
     }

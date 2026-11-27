@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { isTransientAuthError } from "../core/auth-errors";
 import {
   ConnectOnboardingModalComponent,
@@ -541,9 +542,7 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
       if (this.onboarding)
         this.onboarding = { ...this.onboarding, challenge: "" };
       this.onboardingFeedback =
-        (typeof error?.error?.message === "string"
-          ? error.error.message
-          : "Invio non completato.") +
+        humanError(error, "Invio non completato.") +
         " Ricarica la pagina e verifica nuovamente credenziali e stato prima di un nuovo invio.";
     } finally {
       this.loading = false;
@@ -670,10 +669,12 @@ export class AdminAuthPanelComponent implements OnChanges, OnInit, OnDestroy {
       await this.enterApplication();
     } catch (error: any) {
       this.clearCredentials();
+      const loginFallback = "Non siamo riusciti a completare l'accesso. Riprova.";
+      // On login a bare 401/403 means rejected credentials, not an expired session.
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Non siamo riusciti a completare l'accesso. Riprova.";
+        [401, 403].includes(error?.status) && !error?.error?.message
+          ? loginFallback
+          : humanError(error, loginFallback);
       if (this.onboarding?.needsLegacyVerification) this.onboardingFeedback = this.feedback;
     } finally {
       this.loading = false;

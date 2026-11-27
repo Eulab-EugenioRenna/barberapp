@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { TimeSelectComponent } from "./time-select.component";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { Component, LOCALE_ID, OnInit, inject } from "@angular/core";
@@ -510,7 +511,7 @@ export class AppointmentAutomationPolicyComponent implements OnInit {
   feedback = "";
   busy = false;
   private error(e: any) {
-    return e?.error?.message || e?.message || "Impostazioni non disponibili. Riprova.";
+    return humanError(e, "Impostazioni non disponibili. Riprova.");
   }
   ngOnInit() { void this.load(); }
   edited() {

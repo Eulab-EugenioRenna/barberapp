@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { CalendarInputComponent } from "../calendar-input.component";
 import { slotOptions } from "../core/slot-options";
 import { CommonModule } from "@angular/common";
@@ -207,7 +208,7 @@ export class PersonalBookingComponent implements OnInit {
       if (request !== this.slotsRequest) return;
       this.slotOptions = slotOptions(response.slots || []);
     } catch (error: any) {
-      if (request === this.slotsRequest) this.feedback = error?.error?.message || "Orari non disponibili: riprova.";
+      if (request === this.slotsRequest) this.feedback = humanError(error, "Orari non disponibili: riprova.");
     } finally {
       if (request === this.slotsRequest) this.slotsLoading = false;
     }
@@ -243,11 +244,12 @@ export class PersonalBookingComponent implements OnInit {
       this.booked.emit();
     } catch (error: any) {
       this.retryable = this.creations.state("appointment").kind === "pending";
-      this.feedback =
-        error?.error?.message ||
-        (this.retryable
+      this.feedback = humanError(
+        error,
+        this.retryable
           ? "Esito da verificare: premi «Verifica la stessa prenotazione», non viene creato un doppione."
-          : "Prenotazione non riuscita: riprova.");
+          : "Prenotazione non riuscita: riprova.",
+      );
       if (!this.retryable) this.loadSlots();
     } finally {
       this.saving = false;

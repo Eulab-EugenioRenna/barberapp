@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import {
   Component,
   OnInit,
@@ -829,7 +830,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
           : "");
       if (this.locationId) await this.changeLocation();
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Caricamento non riuscito";
+      this.feedback = humanError(error, "Caricamento non riuscito");
     }
   }
   ngOnDestroy() {
@@ -937,7 +938,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
           ? "Prodotto non trovato per questo barcode."
           : error?.status === 0
             ? "Rete assente. Riprova la scansione quando la connessione è disponibile."
-            : error?.error?.message || "Scansione non riuscita. Riprova.",
+            : humanError(error, "Scansione non riuscita. Riprova."),
       );
     }
   }
@@ -967,7 +968,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
       setTimeout(() => this.restoreInventoryScroll(), 0);
     } catch (error: any) {
       if (token === this.generation)
-        this.feedback = error?.error?.message || "Giacenze non disponibili";
+        this.feedback = humanError(error, "Giacenze non disponibili");
     } finally {
       if (token === this.generation) this.loading = false;
     }
@@ -999,7 +1000,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
       this.hasMore = result.hasMore;
       if (!append) setTimeout(() => this.restoreInventoryScroll(), 0);
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Registro non disponibile";
+      this.feedback = humanError(error, "Registro non disponibile");
     }
   }
   async loadMore() {
@@ -1053,7 +1054,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
       await this.load();
     } catch (error: any) {
       this.feedback =
-        (error?.error?.message || "Esito non disponibile") +
+        (humanError(error, "Esito non disponibile")) +
         ". Puoi ripetere la stessa operazione; per modificarla controlla il registro e scegli Nuova operazione.";
     } finally {
       this.busy = false;

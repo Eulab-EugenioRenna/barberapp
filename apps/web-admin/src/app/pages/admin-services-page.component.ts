@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { PriceSettingsComponent } from "../shared/price-settings.component";
 import { ActivityPickerComponent } from "../shared/activity-picker.component";
 import { ActivitiesService } from "../core/activities.service";
@@ -735,7 +736,7 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges 
       this.newBrandName = "";
       this.brandFeedback = "";
     } catch (error: any) {
-      this.brandFeedback = error?.error?.message || "Brand non creato";
+      this.brandFeedback = humanError(error, "Brand non creato");
     }
   }
   async saveBrandName(): Promise<void> {
@@ -746,7 +747,7 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges 
       this.renamingBrandId = "";
       this.brandFeedback = "Brand rinominato";
     } catch (error: any) {
-      this.brandFeedback = error?.error?.message || "Brand non rinominato";
+      this.brandFeedback = humanError(error, "Brand non rinominato");
     }
   }
   async removeBrand(brand: { id: string; name: string; products: number }): Promise<void> {
@@ -758,7 +759,7 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges 
       this.brandFeedback = "Brand eliminato";
       this.reloadProducts.emit();
     } catch (error: any) {
-      this.brandFeedback = error?.error?.message || "Brand non eliminato";
+      this.brandFeedback = humanError(error, "Brand non eliminato");
     }
   }
 
@@ -859,7 +860,7 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges 
         "error",
         error?.status === 0
           ? "Rete assente. Riprova quando la connessione è disponibile."
-          : error?.error?.message || "Ricerca del barcode non riuscita",
+          : humanError(error, "Ricerca del barcode non riuscita"),
       );
     }
   }

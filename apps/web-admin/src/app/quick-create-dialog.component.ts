@@ -1,3 +1,4 @@
+import { humanError } from "./core/human-error";
 import { ActivityPickerComponent } from "./shared/activity-picker.component";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
@@ -275,7 +276,7 @@ export class QuickCreateDialogComponent {
           ? "Barcode già associato a un altro prodotto. Verifica il listino."
           : error?.status === 0
             ? "Rete assente. I dati sono conservati: riprova quando torna la connessione."
-            : error?.error?.message || "Salvataggio non riuscito. Riprova.";
+            : humanError(error, "Salvataggio non riuscito. Riprova.");
     } finally {
       this.saving = false;
     }

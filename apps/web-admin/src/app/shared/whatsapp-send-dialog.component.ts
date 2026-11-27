@@ -1,7 +1,7 @@
+import { humanError } from "../core/human-error";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { HttpErrorResponse } from "@angular/common/http";
 import type { WhatsAppAudienceView, WhatsAppBroadcastView, WhatsAppConnection, WhatsAppImageInput } from "@barber/shared/whatsapp";
 import { prepareWhatsAppImage } from "./whatsapp-image";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
@@ -298,6 +298,5 @@ function newKey(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
 function message(error: unknown): string {
-  if (error instanceof HttpErrorResponse) return error.error?.message || "Invio non riuscito. Riprova.";
-  return error instanceof Error ? error.message : "Invio non riuscito. Riprova.";
+  return humanError(error, "Invio non riuscito. Riprova.");
 }

@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { CommonModule, DOCUMENT } from "@angular/common";
 import { Component, inject, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -163,7 +164,7 @@ export class PersonalAccountComponent implements OnInit {
       if (user) this.store.setCurrentUser({ ...user, firstName: result.profile.firstName, lastName: result.profile.lastName });
       this.feedback = "Profilo aggiornato in ALORA e nelle altre app EULAB.";
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Profilo non aggiornato. Riprova tra poco.";
+      this.feedback = humanError(error, "Profilo non aggiornato. Riprova tra poco.");
     } finally { this.busy = false; }
   }
   async setPreference(method: PersonalSecurity["preferredMethod"]): Promise<void> {
@@ -174,7 +175,7 @@ export class PersonalAccountComponent implements OnInit {
       this.security = await firstValueFrom(this.api.setPersonalMfaPreference(method));
       this.feedback = "Metodo di verifica aggiornato.";
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Preferenza non salvata: il metodo potrebbe non essere attivo per la tua organizzazione.";
+      this.feedback = humanError(error, "Preferenza non salvata: il metodo potrebbe non essere attivo per la tua organizzazione.");
     } finally { this.busy = false; }
   }
   /** Opens only the secure step of the provider, then the login brings the person back here. */
@@ -187,7 +188,7 @@ export class PersonalAccountComponent implements OnInit {
       this.store.rememberRequestedUrl("/account");
       this.document.location.assign(redirectUrl);
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Operazione non disponibile ora. Riprova tra poco.";
+      this.feedback = humanError(error, "Operazione non disponibile ora. Riprova tra poco.");
       this.busy = false;
     }
   }
