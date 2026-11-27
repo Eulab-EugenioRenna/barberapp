@@ -8,6 +8,7 @@ import { join } from "path";
 import { AppModule } from "./app.module";
 import { CorrelationIdInterceptor } from "./common/correlation-id.interceptor";
 import { configureRequestBodies } from "./common/request-bodies";
+import { validationExceptionFactory } from "./common/validation-messages";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -48,6 +49,7 @@ async function bootstrap(): Promise<void> {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      exceptionFactory: validationExceptionFactory,
     }),
   );
   app.useGlobalInterceptors(new CorrelationIdInterceptor());
