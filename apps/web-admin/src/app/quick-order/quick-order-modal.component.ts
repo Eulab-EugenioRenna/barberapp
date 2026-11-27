@@ -349,12 +349,9 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
         )
         .map((person) => person.id),
     );
-    const options = [
-      { value: "", label: "Nessun collaboratore" },
-      ...this.collaboratorOptions.filter((option) =>
-        eligible.has(option.value),
-      ),
-    ];
+    const options = this.collaboratorOptions.filter((option) =>
+      eligible.has(option.value),
+    );
     if (
       item.collaboratorId &&
       !options.some((option) => option.value === item.collaboratorId)
@@ -370,6 +367,14 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       });
     }
     return options;
+  }
+
+  /** The owner («riferimento») by default; otherwise the only person who can do it. */
+  private defaultPerformerFor(item: any): string {
+    const options = this.collaboratorOptionsFor(item);
+    if (options.some((option) => option.value === this.defaultCollaboratorId))
+      return this.defaultCollaboratorId;
+    return options.length === 1 ? options[0].value : "";
   }
 
   get collaboratorOptions() {
@@ -823,6 +828,8 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
       collaboratorId: "",
       nonPerformanceChargeReason: "",
     });
+    const added = this.items[this.items.length - 1];
+    added.collaboratorId = this.defaultPerformerFor(added);
     this.queueQuote();
   }
 
