@@ -1,6 +1,6 @@
 import { slotOptions } from "./core/slot-options";
 import { OperationalContextService } from "./core/operational-context.service";
-import { UiPageComponent } from "@alora/ui";
+import { UiConfirmComponent, UiPageComponent } from "@alora/ui";
 import type { AdminNavKey } from "./core/admin-navigation";
 import { AdminPageHeaderComponent } from "./shell/admin-page-header.component";
 import {
@@ -68,6 +68,7 @@ type ViewKey =
   imports: [
     CommonModule,
     UiPageComponent,
+    UiConfirmComponent,
     AdminPageHeaderComponent,
     FormsModule,
     NgClass,
@@ -119,55 +120,18 @@ type ViewKey =
         (saved)="refreshAfterAppointmentChange()"
         (createOrder)="openQuickOrder($event)"
       ></barber-admin-appointments-editor-modal>
-      <div *ngIf="confirmDialog" class="confirm-overlay">
-        <button
-          type="button"
-          class="confirm-backdrop"
-          (click)="closeConfirmDialog()"
-        ></button>
-        <article
-          class="confirm-dialog panel"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-dialog-title"
-        >
-          <p class="eyebrow text-[var(--accent)]">Conferma eliminazione</p>
-          <h2
-            id="confirm-dialog-title"
-            class="mt-3 font-display text-2xl sm:text-3xl"
-          >
-            {{ confirmDialog.title }}
-          </h2>
-          <p class="mt-4 text-sm text-[var(--muted)]">
-            {{ confirmDialog.body }}
-          </p>
-          <p class="mt-2 text-sm font-semibold text-red-700">
-            Questa operazione non puo essere annullata.
-          </p>
-          <div class="mt-6 flex flex-wrap gap-3">
-            <button
-              type="button"
-              class="pill-btn"
-              [disabled]="confirmDialog.running"
-              (click)="closeConfirmDialog()"
-            >
-              Annulla
-            </button>
-            <button
-              type="button"
-              class="primary-btn destructive-btn"
-              [disabled]="confirmDialog.running"
-              (click)="runConfirmDialog()"
-            >
-              {{
-                confirmDialog.running
-                  ? "Eliminazione..."
-                  : confirmDialog.confirmLabel
-              }}
-            </button>
-          </div>
-        </article>
-      </div>
+      <ui-confirm
+        *ngIf="confirmDialog"
+        eyebrow="Conferma eliminazione"
+        [title]="confirmDialog.title"
+        [body]="confirmDialog.body"
+        note="Questa operazione non può essere annullata."
+        [confirmLabel]="confirmDialog.confirmLabel"
+        runningLabel="Eliminazione..."
+        [running]="confirmDialog.running"
+        (cancel)="closeConfirmDialog()"
+        (confirm)="runConfirmDialog()"
+      ></ui-confirm>
 
       <barber-admin-auth-panel *ngIf="!sessionToken"></barber-admin-auth-panel>
 

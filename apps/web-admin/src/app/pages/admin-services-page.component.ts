@@ -20,7 +20,7 @@ import { AdminApiService } from "../core/admin-api.service";
 import { BarcodeScannerService } from "../core/barcode-scanner.service";
 import { SessionStore } from "../core/session.store";
 import { FormsModule } from "@angular/forms";
-import { UiSelectComponent } from "@alora/ui";
+import { UiConfirmService, UiSelectComponent } from "@alora/ui";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
@@ -707,6 +707,7 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges 
 
   readonly activities = inject(ActivitiesService);
   readonly brands = inject(ProductBrandsService);
+  private readonly confirmDialog = inject(UiConfirmService);
   serviceActivity = "";
   productActivity = "";
   productBrand = "";
@@ -751,7 +752,12 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges 
   }
   async removeBrand(brand: { id: string; name: string; products: number }): Promise<void> {
     const note = brand.products ? ` I suoi ${brand.products} prodotti restano, senza brand.` : "";
-    if (!window.confirm(`Eliminare il brand «${brand.name}»?${note}`)) return;
+    const ok = await this.confirmDialog.ask({
+      title: `Eliminare il brand «${brand.name}»?`,
+      body: note.trim(),
+      confirmLabel: "Elimina brand",
+    });
+    if (!ok) return;
     try {
       await this.brands.remove(brand.id);
       if (this.productBrand === brand.id) this.productBrand = "";

@@ -28,7 +28,12 @@ import {
   ElementRef,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
+import {
+  UiConfirmService,
+  UiSelectComponent,
+  uiOptions,
+  type UiOption,
+} from "@alora/ui";
 import {
   QuickCreateDialogComponent,
   QuickCreateKind,
@@ -78,6 +83,7 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   private quoteTimer: ReturnType<typeof setTimeout> | null = null;
   private quoteGeneration = 0;
   readonly session = inject(SessionStore);
+  private readonly confirmDialog = inject(UiConfirmService);
   private readonly customerDirectory = inject(CustomerDirectoryService);
 
   protected readonly Number = Number;
@@ -963,9 +969,14 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
     }
   }
 
-  removeItem(index: number): void {
+  async removeItem(index: number): Promise<void> {
     if (this.items[index]?.booking) return;
-    if (!this.confirmDestructive("Rimuovi questa riga dal conto?")) return;
+    const item = this.items[index];
+    if (!(await this.confirmDestructive("Rimuovi questa riga dal conto?")))
+      return;
+    // The list may have changed while the confirm was open.
+    index = this.items.indexOf(item);
+    if (index < 0) return;
     this.items.splice(index, 1);
     this.queueQuote();
     if (this.pricePadIndex === index) this.pricePadIndex = -1;
@@ -1098,8 +1109,11 @@ export class QuickOrderModalComponent implements OnInit, OnDestroy {
   }
 
   /** Conferma su azioni distruttive. Overridabile nei test. */
-  protected confirmDestructive(message: string): boolean {
-    return window.confirm(message);
+  protected confirmDestructive(message: string): Promise<boolean> {
+    return this.confirmDialog.ask({
+      title: message,
+      confirmLabel: "Rimuovi",
+    });
   }
 
   get writeState() {

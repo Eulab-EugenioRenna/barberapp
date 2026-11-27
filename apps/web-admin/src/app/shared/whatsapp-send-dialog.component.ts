@@ -3,6 +3,7 @@ import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } fro
 import { FormsModule } from "@angular/forms";
 import { HttpErrorResponse } from "@angular/common/http";
 import type { WhatsAppAudienceView, WhatsAppBroadcastView, WhatsAppConnection, WhatsAppImageInput } from "@barber/shared/whatsapp";
+import { UiSheetComponent } from "@alora/ui";
 import { prepareWhatsAppImage } from "./whatsapp-image";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
 
@@ -21,15 +22,17 @@ export interface WhatsAppRecipient {
 @Component({
   selector: "alora-whatsapp-send-dialog",
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UiSheetComponent],
   template: `
-    <div class="confirm-overlay wa-send-overlay">
-      <button type="button" class="confirm-backdrop" aria-label="Chiudi" (click)="close()"></button>
-      <article class="confirm-dialog panel wa-send" role="dialog" aria-modal="true" aria-labelledby="wa-send-title">
-        <p class="eyebrow text-[var(--accent)]">WhatsApp</p>
-        <h2 id="wa-send-title" class="font-display text-2xl">
-          {{ customer ? "Messaggio a " + customerName : "Messaggio a tutti i clienti" }}
-        </h2>
+    <ui-sheet
+      size="md"
+      eyebrow="WhatsApp"
+      [title]="customer ? 'Messaggio a ' + customerName : 'Messaggio a tutti i clienti'"
+      subtitle="Il messaggio parte dal tuo numero WhatsApp collegato."
+      closeLabel="Chiudi messaggio WhatsApp"
+      (close)="close()"
+    >
+      <div class="wa-send">
 
         <p *ngIf="loading" class="mt-3 text-sm text-[var(--muted)]">Verifico il collegamento…</p>
         <ng-container *ngIf="!loading">
@@ -79,7 +82,7 @@ export interface WhatsAppRecipient {
             Puoi chiudere questa finestra: l’invio continua.
           </p>
 
-          <form *ngIf="canWrite" class="mt-4 grid gap-3" (ngSubmit)="send()">
+          <form *ngIf="canWrite" id="wa-send-form" class="mt-4 grid gap-3" (ngSubmit)="send()">
             <fieldset class="grid gap-3" [disabled]="sending || !!result">
               <label class="field">
                 <span>{{ image ? "Didascalia (facoltativa)" : "Messaggio" }}</span>
@@ -101,24 +104,28 @@ export interface WhatsAppRecipient {
             </fieldset>
             <p *ngIf="result" role="status" class="wa-send-ok">{{ result }}</p>
             <p *ngIf="error" role="alert" class="wa-send-note">{{ error }}</p>
-            <div class="flex flex-wrap justify-end gap-2">
-              <button type="button" class="pill-btn" (click)="close()">{{ result ? "Chiudi" : "Annulla" }}</button>
-              <button *ngIf="!result" class="primary-btn" [disabled]="sending || !authorized || (!text.trim() && !image)">
-                {{ sending ? "Invio…" : customer ? "Invia" : "Invia a " + (audience?.eligible ?? 0) + " clienti" }}
-              </button>
-            </div>
           </form>
-          <div *ngIf="!canWrite" class="mt-4 flex justify-end">
-            <button type="button" class="pill-btn" (click)="close()">Chiudi</button>
-          </div>
         </ng-container>
-      </article>
-    </div>
+      </div>
+      <ng-container ngProjectAs="[uiSheetBar]">
+        <button
+          *ngIf="!loading && canWrite && !result; else closeOnly"
+          type="submit"
+          form="wa-send-form"
+          class="primary-btn"
+          [disabled]="sending || !authorized || (!text.trim() && !image)"
+        >
+          {{ sending ? "Invio…" : customer ? "Invia" : "Invia a " + (audience?.eligible ?? 0) + " clienti" }}
+        </button>
+        <ng-template #closeOnly>
+          <button type="button" class="primary-btn" (click)="close()">Chiudi</button>
+        </ng-template>
+      </ng-container>
+    </ui-sheet>
   `,
   styles: [
     `
-      .wa-send-overlay { z-index: 90; }
-      .wa-send { width: min(32rem, 100%); }
+      .wa-send { display: grid; align-content: start; }
       .wa-send-note {
         margin-top: 0.75rem;
         border-radius: 1rem;
