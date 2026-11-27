@@ -899,6 +899,9 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     this.activeView = view;
     this.newMenuOpen = false;
     if (previous !== view) this.feedback = "";
+    // The customers page opens with an empty search box: show the whole list again.
+    if (view === "customers" && previous !== view && this.adminFacade.customerQuery())
+      void this.runLoadMore(() => this.adminFacade.reloadCustomers(""));
     if (this.sessionStore.isAuthenticated()) void this.loadView();
   }
 

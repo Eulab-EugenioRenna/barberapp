@@ -91,6 +91,11 @@ export class AdminFacade {
     return currentUser?.role === "platform_admin" ? "platform" : "tenant";
   }
 
+  /** Search currently applied to the customers list ("" = whole list). */
+  customerQuery(): string {
+    return this.customerSearch;
+  }
+
   hasLoaded(dataset: AdminDataset): boolean {
     return this.loadedAt.has(dataset);
   }
