@@ -10,7 +10,8 @@ export const SALES_TOUR: TourDefinition = {
   title: "Cassa",
   // v2: "Conti da chiudere" merged into the till.
   // v4: quick sale modal (barcode in the title bar, one row per line, VAT from the price list).
-  version: 6,
+  // v7: «Nuova vendita» in the page head, secondary row actions in «…».
+  version: 7,
   when: (ctx) => ctx.canView("sales"),
   steps: () => [
     {
@@ -23,18 +24,12 @@ export const SALES_TOUR: TourDefinition = {
           : " Il tuo account può consultarli, non chiuderli né modificarli."),
     },
     {
-      target: "header-new",
-      title: "Nuovo",
-      body: (c) =>
-        [
-          c.can("sales.manage") &&
-            "«Vendi adesso»: solo prodotti, solo servizi o entrambi, anche senza prenotazione.",
-          c.can("appointments.create") &&
-            "«Prenota»: un appuntamento futuro, con il controllo di orari e disponibilità.",
-        ]
-          .filter(Boolean)
-          .join(" "),
-      when: (c) => c.can("sales.manage") || c.can("appointments.create"),
+      target: "sales-new",
+      title: "Nuova vendita",
+      body:
+        "Apre la cassa: solo prodotti, solo servizi o entrambi, anche senza prenotazione. " +
+        "Per un appuntamento futuro usa «Nuovo › Prenota» in Agenda.",
+      when: (c) => c.can("sales.manage"),
     },
     {
       title: "La cassa veloce",
@@ -86,17 +81,12 @@ export const SALES_TOUR: TourDefinition = {
       when: (c) => c.can("sales.manage"),
     },
     {
-      target: "sales-link",
-      title: "Collega una vendita già fatta",
+      target: "sales-more",
+      title: "Le altre azioni",
       body:
-        "Se hai già incassato con una vendita senza appuntamento, collegala qui: il conto si chiude senza un secondo incasso.",
-      when: (c) => c.can("sales.manage"),
-    },
-    {
-      target: "sales-cancel",
-      title: "Annulla appuntamento",
-      body: "Se il servizio non è avvenuto e non va incassato, annulla l'appuntamento: ti viene chiesta conferma.",
-      when: (c) => c.can("appointments.update.all"),
+        "Nel menu «…» della riga: «Collega una vendita già fatta» chiude il conto senza un secondo incasso; " +
+        "«Annulla appuntamento» se il servizio non è avvenuto e non va incassato (ti viene chiesta conferma).",
+      when: (c) => c.can("sales.manage") || c.can("appointments.update.all"),
     },
     {
       title: "Conti registrati",

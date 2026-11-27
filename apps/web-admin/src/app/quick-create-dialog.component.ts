@@ -3,7 +3,7 @@ import { ActivityPickerComponent } from "./shared/activity-picker.component";
 import { CommonModule } from "@angular/common";
 import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { UiSelectComponent, type UiOption } from "@alora/ui";
+import { UiSelectComponent, UiSheetComponent, type UiOption } from "@alora/ui";
 import { firstValueFrom } from "rxjs";
 import { AdminApiService } from "./core/admin-api.service";
 import { AutofocusFirstDirective } from "./shared/autofocus-first.directive";
@@ -23,30 +23,24 @@ export interface QuickCreatePrefill {
     FormsModule,
     AutofocusFirstDirective,
     UiSelectComponent,
+    UiSheetComponent,
   ],
   template: `
-    <div
-      barberAutofocusFirst
-      class="quick-create-overlay"
-      role="dialog"
-      aria-modal="true"
-      [attr.aria-labelledby]="titleId"
+    <ui-sheet
+      size="sm"
+      [layer]="1300"
+      eyebrow="Aggiunta veloce"
+      [title]="title"
+      subtitle="Potrai completare i dettagli in seguito."
+      [busy]="saving"
+      (close)="cancel.emit()"
     >
-      <button
-        type="button"
-        class="quick-create-backdrop"
-        aria-label="Chiudi"
-        [disabled]="saving"
-        (click)="cancel.emit()"
-      ></button>
-      <form class="quick-create-dialog" (ngSubmit)="save()">
-        <p class="eyebrow text-[var(--accent)]">Aggiunta veloce</p>
-        <h2 [id]="titleId" class="font-display text-2xl sm:text-3xl">
-          {{ title }}
-        </h2>
-        <p class="mt-2 text-sm text-[var(--muted)]">
-          Potrai completare i dettagli in seguito.
-        </p>
+      <form
+        barberAutofocusFirst
+        [id]="titleId + '-form'"
+        class="quick-create-form"
+        (ngSubmit)="save()"
+      >
         <div *ngIf="kind === 'product' && barcode" class="field mt-4">
           <span>Associa a un prodotto del catalogo</span>
           <ui-select
@@ -111,55 +105,26 @@ export interface QuickCreatePrefill {
         >
           {{ error }}
         </p>
-        <div class="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            class="pill-btn"
-            [disabled]="saving"
-            (click)="cancel.emit()"
-          >
-            Annulla
-          </button>
-          <button
-            type="submit"
-            class="primary-btn"
-            [disabled]="
-              saving ||
-              (!existingProductId &&
-                (!name.trim() || (kind !== 'customer' && price === '')))
-            "
-          >
-            {{ saving ? "Salvataggio..." : "Salva e seleziona" }}
-          </button>
-        </div>
       </form>
-    </div>
+      <button
+        uiSheetBar
+        type="submit"
+        class="primary-btn"
+        [attr.form]="titleId + '-form'"
+        [disabled]="
+          saving ||
+          (!existingProductId &&
+            (!name.trim() || (kind !== 'customer' && price === '')))
+        "
+      >
+        {{ saving ? "Salvataggio..." : "Salva e seleziona" }}
+      </button>
+    </ui-sheet>
   `,
   styles: [
     `
-      .quick-create-overlay {
-        position: fixed;
-        z-index: 1300;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        padding: 1rem;
-      }
-      .quick-create-backdrop {
-        position: absolute;
-        inset: 0;
-        border: 0;
-        background: rgba(30, 52, 37, 0.42);
-        backdrop-filter: blur(3px);
-      }
-      .quick-create-dialog {
-        position: relative;
-        width: min(100%, 28rem);
-        border: 0.0625rem solid var(--line);
-        border-radius: 1.75rem;
-        background: #fffdf9;
-        padding: 1.5rem;
-        box-shadow: 0 1.5rem 4rem rgba(15, 23, 32, 0.22);
+      .quick-create-form > :first-child {
+        margin-top: 0;
       }
     `,
   ],

@@ -21,7 +21,7 @@ import { AdminApiService } from "../core/admin-api.service";
 import { BarcodeScannerService } from "../core/barcode-scanner.service";
 import { SessionStore } from "../core/session.store";
 import { FormsModule } from "@angular/forms";
-import { UiSelectComponent } from "@alora/ui";
+import { UiConfirmService, UiSelectComponent, UiSheetComponent } from "@alora/ui";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
@@ -38,32 +38,29 @@ import { ProductBrandsService } from "../core/product-brands.service";
     CommonModule,
     FormsModule,
     UiSelectComponent,
+    UiSheetComponent,
     InfiniteScrollDirective,
     AutofocusFirstDirective,
     UiIconComponent,
   ],
   styles: [
     `
-      .catalog-dialog {
-        width: min(60rem, 100%);
-      }
       .catalog-form {
-        display: grid;
-        gap: 1rem;
-      }
-      .catalog-col {
         display: grid;
         align-content: start;
         gap: 1rem;
         min-width: 0;
       }
-      @media (min-width: 900px) {
-        .catalog-form {
+      .catalog-form .ui-step:not(:first-child) {
+        margin-top: 0.5rem;
+      }
+      .catalog-pair {
+        display: grid;
+        gap: 1rem;
+      }
+      @media (min-width: 40rem) {
+        .catalog-pair {
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-          column-gap: 1.5rem;
-        }
-        .catalog-actions {
-          grid-column: 1 / -1;
         }
       }
     `,
@@ -274,386 +271,340 @@ import { ProductBrandsService } from "../core/product-brands.service";
       </article>
     </section>
 
-    <div *ngIf="serviceFormOpen" class="confirm-overlay">
-      <button
-        type="button"
-        class="confirm-backdrop"
-        (click)="serviceFormOpen = false"
-        aria-label="Chiudi modulo servizio"
-      ></button>
-      <article
+    <ui-sheet
+      *ngIf="serviceFormOpen"
+      size="md"
+      eyebrow="Servizio"
+      [title]="serviceForm.id ? (serviceForm.name || 'Modifica servizio') : 'Nuovo servizio'"
+      subtitle="Nome, durata e prezzo bastano: il resto è in «Avanzate»."
+      closeLabel="Chiudi modulo servizio"
+      (close)="serviceFormOpen = false"
+    >
+      <form
+        id="service-form"
         barberAutofocusFirst
-        class="confirm-dialog catalog-dialog panel max-h-[85vh] overflow-auto"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="service-form-title"
+        class="catalog-form"
+        (ngSubmit)="submitService()"
       >
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="eyebrow text-[var(--accent)]">Servizio</p>
-            <h2
-              id="service-form-title"
-              class="mt-2 font-display text-2xl sm:text-3xl"
-            >
-              {{ serviceForm.id ? "Modifica servizio" : "Nuovo servizio" }}
-            </h2>
-          </div>
-          <button
-            type="button"
-            class="pill-btn"
-            (click)="serviceFormOpen = false"
-          >
-            Chiudi
-          </button>
-        </div>
-
-        <form class="catalog-form mt-4" (ngSubmit)="submitService()">
-          <div class="catalog-col">
+        <p class="ui-step">1 · Servizio</p>
+        <label class="field">
+          <span>Nome <em class="required-mark" aria-hidden="true">*</em></span>
+          <input [(ngModel)]="serviceForm.name" name="serviceName" required />
+        </label>
+        <div class="catalog-pair">
           <label class="field">
-            <span
-              >Nome <em class="required-mark" aria-hidden="true">*</em></span
-            >
-            <input [(ngModel)]="serviceForm.name" name="serviceName" required />
-          </label>
-          <alora-activity-picker
-            kind="service"
-            [value]="serviceForm.activityId"
-            (valueChange)="serviceForm.activityId = $event"
-          ></alora-activity-picker>
-          <label class="field">
-            <span>Risorse richieste</span>
-            <span
-              ><input
-                type="checkbox"
-                [(ngModel)]="serviceForm.requiresRoom"
-                name="requiresRoom"
-              />
-              Richiede una stanza o postazione della sede</span
-            >
-          </label>
-          <label class="field">
-            <span>Descrizione pubblica</span>
+            <span>Durata minuti <em class="required-mark" aria-hidden="true">*</em></span>
             <input
-              [(ngModel)]="serviceForm.publicDescription"
-              name="servicePublicDescription"
+              [(ngModel)]="serviceForm.durationMinutes"
+              name="serviceDurationMinutes"
+              type="number"
+              min="15"
+              step="15"
             />
           </label>
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
-            <label class="field">
-              <span>Durata minuti</span>
-              <input
-                [(ngModel)]="serviceForm.durationMinutes"
-                name="serviceDurationMinutes"
-                type="number"
-                min="15"
-                step="15"
-              />
-            </label>
-            <label class="field">
-              <span>Prezzo</span>
-              <input
-                [(ngModel)]="serviceForm.basePrice"
-                name="serviceBasePrice"
-                type="number"
-                min="0"
-                step="1"
-              />
-            </label>
-          </div>
-          <details class="field" [open]="serviceForm.priceMode && serviceForm.priceMode !== 'legacy'">
-            <summary class="cursor-pointer text-sm font-semibold">IVA e tipo di prezzo</summary>
+          <label class="field">
+            <span>Prezzo</span>
+            <input
+              [(ngModel)]="serviceForm.basePrice"
+              name="serviceBasePrice"
+              type="number"
+              min="0"
+              step="1"
+            />
+          </label>
+        </div>
+        <alora-activity-picker
+          kind="service"
+          [value]="serviceForm.activityId"
+          (valueChange)="serviceForm.activityId = $event"
+        ></alora-activity-picker>
+
+        <p class="ui-step">2 · Prenotazione online</p>
+        <label class="field">
+          <span>Descrizione pubblica</span>
+          <input
+            [(ngModel)]="serviceForm.publicDescription"
+            name="servicePublicDescription"
+          />
+        </label>
+        <label class="field checkbox-field">
+          <input
+            [(ngModel)]="serviceForm.isPublic"
+            name="serviceIsPublic"
+            type="checkbox"
+          />
+          <span>Mostra sulla pagina di prenotazione</span>
+        </label>
+        <label *ngIf="serviceForm.isPublic" class="field checkbox-field">
+          <input
+            [(ngModel)]="serviceForm.isBookableOnline"
+            name="serviceIsBookableOnline"
+            type="checkbox"
+          />
+          <span>I clienti possono prenotarlo da soli</span>
+        </label>
+
+        <details
+          class="ui-advanced"
+          [open]="serviceForm.priceMode && serviceForm.priceMode !== 'legacy'"
+        >
+          <summary>
+            <span>Avanzate <small>IVA, tipo di prezzo, colore, stanza, prodotti e consumi</small></span>
+          </summary>
+          <div class="ui-advanced-body">
             <alora-price-settings kind="service" [value]="serviceForm"></alora-price-settings>
-          </details>
-          <div class="grid gap-3 sm:gap-4 md:grid-cols-2">
             <label class="field">
-              <span>Colore</span>
+              <span>Colore in agenda</span>
               <input
                 [(ngModel)]="serviceForm.color"
                 name="serviceColor"
                 type="color"
               />
             </label>
-            <div class="grid gap-3 pt-6">
-              <label class="field checkbox-field">
-                <input
-                  [(ngModel)]="serviceForm.isPublic"
-                  name="serviceIsPublic"
-                  type="checkbox"
-                />
-                <span>Mostra sulla pagina di prenotazione</span>
-              </label>
-              <label *ngIf="serviceForm.isPublic" class="field checkbox-field">
-                <input
-                  [(ngModel)]="serviceForm.isBookableOnline"
-                  name="serviceIsBookableOnline"
-                  type="checkbox"
-                />
-                <span>I clienti possono prenotarlo da soli</span>
-              </label>
-            </div>
-          </div>
-          </div>
-          <div class="catalog-col">
-          <p *ngIf="!serviceForm.id" class="field-hint">Prodotti collegati: salva prima il servizio, poi potrai collegare i prodotti che usa o che consigli.</p>
-          <p *ngIf="serviceForm.id && !products.length" class="field-hint">Prodotti collegati: per collegarli serve prima creare i prodotti nella scheda «Prodotti».</p>
-          <div *ngIf="serviceForm.id && products.length" class="field">
-            <span>Prodotti consigliati con il servizio</span>
-            <div
-              class="mt-3 grid gap-3"
-              *ngIf="
-                serviceForm.serviceProducts?.length;
-                else noServiceProducts
-              "
-            >
-              <article
-                *ngFor="let serviceProduct of serviceForm.serviceProducts"
-                class="rounded-2xl border border-[var(--line)] px-4 py-3"
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <strong>{{ serviceProduct.product?.name }}</strong>
-                    <p class="text-sm text-[var(--muted)]">
-                      {{ formatServiceProductMode(serviceProduct.mode) }} ·
-                      quantità
-                      {{ serviceProduct.quantity }}
-                      <span *ngIf="serviceProduct.priceLocked"
-                        >· prezzo bloccato</span
-                      >
-                    </p>
-                  </div>
-                  <button
-                    aloraFunction="services.manage"
-                    type="button"
-                    class="pill-btn"
-                    (click)="detachProduct.emit(serviceProduct.productId)"
-                  >
-                    Rimuovi
-                  </button>
-                </div>
-              </article>
-            </div>
-            <ng-template #noServiceProducts>
-              <p class="mt-3 text-sm text-[var(--muted)]">
-                Nessun prodotto associato a questo servizio.
-              </p>
-            </ng-template>
-            <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
-              <div class="field md:col-span-2">
-                <span>Prodotto</span>
-                <ui-select
-                  [value]="serviceProductForm.productId"
-                  (valueChange)="selectServiceProduct($event)"
-                  [options]="productSelectOptions"
-                  label="Prodotto"
-                  placeholder="Seleziona prodotto"
-                ></ui-select>
-              </div>
-              <div class="field">
-                <span>Modalità</span>
-                <ui-select
-                  [value]="serviceProductForm.mode"
-                  (valueChange)="serviceProductForm.mode = $event"
-                  [options]="serviceProductModeOptions"
-                  label="Modalità"
-                ></ui-select>
-              </div>
-              <label class="field">
-                <span>Quantità</span>
-                <input
-                  [(ngModel)]="serviceProductForm.quantity"
-                  name="serviceProductQuantity"
-                  type="number"
-                  min="1"
-                  step="1"
-                />
-              </label>
-              <label *ngIf="selectedProductTracked" class="field md:col-span-2" aloraFunction="inventory.manage"><span>Quantità scaricata dal magazzino a ogni servizio (facoltativo)</span><input type="number" min="0.001" step="0.001" [(ngModel)]="serviceProductForm.consumptionUnits" name="consumptionUnits" placeholder="Vuoto: nessuno scarico automatico"></label>
-              <label class="field checkbox-field md:col-span-2">
-                <input
-                  [(ngModel)]="serviceProductForm.priceLocked"
-                  name="serviceProductPriceLocked"
-                  type="checkbox"
-                />
-                <span>Blocca prezzo prodotto nel servizio</span>
-              </label>
-            </div>
-            <div class="mt-3">
-              <button
-                aloraFunction="services.manage"
-                type="button"
-                class="pill-btn"
-                [disabled]="
-                  !serviceForm.id || !serviceProductForm.productId || loading
-                "
-                (click)="attachProduct.emit()"
-              >
-                Collega prodotto
-              </button>
-            </div>
-          </div>
-          </div>
-          <div class="catalog-actions flex flex-wrap gap-3">
-            <button
-              aloraFunction="services.manage"
-              type="submit"
-              class="primary-btn"
-              [disabled]="loading || !serviceFormValid"
-            >
-              <barber-ui-icon name="save"></barber-ui-icon>
-              {{ serviceForm.id ? "Salva servizio" : "Crea servizio" }}
-            </button>
-            <button
-              aloraFunction="services.manage"
-              *ngIf="serviceForm.id"
-              type="button"
-              class="pill-btn"
-              (click)="removeService()"
-            >
-              <barber-ui-icon name="trash"></barber-ui-icon> Elimina
-            </button>
-            <button
-              aloraFunction="services.manage"
-              type="button"
-              class="secondary-btn"
-              (click)="openNewService()"
-            >
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo servizio
-            </button>
-          </div>
-        </form>
-      </article>
-    </div>
-
-    <div *ngIf="productFormOpen" class="confirm-overlay">
-      <button
-        type="button"
-        class="confirm-backdrop"
-        (click)="productFormOpen = false"
-        aria-label="Chiudi modulo prodotto"
-      ></button>
-      <article
-        barberAutofocusFirst
-        class="confirm-dialog catalog-dialog panel max-h-[85vh] overflow-auto"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="product-form-title"
-      >
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="eyebrow text-[var(--accent)]">Prodotto</p>
-            <h2
-              id="product-form-title"
-              class="mt-2 font-display text-2xl sm:text-3xl"
-            >
-              {{ productForm.id ? "Modifica prodotto" : "Nuovo prodotto" }}
-            </h2>
-          </div>
-          <button
-            type="button"
-            class="pill-btn"
-            (click)="productFormOpen = false"
-          >
-            Chiudi
-          </button>
-        </div>
-
-        <form class="catalog-form mt-4" (ngSubmit)="submitProduct()">
-          <div class="catalog-col">
-          <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field"
-              ><span
-                >Nome <em class="required-mark" aria-hidden="true">*</em></span
-              ><input
-                [(ngModel)]="productForm.name"
-                name="productName"
-                required
-            /></label>
-            <label class="field"
-              ><span>Prezzo di vendita</span
-              ><input
-                [(ngModel)]="productForm.price"
-                name="productPrice"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Puoi definirlo anche al momento della vendita"
-            /></label>
-          </div>
-          <div class="field" data-tour="services-product-brand">
-            <span>Brand (facoltativo)</span>
-            <select [(ngModel)]="productForm.brandId" name="productBrandId" *ngIf="brands.brands().length">
-              <option *ngFor="let option of brandSelectOptions" [value]="option.value">{{ option.label }}</option>
-            </select>
-            <div class="flex flex-wrap gap-2">
+            <label class="field checkbox-field">
               <input
-                class="min-w-0 flex-1"
-                [(ngModel)]="newBrandName"
-                name="productNewBrand"
-                maxlength="80"
-                [placeholder]="brands.brands().length ? 'Oppure scrivi un nuovo brand' : 'Es. Davines, Proraso'"
-                (keydown.enter)="$event.preventDefault(); addBrand()"
+                type="checkbox"
+                [(ngModel)]="serviceForm.requiresRoom"
+                name="requiresRoom"
               />
-              <button type="button" class="secondary-btn" [disabled]="!newBrandName.trim()" (click)="addBrand()">Aggiungi brand</button>
+              <span>Richiede una stanza o postazione della sede</span>
+            </label>
+            <p *ngIf="!serviceForm.id" class="field-hint">Prodotti collegati: salva prima il servizio, poi potrai collegare i prodotti che usa o che consigli.</p>
+            <p *ngIf="serviceForm.id && !products.length" class="field-hint">Prodotti collegati: per collegarli serve prima creare i prodotti nella scheda «Prodotti».</p>
+            <div *ngIf="serviceForm.id && products.length" class="field">
+              <span>Prodotti consigliati con il servizio</span>
+              <div
+                class="mt-3 grid gap-3"
+                *ngIf="
+                  serviceForm.serviceProducts?.length;
+                  else noServiceProducts
+                "
+              >
+                <article
+                  *ngFor="let serviceProduct of serviceForm.serviceProducts"
+                  class="rounded-2xl border border-[var(--line)] px-4 py-3"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <strong>{{ serviceProduct.product?.name }}</strong>
+                      <p class="text-sm text-[var(--muted)]">
+                        {{ formatServiceProductMode(serviceProduct.mode) }} ·
+                        quantità
+                        {{ serviceProduct.quantity }}
+                        <span *ngIf="serviceProduct.priceLocked"
+                          >· prezzo bloccato</span
+                        >
+                      </p>
+                    </div>
+                    <button
+                      aloraFunction="services.manage"
+                      type="button"
+                      class="pill-btn"
+                      (click)="detachProduct.emit(serviceProduct.productId)"
+                    >
+                      Rimuovi
+                    </button>
+                  </div>
+                </article>
+              </div>
+              <ng-template #noServiceProducts>
+                <p class="mt-3 text-sm text-[var(--muted)]">
+                  Nessun prodotto associato a questo servizio.
+                </p>
+              </ng-template>
+              <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
+                <div class="field md:col-span-2">
+                  <span>Prodotto</span>
+                  <ui-select
+                    [value]="serviceProductForm.productId"
+                    (valueChange)="selectServiceProduct($event)"
+                    [options]="productSelectOptions"
+                    label="Prodotto"
+                    placeholder="Seleziona prodotto"
+                  ></ui-select>
+                </div>
+                <div class="field">
+                  <span>Modalità</span>
+                  <ui-select
+                    [value]="serviceProductForm.mode"
+                    (valueChange)="serviceProductForm.mode = $event"
+                    [options]="serviceProductModeOptions"
+                    label="Modalità"
+                  ></ui-select>
+                </div>
+                <label class="field">
+                  <span>Quantità</span>
+                  <input
+                    [(ngModel)]="serviceProductForm.quantity"
+                    name="serviceProductQuantity"
+                    type="number"
+                    min="1"
+                    step="1"
+                  />
+                </label>
+                <label *ngIf="selectedProductTracked" class="field md:col-span-2" aloraFunction="inventory.manage"><span>Quantità scaricata dal magazzino a ogni servizio (facoltativo)</span><input type="number" min="0.001" step="0.001" [(ngModel)]="serviceProductForm.consumptionUnits" name="consumptionUnits" placeholder="Vuoto: nessuno scarico automatico"></label>
+                <label class="field checkbox-field md:col-span-2">
+                  <input
+                    [(ngModel)]="serviceProductForm.priceLocked"
+                    name="serviceProductPriceLocked"
+                    type="checkbox"
+                  />
+                  <span>Blocca prezzo prodotto nel servizio</span>
+                </label>
+              </div>
+              <div class="mt-3">
+                <button
+                  aloraFunction="services.manage"
+                  type="button"
+                  class="pill-btn"
+                  [disabled]="
+                    !serviceForm.id || !serviceProductForm.productId || loading
+                  "
+                  (click)="attachProduct.emit()"
+                >
+                  Collega prodotto
+                </button>
+              </div>
             </div>
-            <small class="field-hint">Raggruppa i prodotti: in Panoramica › Prodotti vedi il venduto per brand.</small>
-            <small *ngIf="brandFeedback" role="status">{{ brandFeedback }}</small>
           </div>
-          <alora-activity-picker
-            kind="product"
-            [value]="productForm.activityId"
-            (valueChange)="productForm.activityId = $event"
-          ></alora-activity-picker>
-          <label class="field" data-tour="services-product-barcode"
-            ><span>Barcode (EAN/UPC o codice interno)</span
+        </details>
+      </form>
+      <ng-container ngProjectAs="[uiSheetBar]">
+        <button
+          aloraFunction="services.manage"
+          *ngIf="serviceForm.id"
+          type="button"
+          class="pill-btn ui-bar-start"
+          [disabled]="loading"
+          (click)="removeService()"
+        >
+          <barber-ui-icon name="trash"></barber-ui-icon> Elimina servizio
+        </button>
+        <button
+          aloraFunction="services.manage"
+          type="submit"
+          form="service-form"
+          class="primary-btn"
+          [disabled]="loading || !serviceFormValid"
+        >
+          <barber-ui-icon name="save"></barber-ui-icon>
+          {{ serviceForm.id ? "Salva servizio" : "Crea servizio" }}
+        </button>
+      </ng-container>
+    </ui-sheet>
+
+    <ui-sheet
+      *ngIf="productFormOpen"
+      size="md"
+      eyebrow="Prodotto"
+      [title]="productForm.id ? (productForm.name || 'Modifica prodotto') : 'Nuovo prodotto'"
+      subtitle="Nome e prezzo bastano: brand, IVA e costi sono in «Avanzate»."
+      closeLabel="Chiudi modulo prodotto"
+      (close)="productFormOpen = false"
+    >
+      <form
+        id="product-form"
+        barberAutofocusFirst
+        class="catalog-form"
+        (ngSubmit)="submitProduct()"
+      >
+        <p class="ui-step">1 · Prodotto</p>
+        <div class="catalog-pair">
+          <label class="field"
+            ><span
+              >Nome <em class="required-mark" aria-hidden="true">*</em></span
             ><input
-              [(ngModel)]="productForm.barcode"
-              name="productBarcode"
-              autocomplete="off"
-              inputmode="numeric"
-              placeholder="Scansiona il prodotto o scrivi il codice"
-              (keydown.enter)="$event.preventDefault()"
+              [(ngModel)]="productForm.name"
+              name="productName"
+              required
           /></label>
           <label class="field"
-            ><span>Descrizione</span
+            ><span>Prezzo di vendita</span
             ><input
-              [(ngModel)]="productForm.description"
-              name="productDescription"
+              [(ngModel)]="productForm.price"
+              name="productPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Anche al momento della vendita"
           /></label>
-          </div>
-          <div class="catalog-col">
+        </div>
+        <label class="field" data-tour="services-product-barcode"
+          ><span>Barcode (EAN/UPC o codice interno)</span
+          ><input
+            [(ngModel)]="productForm.barcode"
+            name="productBarcode"
+            autocomplete="off"
+            inputmode="numeric"
+            placeholder="Scansiona il prodotto o scrivi il codice"
+            (keydown.enter)="$event.preventDefault()"
+        /></label>
+        <alora-activity-picker
+          kind="product"
+          [value]="productForm.activityId"
+          (valueChange)="productForm.activityId = $event"
+        ></alora-activity-picker>
+        <label class="field"
+          ><span>Descrizione</span
+          ><input
+            [(ngModel)]="productForm.description"
+            name="productDescription"
+        /></label>
+
+        <details
+          class="ui-advanced"
+          [open]="!!productForm.brandId || (productForm.priceMode && productForm.priceMode !== 'legacy')"
+        >
+          <summary>
+            <span>Avanzate <small>brand, IVA, tipo di prezzo, costo e magazzino</small></span>
+          </summary>
+          <div class="ui-advanced-body">
+            <div class="field" data-tour="services-product-brand">
+              <span>Brand (facoltativo)</span>
+              <select [(ngModel)]="productForm.brandId" name="productBrandId" *ngIf="brands.brands().length">
+                <option *ngFor="let option of brandSelectOptions" [value]="option.value">{{ option.label }}</option>
+              </select>
+              <div class="flex flex-wrap gap-2">
+                <input
+                  class="min-w-0 flex-1"
+                  [(ngModel)]="newBrandName"
+                  name="productNewBrand"
+                  maxlength="80"
+                  [placeholder]="brands.brands().length ? 'Oppure scrivi un nuovo brand' : 'Es. Davines, Proraso'"
+                  (keydown.enter)="$event.preventDefault(); addBrand()"
+                />
+                <button type="button" class="secondary-btn" [disabled]="!newBrandName.trim()" (click)="addBrand()">Aggiungi brand</button>
+              </div>
+              <small class="field-hint">Raggruppa i prodotti: in Panoramica › Prodotti vedi il venduto per brand.</small>
+              <small *ngIf="brandFeedback" role="status">{{ brandFeedback }}</small>
+            </div>
             <alora-price-settings kind="product" [value]="productForm"></alora-price-settings>
           </div>
-          <div class="catalog-actions flex flex-wrap gap-2">
-            <button
-              aloraFunction="services.manage"
-              type="submit"
-              class="primary-btn"
-              [disabled]="loading || !productFormValid"
-            >
-              <barber-ui-icon name="save"></barber-ui-icon>
-              {{ productForm.id ? "Salva prodotto" : "Crea prodotto" }}
-            </button>
-            <button
-              aloraFunction="services.manage"
-              *ngIf="productForm.id"
-              type="button"
-              class="pill-btn"
-              (click)="removeProductItem()"
-            >
-              <barber-ui-icon name="trash"></barber-ui-icon> Elimina prodotto
-            </button>
-            <button
-              aloraFunction="services.manage"
-              type="button"
-              class="secondary-btn"
-              (click)="openNewProduct()"
-            >
-              <barber-ui-icon name="plus"></barber-ui-icon> Nuovo prodotto
-            </button>
-          </div>
-        </form>
-      </article>
-    </div>
+        </details>
+      </form>
+      <ng-container ngProjectAs="[uiSheetBar]">
+        <button
+          aloraFunction="services.manage"
+          *ngIf="productForm.id"
+          type="button"
+          class="pill-btn ui-bar-start"
+          [disabled]="loading"
+          (click)="removeProductItem()"
+        >
+          <barber-ui-icon name="trash"></barber-ui-icon> Elimina prodotto
+        </button>
+        <button
+          aloraFunction="services.manage"
+          type="submit"
+          form="product-form"
+          class="primary-btn"
+          [disabled]="loading || !productFormValid"
+        >
+          <barber-ui-icon name="save"></barber-ui-icon>
+          {{ productForm.id ? "Salva prodotto" : "Crea prodotto" }}
+        </button>
+      </ng-container>
+    </ui-sheet>
   `,
 })
 export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges {
@@ -708,6 +659,7 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges 
 
   readonly activities = inject(ActivitiesService);
   readonly brands = inject(ProductBrandsService);
+  private readonly confirmDialog = inject(UiConfirmService);
   serviceActivity = "";
   productActivity = "";
   productBrand = "";
@@ -752,7 +704,12 @@ export class AdminServicesPageComponent implements OnInit, OnDestroy, OnChanges 
   }
   async removeBrand(brand: { id: string; name: string; products: number }): Promise<void> {
     const note = brand.products ? ` I suoi ${brand.products} prodotti restano, senza brand.` : "";
-    if (!window.confirm(`Eliminare il brand «${brand.name}»?${note}`)) return;
+    const ok = await this.confirmDialog.ask({
+      title: `Eliminare il brand «${brand.name}»?`,
+      body: note.trim(),
+      confirmLabel: "Elimina brand",
+    });
+    if (!ok) return;
     try {
       await this.brands.remove(brand.id);
       if (this.productBrand === brand.id) this.productBrand = "";

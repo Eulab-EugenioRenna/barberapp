@@ -8,12 +8,16 @@ import {
   OnInit,
   Output,
   OnChanges,
-  HostListener,
   inject,
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { UiSelectComponent, type UiOption } from "@alora/ui";
+import {
+  UiConfirmComponent,
+  UiSelectComponent,
+  UiSheetComponent,
+  type UiOption,
+} from "@alora/ui";
 import { firstValueFrom } from "rxjs";
 import type { TeamOverview, TeamRole, TeamUser } from "@eulab/connect/server";
 import { ADMIN_API_URL } from "../core/api-config";
@@ -77,8 +81,26 @@ interface Pending extends AccountDraft {
     RouterLink,
     AutofocusFirstDirective,
     UiSelectComponent,
+    UiSheetComponent,
+    UiConfirmComponent,
   ],
   templateUrl: "./admin-team-page.component.html",
+  styles: [
+    `
+      .team-summary {
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        margin: 0;
+      }
+      .team-summary dt {
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+      .team-summary dd {
+        margin: 0.15rem 0 0;
+        font-weight: 700;
+      }
+    `,
+  ],
 })
 export class AdminTeamPageComponent implements OnInit, OnChanges {
   private readonly http = inject(HttpClient);
@@ -109,6 +131,9 @@ export class AdminTeamPageComponent implements OnInit, OnChanges {
   showInitialPassword = false;
   confirmRevoke = false;
   deleteRoleId = "";
+  /** «Nuovo accesso» wizard: 1 · Persona, 2 · Ruolo, 3 · Conferma. */
+  readonly accountSteps = ["Persona", "Ruolo", "Conferma"] as const;
+  accountStep = 1;
   readonly options = ROLE_OPTIONS;
   get canManage(): boolean {
     return !!this.overview?.canManage && this.session.can("team.manage");
@@ -381,7 +406,8 @@ export class AdminTeamPageComponent implements OnInit, OnChanges {
       this.policyOpen = false;
     }
   }
-  @HostListener("document:keydown.escape") dismiss(): void {
+  /** Escape is handled by each ui-sheet (top layer only). */
+  dismiss(): void {
     if (this.busy) return;
     this.close();
     this.rolePanel = false;
@@ -417,6 +443,7 @@ export class AdminTeamPageComponent implements OnInit, OnChanges {
         value.toString(16).padStart(8, "0"),
       ).join("");
     this.showInitialPassword = false;
+    this.accountStep = 1;
     this.account = {
       id: crypto.randomUUID(),
       firstName: person?.professional?.firstName || "",
@@ -464,6 +491,62 @@ export class AdminTeamPageComponent implements OnInit, OnChanges {
       !!this.account?.email.trim() &&
       this.choiceAvailable(this.choice) &&
       (!this.requiresProfile || !!this.account.collaboratorId)
+    );
+  }
+  /** A step is reachable when every step before it is complete. */
+  canReachAccountStep(step: number): boolean {
+    const draft = this.account;
+    if (!draft) return false;
+    const person =
+      !!draft.firstName.trim() &&
+      !!draft.lastName.trim() &&
+      !!draft.email.trim();
+    const role =
+      this.choiceAvailable(this.choice) &&
+      (!this.requiresProfile || !!draft.collaboratorId);
+    if (step <= 1) return true;
+    if (step === 2) return person;
+    return person && role;
+  }
+  nextAccountStep(): void {
+    if (this.accountStep < 3 && this.canReachAccountStep(this.accountStep + 1))
+      this.accountStep += 1;
+  }
+  isPresetChoice(value: unknown): boolean {
+    return typeof value === "string" && value.startsWith("preset:");
+  }
+  /** Short line on the role card. */
+  roleSummary(value: unknown): string {
+    if (value === "preset:collaborator")
+      return "La propria agenda e le attività assegnate.";
+    if (value === "preset:owner")
+      return "Gestisce tutto: squadra, cassa, impostazioni.";
+    return "Le attività scelte per questo ruolo.";
+  }
+  /** What the chosen role allows, as in the original form. */
+  roleDescription(choice: string): string {
+    return choice === "preset:collaborator"
+      ? "La persona vedrà soltanto la propria agenda e potrà aggiornare le attività assegnate. Cassa, clienti completi, dati economici e impostazioni del salone sono esclusi."
+      : choice === "preset:owner"
+        ? "Gestione completa delle funzioni abilitate per il salone. Assegna questo ruolo soltanto a chi deve amministrare l’attività."
+        : "Si applicano le attività del ruolo personalizzato che hai creato.";
+  }
+  get choiceLabel(): string {
+    return (
+      this.roleOptions.find((option) => option.value === this.choice)?.label ||
+      "Da scegliere"
+    );
+  }
+  accountProfileLabel(id: string | null): string {
+    if (!id) return "Nessuno";
+    const pro = this.profileChoices.find((item) => item.id === id);
+    return pro ? `${pro.firstName} ${pro.lastName}` : "Nessuno";
+  }
+  get roleToDelete(): TeamRole | null {
+    return (
+      (this.deleteRoleId &&
+        this.customRoles.find((role) => role.id === this.deleteRoleId)) ||
+      null
     );
   }
   private async resolveRole(): Promise<string> {
@@ -674,6 +757,7 @@ export class AdminTeamPageComponent implements OnInit, OnChanges {
       this.feedback =
         "Richiesta non confermata. Verifica la ricezione del link con la persona prima di un nuovo invio; nessuna richiesta è stata ripetuta automaticamente.";
     } finally {
+      this.confirmPasswordReset = false;
       this.busy = false;
     }
   }
@@ -703,6 +787,7 @@ export class AdminTeamPageComponent implements OnInit, OnChanges {
       this.feedback =
         "Esito da verificare. Aggiorna la squadra prima di un’altra operazione.";
     } finally {
+      this.confirmRevoke = false;
       await this.load();
       this.busy = false;
     }
@@ -823,6 +908,7 @@ export class AdminTeamPageComponent implements OnInit, OnChanges {
     } catch {
       this.feedback = "Esito da verificare. Aggiorna prima di riprovare.";
     } finally {
+      this.deleteRoleId = "";
       await this.load();
       this.busy = false;
     }

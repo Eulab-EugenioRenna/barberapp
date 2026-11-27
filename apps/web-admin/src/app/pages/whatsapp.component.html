@@ -331,19 +331,18 @@
     </ol>
   </section>
 
-  <div *ngIf="detail" class="confirm-overlay">
-    <button type="button" class="confirm-backdrop" aria-label="Chiudi dettaglio invio" (click)="closeDetail()"></button>
-    <article class="confirm-dialog panel wa-detail" role="dialog" aria-modal="true" aria-labelledby="wa-detail-title">
+  <ui-sheet
+    *ngIf="detail"
+    size="md"
+    [eyebrow]="detail.kind === 'broadcast' ? 'Messaggio a tutti' : 'Messaggio singolo'"
+    [title]="detailTitle"
+    [subtitle]="detailSubtitle"
+    closeLabel="Chiudi dettaglio invio"
+    (close)="closeDetail()"
+  >
+    <div class="wa-detail">
       <ng-container *ngIf="detail.kind === 'broadcast'">
         <ng-container *ngIf="detail.job as job">
-          <div class="wa-detail-head">
-            <div>
-              <p class="eyebrow text-[var(--accent)]">Messaggio a tutti</p>
-              <h2 id="wa-detail-title" class="font-display text-2xl">{{ broadcastStatus(job.status) }} <span class="wa-percent">{{ broadcastPercent(job) }}%</span></h2>
-              <p class="wa-muted">Creato il {{ job.createdAt | date: 'dd MMM yyyy, HH:mm' }}<ng-container *ngIf="job.finishedAt"> · chiuso il {{ job.finishedAt | date: 'dd MMM, HH:mm' }}</ng-container></p>
-            </div>
-            <button type="button" class="pill-btn" (click)="closeDetail()">Chiudi</button>
-          </div>
           <p *ngIf="job.preview" class="wa-detail-text">{{ job.preview }}</p>
           <span class="wa-seg wa-seg-lg" aria-hidden="true" *ngIf="shares(job) as s">
             <i class="s-ok" [style.width.%]="s.sent"></i><i class="s-progress" [style.width.%]="s.sending"></i><i class="s-error" [style.width.%]="s.failed"></i><i class="s-warn" [style.width.%]="s.uncertain"></i>
@@ -413,14 +412,6 @@
       </ng-container>
       <ng-container *ngIf="detail.kind === 'single'">
         <ng-container *ngIf="detail.item as item">
-          <div class="wa-detail-head">
-            <div>
-              <p class="eyebrow text-[var(--accent)]">Messaggio singolo</p>
-              <h2 id="wa-detail-title" class="font-display text-2xl">{{ item.recipientName || 'Destinatario' }}</h2>
-              <p class="wa-muted">{{ item.createdAt | date: 'dd MMM yyyy, HH:mm' }}</p>
-            </div>
-            <button type="button" class="pill-btn" (click)="closeDetail()">Chiudi</button>
-          </div>
           <dl class="wa-detail-list">
             <div><dt>Stato</dt><dd><span class="wa-pill" [class]="'wa-pill tone-' + statusOf(item).tone">{{ statusOf(item).label }}</span></dd></div>
             <div *ngIf="item.recipient"><dt>Numero</dt><dd>{{ item.recipient }}</dd></div>
@@ -432,6 +423,6 @@
           <p class="wa-muted">«Inviato» vuol dire verificato sul telefono e accettato da WhatsApp. Se non parte viene riprovato da solo; «Da verificare» non viene mai ripetuto in automatico.</p>
         </ng-container>
       </ng-container>
-    </article>
-  </div>
+    </div>
+  </ui-sheet>
 </ui-page>

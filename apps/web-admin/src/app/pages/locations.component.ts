@@ -1,9 +1,14 @@
 import { humanError } from "../core/human-error";
 import { TimeSelectComponent } from "../shared/time-select.component";
-import { Component, OnInit, HostListener, inject } from "@angular/core";
+import { Component, OnInit, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { UiPageComponent, UiTabsComponent, type UiTab } from "@alora/ui";
+import {
+  UiPageComponent,
+  UiSheetComponent,
+  UiTabsComponent,
+  type UiTab,
+} from "@alora/ui";
 import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { HttpClient } from "@angular/common/http";
 import { firstValueFrom } from "rxjs";
@@ -13,7 +18,15 @@ import { OperationalContextService } from "../core/operational-context.service";
 import { ActivitiesService } from "../core/activities.service";
 @Component({
   standalone: true,
-  imports: [TimeSelectComponent, CommonModule, FormsModule, UiPageComponent, UiTabsComponent, AdminPageHeaderComponent],
+  imports: [
+    TimeSelectComponent,
+    CommonModule,
+    FormsModule,
+    UiPageComponent,
+    UiSheetComponent,
+    UiTabsComponent,
+    AdminPageHeaderComponent,
+  ],
   template: ` <ui-page class="locations-shell">
     <alora-page-header navKey="locations" [refreshing]="loading" (refresh)="load()">
       <button
@@ -22,11 +35,9 @@ import { ActivitiesService } from "../core/activities.service";
         type="button"
         class="primary-btn"
         data-tour="locations-create"
-        [attr.aria-expanded]="createOpen"
-        aria-controls="location-create"
-        (click)="createOpen = !createOpen"
+        (click)="createOpen = true"
       >
-        {{ createOpen ? "Chiudi" : "Nuova sede" }}
+        Nuova sede
       </button>
     </alora-page-header>
     <ui-tabs
@@ -40,214 +51,243 @@ import { ActivitiesService } from "../core/activities.service";
     <p *ngIf="loading" role="status">Caricamento delle sedi…</p>
     <ng-container *ngIf="section === 'structure'">
     <section
-      *ngIf="canEdit && (createOpen || (!loading && !locations.length))"
-      id="location-create"
-      class="panel create-panel"
+      *ngIf="!loading && !locations.length"
+      class="panel empty-panel"
     >
-      <h2>Nuova sede</h2>
-      <form (ngSubmit)="create()">
-        <label
-          >Nome<input
-            [(ngModel)]="newName"
-            name="newName"
-            maxlength="120"
-            required /></label
-        ><label
-          >Indirizzo<input
-            [(ngModel)]="newAddress"
-            name="newAddress"
-            maxlength="500" /></label
-        >
-        <fieldset class="activity-checks" data-tour="locations-create-activities">
-          <legend>Attività svolte in questa sede (facoltativo)</legend>
-          <label *ngFor="let activity of activities.active(); trackBy: trackById"
-            ><input
-              type="checkbox"
-              [checked]="newActivityIds.includes(activity.id)"
-              (change)="toggleNewActivity(activity.id)"
-            />{{ activity.name }}</label
-          >
-          <button type="button" class="text-btn" (click)="section = 'activities'">
-            + Aggiungi un’attività al catalogo
-          </button>
-        </fieldset>
-        <button
-          class="primary-btn"
-          [disabled]="busy || !newName.trim()"
-        >
-          Crea sede
-        </button>
-      </form>
-    </section>
-    <section class="locations-grid">
-      <article
-        *ngFor="let location of locations; trackBy: trackById"
-        class="panel location-card"
-        data-tour="locations-card"
+      <h2>Nessuna sede</h2>
+      <p class="muted">
+        La sede è il luogo dove lavori: orari, attività svolte e risorse
+        (poltrone, cabine) si configurano qui.
+      </p>
+      <button
+        *ngIf="canEdit"
+        type="button"
+        class="primary-btn"
+        (click)="createOpen = true"
       >
-        <div class="card-heading">
-          <div>
+        Crea la prima sede
+      </button>
+    </section>
+    <div
+      *ngIf="locations.length"
+      class="locations-layout"
+      [class.has-list]="locations.length > 1"
+    >
+      <nav
+        *ngIf="locations.length > 1"
+        class="location-list"
+        aria-label="Sedi"
+      >
+        <button
+          *ngFor="let location of locations; trackBy: trackById"
+          type="button"
+          class="location-pick"
+          [class.on]="selectedLocation?.id === location.id"
+          [attr.aria-current]="selectedLocation?.id === location.id ? 'true' : null"
+          (click)="selectLocation(location)"
+        >
+          <span class="location-pick-main">
+            <strong>{{ location.name }}</strong>
+            <span class="muted">{{ location.address || "Indirizzo da completare" }}</span>
+          </span>
+          <span class="location-pick-side">
             <span class="status" [class.inactive]="!location.isActive">{{
               location.isActive ? "Attiva" : "Disattivata"
             }}</span>
-            <h2>{{ location.name }}</h2>
-            <p>{{ location.address || "Indirizzo da completare" }}</p>
-          </div>
-          <button
-            *ngIf="canEdit"
-            class="secondary-btn"
-            data-tour="locations-configure"
-            (click)="edit(location)"
-          >
-            Configura sede
-          </button>
-        </div>
-        <p class="public-state">
-          {{
-            location.isPublic
-              ? "Visibile nelle prenotazioni online"
-              : "Uso interno"
-          }}
-        </p>
-        <div
-          *ngFor="let sector of location.sectors; trackBy: trackById"
-          class="sector-card"
-        >
+            <span class="muted">{{ location.sectors.length }} attività</span>
+          </span>
+        </button>
+      </nav>
+      <article
+        *ngIf="selectedLocation as location"
+        id="location-detail"
+        class="panel location-detail"
+        data-tour="locations-card"
+      >
+        <section class="ui-section">
           <div class="card-heading">
             <div>
-              <h3>{{ sector.name }}</h3>
-              <span class="status" [class.inactive]="!sector.isActive">{{
-                sector.isActive ? "Attiva" : "Disattivata"
-              }}</span>
+              <p class="ui-step">1 · Sede</p>
+              <h2>{{ location.name }}</h2>
+              <p class="muted">{{ location.address || "Indirizzo da completare" }}</p>
             </div>
             <button
               *ngIf="canEdit"
+              type="button"
               class="secondary-btn"
-              data-tour="locations-sector-configure"
-              (click)="edit(sector, true)"
+              data-tour="locations-configure"
+              (click)="edit(location)"
             >
-              Configura attività
+              Configura sede
             </button>
           </div>
-          <p class="professionals">
-            {{ professionalNames(sector) || "Nessun professionista assegnato" }}
-          </p>
-          <h4>Risorse</h4>
-          <p *ngIf="!sector.rooms.length" class="muted">
-            Nessuna risorsa configurata
+          <div class="badges">
+            <span class="status" [class.inactive]="!location.isActive">{{
+              location.isActive ? "Attiva" : "Disattivata"
+            }}</span>
+            <span class="public-state">{{
+              location.isPublic
+                ? "Visibile nelle prenotazioni online"
+                : "Uso interno"
+            }}</span>
+            <span class="public-state">{{
+              location.weeklyHours == null ? "Orari standard 09:00–19:00" : "Orari personalizzati"
+            }}</span>
+          </div>
+        </section>
+
+        <section class="ui-section">
+          <p class="ui-step">2 · Attività e risorse</p>
+          <p *ngIf="!location.sectors.length" class="muted">
+            Nessuna attività in questa sede: aggiungine una qui sotto.
           </p>
           <div
-            *ngFor="let room of sector.rooms; trackBy: trackById"
-            class="resource"
+            *ngFor="let sector of location.sectors; trackBy: trackById"
+            class="sector-card"
           >
-            <span
-              >{{ room.name }} · capienza {{ room.capacity }} ·
-              {{
-                room.isActive
-                  ? room.isPublic
-                    ? "online e interno"
-                    : "interno"
-                  : "disattivata"
-              }}</span
+            <div class="card-heading">
+              <div>
+                <h3>{{ sector.name }}</h3>
+                <span class="status" [class.inactive]="!sector.isActive">{{
+                  sector.isActive ? "Attiva" : "Disattivata"
+                }}</span>
+              </div>
+              <button
+                *ngIf="canEdit"
+                type="button"
+                class="secondary-btn"
+                data-tour="locations-sector-configure"
+                (click)="edit(sector, true)"
+              >
+                Configura attività
+              </button>
+            </div>
+            <p class="professionals">
+              {{ professionalNames(sector) || "Nessun professionista assegnato" }}
+            </p>
+            <h4>Risorse</h4>
+            <p *ngIf="!sector.rooms.length" class="muted">
+              Nessuna risorsa configurata
+            </p>
+            <div
+              *ngFor="let room of sector.rooms; trackBy: trackById"
+              class="resource"
             >
-            <div *ngIf="canEdit" class="capacity-control" data-tour="locations-resource-controls">
-              <label
+              <span
+                >{{ room.name }} · capienza {{ room.capacity }} ·
+                {{
+                  room.isActive
+                    ? room.isPublic
+                      ? "online e interno"
+                      : "interno"
+                    : "disattivata"
+                }}</span
+              >
+              <div *ngIf="canEdit" class="capacity-control" data-tour="locations-resource-controls">
+                <label
+                  >Capienza<input
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    [attr.aria-label]="'Capienza di ' + room.name"
+                    [ngModel]="room.requestedCapacity ?? room.capacity"
+                    (ngModelChange)="room.requestedCapacity = $event"
+                    [ngModelOptions]="{ standalone: true }"
+                    [disabled]="busy"
+                /></label>
+                <button
+                  class="text-btn"
+                  [disabled]="
+                    busy ||
+                    room.requestedCapacity == null ||
+                    room.requestedCapacity === room.capacity
+                  "
+                  (click)="roomCapacity(room)"
+                >
+                  Salva capienza
+                </button>
+                <button
+                  class="text-btn"
+                  [disabled]="busy"
+                  (click)="roomState(room)"
+                >
+                  {{ room.isActive ? "Disattiva" : "Riattiva" }}</button
+                ><button
+                  class="text-btn"
+                  [disabled]="busy"
+                  (click)="roomPublic(room)"
+                >
+                  {{ room.isPublic ? "Solo interno" : "Abilita online" }}
+                </button>
+              </div>
+            </div>
+            <form
+              *ngIf="canEdit"
+              (ngSubmit)="createRoom(sector)"
+              class="inline-form"
+              data-tour="locations-resource-add"
+            >
+              <label class="grow"
+                >Nome della risorsa<input
+                  [(ngModel)]="sector.newRoomName"
+                  [name]="'room-' + sector.id"
+                  maxlength="120"
+                  placeholder="Es. Postazione 1"
+                  required /></label
+              ><label
                 >Capienza<input
                   type="number"
                   min="1"
                   max="100"
                   step="1"
-                  [attr.aria-label]="'Capienza di ' + room.name"
-                  [ngModel]="room.requestedCapacity ?? room.capacity"
-                  (ngModelChange)="room.requestedCapacity = $event"
-                  [ngModelOptions]="{ standalone: true }"
-                  [disabled]="busy"
-              /></label>
-              <button
-                class="text-btn"
-                [disabled]="
-                  busy ||
-                  room.requestedCapacity == null ||
-                  room.requestedCapacity === room.capacity
-                "
-                (click)="roomCapacity(room)"
-              >
-                Salva capienza
-              </button>
-              <button
-                class="text-btn"
-                [disabled]="busy"
-                (click)="roomState(room)"
-              >
-                {{ room.isActive ? "Disattiva" : "Riattiva" }}</button
+                  [(ngModel)]="sector.newRoomCapacity"
+                  [name]="'room-capacity-' + sector.id"
+                  placeholder="1" /></label
               ><button
-                class="text-btn"
-                [disabled]="busy"
-                (click)="roomPublic(room)"
+                class="secondary-btn"
+                [disabled]="busy || !sector.newRoomName?.trim()"
               >
-                {{ room.isPublic ? "Solo interno" : "Abilita online" }}
+                Aggiungi
               </button>
-            </div>
+            </form>
           </div>
+        </section>
+
+        <section
+          *ngIf="canEdit && missingActivities(location).length"
+          class="ui-section"
+        >
+          <p class="ui-step">3 · Aggiungi un’attività</p>
           <form
-            *ngIf="canEdit"
-            (ngSubmit)="createRoom(sector)"
+            (ngSubmit)="createSector(location)"
             class="inline-form"
-            data-tour="locations-resource-add"
+            data-tour="locations-sector-add"
           >
             <label class="grow"
-              >Nome della risorsa<input
-                [(ngModel)]="sector.newRoomName"
-                [name]="'room-' + sector.id"
-                maxlength="120"
-                placeholder="Es. Postazione 1"
-                required /></label
-            ><label
-              >Capienza<input
-                type="number"
-                min="1"
-                max="100"
-                step="1"
-                [(ngModel)]="sector.newRoomCapacity"
-                [name]="'room-capacity-' + sector.id"
-                placeholder="1" /></label
+              >Attività dal catalogo<select
+                [(ngModel)]="location.newActivityId"
+                [name]="'sector-' + location.id"
+                required
+              >
+                <option value="">Scegli dal catalogo</option>
+                <option
+                  *ngFor="let activity of missingActivities(location); trackBy: trackById"
+                  [value]="activity.id"
+                >
+                  {{ activity.name }}
+                </option>
+              </select></label
             ><button
               class="secondary-btn"
-              [disabled]="busy || !sector.newRoomName?.trim()"
+              [disabled]="busy || !location.newActivityId"
             >
               Aggiungi
             </button>
           </form>
-        </div>
-        <form
-          *ngIf="canEdit && missingActivities(location).length"
-          (ngSubmit)="createSector(location)"
-          class="inline-form"
-          data-tour="locations-sector-add"
-        >
-          <label class="grow"
-            >Aggiungi un’attività a questa sede<select
-              [(ngModel)]="location.newActivityId"
-              [name]="'sector-' + location.id"
-              required
-            >
-              <option value="">Scegli dal catalogo</option>
-              <option
-                *ngFor="let activity of missingActivities(location); trackBy: trackById"
-                [value]="activity.id"
-              >
-                {{ activity.name }}
-              </option>
-            </select></label
-          ><button
-            class="secondary-btn"
-            [disabled]="busy || !location.newActivityId"
-          >
-            Aggiungi
-          </button>
-        </form>
+        </section>
       </article>
-    </section>
+    </div>
     </ng-container>
     <section
       *ngIf="section === 'activities'"
@@ -392,42 +432,112 @@ import { ActivitiesService } from "../core/activities.service";
         </button>
       </div>
     </section>
-    <div
-      *ngIf="editor"
-      class="editor-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="location-editor-title"
+    <ui-sheet
+      *ngIf="createOpen && canEdit"
+      size="md"
+      eyebrow="Sedi"
+      title="Nuova sede"
+      subtitle="Nome e indirizzo bastano: orari e risorse si configurano dopo."
+      [busy]="busy"
+      closeLabel="Chiudi nuova sede"
+      (close)="createOpen = false"
     >
-      <form class="panel editor" (ngSubmit)="save()">
-        <div class="card-heading">
-          <h2 id="location-editor-title">
-            {{ editor.isSector ? "Configura attività" : "Configura sede" }}
-          </h2>
-          <button
-            type="button"
-            class="secondary-btn"
-            (click)="closeEditor()"
-            [disabled]="busy"
+      <form
+        id="location-create"
+        class="sheet-form"
+        (ngSubmit)="create()"
+      >
+        <p class="ui-step">1 · Dove</p>
+        <div class="sheet-fields">
+          <label
+            >Nome<input
+              [(ngModel)]="newName"
+              name="newName"
+              maxlength="120"
+              autofocus
+              required /></label
+          ><label
+            >Indirizzo<input
+              [(ngModel)]="newAddress"
+              name="newAddress"
+              maxlength="500" /></label
           >
-            Chiudi
+        </div>
+        <p class="ui-step">
+          2 · Attività svolte <span class="ui-step-hint">facoltativo</span>
+        </p>
+        <div
+          *ngIf="activities.active().length"
+          class="touch-grid"
+          data-tour="locations-create-activities"
+        >
+          <button
+            *ngFor="let activity of activities.active(); trackBy: trackById"
+            type="button"
+            class="touch-card"
+            [attr.aria-pressed]="newActivityIds.includes(activity.id)"
+            (click)="toggleNewActivity(activity.id)"
+          >
+            <span class="touch-card-kind">Attività</span>
+            <strong>{{ activity.name }}</strong>
+            <span class="touch-card-text">{{
+              newActivityIds.includes(activity.id) ? "Svolta qui" : "Tocca per aggiungere"
+            }}</span>
           </button>
         </div>
-        <label *ngIf="!editor.isSector"
-          >Nome<input
-            [(ngModel)]="editor.name"
-            name="editName"
-            maxlength="120"
-            required /></label
-        ><p *ngIf="editor.isSector" class="muted">
+        <button
+          type="button"
+          class="text-btn add-activity"
+          (click)="createOpen = false; section = 'activities'"
+        >
+          + Aggiungi un’attività al catalogo
+        </button>
+        <p *ngIf="feedback" role="status" class="ui-warn">{{ feedback }}</p>
+      </form>
+      <button
+        uiSheetBar
+        type="submit"
+        form="location-create"
+        class="primary-btn"
+        [disabled]="busy || !newName.trim()"
+      >
+        {{ busy ? "Salvataggio…" : "Crea sede" }}
+      </button>
+    </ui-sheet>
+    <ui-sheet
+      *ngIf="editor"
+      size="md"
+      [eyebrow]="editor.isSector ? 'Attività' : 'Sede'"
+      [title]="editor.isSector ? 'Configura attività' : 'Configura sede'"
+      [subtitle]="editor.name"
+      [busy]="busy"
+      closeLabel="Chiudi configurazione"
+      (close)="closeEditor()"
+    >
+      <form
+        id="location-editor-form"
+        class="sheet-form editor"
+        (ngSubmit)="save()"
+      >
+        <p class="ui-step">1 · Dati</p>
+        <div *ngIf="!editor.isSector" class="sheet-fields">
+          <label
+            >Nome<input
+              [(ngModel)]="editor.name"
+              name="editName"
+              maxlength="120"
+              required /></label
+          ><label
+            >Indirizzo<input
+              [(ngModel)]="editor.address"
+              name="editAddress"
+              maxlength="500"
+          /></label>
+        </div>
+        <p *ngIf="editor.isSector" class="muted">
           <strong>{{ editor.name }}</strong> · il nome dell’attività vale per tutte le sedi e
           si cambia dal Catalogo attività.
-        </p><label *ngIf="!editor.isSector"
-          >Indirizzo<input
-            [(ngModel)]="editor.address"
-            name="editAddress"
-            maxlength="500"
-        /></label>
+        </p>
         <div class="checks">
           <label
             ><input
@@ -447,6 +557,7 @@ import { ActivitiesService } from "../core/activities.service";
           La disattivazione impedisce nuove prenotazioni. Lo storico resta
           consultabile.
         </p>
+        <p class="ui-step">2 · Orari</p>
         <label class="check"
           ><input
             type="checkbox"
@@ -481,6 +592,7 @@ import { ActivitiesService } from "../core/activities.service";
             ></alora-time-select>
           </div>
         </fieldset>
+        <p class="ui-step">3 · Chiusure</p>
         <label
           >Giorni di chiusura<textarea
             [(ngModel)]="editor.closedDates"
@@ -488,12 +600,19 @@ import { ActivitiesService } from "../core/activities.service";
             rows="3"
             placeholder="Una data per riga, es. 2026-12-25"
           ></textarea></label
-        ><button class="primary-btn" [disabled]="busy || (!editor.isSector && !editor.name.trim())">
-          {{ busy ? "Salvataggio…" : "Salva configurazione" }}
-        </button>
-        <p *ngIf="feedback" role="status">{{ feedback }}</p>
+        >
+        <p *ngIf="feedback" role="status" class="ui-warn">{{ feedback }}</p>
       </form>
-    </div>
+      <button
+        uiSheetBar
+        type="submit"
+        form="location-editor-form"
+        class="primary-btn"
+        [disabled]="busy || (!editor.isSector && !editor.name.trim())"
+      >
+        {{ busy ? "Salvataggio…" : "Salva configurazione" }}
+      </button>
+    </ui-sheet>
   </ui-page>`,
   styles: [
     `
@@ -536,27 +655,109 @@ import { ActivitiesService } from "../core/activities.service";
         border-radius: 1.3rem;
         padding: 1.4rem;
       }
-      .create-panel {
-        margin-bottom: 1.4rem;
+      .empty-panel {
+        display: grid;
+        justify-items: start;
+        gap: 0.75rem;
       }
-      .activity-checks {
+      /* List left, detail right; one location: only the detail. */
+      .locations-layout {
+        display: grid;
+        gap: 1.4rem;
+        align-items: start;
+      }
+      @media (min-width: 64rem) {
+        .locations-layout.has-list {
+          grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr);
+        }
+        .location-list {
+          position: sticky;
+          top: 1rem;
+        }
+      }
+      .location-list {
+        display: grid;
+        gap: 0.6rem;
+      }
+      .location-pick {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        width: 100%;
+        min-height: 4.5rem;
+        border: 1px solid var(--line);
+        border-radius: 1.1rem;
+        background: var(--panel);
+        padding: 0.85rem 1rem;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+      .location-pick.on {
+        border-color: var(--alora-forest);
+        box-shadow: inset 0 0 0 2px var(--alora-forest);
+      }
+      .location-pick-main,
+      .location-pick-side {
+        display: grid;
+        gap: 0.25rem;
+        min-width: 0;
+        align-content: start;
+      }
+      .location-pick-side {
+        justify-items: end;
+        flex: none;
+      }
+      .location-pick .muted {
+        line-height: 1.3;
+      }
+      .location-detail {
+        display: grid;
+        gap: 1rem;
+        min-width: 0;
+        scroll-margin-top: 1rem;
+      }
+      .location-detail .ui-step {
+        color: var(--muted);
+      }
+      .badges {
         display: flex;
         flex-wrap: wrap;
+        align-items: center;
         gap: 0.5rem 1rem;
-        align-items: center;
-        border: 1px solid var(--line);
+      }
+      .ui-section > .sector-card:first-of-type {
+        border-top: 0;
+        margin-top: 0;
+        padding-top: 0;
+      }
+      .sheet-form {
+        display: grid;
+        gap: 1rem;
+      }
+      .sheet-form .ui-step {
+        margin-top: 0.5rem;
+      }
+      .sheet-form .ui-step:first-child {
+        margin-top: 0;
+      }
+      .sheet-fields {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+        gap: 0.9rem;
+      }
+      .sheet-form input:not([type="checkbox"]),
+      .sheet-form textarea {
+        min-height: 3.2rem;
         border-radius: 1rem;
-        padding: 0.7rem 0.9rem;
-        min-width: min(100%, 22rem);
+        font-size: 1rem;
       }
-      .activity-checks legend {
-        font-size: 0.85rem;
-        padding: 0 0.3rem;
+      .sheet-form .touch-grid {
+        margin-top: 0;
       }
-      .activity-checks label {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35rem;
+      .add-activity {
+        justify-self: start;
+        margin-left: 0;
       }
       .preset-row {
         display: flex;
@@ -591,12 +792,6 @@ import { ActivitiesService } from "../core/activities.service";
         font-weight: 700;
         max-width: 18rem;
       }
-      .create-panel form {
-        display: flex;
-        gap: 0.8rem;
-        align-items: end;
-        flex-wrap: wrap;
-      }
       label {
         display: grid;
         gap: 0.35rem;
@@ -613,11 +808,6 @@ import { ActivitiesService } from "../core/activities.service";
       }
       input[type="checkbox"] {
         accent-color: #27593c;
-      }
-      .locations-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
-        gap: 1.4rem;
       }
       .status {
         font-size: 0.68rem;
@@ -701,24 +891,6 @@ import { ActivitiesService } from "../core/activities.service";
         align-items: center;
         gap: 0.4rem;
       }
-      .editor-overlay {
-        position: fixed;
-        inset: 0;
-        background: #11271988;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 100;
-        padding: 1rem;
-      }
-      .editor {
-        width: 100%;
-        max-width: 640px;
-        max-height: 92vh;
-        overflow: auto;
-        display: grid;
-        gap: 1rem;
-      }
       .hours-row {
         display: grid;
         grid-template-columns: 1fr 110px 110px;
@@ -768,31 +940,25 @@ export class LocationsComponent implements OnInit {
     if (wasOpen) this.focusedBefore?.focus();
     this.focusedBefore = null;
   }
-  @HostListener("document:keydown", ["$event"])
-  onKey(event: KeyboardEvent) {
-    if (!this.editor) return;
-    if (event.key === "Escape" && !this.busy) {
-      event.preventDefault();
-      this.closeEditor();
-    }
-    if (event.key === "Tab") {
-      const controls = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          ".editor input:not([disabled]), .editor button:not([disabled]), .editor textarea:not([disabled])",
-        ),
-      ).filter((control) => control.offsetParent !== null);
-      const first = controls[0],
-        last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    }
-  }
   locations: any[] = [];
+  /** Location open on the right; the only one is open straight away. */
+  selectedId = "";
+  get selectedLocation(): any {
+    return (
+      this.locations.find((location) => location.id === this.selectedId) ||
+      this.locations[0] ||
+      null
+    );
+  }
+  selectLocation(location: any) {
+    this.selectedId = location.id;
+    if (typeof window !== "undefined" && window.innerWidth < 1024)
+      setTimeout(() =>
+        document
+          .getElementById("location-detail")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+  }
   createOpen = false;
   section: "structure" | "activities" | "people" | "visibility" = "structure";
   readonly activities = inject(ActivitiesService);
@@ -1021,7 +1187,9 @@ export class LocationsComponent implements OnInit {
   edit(row: any, isSector = false) {
     this.focusedBefore = document.activeElement as HTMLElement;
     setTimeout(() =>
-      document.querySelector<HTMLInputElement>(".editor input")?.focus(),
+      document
+        .querySelector<HTMLInputElement>("#location-editor-form input")
+        ?.focus(),
     );
     this.feedback = "";
     this.editor = {

@@ -28,7 +28,8 @@
               }
             ],
             "styles": [
-              "apps/web-admin/src/styles.css"
+              "apps/web-admin/src/styles.css",
+              "libs/ui/src/sheet/ui-sheet.css"
             ]
           },
           "configurations": {

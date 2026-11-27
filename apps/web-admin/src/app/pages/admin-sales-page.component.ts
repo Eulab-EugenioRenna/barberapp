@@ -1,10 +1,17 @@
 import { FunctionAccessDirective } from "../shared/function-access.directive";
 import { CommonModule } from "@angular/common";
-import { Component, EventEmitter, Input, Output } from "@angular/core";
+import { Component, EventEmitter, Input, Output, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
-import { UiSelectComponent, uiOptions, type UiOption } from "@alora/ui";
+import {
+  UiMoreMenuComponent,
+  UiSelectComponent,
+  UiSheetComponent,
+  uiOptions,
+  type UiOption,
+} from "@alora/ui";
+import { SessionStore } from "../core/session.store";
 import {
   buildAccountRows,
   KIND_LABELS,
@@ -27,6 +34,24 @@ import {
         display: grid;
         gap: 0.75rem;
       }
+      .account-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .account-line > .account-main {
+        flex: 1 1 18rem;
+        min-width: 0;
+      }
+      .account-sub {
+        margin-top: 0.25rem;
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 0.875rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .account-row-alert {
         border-color: #f2c46d;
       }
@@ -43,7 +68,7 @@ import {
       }
       .account-actions {
         display: flex;
-        flex-wrap: wrap;
+        flex: 0 0 auto;
         align-items: center;
         gap: 0.5rem;
       }
@@ -64,19 +89,31 @@ import {
     InfiniteScrollDirective,
     UiIconComponent,
     UiSelectComponent,
+    UiSheetComponent,
+    UiMoreMenuComponent,
   ],
   template: `
     <section class="grid gap-4">
       <article class="panel rounded-[2rem] p-4 sm:p-5">
-        <div class="min-w-0">
-          <p class="eyebrow text-[var(--accent)]">Conti</p>
-          <h3 class="mt-1 font-display text-2xl sm:text-3xl">
-            Tutti i conti
-          </h3>
-          <p class="mt-1 text-sm text-[var(--muted)]">
-            Da chiudere, aperti e registrati in un'unica lista: ogni conto
-            mostra la sua etichetta.
-          </p>
+        <div class="page-head">
+          <div class="min-w-0">
+            <p class="eyebrow text-[var(--accent)]">Cassa</p>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h3 class="font-display text-2xl sm:text-3xl">Vendite e conti</h3>
+              <span class="status-pill status-pill-neutral"
+                >{{ rows.length }} conti</span
+              >
+            </div>
+          </div>
+          <button
+            aloraFunction="sales.manage"
+            type="button"
+            class="primary-btn"
+            data-tour="sales-new"
+            (click)="openQuickOrder.emit()"
+          >
+            <barber-ui-icon name="receipt"></barber-ui-icon> Nuova vendita
+          </button>
         </div>
 
         <div
@@ -117,87 +154,83 @@ import {
             [attr.data-sale-id]="row.sale?.id || null"
             [attr.data-tour]="first ? 'sales-row' : null"
           >
-            <button
-              type="button"
-              class="account-main text-left"
-              (click)="openRow(row)"
-              [attr.aria-label]="'Apri il conto di ' + row.customer"
-            >
-              <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <strong>{{ row.customer }}</strong>
-                  <span
-                    class="status-pill"
-                    [ngClass]="pillClass(row.kind)"
-                    [attr.data-tour]="first ? 'sales-row-label' : null"
-                    >{{ kindLabel(row.kind) }}</span
-                  >
-                  <span
-                    *ngIf="row.kind === 'registered' && row.sale?.paymentStatus"
-                    class="status-pill"
-                    [ngClass]="row.sale.paymentStatus === 'paid' ? 'status-pill-green' : 'status-pill-neutral'"
-                    >{{ formatPaymentStatus(row.sale.paymentStatus) }}</span
-                  >
+            <div class="account-line">
+              <button
+                type="button"
+                class="account-main text-left"
+                (click)="openRow(row)"
+                [attr.aria-label]="'Apri il conto di ' + row.customer"
+              >
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <strong>{{ row.customer }}</strong>
+                    <span
+                      class="status-pill"
+                      [ngClass]="pillClass(row.kind)"
+                      [attr.data-tour]="first ? 'sales-row-label' : null"
+                      >{{ kindLabel(row.kind) }}</span
+                    >
+                  </div>
+                  <p class="account-sub">
+                    {{ formatDateTime(row.when) }}
+                    <ng-container *ngIf="row.who"> · {{ row.who }}</ng-container>
+                    <ng-container *ngIf="row.lines"> · {{ row.lines }}</ng-container>
+                  </p>
                 </div>
-                <p class="mt-1 text-sm text-[var(--muted)]">
-                  {{ formatDateTime(row.when) }}
-                  <ng-container *ngIf="row.who"> · {{ row.who }}</ng-container>
-                </p>
-                <p class="mt-1 text-xs text-[var(--muted)]">{{ row.lines }}</p>
-              </div>
-              <div class="text-right">
-                <strong *ngIf="row.total !== null">€{{ row.total.toFixed(2) }}</strong>
-                <p
-                  *ngIf="row.kind === 'registered'"
-                  class="text-sm text-[var(--muted)]"
-                >
-                  {{ formatPaymentMethod(row.sale?.paymentMethod) }}
-                </p>
-              </div>
-            </button>
+                <div class="text-right">
+                  <strong *ngIf="row.total !== null">€{{ row.total.toFixed(2) }}</strong>
+                  <p
+                    *ngIf="row.kind === 'registered'"
+                    class="text-sm text-[var(--muted)]"
+                  >
+                    {{ formatPaymentStatus(row.sale?.paymentStatus) }}
+                  </p>
+                </div>
+              </button>
 
-            <div
-              *ngIf="row.kind !== 'registered'"
-              class="account-actions"
-            >
-              <button
-                aloraFunction="sales.manage"
-                type="button"
-                class="primary-btn"
-                [attr.data-tour]="first ? 'sales-close' : null"
-                [disabled]="loading"
-                (click)="closeAccount.emit({ appointment: row.appointment, sale: row.sale })"
-              >
-                <barber-ui-icon name="receipt"></barber-ui-icon> Chiudi il conto
-              </button>
-              <button
-                aloraFunction="sales.manage"
-                type="button"
-                class="secondary-btn"
-                *ngIf="row.appointment && unlinkedSales.length"
-                [attr.data-tour]="first ? 'sales-link' : null"
-                (click)="toggleLink(row.key)"
-              >
-                <barber-ui-icon name="link"></barber-ui-icon>
-                {{ linkOpenFor === row.key ? "Chiudi collegamento" : "Collega vendita" }}
-              </button>
-              <button
-                aloraFunction="appointments.update.all"
-                type="button"
-                class="ghost-btn text-red-700"
-                *ngIf="row.appointment"
-                [attr.data-tour]="first ? 'sales-cancel' : null"
-                [disabled]="loading"
-                (click)="cancelAppointment.emit(row.appointment)"
-              >
-                <barber-ui-icon name="ban"></barber-ui-icon> Annulla appuntamento
-              </button>
+              <div *ngIf="row.kind !== 'registered'" class="account-actions">
+                <button
+                  aloraFunction="sales.manage"
+                  type="button"
+                  class="primary-btn"
+                  [attr.data-tour]="first ? 'sales-close' : null"
+                  [disabled]="loading"
+                  (click)="closeAccount.emit({ appointment: row.appointment, sale: row.sale })"
+                >
+                  <barber-ui-icon name="receipt"></barber-ui-icon> Chiudi il conto
+                </button>
+                <ui-more-menu
+                  *ngIf="hasMoreActions(row)"
+                  [label]="'Altre azioni per il conto di ' + row.customer"
+                  [attr.data-tour]="first ? 'sales-more' : null"
+                >
+                  <button
+                    *ngIf="row.appointment && unlinkedSales.length && can('sales.manage')"
+                    type="button"
+                    role="menuitem"
+                    (click)="toggleLink(row.key)"
+                  >
+                    <barber-ui-icon name="link"></barber-ui-icon>
+                    {{ linkOpenFor === row.key ? "Chiudi collegamento" : "Collega una vendita già fatta" }}
+                  </button>
+                  <button
+                    *ngIf="row.appointment && can('appointments.update.all')"
+                    type="button"
+                    role="menuitem"
+                    class="ui-more-danger"
+                    [disabled]="loading"
+                    (click)="cancelAppointment.emit(row.appointment)"
+                  >
+                    <barber-ui-icon name="ban"></barber-ui-icon> Annulla appuntamento
+                  </button>
+                </ui-more-menu>
+              </div>
             </div>
 
             <div
               aloraFunction="sales.manage"
               *ngIf="linkOpenFor === row.key"
-              class="mt-3 flex flex-wrap items-center gap-2 rounded-2xl bg-black/5 p-3"
+              class="flex flex-wrap items-center gap-2 rounded-2xl bg-black/5 p-3"
             >
               <ui-select
                 class="min-w-[min(14rem,100%)] flex-1 text-sm"
@@ -241,43 +274,16 @@ import {
       </article>
     </section>
 
-    <div *ngIf="selectedSale" class="confirm-overlay">
-      <button
-        type="button"
-        class="confirm-backdrop"
-        (click)="closeSaleDetail()"
-        aria-label="Chiudi dettaglio vendita"
-      ></button>
-      <article
-        class="confirm-dialog panel max-h-[85vh] overflow-auto"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="sale-detail-title"
-      >
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="eyebrow text-[var(--accent)]">Vendita</p>
-            <h2
-              id="sale-detail-title"
-              class="mt-2 font-display text-2xl sm:text-3xl"
-            >
-              {{ selectedSale.customer?.firstName || "Vendita" }}
-              {{ selectedSale.customer?.lastName || "senza cliente" }}
-            </h2>
-            <p class="mt-1 text-sm text-[var(--muted)]">
-              {{ formatDateTime(selectedSale.soldAt) }} ·
-              {{ formatPaymentMethod(selectedSale.paymentMethod) }}
-            </p>
-            <p class="mt-1 text-xs text-[var(--muted)]">
-              Riferimento {{ selectedSale.id }}
-            </p>
-          </div>
-          <button type="button" class="pill-btn" (click)="closeSaleDetail()">
-            Chiudi
-          </button>
-        </div>
-
-        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+    <ui-sheet
+      *ngIf="selectedSale"
+      size="md"
+      eyebrow="Vendita registrata"
+      [title]="saleCustomerName(selectedSale)"
+      [subtitle]="formatDateTime(selectedSale.soldAt) + ' · ' + formatPaymentMethod(selectedSale.paymentMethod) + ' · Riferimento ' + selectedSale.id"
+      closeLabel="Chiudi dettaglio vendita"
+      (close)="closeSaleDetail()"
+    >
+        <div class="grid gap-3 sm:grid-cols-2">
           <article class="rounded-2xl border border-[var(--line)] p-4">
             <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
               Cliente
@@ -308,7 +314,7 @@ import {
 
         <article
           *ngIf="selectedSale.appointment"
-          class="mt-4 rounded-2xl border border-[var(--line)] p-4"
+          class="rounded-2xl border border-[var(--line)] p-4"
         >
           <p class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
             Appuntamento collegato
@@ -335,7 +341,7 @@ import {
           </p>
         </article>
 
-        <div class="mt-4 grid gap-3">
+        <div class="grid gap-3">
           <article
             *ngFor="let item of selectedSale.items || []"
             class="rounded-2xl border border-[var(--line)] p-4"
@@ -365,7 +371,7 @@ import {
         </div>
 
         <div
-          class="mt-4 grid gap-2 rounded-2xl border border-[var(--line)] p-4 text-sm"
+          class="grid gap-2 rounded-2xl border border-[var(--line)] p-4 text-sm"
         >
           <div class="flex justify-between">
             <span class="text-[var(--muted)]">Subtotale</span>
@@ -394,14 +400,14 @@ import {
             <span>{{ formatPaymentStatus(selectedSale.paymentStatus) }}</span>
           </div>
         </div>
-        <div class="mt-4 flex flex-wrap gap-3">
+        <ng-container ngProjectAs="[uiSheetBar]">
           <button
             aloraFunction="sales.manage"
             type="button"
-            class="primary-btn"
-            (click)="editSelectedSale()"
+            class="danger-btn ui-bar-start"
+            (click)="deleteSelectedSale()"
           >
-            <barber-ui-icon name="edit"></barber-ui-icon> Modifica vendita
+            <barber-ui-icon name="trash"></barber-ui-icon> Elimina vendita
           </button>
           <button
             *ngIf="selectedSale.orderStatus !== 'cancelled'"
@@ -412,17 +418,20 @@ import {
           >
             <barber-ui-icon name="close"></barber-ui-icon> Annulla vendita
           </button>
+          <div class="ui-bar-info">
+            <span>Totale</span>
+            <strong>€{{ Number(selectedSale.total || 0).toFixed(2) }}</strong>
+          </div>
           <button
             aloraFunction="sales.manage"
             type="button"
-            class="pill-btn"
-            (click)="deleteSelectedSale()"
+            class="primary-btn"
+            (click)="editSelectedSale()"
           >
-            <barber-ui-icon name="trash"></barber-ui-icon> Elimina vendita
+            <barber-ui-icon name="edit"></barber-ui-icon> Modifica vendita
           </button>
-        </div>
-      </article>
-    </div>
+        </ng-container>
+    </ui-sheet>
   `,
 })
 export class AdminSalesPageComponent {
@@ -443,6 +452,10 @@ export class AdminSalesPageComponent {
   @Output() closeAccount = new EventEmitter<{ appointment: any; sale: any }>();
   @Output() linkOrder = new EventEmitter<{ appointment: any; saleId: string }>();
   @Output() cancelAppointment = new EventEmitter<any>();
+  /** «Nuova vendita»: opens the till empty. */
+  @Output() openQuickOrder = new EventEmitter<void>();
+
+  private readonly session = inject(SessionStore);
 
   protected readonly Number = Number;
   selectedSale: any = null;
@@ -522,6 +535,23 @@ export class AdminSalesPageComponent {
       return;
     }
     this.closeAccount.emit({ appointment: row.appointment, sale: row.sale });
+  }
+
+  can(permission: string): boolean {
+    return this.session.can(permission);
+  }
+
+  /** Secondary actions of a row to close, kept in its «…» menu. */
+  hasMoreActions(row: AccountRow): boolean {
+    if (!row.appointment) return false;
+    return (
+      (this.unlinkedSales.length > 0 && this.can("sales.manage")) ||
+      this.can("appointments.update.all")
+    );
+  }
+
+  saleCustomerName(sale: any): string {
+    return personName(sale?.customer) || "Vendita senza cliente";
   }
 
   toggleLink(key: string): void {

@@ -13,7 +13,8 @@ import { UiIconComponent } from "../icon/ui-icon.component";
 import type { UiNavGroup, UiNavItem } from "./ui-nav.types";
 
 /**
- * Grouped vertical navigation for a dark surface. Expanded: group labels,
+ * Grouped vertical navigation for a dark surface. Expanded: group labels
+ * (hidden for a group with a single visible item),
  * icon, label and hint. Collapsed (rail): icons only, groups separated by a
  * divider, label exposed through aria-label and title.
  */
@@ -25,8 +26,18 @@ import type { UiNavGroup, UiNavItem } from "./ui-nav.types";
   host: { "[class.collapsed]": "collapsed" },
   template: `<nav [attr.aria-label]="ariaLabel">
     <section *ngFor="let group of groups; trackBy: trackGroup" class="ui-nav-group">
-      <h3 class="ui-nav-group-label" [attr.id]="'ui-nav-' + group.id">{{ group.label }}</h3>
-      <ul [attr.aria-labelledby]="'ui-nav-' + group.id">
+      <!-- A group with one destination needs no title: the item says it all. -->
+      <h3
+        *ngIf="group.items.length > 1"
+        class="ui-nav-group-label"
+        [attr.id]="'ui-nav-' + group.id"
+      >
+        {{ group.label }}
+      </h3>
+      <ul
+        [attr.aria-labelledby]="group.items.length > 1 ? 'ui-nav-' + group.id : null"
+        [attr.aria-label]="group.items.length > 1 ? null : group.label"
+      >
         <li *ngFor="let item of group.items; trackBy: trackItem">
           <button
             type="button"

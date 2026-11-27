@@ -110,54 +110,63 @@ import {
             </button>
           </div>
         </div>
-        <div class="filters mt-3" data-tour="dashboard-filters">
-          <div class="field">
-            <span>Periodo</span>
-            <ui-select
-              [value]="revenueFilters.period"
-              (valueChange)="applyPeriod($event)"
-              [options]="periodOptions"
-              label="Periodo"
-            ></ui-select>
+        <div class="mt-3" data-tour="dashboard-filters">
+          <div class="filters">
+            <div class="field">
+              <span>Periodo</span>
+              <ui-select
+                [value]="revenueFilters.period"
+                (valueChange)="applyPeriod($event)"
+                [options]="periodOptions"
+                label="Periodo"
+              ></ui-select>
+            </div>
+            <label class="field" *ngIf="revenueFilters.period !== 'all'">
+              <span>Data di riferimento</span>
+              <barber-calendar-input
+                compact
+                [value]="revenueFilters.date"
+                (valueChange)="applyDate($event)"
+                label="Data"
+                placeholder="Seleziona data"
+              ></barber-calendar-input>
+            </label>
+            <button
+              type="button"
+              class="ghost-btn reset"
+              data-tour="dashboard-reset"
+              [disabled]="loading"
+              (click)="resetRevenueFilters.emit()"
+            >
+              Azzera filtri
+            </button>
           </div>
-          <label class="field" *ngIf="revenueFilters.period !== 'all'">
-            <span>Data di riferimento</span>
-            <barber-calendar-input
-              compact
-              [value]="revenueFilters.date"
-              (valueChange)="applyDate($event)"
-              label="Data"
-              placeholder="Seleziona data"
-            ></barber-calendar-input>
-          </label>
-          <div class="field">
-            <span>Cliente</span>
-            <alora-customer-select
-              [value]="revenueFilters.customerId"
-              (valueChange)="applyCustomer($event)"
-              allLabel="Tutti i clienti"
-              placeholder="Tutti i clienti"
-            ></alora-customer-select>
-          </div>
-          <div class="field" *ngIf="kind !== 'products' && hasTeam">
-            <span>Professionista</span>
-            <ui-select
-              [value]="revenueFilters.collaboratorId"
-              (valueChange)="applyCollaborator($event)"
-              [options]="collaboratorFilterOptions"
-              label="Professionista"
-              placeholder="Tutta la squadra"
-            ></ui-select>
-          </div>
-          <button
-            type="button"
-            class="ghost-btn reset"
-            data-tour="dashboard-reset"
-            [disabled]="loading"
-            (click)="resetRevenueFilters.emit()"
-          >
-            Azzera filtri
-          </button>
+          <details class="ui-advanced dashboard-more mt-3" [open]="activeExtraFilters > 0">
+            <summary>
+              <span>Filtri <small>{{ activeExtraFilters ? activeExtraFilters + " attivi" : "cliente" + (kind !== 'products' && hasTeam ? ", professionista" : "") }}</small></span>
+            </summary>
+            <div class="ui-advanced-body filters">
+              <div class="field">
+                <span>Cliente</span>
+                <alora-customer-select
+                  [value]="revenueFilters.customerId"
+                  (valueChange)="applyCustomer($event)"
+                  allLabel="Tutti i clienti"
+                  placeholder="Tutti i clienti"
+                ></alora-customer-select>
+              </div>
+              <div class="field" *ngIf="kind !== 'products' && hasTeam">
+                <span>Professionista</span>
+                <ui-select
+                  [value]="revenueFilters.collaboratorId"
+                  (valueChange)="applyCollaborator($event)"
+                  [options]="collaboratorFilterOptions"
+                  label="Professionista"
+                  placeholder="Tutta la squadra"
+                ></ui-select>
+              </div>
+            </div>
+          </details>
         </div>
       </article>
 
@@ -480,6 +489,11 @@ export class AdminDashboardPageComponent {
   @Output() editAppointment = new EventEmitter<any>();
   @Output() applyRevenueFilters = new EventEmitter<void>();
   @Output() resetRevenueFilters = new EventEmitter<void>();
+
+  /** Filters kept under «Filtri»: the panel opens when one is set. */
+  get activeExtraFilters(): number {
+    return [this.revenueFilters?.customerId, this.revenueFilters?.collaboratorId].filter(Boolean).length;
+  }
   @Output() loadMoreActivity = new EventEmitter<void>();
   @Output() openQuickOrder = new EventEmitter<void>();
 

@@ -1,4 +1,3 @@
-import { humanError } from "../core/human-error";
 import {
   Component,
   OnInit,
@@ -11,7 +10,12 @@ import {
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import { UiPageComponent, UiSelectComponent, type UiOption } from "@alora/ui";
+import {
+  UiPageComponent,
+  UiSelectComponent,
+  UiSheetComponent,
+  type UiOption,
+} from "@alora/ui";
 import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { HttpClient } from "@angular/common/http";
 import { firstValueFrom } from "rxjs";
@@ -20,6 +24,7 @@ import { OperationalContextService } from "../core/operational-context.service";
 import { ADMIN_API_URL } from "../core/api-config";
 import { BarcodeScannerService } from "../core/barcode-scanner.service";
 import { AdminApiService } from "../core/admin-api.service";
+import { KIND_REASON, movementReason } from "./inventory-movement";
 
 @Component({
   standalone: true,
@@ -29,6 +34,7 @@ import { AdminApiService } from "../core/admin-api.service";
     RouterLink,
     UiPageComponent,
     UiSelectComponent,
+    UiSheetComponent,
     AdminPageHeaderComponent,
   ],
   template: ` <ui-page class="inventory-shell">
@@ -104,13 +110,7 @@ import { AdminApiService } from "../core/admin-api.service";
       </section>
       <p *ngIf="feedback" role="status" class="notice">{{ feedback }}</p>
       <p *ngIf="loading" role="status">Caricamento magazzino…</p>
-      <div
-        class="inventory-layout"
-        *ngIf="locationId"
-        [class.with-operation]="
-          session.can('inventory.manage') && !!selectedProduct
-        "
-      >
+      <div class="inventory-layout" *ngIf="locationId">
         <section class="panel balances">
           <div class="section-heading">
             <h2>Giacenze</h2>
@@ -131,7 +131,7 @@ import { AdminApiService } from "../core/admin-api.service";
               type="button"
               class="stock-card"
               [class.selected]="productId === row.id"
-              (click)="selectProduct(row.id)"
+              (click)="openProduct(row.id)"
               [disabled]="busy || attempted"
             >
               <div>
@@ -154,86 +154,82 @@ import { AdminApiService } from "../core/admin-api.service";
             </button>
           </div>
         </section>
-        <section
-          class="panel operation-panel"
-          data-tour="inventory-operation"
-          *ngIf="session.can('inventory.manage') && selectedProduct"
+      </div>
+      <ui-sheet
+        *ngIf="movementOpen && session.can('inventory.manage') && selectedProduct"
+        size="lg"
+        eyebrow="Nuovo movimento"
+        [title]="selectedProduct.name"
+        [subtitle]="movementSubtitle"
+        [busy]="busy"
+        closeLabel="Chiudi nuovo movimento"
+        (close)="movementOpen = false"
+      >
+        <form
+          id="inventory-movement-form"
+          class="movement-form"
+          (ngSubmit)="submit()"
         >
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Nuovo movimento</p>
-              <h2>{{ selectedProduct.name }}</h2>
+          <fieldset [disabled]="busy || attempted">
+            <p class="ui-step">1 · Che movimento è</p>
+            <div class="touch-grid" role="radiogroup" aria-label="Tipo di movimento">
+              <button
+                *ngFor="let kind of kindCards"
+                type="button"
+                class="touch-card"
+                role="radio"
+                [attr.aria-checked]="form.kind === kind.value"
+                [disabled]="kind.disabled"
+                (click)="chooseKind(kind.value)"
+              >
+                <span class="touch-card-kind">{{ kind.tag }}</span>
+                <strong>{{ kind.label }}</strong>
+                <span class="touch-card-text">{{ kind.text }}</span>
+              </button>
             </div>
-          </div>
-          <form (ngSubmit)="submit()">
-            <fieldset [disabled]="busy || attempted">
-              <div class="select-field">
-                <span>Operazione</span
-                ><ui-select
-                  label="Operazione"
-                  [options]="kindOptions"
-                  [filterable]="false"
-                  [(ngModel)]="form.kind"
-                  name="kind"
-                ></ui-select>
-              </div>
-              <p class="hint" *ngIf="form.kind === 'opening'">
-                Inserisci la quantità contata; il costo è facoltativo. Non
-                vengono ricostruiti acquisti o IVA passati.
-              </p>
-              <p class="hint" *ngIf="form.kind === 'adjust'">
-                Inserisci la giacenza contata. Sarà registrata la differenza;
-                senza costo si usa l'ultimo costo noto.
-              </p>
+
+            <p class="ui-step">
+              2 · {{ form.kind === "adjust" || form.kind === "opening" ? "Quanti ne hai contati" : "Quanti" }}
+            </p>
+            <div class="movement-fields">
               <label
-                >{{ form.kind === "adjust" ? "Giacenza contata" : "Quantità"
-                }}<input
+                >{{ form.kind === "adjust" || form.kind === "opening" ? "Quantità contata" : "Quantità" }}<input
                   type="number"
                   min="0"
                   step="0.001"
+                  inputmode="decimal"
                   #movementQuantity
                   name="quantity"
                   [(ngModel)]="form.quantity"
                   required
               /></label>
-              <label
-                *ngIf="
-                  form.kind === 'opening' ||
-                  form.kind === 'receipt' ||
-                  form.kind === 'adjust'
-                "
-                >{{
-                  form.kind === "receipt"
-                    ? "Costo unitario di acquisto (facoltativo)"
-                    : "Costo netto unitario (facoltativo)"
-                }}<input
+              <label *ngIf="showsCost"
+                ><span
+                  >{{
+                    form.kind === "receipt"
+                      ? "Costo unitario di acquisto"
+                      : "Costo netto unitario"
+                  }}<span *ngIf="!costRequired" class="field-note">facoltativo</span></span
+                ><input
                   type="number"
                   min="0"
                   step="0.000001"
+                  inputmode="decimal"
                   name="unitCost"
                   [(ngModel)]="form.unitCost"
+                  [required]="costRequired"
               /></label>
-              <div class="two-fields" *ngIf="form.kind === 'receipt'">
-                <div class="select-field">
-                  <span>Modalità costo</span
-                  ><ui-select
-                    label="Modalità costo"
-                    name="costMode"
-                    [options]="costModeOptions"
-                    [filterable]="false"
-                    [(ngModel)]="form.costMode"
-                  ></ui-select>
-                </div
-                ><label
-                  >IVA acquisto (%)<input
-                    name="purchaseVatRate"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    [(ngModel)]="form.purchaseVatRate"
-                /></label>
-              </div>
+              <label *ngIf="form.kind === 'receipt'"
+                >IVA acquisto (%)<input
+                  name="purchaseVatRate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  inputmode="decimal"
+                  [(ngModel)]="form.purchaseVatRate"
+                  required
+              /></label>
               <div *ngIf="form.kind === 'transfer'" class="select-field">
                 <span>Sede di destinazione</span
                 ><ui-select
@@ -256,40 +252,84 @@ import { AdminApiService } from "../core/admin-api.service";
                   required
                 ></ui-select>
               </div>
-              <label
-                >Motivo (facoltativo)<textarea
-                  [(ngModel)]="form.reason"
-                  name="reason"
-                  maxlength="500"
-                  placeholder="Documento, conteggio o motivo della rettifica"
-                ></textarea>
-              </label>
-            </fieldset>
-            <div class="form-actions">
-              <button
-                type="submit"
-                class="primary-btn"
-                [disabled]="busy || form.quantity === ''"
-              >
-                {{
-                  busy
-                    ? "Registrazione…"
-                    : attempted
-                      ? "Ripeti la stessa operazione"
-                      : "Registra movimento"
-                }}</button
-              ><button
-                type="button"
-                class="pill-btn"
-                [disabled]="busy"
-                (click)="newOperation()"
-              >
-                Nuova operazione
-              </button>
             </div>
-          </form>
-        </section>
-      </div>
+            <p class="hint" *ngIf="form.kind === 'opening'">
+              Inserisci la quantità che hai in sede e il costo unitario netto.
+              Non vengono ricostruiti acquisti o IVA passati.
+            </p>
+            <p class="hint" *ngIf="form.kind === 'adjust'">
+              Sarà registrata la differenza con la giacenza attuale; il costo
+              serve solo se ne hai contati di più.
+            </p>
+            <details *ngIf="form.kind === 'receipt'" class="ui-advanced">
+              <summary>
+                Avanzate
+                <small>costo {{ form.costMode === "gross" ? "IVA inclusa" : "IVA esclusa" }}</small>
+              </summary>
+              <div class="ui-advanced-body">
+                <div class="select-field">
+                  <span>Modalità costo</span
+                  ><ui-select
+                    label="Modalità costo"
+                    name="costMode"
+                    [options]="costModeOptions"
+                    [filterable]="false"
+                    [(ngModel)]="form.costMode"
+                  ></ui-select>
+                </div>
+              </div>
+            </details>
+
+            <p class="ui-step">
+              3 · Motivo <span class="ui-step-hint">facoltativo</span>
+            </p>
+            <label
+              ><span class="sr-only">Motivo</span
+              ><textarea
+                [(ngModel)]="form.reason"
+                name="reason"
+                maxlength="500"
+                rows="2"
+                [placeholder]="'Documento, conteggio o nota. Se vuoto: «' + kindLabel(form.kind) + '»'"
+              ></textarea>
+            </label>
+          </fieldset>
+          <p *ngIf="feedback" role="status" [class]="attempted ? 'ui-error' : 'ui-warn'">
+            {{ feedback }}
+          </p>
+        </form>
+        <ng-container ngProjectAs="[uiSheetBar]">
+          <button
+            *ngIf="attempted"
+            type="button"
+            class="pill-btn ui-bar-start"
+            [disabled]="busy"
+            (click)="newOperation()"
+          >
+            Nuova operazione
+          </button>
+          <span *ngIf="!attempted" class="ui-bar-info ui-bar-start">
+            <span>{{ kindLabel(form.kind) }}</span>
+            <strong>{{
+              form.quantity === "" ? "Quantità da inserire" : number(form.quantity, 3)
+            }}</strong>
+          </span>
+          <button
+            type="submit"
+            form="inventory-movement-form"
+            class="primary-btn"
+            [disabled]="busy || !canSubmit"
+          >
+            {{
+              busy
+                ? "Registrazione…"
+                : attempted
+                  ? "Ripeti la stessa operazione"
+                  : "Registra movimento"
+            }}
+          </button>
+        </ng-container>
+      </ui-sheet>
       <section
         class="panel movements"
         *ngIf="selectedProduct"
@@ -300,7 +340,17 @@ import { AdminApiService } from "../core/admin-api.service";
             <p class="eyebrow">Registro movimenti</p>
             <h2>{{ selectedProduct.name }}</h2>
           </div>
-          <p>
+          <button
+            *ngIf="session.can('inventory.manage')"
+            type="button"
+            class="primary-btn"
+            data-tour="inventory-operation"
+            [disabled]="busy"
+            (click)="movementOpen = true"
+          >
+            Nuovo movimento
+          </button>
+          <p class="average-cost">
             Costo medio netto:
             {{
               selectedProduct.initialized
@@ -370,8 +420,7 @@ import { AdminApiService } from "../core/admin-api.service";
         font-size: 0.9rem;
       }
       .section-heading,
-      nav,
-      .form-actions {
+      nav {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -407,18 +456,14 @@ import { AdminApiService } from "../core/admin-api.service";
         font-size: 0.75rem;
         color: var(--muted);
       }
-      /* Stock list uses the full width; the movement panel opens beside it
-         only when a product is selected. */
+      /* Stock list uses the full width; a product opens the movement sheet. */
       .inventory-layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
         gap: var(--space-lg);
         align-items: start;
       }
-      .inventory-layout.with-operation {
-        grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
-      }
-      .inventory-layout:not(.with-operation) .stock-list {
+      .inventory-layout .stock-list {
         grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
       }
       .section-heading {
@@ -468,25 +513,6 @@ import { AdminApiService } from "../core/admin-api.service";
       .stock-numbers strong {
         font-variant-numeric: tabular-nums;
       }
-      .operation-panel {
-        background: var(--ink);
-        color: #f9faef;
-      }
-      .operation-panel p {
-        color: #d3dccb;
-      }
-      .operation-panel .eyebrow {
-        color: #c0dc7c;
-      }
-      .operation-panel input,
-      .operation-panel textarea {
-        background: #fff;
-        color: #24392b;
-      }
-      .operation-panel .pill-btn {
-        background: #f4f7eb;
-        color: #24392b;
-      }
       form,
       fieldset {
         display: grid;
@@ -520,10 +546,39 @@ import { AdminApiService } from "../core/admin-api.service";
         min-height: 5rem;
         resize: vertical;
       }
-      .two-fields {
+      .movement-form fieldset {
+        gap: 1.25rem;
+      }
+      .movement-fields {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: var(--space-sm);
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+        gap: 0.9rem;
+      }
+      .movement-form label,
+      .movement-form .select-field {
+        font-size: 0.92rem;
+        font-weight: 700;
+      }
+      .movement-form input,
+      .movement-form textarea {
+        min-height: 3.375rem;
+        padding: 0.85rem 1rem;
+        border-radius: 1.2rem;
+        font-size: 1.05rem;
+      }
+      .movement-form textarea {
+        min-height: 4.5rem;
+      }
+      .movement-form .touch-grid {
+        margin-top: -0.5rem;
+      }
+      .field-note {
+        margin-left: 0.35rem;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .average-cost {
+        flex-basis: 100%;
       }
       .hint,
       .empty {
@@ -619,8 +674,7 @@ import { AdminApiService } from "../core/admin-api.service";
         }
       }
       @media (max-width: 850px) {
-        .inventory-layout,
-        .inventory-layout.with-operation {
+        .inventory-layout {
           grid-template-columns: 1fr;
         }
         .context-panel {
@@ -644,14 +698,8 @@ import { AdminApiService } from "../core/admin-api.service";
         .panel {
           padding: 1rem;
         }
-        .two-fields {
-          grid-template-columns: 1fr;
-        }
         .stock-card strong {
           overflow-wrap: anywhere;
-        }
-        .form-actions > * {
-          width: 100%;
         }
       }
     `,
@@ -754,16 +802,73 @@ export class InventoryComponent implements OnInit, OnDestroy {
       locations.map((loc) => ({ value: loc.id, label: loc.name })),
     );
   }
-  get kindOptions(): UiOption[] {
+  /** «Nuovo movimento» sheet. */
+  movementOpen = false;
+  /** Movement types as touch cards; inventory first only when not counted yet. */
+  get kindCards(): Array<{
+    value: string;
+    tag: string;
+    label: string;
+    text: string;
+    disabled: boolean;
+  }> {
     const initialized = !!this.selectedProduct?.initialized;
-    return this.cachedOptions("kinds", [initialized], () => [
-      { value: "opening", label: "Inventario iniziale", disabled: initialized },
-      { value: "receipt", label: "Carico acquisto" },
-      { value: "issue", label: "Scarico interno" },
-      { value: "adjust", label: "Rettifica inventario" },
-      { value: "transfer", label: "Trasferimento" },
-      { value: "return", label: "Reso da scarico" },
-    ]);
+    const canTransfer = this.destinations.length > 0;
+    const key = `${initialized}|${canTransfer}`;
+    if (key !== this.kindCardsKey) {
+      this.kindCardsKey = key;
+      this.kindCardsCache = [
+        { value: "opening", tag: "Prima volta", label: "Inventario iniziale", text: "Quanti ne hai in sede adesso", disabled: false },
+        { value: "receipt", tag: "Entrata", label: "Carico", text: "Merce acquistata o arrivata", disabled: false },
+        { value: "issue", tag: "Uscita", label: "Scarico", text: "Uso interno, rotture, omaggi", disabled: false },
+        { value: "adjust", tag: "Conteggio", label: "Rettifica", text: "Correggi con la quantità contata", disabled: false },
+        { value: "transfer", tag: "Sedi", label: "Trasferimento", text: "Sposta verso un'altra sede", disabled: !canTransfer },
+        { value: "return", tag: "Rientro", label: "Reso", text: "Annulla uno scarico registrato", disabled: false },
+      ].filter((card) => !(initialized && card.value === "opening"));
+    }
+    return this.kindCardsCache;
+  }
+  private kindCardsKey = "";
+  private kindCardsCache: Array<{
+    value: string;
+    tag: string;
+    label: string;
+    text: string;
+    disabled: boolean;
+  }> = [];
+  kindLabel(kind: string): string {
+    return KIND_REASON[kind] || kind;
+  }
+  get movementSubtitle(): string {
+    const product = this.selectedProduct;
+    if (!product) return "";
+    return product.initialized
+      ? `Giacenza attuale ${this.number(product.quantity, 3)}: scegli il movimento e la quantità.`
+      : "Prima volta: registra la quantità che hai in sede.";
+  }
+  get showsCost(): boolean {
+    return ["opening", "receipt", "adjust"].includes(this.form.kind);
+  }
+  /** Cost and VAT are optional: the server uses the last known cost (or 0). */
+  get costRequired(): boolean {
+    return false;
+  }
+  get canSubmit(): boolean {
+    if (this.attempted) return true;
+    if (this.form.quantity === "" || this.form.quantity === null) return false;
+    if (this.costRequired && `${this.form.unitCost ?? ""}` === "") return false;
+    if (this.form.kind === "transfer" && !this.form.toLocationId) return false;
+    if (this.form.kind === "return" && !this.form.returnOfId) return false;
+    return true;
+  }
+  chooseKind(kind: string): void {
+    this.form.kind = kind;
+  }
+  /** Tap on a product: select it and open the movement sheet. */
+  async openProduct(id: string): Promise<void> {
+    await this.selectProduct(id);
+    if (this.productId === id && this.session.can("inventory.manage"))
+      this.movementOpen = true;
   }
   get destinationOptions(): UiOption[] {
     return this.cachedOptions(
@@ -827,7 +932,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
           : "");
       if (this.locationId) await this.changeLocation();
     } catch (error: any) {
-      this.feedback = humanError(error, "Caricamento non riuscito");
+      this.feedback = error?.error?.message || "Caricamento non riuscito";
     }
   }
   ngOnDestroy() {
@@ -839,6 +944,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
     this.saveInventoryScroll();
     this.context.select(this.locationId, "", false);
     this.productId = "";
+    this.movementOpen = false;
     this.rows = [];
     this.movements = [];
     this.newOperation();
@@ -924,6 +1030,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
       )
         return;
       this.showScanFeedback("ok", `Selezionato: ${product.name}`);
+      if (this.session.can("inventory.manage")) this.movementOpen = true;
       this.changeDetector.detectChanges();
       this.movementQuantity?.nativeElement.focus();
     } catch (error: any) {
@@ -935,7 +1042,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
           ? "Prodotto non trovato per questo barcode."
           : error?.status === 0
             ? "Rete assente. Riprova la scansione quando la connessione è disponibile."
-            : humanError(error, "Scansione non riuscita. Riprova."),
+            : error?.error?.message || "Scansione non riuscita. Riprova.",
       );
     }
   }
@@ -965,7 +1072,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
       setTimeout(() => this.restoreInventoryScroll(), 0);
     } catch (error: any) {
       if (token === this.generation)
-        this.feedback = humanError(error, "Giacenze non disponibili");
+        this.feedback = error?.error?.message || "Giacenze non disponibili";
     } finally {
       if (token === this.generation) this.loading = false;
     }
@@ -997,7 +1104,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
       this.hasMore = result.hasMore;
       if (!append) setTimeout(() => this.restoreInventoryScroll(), 0);
     } catch (error: any) {
-      this.feedback = humanError(error, "Registro non disponibile");
+      this.feedback = error?.error?.message || "Registro non disponibile";
     }
   }
   async loadMore() {
@@ -1022,7 +1129,7 @@ export class InventoryComponent implements OnInit, OnDestroy {
         productId: this.productId,
         quantity: String(this.form.quantity),
         idempotencyKey: this.key,
-        ...(this.form.reason.trim() ? { reason: this.form.reason.trim() } : {}),
+        reason: movementReason(this.form.reason, this.form.kind),
         ...(["opening", "receipt", "adjust"].includes(this.form.kind) &&
         this.form.unitCost !== ""
           ? { unitCost: String(this.form.unitCost) }
@@ -1030,9 +1137,9 @@ export class InventoryComponent implements OnInit, OnDestroy {
         ...(this.form.kind === "receipt"
           ? {
               costMode: this.form.costMode,
-              ...(String(this.form.purchaseVatRate ?? "") !== ""
-                ? { purchaseVatRate: String(this.form.purchaseVatRate) }
-                : {}),
+              ...(`${this.form.purchaseVatRate ?? ""}` === ""
+                ? {}
+                : { purchaseVatRate: String(this.form.purchaseVatRate) }),
             }
           : {}),
         ...(this.form.kind === "transfer"
@@ -1044,18 +1151,17 @@ export class InventoryComponent implements OnInit, OnDestroy {
       };
     this.attempted = true;
     try {
-      const result: any = await firstValueFrom(
+      await firstValueFrom(
         this.http.post(`${ADMIN_API_URL}/inventory/operations`, this.snapshot),
       );
       this.newOperation();
-      this.feedback = result?.warnings?.length
-        ? `Movimento registrato. ${result.warnings.join(". ")}`
-        : "Movimento registrato e giacenza riconciliata";
+      this.movementOpen = false;
+      this.feedback = "Movimento registrato e giacenza riconciliata";
       this.page = 1;
       await this.load();
     } catch (error: any) {
       this.feedback =
-        (humanError(error, "Esito non disponibile")) +
+        (error?.error?.message || "Esito non disponibile") +
         ". Puoi ripetere la stessa operazione; per modificarla controlla il registro e scegli Nuova operazione.";
     } finally {
       this.busy = false;
@@ -1088,3 +1194,4 @@ export class InventoryComponent implements OnInit, OnDestroy {
     }
   }
 }
+

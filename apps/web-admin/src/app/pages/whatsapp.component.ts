@@ -1,5 +1,5 @@
-import { AfterViewChecked, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { AfterViewChecked, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, LOCALE_ID, inject } from "@angular/core";
+import { CommonModule, formatDate } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import type {
   WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView,
@@ -10,14 +10,14 @@ import { SessionStore } from "../core/session.store";
 import { WhatsAppApiService } from "../core/whatsapp-api.service";
 import { NotificationsFeedService } from "../core/notifications-feed.service";
 import { humanError } from "../core/human-error";
-import { UiPageComponent, UiSelectComponent, UiTabsComponent, type UiOption, type UiTab } from "@alora/ui";
+import { UiPageComponent, UiSelectComponent, UiSheetComponent, UiTabsComponent, type UiOption, type UiTab } from "@alora/ui";
 import { AdminPageHeaderComponent } from "../shell/admin-page-header.component";
 import { CustomerDirectoryService } from "../core/customer-directory.service";
 import { CustomerSelectComponent } from "../shared/customer-select.component";
 import { ActivatedRoute, Router } from "@angular/router";
 import { broadcastShares, recipientStatus, sendStatus, SEND_ATTEMPTS, type SendStatus } from "../core/whatsapp-send-status";
 @Component({
-  standalone: true, imports: [CommonModule, FormsModule, CustomerSelectComponent, UiPageComponent, UiTabsComponent, UiSelectComponent, AdminPageHeaderComponent],
+  standalone: true, imports: [CommonModule, FormsModule, CustomerSelectComponent, UiPageComponent, UiTabsComponent, UiSelectComponent, UiSheetComponent, AdminPageHeaderComponent],
   templateUrl: "./whatsapp.component.html", styleUrl: "./whatsapp.component.css",
 })
 export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
@@ -63,6 +63,7 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   readonly session = inject(SessionStore);
+  private readonly locale = inject(LOCALE_ID);
   readonly api = inject(WhatsAppApiService);
   connections: WhatsAppConnection[] = [];
   archives: WhatsAppArchiveView[] = [];
@@ -349,6 +350,20 @@ export class WhatsAppComponent implements OnInit, OnDestroy, AfterViewChecked {
   openSingle(item: WhatsAppOutboxView) {
     this.detailFeedback = "";
     this.detail = { kind: "single", item };
+  }
+  get detailTitle(): string {
+    const detail = this.detail;
+    if (!detail) return "";
+    if (detail.kind === "single") return detail.item.recipientName || "Destinatario";
+    return `${this.broadcastStatus(detail.job.status)} · ${this.broadcastPercent(detail.job)}%`;
+  }
+  get detailSubtitle(): string {
+    const detail = this.detail;
+    if (!detail) return "";
+    const when = (value: string | Date, pattern: string) => formatDate(value, pattern, this.locale);
+    if (detail.kind === "single") return when(detail.item.createdAt, "dd MMM yyyy, HH:mm");
+    const job = detail.job;
+    return `Creato il ${when(job.createdAt, "dd MMM yyyy, HH:mm")}${job.finishedAt ? ` · chiuso il ${when(job.finishedAt, "dd MMM, HH:mm")}` : ""}`;
   }
   closeDetail() {
     this.detail = null;

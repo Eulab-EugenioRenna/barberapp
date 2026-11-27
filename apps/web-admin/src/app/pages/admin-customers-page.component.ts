@@ -5,6 +5,7 @@ import { FormsModule } from "@angular/forms";
 import { InfiniteScrollDirective } from "../shared/infinite-scroll.directive";
 import { AutofocusFirstDirective } from "../shared/autofocus-first.directive";
 import { UiIconComponent } from "../shared/ui-icon.component";
+import { UiSheetComponent } from "@alora/ui";
 import {
   WhatsAppSendDialogComponent,
   type WhatsAppRecipient,
@@ -35,100 +36,37 @@ import {
     AutofocusFirstDirective,
     UiIconComponent,
     WhatsAppSendDialogComponent,
+    UiSheetComponent,
   ],
   styles: [
     `
-      /* Spacing scale of the card: one value per level, used everywhere. */
-      :host {
-        --cd-pad: 1.5rem;
-        --cd-gap: 1.1rem;
-        --cd-field-gap: 0.9rem;
-      }
-      .customer-dialog {
-        display: flex;
-        flex-direction: column;
-        width: min(34rem, 100%);
-        max-height: min(92dvh, 60rem);
-        padding: 0;
-        overflow: hidden;
-      }
-      .customer-dialog-wide {
-        width: min(78rem, 100%);
-        height: min(92dvh, 60rem);
-      }
-      .customer-dialog-head {
-        display: flex;
-        flex: none;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--cd-gap);
-        padding: calc(var(--cd-pad) * 0.8) var(--cd-pad);
-        border-bottom: 0.0625rem solid var(--line);
-      }
-      .customer-dialog-body {
-        display: grid;
-        flex: 1;
-        min-height: 0;
-        grid-template-rows: minmax(0, 1fr);
-      }
-      .customer-dialog-wide .customer-dialog-body {
-        grid-template-columns: minmax(20rem, 25rem) minmax(0, 1fr);
-      }
-      .customer-col {
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        height: 100%;
-      }
       .customer-col-title {
         margin: 0;
         color: var(--muted);
         font-size: 0.72rem;
         font-weight: 800;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
       }
-      /* Left: full height, fields scroll, actions always at the bottom. */
-      .customer-profile {
-        background: rgba(30, 52, 37, 0.025);
-      }
-      .customer-dialog-wide .customer-profile {
-        border-right: 0.0625rem solid var(--line);
-      }
       .customer-profile-fields {
-        display: flex;
-        flex: 1;
-        flex-direction: column;
-        gap: var(--cd-field-gap);
-        min-height: 0;
-        overflow: auto;
-        padding: var(--cd-pad);
-      }
-      .customer-profile-fields textarea {
-        min-height: 7rem;
-        resize: vertical;
+        display: grid;
+        align-content: start;
+        gap: 0.9rem;
       }
       .customer-name-row {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--cd-field-gap);
+        gap: 0.9rem;
       }
-      .customer-profile-actions {
-        display: flex;
-        flex: none;
-        flex-wrap: wrap;
-        gap: 0.6rem;
-        padding: calc(var(--cd-pad) * 0.75) var(--cd-pad);
-        border-top: 0.0625rem solid var(--line);
-        background: var(--panel, #fff);
-      }
-      /* Right: summary and filters stay, the list scrolls. */
       .customer-history {
-        gap: var(--cd-gap);
-        padding: var(--cd-pad);
+        display: grid;
+        align-content: start;
+        gap: 1rem;
       }
-      .customer-history > * {
-        flex: none;
+      .history-summary-line {
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 500;
       }
       .history-kpis {
         display: grid;
@@ -196,18 +134,13 @@ import {
       .history-pill.on em {
         color: rgba(255, 255, 255, 0.75);
       }
-      .customer-history > .history-list {
-        flex: 1;
-      }
       .history-list {
         display: grid;
         align-content: start;
         gap: 0.5rem;
-        min-height: 0;
-        margin: 0 calc(var(--cd-pad) * -0.25) 0 0;
-        padding: 0 calc(var(--cd-pad) * 0.25) 0 0;
+        margin: 0;
+        padding: 0;
         list-style: none;
-        overflow: auto;
       }
       .history-row {
         display: grid;
@@ -284,81 +217,17 @@ import {
         cursor: pointer;
       }
       .history-more {
-        align-self: center;
+        justify-self: center;
       }
 
-      /* Tablet: narrower profile column, KPIs on two rows. */
       @media (max-width: 1100px) {
-        :host {
-          --cd-pad: 1.25rem;
-        }
-        .customer-dialog-wide .customer-dialog-body {
-          grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr);
-        }
         .history-kpis {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
-
-      /* Stacked: one scroll for the whole card, profile first. */
-      @media (max-width: 860px) {
-        .customer-dialog-wide {
-          height: min(94dvh, 60rem);
-        }
-        .customer-dialog-body,
-        .customer-dialog-wide .customer-dialog-body {
-          grid-template-columns: minmax(0, 1fr);
-          grid-template-rows: none;
-          overflow: auto;
-        }
-        .customer-col {
-          height: auto;
-        }
-        .customer-dialog-wide .customer-profile {
-          border-right: 0;
-          border-bottom: 0.0625rem solid var(--line);
-        }
-        .customer-profile-fields,
-        .history-list {
-          overflow: visible;
-        }
-        .history-list {
-          margin: 0;
-          padding: 0;
-        }
-      }
-
-      /* Phone: full screen sheet, tighter spacing, stacked filters. */
       @media (max-width: 640px) {
-        :host {
-          --cd-pad: 1rem;
-          --cd-gap: 0.9rem;
-          --cd-field-gap: 0.75rem;
-        }
-        .customer-dialog,
-        .customer-dialog-wide {
-          position: fixed;
-          inset: 0;
-          width: 100%;
-          height: 100dvh;
-          max-height: none;
-          border-radius: 0;
-        }
-        .customer-dialog-head {
-          padding-top: calc(var(--cd-pad) * 0.8 + env(safe-area-inset-top));
-        }
         .customer-name-row {
           grid-template-columns: minmax(0, 1fr);
-        }
-        .customer-profile-actions {
-          position: sticky;
-          bottom: 0;
-          z-index: 1;
-          padding-bottom: calc(var(--cd-pad) * 0.75 + env(safe-area-inset-bottom));
-        }
-        .customer-profile-actions > * {
-          flex: 1;
-          justify-content: center;
         }
         .history-filters {
           flex-direction: column;
@@ -482,142 +351,122 @@ import {
       </article>
     </section>
 
-    <div *ngIf="formOpen" class="confirm-overlay">
+    <ui-sheet
+      *ngIf="formOpen"
+      [size]="customerForm.id ? 'lg' : 'md'"
+      [split]="!!customerForm.id"
+      [eyebrow]="customerForm.id ? 'Scheda cliente' : 'Nuovo cliente'"
+      [title]="displayName || 'Nuovo cliente'"
+      [subtitle]="customerForm.id ? 'Anagrafica a sinistra, storico di visite e conti a destra.' : 'Nome e cognome sono obbligatori, il resto puoi aggiungerlo dopo.'"
+      closeLabel="Chiudi scheda cliente"
+      (close)="formOpen = false"
+    >
       <button
+        uiSheetHead
+        *ngIf="customerForm.id"
+        aloraFunction="whatsapp.send"
+        data-tour="customer-whatsapp"
         type="button"
-        class="confirm-backdrop"
-        (click)="formOpen = false"
-        aria-label="Chiudi scheda cliente"
-      ></button>
-      <article
-        barberAutofocusFirst
-        class="confirm-dialog panel customer-dialog"
-        [class.customer-dialog-wide]="customerForm.id"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="customer-form-title"
+        class="secondary-btn"
+        (click)="whatsappTo = customerForm"
       >
-        <header class="customer-dialog-head">
-          <div class="min-w-0">
-            <p class="eyebrow text-[var(--accent)]">
-              {{ customerForm.id ? "Scheda cliente" : "Nuovo cliente" }}
-            </p>
-            <h2 id="customer-form-title" class="mt-1 truncate font-display text-2xl sm:text-3xl">
-              {{ displayName || "Nuovo cliente" }}
-            </h2>
-          </div>
-          <div class="flex flex-none flex-wrap justify-end gap-2">
-            <button
-              *ngIf="customerForm.id"
-              aloraFunction="whatsapp.send"
-              data-tour="customer-whatsapp"
-              type="button"
-              class="secondary-btn"
-              (click)="whatsappTo = customerForm"
-            >
-              Invia messaggio
-            </button>
-            <button type="button" class="pill-btn" (click)="formOpen = false">
-              <barber-ui-icon name="close"></barber-ui-icon> Chiudi
-            </button>
-          </div>
-        </header>
+        Invia messaggio
+      </button>
 
-        <div class="customer-dialog-body">
-          <!-- Left: personal data -->
-          <form class="customer-col customer-profile" data-tour="customer-profile" (ngSubmit)="submit()">
-            <div class="customer-profile-fields">
-            <p class="customer-col-title">Anagrafica</p>
-            <div class="customer-name-row">
-              <label class="field">
-                <span>Nome <em class="required-mark" aria-hidden="true">*</em></span>
-                <input
-                  [(ngModel)]="customerForm.firstName"
-                  name="customerFirstName"
-                  autocomplete="given-name"
-                  required
-                />
-              </label>
-              <label class="field">
-                <span>Cognome <em class="required-mark" aria-hidden="true">*</em></span>
-                <input
-                  [(ngModel)]="customerForm.lastName"
-                  name="customerLastName"
-                  autocomplete="family-name"
-                  required
-                />
-              </label>
-            </div>
-            <label class="field">
-              <span>Telefono</span>
-              <input
-                [(ngModel)]="customerForm.phone"
-                name="customerPhone"
-                type="tel"
-                autocomplete="tel"
-              />
-            </label>
-            <label class="field">
-              <span>Email</span>
-              <input
-                [(ngModel)]="customerForm.email"
-                name="customerEmail"
-                type="email"
-                autocomplete="email"
-              />
-            </label>
-            <div *ngIf="customerForm.autoTags?.length" class="flex flex-wrap gap-2">
-              <span *ngFor="let tag of customerForm.autoTags" class="status-pill status-pill-blue">{{ tag }}</span>
-            </div>
-            <label class="field">
-              <span>Tag</span>
-              <input
-                [(ngModel)]="customerForm.tagsText"
-                name="customerTagsText"
-                placeholder="vip, richiamo, preferenze"
-              />
-            </label>
-            <label class="field">
-              <span>Note</span>
-              <textarea
-                [(ngModel)]="customerForm.notes"
-                name="customerNotes"
-                rows="4"
-                placeholder="Preferenze, allergie, cose da ricordare"
-              ></textarea>
-            </label>
-            </div>
-            <div class="customer-profile-actions">
-              <button
-                aloraFunction="clients.manage"
-                type="submit"
-                class="primary-btn"
-                [disabled]="loading || !formValid"
-              >
-                <barber-ui-icon name="save"></barber-ui-icon>
-                {{ customerForm.id ? "Salva" : "Crea cliente" }}
-              </button>
-              <button
-                aloraFunction="clients.manage"
-                *ngIf="customerForm.id"
-                type="button"
-                class="pill-btn"
-                [disabled]="loading"
-                (click)="removeCustomer()"
-              >
-                <barber-ui-icon name="trash"></barber-ui-icon> Elimina
-              </button>
-            </div>
-          </form>
+      <form
+        barberAutofocusFirst
+        id="customer-form"
+        [class.ui-sheet-col]="!!customerForm.id"
+        class="customer-profile-fields"
+        data-tour="customer-profile"
+        (ngSubmit)="submit()"
+      >
+        <p class="ui-step">1 · Anagrafica</p>
+        <div class="customer-name-row">
+          <label class="field">
+            <span>Nome <em class="required-mark" aria-hidden="true">*</em></span>
+            <input
+              [(ngModel)]="customerForm.firstName"
+              name="customerFirstName"
+              autocomplete="given-name"
+              required
+            />
+          </label>
+          <label class="field">
+            <span>Cognome <em class="required-mark" aria-hidden="true">*</em></span>
+            <input
+              [(ngModel)]="customerForm.lastName"
+              name="customerLastName"
+              autocomplete="family-name"
+              required
+            />
+          </label>
+        </div>
+        <label class="field">
+          <span>Telefono</span>
+          <input
+            [(ngModel)]="customerForm.phone"
+            name="customerPhone"
+            type="tel"
+            autocomplete="tel"
+          />
+        </label>
+        <label class="field">
+          <span>Email</span>
+          <input
+            [(ngModel)]="customerForm.email"
+            name="customerEmail"
+            type="email"
+            autocomplete="email"
+          />
+        </label>
+        <div *ngIf="customerForm.autoTags?.length" class="flex flex-wrap gap-2">
+          <span *ngFor="let tag of customerForm.autoTags" class="status-pill status-pill-blue">{{ tag }}</span>
+        </div>
+        <label class="field">
+          <span>Tag</span>
+          <input
+            [(ngModel)]="customerForm.tagsText"
+            name="customerTagsText"
+            placeholder="vip, richiamo, preferenze"
+          />
+        </label>
+        <label class="field">
+          <span>Note</span>
+          <textarea
+            [(ngModel)]="customerForm.notes"
+            name="customerNotes"
+            rows="4"
+            placeholder="Preferenze, allergie, cose da ricordare"
+          ></textarea>
+        </label>
+      </form>
 
-          <!-- Right: history with search and filters -->
-          <section
-            *ngIf="customerForm.id"
-            class="customer-col customer-history"
-            data-tour="customer-history"
-            aria-labelledby="customer-history-title"
-          >
-            <p id="customer-history-title" class="customer-col-title">Storico</p>
+      <section
+        *ngIf="customerForm.id"
+        class="ui-sheet-col customer-history"
+        data-tour="customer-history"
+        aria-labelledby="customer-history-title"
+      >
+        <p id="customer-history-title" class="ui-step">2 · Storico</p>
+        <label class="field history-search">
+            <span class="sr-only">Cerca nello storico</span>
+            <input
+              [(ngModel)]="historyQuery"
+              name="historyQuery"
+              type="search"
+              autocomplete="off"
+              placeholder="Cerca servizio, prodotto, professionista, note"
+            />
+          </label>
+        <details class="ui-advanced" data-tour="customer-history-filters">
+          <summary>
+            <span>Riepilogo e filtri</span>
+            <small class="history-summary-line" *ngIf="!historyLoading && customerHistory">
+              €{{ summary.spent | number: "1.2-2" }} · {{ summary.visits }} visite<ng-container *ngIf="filtersActive"> · filtri attivi</ng-container>
+            </small>
+          </summary>
+          <div class="ui-advanced-body">
             <div class="history-kpis" *ngIf="!historyLoading && customerHistory">
               <div><span>Speso</span><strong>€{{ summary.spent | number: "1.2-2" }}</strong></div>
               <div><span>Visite</span><strong>{{ summary.visits }}</strong></div>
@@ -631,115 +480,125 @@ import {
               </div>
             </div>
 
-            <div class="history-tools" data-tour="customer-history-filters">
-              <label class="field history-search">
-                <span class="sr-only">Cerca nello storico</span>
-                <input
-                  [(ngModel)]="historyQuery"
-                  name="historyQuery"
-                  type="search"
-                  autocomplete="off"
-                  placeholder="Cerca servizio, prodotto, professionista, note"
-                />
-              </label>
-              <div class="history-filters">
-                <div class="history-pills" role="group" aria-label="Tipo">
-                  <button
-                    *ngFor="let option of kindOptions"
-                    type="button"
-                    class="history-pill"
-                    [class.on]="historyKind === option.value"
-                    [attr.aria-pressed]="historyKind === option.value"
-                    (click)="historyKind = option.value"
-                  >
-                    {{ option.label }} <em>{{ kindCount(option.value) }}</em>
-                  </button>
-                </div>
-                <div class="history-pills" role="group" aria-label="Periodo">
-                  <button
-                    *ngFor="let option of periodOptions"
-                    type="button"
-                    class="history-pill"
-                    [class.on]="historyPeriod === option.value"
-                    [attr.aria-pressed]="historyPeriod === option.value"
-                    (click)="historyPeriod = option.value"
-                  >
-                    {{ option.label }}
-                  </button>
-                </div>
+            <div class="history-filters">
+              <div class="history-pills" role="group" aria-label="Tipo">
+                <button
+                  *ngFor="let option of kindOptions"
+                  type="button"
+                  class="history-pill"
+                  [class.on]="historyKind === option.value"
+                  [attr.aria-pressed]="historyKind === option.value"
+                  (click)="historyKind = option.value"
+                >
+                  {{ option.label }} <em>{{ kindCount(option.value) }}</em>
+                </button>
+              </div>
+              <div class="history-pills" role="group" aria-label="Periodo">
+                <button
+                  *ngFor="let option of periodOptions"
+                  type="button"
+                  class="history-pill"
+                  [class.on]="historyPeriod === option.value"
+                  [attr.aria-pressed]="historyPeriod === option.value"
+                  (click)="historyPeriod = option.value"
+                >
+                  {{ option.label }}
+                </button>
               </div>
             </div>
-
-            <p *ngIf="historyLoading" class="text-sm text-[var(--muted)]" role="status">
-              Caricamento storico…
-            </p>
-            <ul *ngIf="!historyLoading" class="history-list" aria-live="polite">
-              <li *ngFor="let row of visibleRows; trackBy: trackByRow">
-                <button
-                  type="button"
-                  class="history-row"
-                  [class.history-row-future]="row.future"
-                  [attr.aria-expanded]="expanded === row.id"
-                  (click)="expanded = expanded === row.id ? null : row.id"
-                >
-                  <span class="history-icon" [class.sale]="row.kind === 'sale'" aria-hidden="true">
-                    <barber-ui-icon [name]="row.kind === 'sale' ? 'receipt' : 'calendar'"></barber-ui-icon>
-                  </span>
-                  <span class="history-main">
-                    <strong class="truncate">{{ row.title }}</strong>
-                    <span class="history-meta">
-                      {{ formatDateTime(row.at) }}
-                      <ng-container *ngIf="row.subtitle"> · {{ row.subtitle }}</ng-container>
-                    </span>
-                  </span>
-                  <span class="history-side">
-                    <strong *ngIf="row.amount !== null">€{{ row.amount | number: "1.2-2" }}</strong>
-                    <span
-                      class="status-pill"
-                      [class.status-pill-blue]="row.future"
-                      [class.status-pill-neutral]="!row.future"
-                      >{{ row.future ? "In programma" : statusLabel(row) }}</span
-                    >
-                  </span>
-                </button>
-                <div *ngIf="expanded === row.id" class="history-detail">
-                  <ul *ngIf="row.lines.length" class="grid gap-1">
-                    <li *ngFor="let line of row.lines" class="flex justify-between gap-3">
-                      <span>{{ line.quantity }} × {{ line.label }}</span>
-                      <span>€{{ line.total | number: "1.2-2" }}</span>
-                    </li>
-                  </ul>
-                  <p *ngIf="row.paymentMethod">Pagamento: {{ formatPaymentMethod(row.paymentMethod) }}</p>
-                  <p *ngIf="row.kind === 'appointment'">
-                    {{ row.settled ? "Conto registrato in cassa." : row.future ? "Appuntamento futuro." : "Nessun conto collegato." }}
-                  </p>
-                  <p *ngIf="row.notes">Note: {{ row.notes }}</p>
-                </div>
-              </li>
-              <li *ngIf="!filteredRows.length" class="history-empty">
-                {{ historyRows.length ? "Nessuna voce con questi filtri." : "Nessuna attività registrata." }}
-                <button
-                  *ngIf="historyRows.length"
-                  type="button"
-                  class="link-btn"
-                  (click)="resetHistoryFilters()"
-                >
-                  Azzera filtri
-                </button>
-              </li>
-            </ul>
+          </div>
+        </details>
+        <p *ngIf="historyLoading" class="text-sm text-[var(--muted)]" role="status">
+          Caricamento storico…
+        </p>
+        <ul *ngIf="!historyLoading" class="history-list" aria-live="polite">
+          <li *ngFor="let row of visibleRows; trackBy: trackByRow">
             <button
-              *ngIf="!historyLoading && filteredRows.length > visibleRows.length"
               type="button"
-              class="pill-btn history-more"
-              (click)="historyLimit = historyLimit + 30"
+              class="history-row"
+              [class.history-row-future]="row.future"
+              [attr.aria-expanded]="expanded === row.id"
+              (click)="expanded = expanded === row.id ? null : row.id"
             >
-              Mostra altre {{ filteredRows.length - visibleRows.length }}
+              <span class="history-icon" [class.sale]="row.kind === 'sale'" aria-hidden="true">
+                <barber-ui-icon [name]="row.kind === 'sale' ? 'receipt' : 'calendar'"></barber-ui-icon>
+              </span>
+              <span class="history-main">
+                <strong class="truncate">{{ row.title }}</strong>
+                <span class="history-meta">
+                  {{ formatDateTime(row.at) }}
+                  <ng-container *ngIf="row.subtitle"> · {{ row.subtitle }}</ng-container>
+                </span>
+              </span>
+              <span class="history-side">
+                <strong *ngIf="row.amount !== null">€{{ row.amount | number: "1.2-2" }}</strong>
+                <span
+                  class="status-pill"
+                  [class.status-pill-blue]="row.future"
+                  [class.status-pill-neutral]="!row.future"
+                  >{{ row.future ? "In programma" : statusLabel(row) }}</span
+                >
+              </span>
             </button>
-          </section>
-        </div>
-      </article>
-    </div>
+            <div *ngIf="expanded === row.id" class="history-detail">
+              <ul *ngIf="row.lines.length" class="grid gap-1">
+                <li *ngFor="let line of row.lines" class="flex justify-between gap-3">
+                  <span>{{ line.quantity }} × {{ line.label }}</span>
+                  <span>€{{ line.total | number: "1.2-2" }}</span>
+                </li>
+              </ul>
+              <p *ngIf="row.paymentMethod">Pagamento: {{ formatPaymentMethod(row.paymentMethod) }}</p>
+              <p *ngIf="row.kind === 'appointment'">
+                {{ row.settled ? "Conto registrato in cassa." : row.future ? "Appuntamento futuro." : "Nessun conto collegato." }}
+              </p>
+              <p *ngIf="row.notes">Note: {{ row.notes }}</p>
+            </div>
+          </li>
+          <li *ngIf="!filteredRows.length" class="history-empty">
+            {{ historyRows.length ? "Nessuna voce con questi filtri." : "Nessuna attività registrata." }}
+            <button
+              *ngIf="historyRows.length"
+              type="button"
+              class="link-btn"
+              (click)="resetHistoryFilters()"
+            >
+              Azzera filtri
+            </button>
+          </li>
+        </ul>
+        <button
+          *ngIf="!historyLoading && filteredRows.length > visibleRows.length"
+          type="button"
+          class="pill-btn history-more"
+          (click)="historyLimit = historyLimit + 30"
+        >
+          Mostra altre {{ filteredRows.length - visibleRows.length }}
+        </button>
+      </section>
+
+      <ng-container ngProjectAs="[uiSheetBar]">
+        <button
+          aloraFunction="clients.manage"
+          *ngIf="customerForm.id"
+          type="button"
+          class="danger-btn ui-bar-start"
+          [disabled]="loading"
+          (click)="removeCustomer()"
+        >
+          <barber-ui-icon name="trash"></barber-ui-icon> Elimina
+        </button>
+        <button
+          aloraFunction="clients.manage"
+          type="submit"
+          form="customer-form"
+          class="primary-btn"
+          [disabled]="loading || !formValid"
+        >
+          <barber-ui-icon name="save"></barber-ui-icon>
+          {{ customerForm.id ? "Salva" : "Crea cliente" }}
+        </button>
+      </ng-container>
+    </ui-sheet>
 
     <alora-whatsapp-send-dialog
       *ngIf="whatsappTo !== undefined"
@@ -826,6 +685,10 @@ export class AdminCustomersPageComponent {
     return row.kind === "sale"
       ? this.formatPaymentStatus(row.status)
       : this.formatAppointmentStatus(row.status);
+  }
+
+  get filtersActive(): boolean {
+    return this.historyKind !== "all" || this.historyPeriod !== "all";
   }
 
   resetHistoryFilters(): void {

@@ -22,3 +22,13 @@ export {
 export { UiSelectComponent, uiSameValue } from "./select/ui-select.component";
 export { UiMultiSelectComponent } from "./select/ui-multi-select.component";
 export { UiAutocompleteComponent } from "./select/ui-autocomplete.component";
+export {
+  UiSheetComponent,
+  type UiSheetSize,
+} from "./sheet/ui-sheet.component";
+export {
+  UiConfirmComponent,
+  UiConfirmService,
+  type UiConfirmOptions,
+} from "./sheet/ui-confirm.component";
+export { UiMoreMenuComponent } from "./sheet/ui-more-menu.component";
