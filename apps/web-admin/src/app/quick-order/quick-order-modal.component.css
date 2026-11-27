@@ -9,6 +9,12 @@
   display: grid;
   place-items: center;
   padding: clamp(0.5rem, 3vw, 2.5rem);
+  /* Installed app with «window-controls-overlay»: the title bar band is part
+     of the page, keep the sheet below the window buttons. */
+  padding-top: max(
+    clamp(0.5rem, 3vw, 2.5rem),
+    calc(env(titlebar-area-y, 0px) + env(titlebar-area-height, 0px) + 0.5rem)
+  );
   opacity: 1;
   transition:
     opacity 220ms ease,
@@ -385,8 +391,41 @@
     position: sticky;
     bottom: -1rem;
     z-index: 2;
+    /* Payment, status and total on one row: the pinned bar takes ~140px
+       instead of ~230px, leaving room for the cart lines above it. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 0.6rem 0.75rem;
     margin-bottom: -1rem;
+    padding-top: 0.75rem;
     padding-bottom: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
+  }
+  .checkout-bar .field {
+    gap: 0.3rem;
+  }
+  .checkout-bar .field span {
+    font-size: 0.78rem;
+  }
+  .checkout-bar select {
+    min-height: 2.6rem;
+    padding: 0.5rem 0.8rem;
+  }
+  .checkout-total {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 0.1rem;
+    padding-top: 0;
+    border-top: 0;
+    font-size: 0.78rem;
+  }
+  .checkout-total strong {
+    font-size: 1.6rem;
+    line-height: 1.1;
+  }
+  .checkout-bar .primary-btn {
+    min-height: 2.9rem;
   }
 }
 @media (max-width: 900px) {
@@ -411,7 +450,13 @@
     z-index: 3;
     flex-wrap: wrap;
     padding: 1rem;
-    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+    padding-top: calc(
+      1rem +
+        max(
+          env(safe-area-inset-top, 0px),
+          env(titlebar-area-y, 0px) + env(titlebar-area-height, 0px)
+        )
+    );
   }
   .quick-order-header h2 {
     font-size: 1.65rem;
