@@ -9,6 +9,30 @@ import { AdminPwaService } from "../core/pwa.service";
   template: `
     <div class="pwa-banner-stack" aria-live="polite">
       <section
+        *ngIf="pwa.updateAvailable()"
+        class="pwa-banner pwa-banner-install pwa-banner-update"
+        role="status"
+      >
+        <span class="pwa-banner-icon pwa-banner-update-icon" aria-hidden="true">↻</span>
+        <div class="pwa-banner-copy">
+          <strong>Nuova versione disponibile</strong>
+          <span>Aggiorna quando vuoi: salva prima eventuali modifiche in corso.</span>
+        </div>
+        <div class="pwa-banner-actions">
+          <button type="button" class="pill-btn" (click)="pwa.dismissUpdate()">
+            Più tardi
+          </button>
+          <button
+            type="button"
+            class="primary-btn pwa-banner-action"
+            (click)="pwa.applyUpdate()"
+          >
+            Aggiorna
+          </button>
+        </div>
+      </section>
+
+      <section
         *ngIf="pwa.offline()"
         class="pwa-banner pwa-banner-offline"
         role="status"
@@ -56,6 +80,15 @@ import { AdminPwaService } from "../core/pwa.service";
       </section>
     </div>
   `,
+  styles: [
+    `
+      .pwa-banner-update-icon {
+        background: #0f3d32;
+        color: white;
+        font-size: 1.05rem;
+      }
+    `,
+  ],
 })
 export class AdminPwaBannerComponent {
   readonly pwa = inject(AdminPwaService);
