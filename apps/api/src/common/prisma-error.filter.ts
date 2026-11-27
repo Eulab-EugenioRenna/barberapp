@@ -32,10 +32,22 @@ export class PrismaErrorFilter implements ExceptionFilter {
       (error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2010" &&
         error.meta?.["code"] === "23514");
+    // The double-booking guard is the one check staff meet daily: say it plainly.
+    const doubleBooking =
+      constraintConflict &&
+      /Conflitto appuntamento/.test(
+        `${error.message} ${
+          error instanceof Prisma.PrismaClientKnownRequestError
+            ? String(error.meta?.["message"] ?? "")
+            : ""
+        }`,
+      );
     const [statusCode, message] =
       error instanceof Prisma.PrismaClientValidationError
         ? [400, "Dati non validi"]
-        : constraintConflict
+        : doubleBooking
+          ? [409, "Il professionista ha già un appuntamento in quell'orario"]
+          : constraintConflict
           ? [
               409,
               "Disponibilità o attribuzione operativa cambiate. Aggiorna e riprova.",

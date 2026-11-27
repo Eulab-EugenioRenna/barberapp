@@ -322,25 +322,8 @@ export class BookingResourcesService {
         collaboratorIds: needsStaff ? eligible : [null],
         rooms: candidateRooms,
       };
-      if (
-        reservations.some(
-          (old) =>
-            old.start < demand.end &&
-            old.end > demand.start &&
-            ((needsStaff &&
-              old.service.requiresCollaborator &&
-              !old.collaboratorId) ||
-              (needsRoom &&
-                old.sectorId === row.service.sectorId &&
-                old.service.requiresRoom &&
-                !old.roomId)),
-        )
-      )
-        throw new ConflictException({
-          code: "LEGACY_RESOURCES_UNKNOWN",
-          message:
-            "Una prenotazione sovrapposta ha risorse storiche da riconciliare",
-        });
+      // Historical bookings without a recorded professional or room do not hold
+      // any known resource: they never block the agenda (the DB still checks real ones).
       demands.push(demand);
     }
     let allocation: ResourceReservation[] | null;
@@ -357,8 +340,9 @@ export class BookingResourcesService {
     if (!allocation)
       throw new ConflictException({
         code: "RESOURCES_UNAVAILABLE",
-        message:
-          "Le risorse per l'intera prenotazione non sono disponibili agli orari scelti",
+        message: lines.some((row) => row.collaboratorId)
+          ? "Il professionista ha già un appuntamento in quell'orario"
+          : "Le risorse per l'intera prenotazione non sono disponibili agli orari scelti",
       });
     return rows.map((row, index) => {
       const collaboratorId = allocation![index].collaboratorId;

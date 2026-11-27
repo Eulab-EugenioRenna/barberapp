@@ -17,10 +17,11 @@ import {
 } from "../../common/operational-lock";
 import type {
   BookingRevisionDto,
-  BookingCancellationDto,
 } from "../../common/booking-mutation.dto";
 import { publicBookingResult } from "../../common/public-booking-result";
-import { saleFilter } from "../locations/operational-scope";
+import { saleFilter, sectorFilter } from "../locations/operational-scope";
+import { linkLegacyBooking } from "./legacy-booking-link";
+import { changeAccountCustomer } from "./account-customer";
 import { normalizeOrderItems, type OrderItemInput } from "../sales/sales.logic";
 import { BookingResourcesService } from "./booking-resources.service";
 import {
@@ -50,6 +51,7 @@ const include = {
 } as const;
 type Account = Prisma.SaleGetPayload<{ include: typeof include }>;
 const stopped = new Set(["cancelled", "no_show", "completed"]);
+export const DEFAULT_CANCELLATION_REASON = "Annullato dall'agenda";
 
 /** All schedule rows of one existing operational account share this transaction and revision. */
 @Injectable()
@@ -69,6 +71,31 @@ export class BookingMutationService {
     )
       throw new BadRequestException("Contesto della modifica non valido");
   }
+  private scopeWhere(context: CommandContext): Prisma.AppointmentWhereInput {
+    return context.scope ? sectorFilter(context.scope) : {};
+  }
+  /** Historical bookings without an account row get one on the fly (never a block). */
+  private async ensureLinked(context: CommandContext, appointmentId: string) {
+    const row = await this.prisma.appointment.findFirst({
+      where: { id: appointmentId, tenantId: context.tenantId },
+      select: { orderItemId: true, orderIssue: true },
+    });
+    if (!row || (row.orderItemId && !row.orderIssue)) return;
+    await this.prisma.$transaction(
+      async (tx) => {
+        await lockOperationalTenant(tx, context.tenantId);
+        await setOperationalActor(tx, context.actorId);
+        await linkLegacyBooking(
+          tx,
+          context.tenantId,
+          appointmentId,
+          this.scopeWhere(context),
+        );
+        await tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+      },
+      { timeout: 15000 },
+    );
+  }
   private async account(
     tx: Prisma.TransactionClient,
     context: CommandContext,
@@ -78,15 +105,12 @@ export class BookingMutationService {
       where: { id: appointmentId, tenantId: context.tenantId },
       select: {
         orderItemId: true,
-        orderIssue: true,
         orderItem: { select: { saleId: true } },
       },
     });
     if (!anchor) throw new NotFoundException("Prenotazione non accessibile");
-    if (!anchor.orderItem || anchor.orderIssue)
-      throw new ConflictException(
-        "Riconcilia prima il collegamento storico del conto",
-      );
+    if (!anchor.orderItem)
+      throw new NotFoundException("Prenotazione non accessibile");
     const account = await tx.sale.findFirst({
       where: {
         id: anchor.orderItem.saleId,
@@ -99,14 +123,8 @@ export class BookingMutationService {
       throw new NotFoundException(
         "Serve accesso a tutti i settori della prenotazione",
       );
-    if (
-      !account.customerId ||
-      !account.customer ||
-      account.items.some((row) => row.booking?.orderIssue)
-    )
-      throw new ConflictException(
-        "Riconcilia prima i collegamenti storici del conto",
-      );
+    if (!account.customerId || !account.customer)
+      throw new ConflictException("Il conto non ha un cliente: assegnalo dalla cassa");
     return account;
   }
   private view(account: Account) {
@@ -137,6 +155,7 @@ export class BookingMutationService {
   }
   async read(context: CommandContext, appointmentId: string) {
     this.internal(context);
+    await this.ensureLinked(context, appointmentId);
     return this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
@@ -195,11 +214,8 @@ export class BookingMutationService {
     input: ReturnType<BookingMutationService["normalize"]>,
     lineOnly = false,
   ) {
-    this.orders.assertRevision(account, input.revision);
-    if (account.orderStatus !== "open")
-      throw new ConflictException(
-        "La pianificazione si modifica su un conto aperto",
-      );
+    // Moving, reassigning or re-timing is last-write-wins on any account state:
+    // only price or row changes need the revision and an open account (economics).
     const tenant = await tx.tenant.findFirst({
       where: { id: context.tenantId, isActive: true, isSuspended: false },
       select: { timezone: true },
@@ -213,7 +229,7 @@ export class BookingMutationService {
       const old = row.appointmentId
         ? booked.find((old) => old.id === row.appointmentId)
         : undefined;
-      if (row.appointmentId && (!old || stopped.has(old.status)))
+      if (row.appointmentId && !old)
         throw new ConflictException(
           "Il servizio non è modificabile in questa prenotazione",
         );
@@ -308,11 +324,25 @@ export class BookingMutationService {
     plan: Awaited<ReturnType<BookingMutationService["plan"]>>,
   ) {
     const { rows, targets } = plan;
+    // Re-sending the price already on the row is not a price change.
+    const priced = input.lines.map((request, i) => {
+      const existing = targets[i].existing;
+      return (
+        request.finalPrice !== null &&
+        !(
+          existing &&
+          existing.serviceId === request.serviceId &&
+          new Prisma.Decimal(request.finalPrice).eq(
+            existing.lineTotal.plus(existing.taxTotal),
+          )
+        )
+      );
+    });
     const economic = targets.some(
       (target, i) =>
         !target.existing ||
         target.existing.serviceId !== input.lines[i].serviceId ||
-        input.lines[i].finalPrice !== null,
+        priced[i],
     );
     const itemInputs: OrderItemInput[] = account.items.map((row) => ({
       ...row,
@@ -336,7 +366,7 @@ export class BookingMutationService {
       if (
         !target.existing ||
         target.existing.serviceId !== request.serviceId ||
-        request.finalPrice !== null
+        priced[index]
       ) {
         const same = target.existing?.serviceId === request.serviceId;
         const changed: OrderItemInput = {
@@ -395,6 +425,7 @@ export class BookingMutationService {
   ) {
     this.internal(context);
     const input = this.normalize(body);
+    await this.ensureLinked(context, appointmentId);
     return this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
@@ -457,14 +488,14 @@ export class BookingMutationService {
     context: CommandContext,
     account: Account,
     input: ReturnType<BookingMutationService["normalize"]>,
-    lineOnly = false,
+    options: { lineOnly?: boolean; baseRevision?: number } = {},
   ) {
     const { rows, targets } = await this.plan(
       tx,
       context,
       account,
       input,
-      lineOnly,
+      options.lineOnly,
     );
     const { economic, itemInputs, normalized } = await this.economics(
       tx,
@@ -472,6 +503,16 @@ export class BookingMutationService {
       input,
       { rows, targets },
     );
+    if (economic) {
+      this.orders.assertRevision(
+        { revision: options.baseRevision ?? account.revision },
+        input.revision,
+      );
+      if (account.orderStatus !== "open")
+        throw new ConflictException(
+          "Prezzo e servizi si cambiano su un conto ancora da incassare: per un conto chiuso usa la cassa",
+        );
+    }
     await tx.$executeRaw`SET CONSTRAINTS alora_appointment_resources DEFERRED`;
     if (normalized) {
       for (const [index, row] of normalized.entries()) {
@@ -600,6 +641,12 @@ export class BookingMutationService {
             replayed: true,
             appointmentIds: [] as string[],
           };
+        await linkLegacyBooking(
+          tx,
+          context.tenantId,
+          appointmentId,
+          this.scopeWhere(context),
+        );
         const account = await this.account(tx, context, appointmentId);
         const recordEvents = await beginAppointmentEvents(tx, context, {
           orderItem: { saleId: account.id },
@@ -623,7 +670,123 @@ export class BookingMutationService {
       { timeout: 15000 },
     );
   }
-  /** Legacy single-line adapter: other reservations remain fixed in the planner's calendar. */
+  /** Posted stock belongs to an executed service: its status stays until the stock is returned. */
+  private async consumed(
+    tx: Prisma.TransactionClient,
+    item: { id: string; stockState: string },
+  ) {
+    return (
+      item.stockState === "posted" ||
+      (await tx.stockMovement.count({ where: { saleItemId: item.id } })) > 0
+    );
+  }
+  /** A cancelled account goes back to work when one of its bookings is corrected. */
+  private async reopen(tx: Prisma.TransactionClient, account: Account) {
+    if (account.orderStatus !== "cancelled") return false;
+    await tx.sale.update({
+      where: { id: account.id },
+      data: {
+        orderStatus:
+          account.paymentStatus === "unpaid" && !account.paymentMethod
+            ? "open"
+            : "confirmed",
+        revision: { increment: 1 },
+      },
+    });
+    return true;
+  }
+  /** After a correction of a cancelled account, it closes again if nothing is left to do. */
+  private async recloseIfIdle(tx: Prisma.TransactionClient, saleId: string) {
+    const items = await tx.saleItem.findMany({
+      where: { saleId },
+      select: { booking: { select: { status: true } } },
+    });
+    if (
+      items.length &&
+      items.every(
+        (row) =>
+          row.booking && ["cancelled", "no_show"].includes(row.booking.status),
+      )
+    )
+      await tx.sale.update({
+        where: { id: saleId },
+        data: { orderStatus: "cancelled", revision: { increment: 1 } },
+      });
+  }
+  private async statusHistory(
+    tx: Prisma.TransactionClient,
+    context: CommandContext,
+    appointmentId: string,
+    from: string,
+    to: string,
+  ) {
+    await tx.auditLog.create({
+      data: {
+        tenantId: context.tenantId,
+        actorUserId: context.actorId,
+        action: "appointment.status_changed",
+        entityType: "appointment",
+        entityId: appointmentId,
+        before: { status: from },
+        after: { status: to },
+      },
+    });
+  }
+  /** Cancels inside the caller's transaction. Money, payments and stock are never changed here. */
+  private async cancelInTransaction(
+    tx: Prisma.TransactionClient,
+    context: CommandContext,
+    account: Account,
+    appointmentId: string,
+    reason: string,
+    mode: "all" | "line",
+  ) {
+    if (account.orderStatus === "superseded")
+      throw new ConflictException("Il conto storico è stato sostituito");
+    const bookings = account.items.flatMap((row) =>
+      row.booking ? [{ ...row.booking, item: row }] : [],
+    );
+    const targets =
+      mode === "all"
+        ? bookings.filter((row) => !stopped.has(row.status))
+        : bookings.filter(
+            (row) => row.id === appointmentId && row.status !== "cancelled",
+          );
+    for (const row of targets)
+      if (row.status === "completed" && (await this.consumed(tx, row.item)))
+        throw new ConflictException(
+          "Il servizio ha consumi di magazzino registrati: resta «eseguito» finché non gestisci il reso dal magazzino",
+        );
+    const ids = new Set(targets.map((row) => row.id));
+    const allStopped =
+      mode === "all" ||
+      account.items.every(
+        (row) =>
+          row.booking &&
+          (ids.has(row.booking.id) ||
+            ["cancelled", "no_show"].includes(row.booking.status)),
+      );
+    if (targets.length || (allStopped && account.orderStatus !== "cancelled"))
+      await applyBookingCancellation(tx, {
+        orderId: account.id,
+        appointmentIds: targets.map((row) => row.id),
+        allStopped,
+        actorId: context.actorId,
+        cancelledByType: "staff",
+        cancelledById: context.actorId,
+        reason,
+        policyResult: "operator_recorded",
+      });
+    for (const row of targets)
+      await this.statusHistory(tx, context, row.id, row.status, "cancelled");
+    return targets.map((row) => row.id);
+  }
+  /**
+   * Single-booking adapter used by the agenda (drag, form, status buttons).
+   * Last write wins for time, professional, status, notes and customer; the
+   * revision is checked only when price or account rows change. Double booking
+   * stays impossible: the database resource check runs before commit.
+   */
   async reviseLine(
     context: CommandContext,
     appointmentId: string,
@@ -640,6 +803,7 @@ export class BookingMutationService {
       "finalPrice",
       "priceOverrideReason",
       "status",
+      "reason",
       "customerId",
       "customerNotes",
       "internalNotes",
@@ -650,22 +814,27 @@ export class BookingMutationService {
       Object.keys(body).some(
         (key) => body[key] !== undefined && !allowed.has(key),
       ) ||
-      !Number.isInteger(body.revision) ||
-      Number(body.revision) < 0
+      (body.revision != null &&
+        (!Number.isInteger(body.revision) || Number(body.revision) < 0))
     )
-      throw new BadRequestException(
-        "Indica revisione e campi della prenotazione validi",
-      );
+      throw new BadRequestException("Campi della prenotazione non validi");
     if (body.finalPrice === null)
       throw new BadRequestException(
         "Indica un prezzo esplicito; zero significa prestazione gratuita",
       );
+    const idempotencyKey =
+      typeof body.idempotencyKey === "string" && body.idempotencyKey
+        ? body.idempotencyKey
+        : `agenda:${randomUUID()}`;
     const command = this.commands.command(
       context,
       "update_booking",
-      body.idempotencyKey,
+      idempotencyKey,
       { adapter: "single_line", appointmentId, input: body },
     );
+    const reason =
+      (typeof body.reason === "string" && body.reason.trim().slice(0, 2000)) ||
+      DEFAULT_CANCELLATION_REASON;
     return this.prisma.$transaction(
       async (tx) => {
         await lockOperationalTenant(tx, context.tenantId);
@@ -677,26 +846,34 @@ export class BookingMutationService {
             replayed: true,
             appointmentIds: [] as string[],
             assignmentChanged: false,
-            customerId: null,
-            previousCollaboratorId: null,
+            customerId: null as string | null,
+            previousCustomerId: null as string | null,
+            previousCollaboratorId: null as string | null,
           };
-        const account = await this.account(tx, context, appointmentId);
+        await linkLegacyBooking(
+          tx,
+          context.tenantId,
+          appointmentId,
+          this.scopeWhere(context),
+        );
+        let account = await this.account(tx, context, appointmentId);
+        const baseRevision = account.revision;
         const recordEvents = await beginAppointmentEvents(tx, context, {
           orderItem: { saleId: account.id },
         });
-        this.orders.assertRevision(account, body.revision);
-        const old = account.items.find(
+        const line = account.items.find(
           (row) => row.booking?.id === appointmentId,
-        )?.booking;
-        if (!old) throw new NotFoundException("Appuntamento non accessibile");
-        if (
-          (body.customerId && body.customerId !== account.customerId) ||
-          (body.locationId && body.locationId !== account.locationId) ||
-          (body.sectorId && body.sectorId !== old.sectorId)
-        )
+        );
+        const old = line?.booking;
+        if (!line || !old)
+          throw new NotFoundException("Appuntamento non accessibile");
+        if (body.locationId && body.locationId !== account.locationId)
           throw new BadRequestException(
-            "Cliente e sede del conto non cambiano con lo spostamento",
+            "La sede del conto non cambia dall'agenda",
           );
+        // Intermediate states (status first, then time) are not conflicts: the
+        // final state is checked once, before commit.
+        await tx.$executeRaw`SET CONSTRAINTS alora_appointment_resources DEFERRED`;
         const tenant = await tx.tenant.findUniqueOrThrow({
           where: { id: context.tenantId },
           select: { timezone: true },
@@ -726,27 +903,74 @@ export class BookingMutationService {
           start.getTime() !== old.startsAt.getTime() ||
           collaboratorId !== old.collaboratorId ||
           roomId !== old.roomId;
+        const priceChange =
+          body.finalPrice !== undefined &&
+          !new Prisma.Decimal(String(body.finalPrice)).eq(
+            line.lineTotal.plus(line.taxTotal),
+          );
+        const status =
+          body.status && body.status !== old.status ? body.status : null;
+        const cancelling = status === "cancelled";
+        const customerId =
+          body.customerId && body.customerId !== account.customerId
+            ? body.customerId
+            : null;
+        const notes =
+          body.customerNotes !== undefined || body.internalNotes !== undefined;
         if (
-          (calendarChange || body.finalPrice !== undefined) &&
-          stopped.has(old.status)
+          status &&
+          old.status === "completed" &&
+          (await this.consumed(tx, line))
         )
           throw new ConflictException(
-            "Le prestazioni eseguite o annullate conservano la pianificazione storica",
+            "Il servizio ha consumi di magazzino registrati: resta «eseguito» finché non gestisci il reso dal magazzino",
           );
-        if (body.status === "cancelled")
-          throw new BadRequestException("Usa l'annullamento con motivazione");
-        if (
-          stopped.has(old.status) &&
-          body.status &&
-          body.status !== old.status
-        )
-          throw new ConflictException(
-            "Lo stato storico non si riapre dalla modifica",
+        const wasCancelled = account.orderStatus === "cancelled";
+        if (status || calendarChange || priceChange || customerId || notes)
+          await this.reopen(tx, account);
+        if (status && !cancelling) {
+          await tx.appointment.update({
+            where: { id: appointmentId },
+            data: { status, updatedById: context.actorId },
+          });
+          await this.statusHistory(
+            tx,
+            context,
+            appointmentId,
+            old.status,
+            status,
           );
-        if (calendarChange || body.finalPrice !== undefined) {
+        }
+        let previousCustomerId: string | null = null;
+        if (customerId)
+          previousCustomerId = (
+            await changeAccountCustomer(tx, {
+              tenantId: context.tenantId,
+              saleId: account.id,
+              customerId,
+            })
+          ).previousCustomerId;
+        if (cancelling) {
+          // The service row (money) stays; only the time and people follow the form.
+          if (calendarChange)
+            await tx.appointment.update({
+              where: { id: appointmentId },
+              data: {
+                startsAt: start,
+                endsAt: new Date(
+                  start.getTime() +
+                    (old.endsAt.getTime() - old.startsAt.getTime()),
+                ),
+                collaboratorId,
+                roomId,
+                updatedById: context.actorId,
+              },
+            });
+        } else if (calendarChange || priceChange) {
+          account = await this.account(tx, context, appointmentId);
           const input = this.normalize({
-            idempotencyKey: body.idempotencyKey!,
-            revision: body.revision!,
+            idempotencyKey,
+            revision: body.revision ?? null,
             lines: [
               {
                 appointmentId,
@@ -761,26 +985,40 @@ export class BookingMutationService {
                 priceOverrideReason: body.priceOverrideReason,
               },
             ],
+          } as unknown as BookingRevisionDto);
+          await this.applyRevision(tx, context, account, input, {
+            lineOnly: true,
+            baseRevision,
           });
-          await this.applyRevision(tx, context, account, input, true);
-        } else
-          await tx.sale.update({
-            where: { id: account.id },
-            data: { revision: { increment: 1 } },
+        }
+        if (notes)
+          await tx.appointment.update({
+            where: { id: appointmentId },
+            data: {
+              ...(body.customerNotes !== undefined
+                ? { customerNotes: body.customerNotes }
+                : {}),
+              ...(body.internalNotes !== undefined
+                ? { internalNotes: body.internalNotes }
+                : {}),
+              updatedById: context.actorId,
+            },
           });
-        await tx.appointment.update({
-          where: { id: appointmentId },
-          data: {
-            ...(body.status ? { status: body.status } : {}),
-            ...(body.customerNotes !== undefined
-              ? { customerNotes: body.customerNotes }
-              : {}),
-            ...(body.internalNotes !== undefined
-              ? { internalNotes: body.internalNotes }
-              : {}),
-            updatedById: context.actorId,
-          },
+        if (cancelling)
+          await this.cancelInTransaction(
+            tx,
+            context,
+            await this.account(tx, context, appointmentId),
+            appointmentId,
+            reason,
+            "line",
+          );
+        await tx.sale.update({
+          where: { id: account.id },
+          data: { revision: { increment: 1 } },
         });
+        if (wasCancelled && !cancelling)
+          await this.recloseIfIdle(tx, account.id);
         const fresh = await this.account(tx, context, appointmentId);
         const current = fresh.items.find(
           (row) => row.booking?.id === appointmentId,
@@ -792,6 +1030,7 @@ export class BookingMutationService {
             orderItemId: current.id,
             orderId: fresh.id,
             orderRevision: fresh.revision,
+            orderStatus: fresh.orderStatus,
             estimatedPrice: current.lineTotal.plus(current.taxTotal).toFixed(2),
             finalPrice: current.booking!.finalPrice,
             customerNotes: current.booking!.customerNotes,
@@ -811,6 +1050,7 @@ export class BookingMutationService {
           replayed: false,
           appointmentIds: [appointmentId],
           customerId: fresh.customerId,
+          previousCustomerId,
           previousCollaboratorId: old.collaboratorId,
           assignmentChanged:
             old.collaboratorId !== current.booking!.collaboratorId,
@@ -819,101 +1059,79 @@ export class BookingMutationService {
       { timeout: 15000 },
     );
   }
+  /** Reason and revision are optional: the agenda never has to justify a cancellation. */
   async cancel(
     context: CommandContext,
     appointmentId: string,
-    body: Omit<BookingCancellationDto, "revision"> & {
-      revision: number | null;
+    body: {
+      idempotencyKey?: string;
+      revision?: number | null;
+      reason?: string | null;
     },
     mode: "all" | "line" = "all",
   ) {
     this.internal(context);
-    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
-    if (
-      reason.length < 3 ||
-      reason.length > 2000 ||
-      (body.revision !== null &&
-        (!Number.isInteger(body.revision) || body.revision < 0))
-    )
-      throw new BadRequestException(
-        "Indica revisione e motivo dell'annullamento",
-      );
+    const reason =
+      (typeof body.reason === "string" && body.reason.trim().slice(0, 2000)) ||
+      DEFAULT_CANCELLATION_REASON;
     const command = this.commands.command(
       context,
       "cancel_booking",
-      body.idempotencyKey,
-      { appointmentId, revision: body.revision, reason, mode },
+      body.idempotencyKey || `agenda-cancel:${randomUUID()}`,
+      { appointmentId, revision: body.revision ?? null, reason, mode },
     );
-    return this.prisma.$transaction(async (tx) => {
-      await lockOperationalTenant(tx, context.tenantId);
-      await setOperationalActor(tx, context.actorId);
-      const replay = await this.commands.replay(tx, command);
-      if (replay)
-        return {
-          result: replay.result,
-          replayed: true,
-          appointmentIds: [] as string[],
-        };
-      const account = await this.account(tx, context, appointmentId);
-      const recordEvents = await beginAppointmentEvents(tx, context, {
-        orderItem: { saleId: account.id },
-      });
-      if (body.revision !== null)
-        this.orders.assertRevision(account, body.revision);
-      if (account.orderStatus === "superseded")
-        throw new ConflictException("Il conto storico è stato sostituito");
-      const active = account.items.flatMap((row) =>
-        row.booking && !stopped.has(row.booking.status) ? [row.booking] : [],
-      );
-      if (!active.length && account.orderStatus !== "cancelled")
-        throw new ConflictException(
-          "Non ci sono servizi prenotati da annullare; le prestazioni eseguite e i rimborsi si gestiscono separatamente",
+    return this.prisma.$transaction(
+      async (tx) => {
+        await lockOperationalTenant(tx, context.tenantId);
+        await setOperationalActor(tx, context.actorId);
+        const replay = await this.commands.replay(tx, command);
+        if (replay)
+          return {
+            result: replay.result,
+            replayed: true,
+            appointmentIds: [] as string[],
+          };
+        await linkLegacyBooking(
+          tx,
+          context.tenantId,
+          appointmentId,
+          this.scopeWhere(context),
         );
-      const targets =
-        mode === "all"
-          ? active
-          : active.filter((row) => row.id === appointmentId);
-      if (
-        mode === "line" &&
-        account.items.find((row) => row.booking?.id === appointmentId)?.booking
-          ?.status === "completed"
-      )
-        throw new ConflictException(
-          "La prestazione eseguita si conserva; il rimborso è un'azione separata",
+        const account = await this.account(tx, context, appointmentId);
+        const recordEvents = await beginAppointmentEvents(tx, context, {
+          orderItem: { saleId: account.id },
+        });
+        const cancelled = await this.cancelInTransaction(
+          tx,
+          context,
+          account,
+          appointmentId,
+          reason,
+          mode,
         );
-      const allStopped =
-        mode === "all" ||
-        (active.length === targets.length &&
-          account.items.every(
-            (row) => row.booking && row.booking.status !== "completed",
-          ));
-      if (targets.length || (allStopped && account.orderStatus !== "cancelled"))
-        await applyBookingCancellation(tx,{orderId:account.id,appointmentIds:targets.map(row=>row.id),allStopped,actorId:context.actorId,cancelledByType:"staff",cancelledById:context.actorId,reason,policyResult:"operator_recorded"});
-      const fresh = await tx.sale.findUniqueOrThrow({
-        where: { id: account.id },
-        include,
-      });
-      const result = JSON.parse(
-        JSON.stringify({
-          ...this.view(fresh),
-          cancelledAppointmentIds: targets.map((row) => row.id),
-          refund: "not_requested",
-          stockReturn: "not_requested",
-        }),
-      ) as Prisma.InputJsonObject;
-      const operation = await this.commands.save(
-        tx,
-        command,
-        account.id,
-        result,
-      );
-      await recordEvents({ orderItem: { saleId: account.id } }, operation.id);
-      await tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
-      return {
-        result,
-        replayed: false,
-        appointmentIds: targets.map((row) => row.id),
-      };
-    });
+        const fresh = await tx.sale.findUniqueOrThrow({
+          where: { id: account.id },
+          include,
+        });
+        const result = JSON.parse(
+          JSON.stringify({
+            ...this.view(fresh),
+            cancelledAppointmentIds: cancelled,
+            refund: "not_requested",
+            stockReturn: "not_requested",
+          }),
+        ) as Prisma.InputJsonObject;
+        const operation = await this.commands.save(
+          tx,
+          command,
+          account.id,
+          result,
+        );
+        await recordEvents({ orderItem: { saleId: account.id } }, operation.id);
+        await tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+        return { result, replayed: false, appointmentIds: cancelled };
+      },
+      { timeout: 15000 },
+    );
   }
 }
