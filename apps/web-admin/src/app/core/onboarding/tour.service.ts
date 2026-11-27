@@ -47,12 +47,56 @@ export class TourService {
   readonly step = computed(() => this.activeState()?.steps[this.indexState()] ?? null);
   readonly isLast = computed(() => this.indexState() >= this.total() - 1);
 
-  /** Whether tours start by themselves on first visit (user preference). */
+  /**
+   * Whether pages with an unseen guide suggest it next to «Guida» (user
+   * preference). Guides never open by themselves: the name is historical.
+   */
   readonly autoStart = signal(localStorage.getItem(AUTO_KEY) !== "0");
 
   private resolveToken = 0;
-  private currentNavKey: AdminNavKey | null = null;
-  private autoTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Page in front of the user, as reported by the shell after navigation. */
+  private readonly currentNav = signal<AdminNavKey | null>(null);
+  /** Bumped when the seen map changes, since localStorage is not reactive. */
+  private readonly seenRevision = signal(0);
+
+  /**
+   * Tour the «Guida» button of the current page suggests: the general tour
+   * while it was never seen, then the page tour. Null when nothing to suggest.
+   */
+  readonly hintTour = computed<TourDefinition | null>(() => {
+    const navKey = this.currentNav();
+    this.seenRevision();
+    if (!this.autoStart() || this.active() || !this.session.currentUser()) return null;
+    const page = this.tourFor(navKey);
+    // The hint lives on the page's «Guida» button: no page tour, no hint.
+    if (!page) return null;
+    const general = this.tourFor(null);
+    if (general && !this.isSeen(general)) return general;
+    return this.isSeen(page) ? null : page;
+  });
+
+  /** Page whose «Guida» button shows the hint, or null. */
+  readonly hintNavKey = computed<AdminNavKey | null>(() =>
+    this.hintTour() ? this.currentNav() : null,
+  );
+
+  hintFor(navKey: AdminNavKey | null): boolean {
+    return navKey !== null && this.hintNavKey() === navKey;
+  }
+
+  /** «Guida» button: starts the suggested tour, otherwise the page tour. */
+  startGuide(navKey: AdminNavKey | null): void {
+    const hinted = this.hintFor(navKey) ? this.hintTour() : null;
+    this.start(hinted ?? navKey);
+  }
+
+  /** «×» on the hint: the user knows the page, stop suggesting its guide. */
+  dismissHint(navKey: AdminNavKey | null): void {
+    const page = this.tourFor(navKey);
+    const general = this.tourFor(null);
+    if (general) this.markSeen(general);
+    if (page) this.markSeen(page);
+  }
 
   context(): TourContext {
     const user = this.session.currentUser();
@@ -88,7 +132,6 @@ export class TourService {
         ? tourOrNavKey
         : this.tourFor(tourOrNavKey);
     if (!definition) return;
-    this.cancelAuto();
     const ctx = this.context();
     const steps = definition
       .steps(ctx)
@@ -122,7 +165,10 @@ export class TourService {
     if (this.indexState() > 0) void this.goTo(this.indexState() - 1, -1);
   }
 
-  /** Completed or skipped: either way it will not start by itself again. */
+  /**
+   * Completed or skipped: either way it is no longer suggested. After the
+   * general tour the page tour is only suggested (hint recomputes), never opened.
+   */
   finish(): void {
     const active = this.activeState();
     if (active) this.markSeen(active.definition);
@@ -130,8 +176,6 @@ export class TourService {
     this.activeState.set(null);
     this.targetElement.set(null);
     this.resolving.set(false);
-    // After the general tour, continue with the guide of the page in front of the user.
-    if (active && active.definition.navKey === null) this.scheduleAuto(this.currentNavKey);
   }
 
   setAutoStart(enabled: boolean): void {
@@ -142,39 +186,22 @@ export class TourService {
   /** Restarts every guide from scratch (e.g. from the personal account page). */
   resetSeen(): void {
     localStorage.removeItem(this.seenKey());
+    this.seenRevision.update((value) => value + 1);
     this.setAutoStart(true);
   }
 
   /**
-   * First visit of a page: the general tour comes first, then the page tour.
-   * Called by the shell after each navigation.
+   * Called by the shell after each navigation. Guides never start by
+   * themselves: this only records the page so `hintTour` can suggest its guide.
+   * The profile may still be loading; the hint follows it reactively.
    */
-  scheduleAuto(navKey: AdminNavKey | null, attempt = 0): void {
-    this.cancelAuto();
-    this.currentNavKey = navKey;
-    if (!this.autoStart()) return;
-    // Let the page render and load its data before measuring anything.
-    this.autoTimer = setTimeout(() => {
-      this.autoTimer = null;
-      if (this.active()) return;
-      // The profile may still be loading: tours depend on it, so wait for it.
-      if (!this.session.currentUser()) {
-        if (attempt < 8) this.scheduleAuto(navKey, attempt + 1);
-        return;
-      }
-      const general = this.tourFor(null);
-      if (general && !this.isSeen(general)) {
-        this.start(general);
-        return;
-      }
-      const page = this.tourFor(navKey);
-      if (page && !this.isSeen(page)) this.start(page);
-    }, 900);
+  scheduleAuto(navKey: AdminNavKey | null, _attempt = 0): void {
+    this.currentNav.set(navKey);
   }
 
+  /** Kept for callers: there is no pending automatic start to cancel. */
   cancelAuto(): void {
-    if (this.autoTimer) clearTimeout(this.autoTimer);
-    this.autoTimer = null;
+    // Nothing scheduled any more.
   }
 
   private async goTo(index: number, direction: 1 | -1): Promise<void> {
@@ -266,5 +293,6 @@ export class TourService {
     const map = this.seenMap();
     map[definition.id] = definition.version;
     localStorage.setItem(this.seenKey(), JSON.stringify(map));
+    this.seenRevision.update((value) => value + 1);
   }
 }

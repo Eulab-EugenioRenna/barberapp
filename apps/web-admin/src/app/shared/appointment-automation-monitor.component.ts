@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { Component, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { RouterLink } from "@angular/router";
@@ -305,7 +306,7 @@ export class AppointmentAutomationMonitorComponent {
       this.feedback = "";
     } catch (e: any) {
       this.runs = [];
-      this.feedback = e?.error?.message || "Esiti non disponibili.";
+      this.feedback = humanError(e, "Esiti non disponibili.");
     } finally {
       this.busy = false;
     }
@@ -320,7 +321,7 @@ export class AppointmentAutomationMonitorComponent {
         "Richiesta segnata come gestita. L’agenda non è stata modificata.";
     } catch (e: any) {
       this.feedback =
-        e?.error?.message || "Richiesta non aggiornata: ricarica gli esiti.";
+        humanError(e, "Richiesta non aggiornata: ricarica gli esiti.");
     } finally {
       this.busy = false;
     }

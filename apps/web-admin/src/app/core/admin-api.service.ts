@@ -35,7 +35,7 @@ export class AdminApiService {
     return keys.some((entry) => this.session.can(entry)) ? load() : of(fallback);
   }
 
-  private loadTenantContext(): Observable<any> {
+  loadTenantContext(): Observable<any> {
     return this.http.get(
       `${ADMIN_API_URL}/tenant/${this.session.can("settings.manage") ? "settings" : "context"}`,
     );
@@ -134,7 +134,7 @@ export class AdminApiService {
     );
   }
 
-  private loadCustomerOptions(): Observable<any[]> {
+  loadCustomerOptions(): Observable<any[]> {
     return this.allowed<any[]>(
       PICK_LIST_ACCESS.customers,
       () => this.http.get<any[]>(`${ADMIN_API_URL}/customers/options`),

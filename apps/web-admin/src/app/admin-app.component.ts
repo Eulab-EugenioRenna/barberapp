@@ -13,6 +13,7 @@ import {
 import { HttpClient } from "@angular/common/http";
 import {
   Component,
+  DestroyRef,
   HostListener,
   OnDestroy,
   OnInit,
@@ -20,10 +21,19 @@ import {
   computed,
   inject,
 } from "@angular/core";
+import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router } from "@angular/router";
 import { toLocalDateKey } from "@barber/shared/utils";
 import { firstValueFrom } from "rxjs";
+import { humanError } from "./core/human-error";
+import {
+  DASHBOARD_REFRESH_MS,
+  QUICK_ORDER_DATASETS,
+  VIEW_DATASETS,
+  splitChanged,
+  type AdminDataset,
+} from "./core/admin-data-policy";
 import { CalendarInputComponent } from "./calendar-input.component";
 import { ADMIN_API_URL } from "./core/api-config";
 import { AdminApiService } from "./core/admin-api.service";
@@ -50,17 +60,12 @@ import {
   appointmentStatusLabel,
   bookingModeLabel,
 } from "./shared/presentation-copy";
+import type { AdminViewKey } from "./core/admin-data-policy";
 
-type ViewKey =
-  | "platform"
-  | "dashboard"
-  | "appointments"
-  | "sales"
-  | "customers"
-  | "services"
-  | "team"
-  | "collaborators"
-  | "settings";
+type ViewKey = AdminViewKey;
+
+/** A sale touches the till, the reports, stock and possibly a new customer. */
+const SALE_CHANGED: readonly AdminDataset[] = ["sales", "stats", "products", "customers", "customerOptions"];
 
 @Component({
   selector: "alora-admin-workspace",
@@ -104,13 +109,13 @@ type ViewKey =
         "
         [appointment]="quickOrderAppointment"
         [sale]="quickOrderSale"
-        [loading]="loading"
+        [loading]="busy"
         (close)="closeQuickOrder()"
         (submitOrder)="saveQuickOrder($event)"
         (retryCreation)="retryQuickOrderCreation()"
         (retryUpdate)="retryQuickOrderUpdate()"
         (customerSearchChange)="searchQuickOrderCustomers($event)"
-        (catalogChanged)="refreshAll()"
+        (catalogChanged)="changed(['products', 'services'])"
       ></barber-quick-order-modal>
       <barber-admin-appointments-editor-modal
         *ngIf="appointmentsEditorOpen"
@@ -172,7 +177,7 @@ type ViewKey =
       <barber-admin-auth-panel *ngIf="!sessionToken"></barber-admin-auth-panel>
 
       <ng-container *ngIf="sessionToken">
-        <alora-page-header [navKey]="headerNavKey" refreshTour="header-refresh" [refreshing]="loading" (refresh)="refreshCurrentView()">
+        <alora-page-header [navKey]="headerNavKey" refreshTour="header-refresh" [refreshing]="refreshing" (refresh)="refreshCurrentView()">
           <div
             uiPageActions
             *ngIf="canCreateSomething && (activeView === 'sales' || activeView === 'dashboard' || activeView === 'appointments')"
@@ -330,7 +335,7 @@ type ViewKey =
               (reset)="resetServiceForm()"
               (editProduct)="editProduct($event)"
               (saveProduct)="saveProduct()"
-              (reloadProducts)="refreshAll()"
+              (reloadProducts)="changed(['products'])"
               (removeProduct)="removeProduct()"
               (resetProduct)="resetProductForm($event)"
               (loadMoreServices)="loadMoreServices()"
@@ -466,34 +471,41 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   });
 
   sessionToken = this.sessionStore.token();
-  loading = false;
+  /** An action the user started (save, delete…): its buttons wait for it. */
+  busy = false;
   feedback = "";
   activeView: ViewKey = "dashboard";
   currentUser: any = this.sessionStore.currentUser();
   uiScale = 92;
 
-  // Riprendiamo l'ultimo tenant caricato dal facade (singleton) per evitare
-  // il lampo "Panoramica" quando la shell viene ricreata al cambio pagina.
-  tenant: any = this.adminFacade.tenant();
-  // Stesso principio del tenant: al remount della shell ripartiamo dagli
-  // ultimi dati in cache del facade invece di mostrare liste vuote.
-  revenueMetrics: any[] = this.adminFacade.revenueMetrics();
-  revenueReport: any = this.adminFacade.revenueReport();
-  appointmentStats: any = this.adminFacade.appointmentStats();
-  collaboratorStats: any[] = this.adminFacade.collaboratorStats();
-  serviceStats: any[] = this.adminFacade.serviceStats();
-  appointments: any[] = this.adminFacade.appointments();
-  sales: any[] = this.adminFacade.sales();
-  services: any[] = this.adminFacade.services();
-  products: any[] = this.adminFacade.products();
-  collaborators: any[] = this.adminFacade.collaborators();
-  customers: any[] = this.adminFacade.customers();
+  /** Background refresh: turns the refresh icon, never disables anything. */
+  get refreshing(): boolean {
+    return this.adminFacade.refreshing() || this.adminFacade.loading();
+  }
+  /** Pages disable their actions only during an action or before their data first arrives. */
+  get loading(): boolean {
+    return this.busy || this.viewDatasets().some((dataset) => !this.adminFacade.hasLoaded(dataset));
+  }
+
+  // Everything below reads the facade cache: it survives page changes.
+  get tenant(): any { return this.adminFacade.tenant(); }
+  get revenueMetrics(): any[] { return this.adminFacade.revenueMetrics(); }
+  get revenueReport(): any { return this.adminFacade.revenueReport(); }
+  get appointmentStats(): any { return this.adminFacade.appointmentStats(); }
+  get collaboratorStats(): any[] { return this.adminFacade.collaboratorStats(); }
+  get serviceStats(): any[] { return this.adminFacade.serviceStats(); }
+  get appointments(): any[] { return this.adminFacade.appointments(); }
+  get sales(): any[] { return this.adminFacade.sales(); }
+  get services(): any[] { return this.adminFacade.services(); }
+  get products(): any[] { return this.adminFacade.products(); }
+  get collaborators(): any[] { return this.adminFacade.collaborators(); }
+  get customers(): any[] { return this.adminFacade.customers(); }
   quickOrderOpen = false;
   quickOrderClosing = false;
   quickOrderAppointment: any = null;
   quickOrderSale: any = null;
   quickOrderCustomers: any[] = [];
-  quickOrderCollaborators: any[] = [];
+  get quickOrderCollaborators(): any[] { return this.adminFacade.collaboratorOptions(); }
   private quickOrderCustomerSearchTimer: ReturnType<typeof setTimeout> | null =
     null;
   private quickOrderCustomerRequestId = 0;
@@ -518,6 +530,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   private dashboardActivityRequestId = 0;
   private dashboardRefreshInFlight = 0;
   private dashboardRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  private lastDashboardRefresh = 0;
+  private readonly destroyRef = inject(DestroyRef);
   platformTenants: any[] = [];
   selectedPlatformTenant: any = null;
   platformPlans: any[] = [];
@@ -822,28 +836,26 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const storedScale = Number(window.localStorage.getItem("barber.ui-scale"));
     this.setUiScale(Number.isFinite(storedScale) ? storedScale : this.uiScale);
-    this.activeView =
-      (this.route.snapshot.data["view"] as ViewKey | undefined) ||
-      this.activeView;
-
-    if (this.sessionStore.isAuthenticated()) {
-      if (this.activeView === "appointments") {
-        void this.refreshShell();
-      } else {
-        void this.refreshAll(true);
-      }
-    }
+    // The component is reused across its views (AdminRouteReuseStrategy):
+    // a view change only swaps the panel and shows what is already cached.
+    this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((data) => {
+      this.enterView((data["view"] as ViewKey | undefined) || "dashboard");
+    });
     this.dashboardRefreshTimer = setInterval(() => {
       if (this.canAutoRefreshDashboard()) {
         void this.refreshDashboardQueries();
       }
-    }, 15_000);
+    }, DASHBOARD_REFRESH_MS);
   }
 
   @HostListener("document:visibilitychange")
   @HostListener("window:online")
   onDocumentVisibilityChange(): void {
-    if (this.canAutoRefreshDashboard()) {
+    // Back on the tab: refresh only if the figures are older than a minute.
+    if (
+      this.canAutoRefreshDashboard() &&
+      Date.now() - this.lastDashboardRefresh >= DASHBOARD_REFRESH_MS
+    ) {
       void this.refreshDashboardQueries();
     }
   }
@@ -859,7 +871,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     if (this.customerSearchTimer) {
       clearTimeout(this.customerSearchTimer);
     }
-    this.appointmentOrderNotifications.stop();
+    // The live «conti da chiudere» stream belongs to the shell: it stays open.
   }
 
   private canAutoRefreshDashboard(): boolean {
@@ -869,11 +881,108 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.currentUser?.role !== "platform_admin" &&
       !this.document.hidden &&
       window.navigator.onLine &&
-      !this.loading &&
+      !this.busy &&
       !this.dashboardRefreshInFlight &&
       !this.adminFacade.loading() &&
       !this.dashboardActivityLoading
     );
+  }
+
+  /** Datasets on screen now (the till's catalog too while it is open). */
+  viewDatasets(): readonly AdminDataset[] {
+    const own = VIEW_DATASETS[this.activeView] ?? [];
+    return this.quickOrderOpen ? [...own, ...QUICK_ORDER_DATASETS] : own;
+  }
+
+  private enterView(view: ViewKey): void {
+    const previous = this.activeView;
+    this.activeView = view;
+    this.newMenuOpen = false;
+    if (previous !== view) this.feedback = "";
+    // The customers page opens with an empty search box: show the whole list again.
+    if (view === "customers" && previous !== view && this.adminFacade.customerQuery())
+      void this.runLoadMore(() => this.adminFacade.reloadCustomers(""));
+    if (this.sessionStore.isAuthenticated()) void this.loadView();
+  }
+
+  /**
+   * Shows the cached data of the view at once and refreshes what is older
+   * than a minute in the background (`force`: the refresh button).
+   */
+  async loadView(force = false): Promise<void> {
+    const view = this.activeView;
+    try {
+      const mode = await this.adminFacade.resolveMode();
+      this.currentUser = this.adminFacade.currentUser();
+      if (mode === "unauthenticated") return;
+      this.syncRouteWithUser();
+      if (mode === "platform") {
+        this.activeView = "platform";
+        await this.adminFacade.ensurePlatform(force);
+        this.platformTenants = this.adminFacade.platformTenants();
+        this.platformPlans = this.adminFacade.platformPlans();
+        this.platformSubscriptions = this.adminFacade.platformSubscriptions();
+        return;
+      }
+      if (view === "dashboard") this.syncAutoRevenueDate();
+      const datasets = this.viewDatasets();
+      const options = { revenueFilters: { ...this.revenueFilters } };
+      if (view === "sales") void this.loadOpenSales();
+      if (view === "dashboard") {
+        const statsAge = Date.now() - this.lastDashboardRefresh;
+        if (force || statsAge >= DASHBOARD_REFRESH_MS) {
+          this.lastDashboardRefresh = Date.now();
+          void this.operationalContext.loadTotals().catch(() => undefined);
+          if (this.can("dashboard.revenue.read")) void this.loadDashboardActivity(true);
+        }
+      }
+      if (force) await this.adminFacade.reload(datasets, options);
+      else await this.adminFacade.ensure(datasets, options);
+      if (view === "settings") this.syncSettingsForm();
+      if (!this.appointmentForm.serviceId && this.services[0]) {
+        this.appointmentForm.serviceId = this.services[0].id;
+      }
+    } catch (error: any) {
+      if (error?.status === 401) {
+        this.rememberRequestedUrl();
+        this.logout();
+        return;
+      }
+      if (view === this.activeView)
+        this.feedback = humanError(error, "Non riusciamo a caricare i dati: usa Aggiorna");
+    }
+  }
+
+  /**
+   * After a save: what is on screen is fetched again now, the rest is only
+   * marked stale and refreshed by the next page that shows it.
+   */
+  async changed(datasets: readonly AdminDataset[]): Promise<void> {
+    const { reloadNow, markStale } = splitChanged(datasets, this.viewDatasets());
+    this.adminFacade.markStale(markStale);
+    if (datasets.includes("sales") && this.activeView === "sales") void this.loadOpenSales();
+    if (datasets.includes("stats") && this.activeView === "dashboard" && this.can("dashboard.revenue.read"))
+      void this.loadDashboardActivity(true);
+    try {
+      await this.adminFacade.reload(reloadNow, { revenueFilters: { ...this.revenueFilters } });
+      if (reloadNow.includes("tenant")) this.syncSettingsForm(true);
+    } catch (error: any) {
+      this.feedback = humanError(error, "Salvato. Non riusciamo ad aggiornare l'elenco: usa Aggiorna");
+    }
+  }
+
+  private settingsSnapshot = "";
+  private settingsTenant: any = null;
+
+  /** Copies the tenant into the settings form unless the user is editing it. */
+  private syncSettingsForm(force = false): void {
+    const tenant = this.tenant;
+    if (!tenant) return;
+    const dirty = this.settingsSnapshot && JSON.stringify(this.settingsForm) !== this.settingsSnapshot;
+    if (!force && (tenant === this.settingsTenant || dirty)) return;
+    this.settingsTenant = tenant;
+    this.applyTenantToSettingsForm(tenant);
+    this.settingsSnapshot = JSON.stringify(this.settingsForm);
   }
 
   async loadMoreCustomers(): Promise<void> {
@@ -912,7 +1021,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       await action();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Caricamento non riuscito";
+        humanError(error, "Caricamento non riuscito");
     }
   }
 
@@ -1075,106 +1184,45 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     };
   }
 
-  async refreshAll(firstLoad = false): Promise<void> {
-    this.syncAutoRevenueDate();
-    try {
-      const state = await this.adminFacade.refreshAll(
-        this.revenueFilters,
-        firstLoad ? () => this.applyStats() : undefined,
-      );
-      this.loading = this.adminFacade.loading();
-      this.feedback = this.adminFacade.feedback();
-      this.currentUser = this.adminFacade.currentUser();
-
-      if (state.mode === "unauthenticated") {
-        return;
-      }
-
-      this.syncRouteWithUser();
-
-      if (state.mode === "platform") {
-        this.activeView = "platform";
-        this.platformTenants = this.adminFacade.platformTenants();
-        this.platformPlans = this.adminFacade.platformPlans();
-        this.platformSubscriptions = this.adminFacade.platformSubscriptions();
-        return;
-      }
-
-      this.tenant = this.adminFacade.tenant();
-      void this.operationalContext.loadTotals().catch(() => undefined);
-      this.appointmentOrderNotifications.connect(this.sessionStore.token());
-      this.applyStats();
-      this.appointments = this.adminFacade.appointments();
-      if (this.activeView === "sales") void this.loadOpenSales();
-      this.services = this.adminFacade.services();
-      this.collaborators = this.adminFacade.collaborators();
-      this.customers = this.adminFacade.customers();
-      this.filteredAppointmentCustomers = [...this.customers];
-      this.settingsForm = {
-        name: this.tenant?.name,
-        publicDomain: this.tenant?.publicDomain || "",
-        primaryColor: this.tenant?.primaryColor,
-        accentColor: this.tenant?.accentColor,
-        bookingMode: this.tenant?.bookingMode,
-        publicTitle: this.tenant?.publicTitle ?? this.tenant?.name ?? "",
-        publicDescription:
-          this.tenant?.publicDescription ||
-          "Scegli il servizio, trova il momento giusto e invia la tua richiesta al salone.",
-        publicStepsText: Array.isArray(this.tenant?.publicSteps)
-          ? this.tenant.publicSteps.join("\n")
-          : "Scegli|Trova il servizio che desideri\nPrenota|Scegli professionista, giorno e orario\nConferma|Invia la richiesta al salone",
-        logoUrl: this.tenant?.logoUrl || "",
-        coverUrl: this.tenant?.coverUrl || "",
-        publicEnabled: this.tenant?.publicEnabled,
-        holidays: Array.isArray(this.tenant?.holidays)
-          ? this.tenant.holidays.map((holiday: any) => ({
-              date: new Date(holiday.date).toISOString().slice(0, 10),
-              name: holiday.name || "",
-            }))
-          : [],
-      };
-
-      if (!this.appointmentForm.serviceId && this.services[0]) {
-        this.appointmentForm.serviceId = this.services[0].id;
-      }
-
-      if (this.can("dashboard.revenue.read"))
-        await this.loadDashboardActivity(true);
-    } catch (error: any) {
-      if (error?.status === 401) {
-        this.rememberRequestedUrl();
-        this.logout();
-        return;
-      }
-      this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Non riusciamo a caricare la panoramica";
-    }
-  }
-
-  /** Reports and the sales/products lists (they may land after the rest on first load). */
-  private applyStats(): void {
-    this.revenueMetrics = this.adminFacade.revenueMetrics();
-    this.revenueReport = this.adminFacade.revenueReport();
-    this.appointmentStats = this.adminFacade.appointmentStats();
-    this.collaboratorStats = this.adminFacade.collaboratorStats();
-    this.serviceStats = this.adminFacade.serviceStats();
-    this.sales = this.adminFacade.sales();
-    this.products = this.adminFacade.products();
+  private applyTenantToSettingsForm(tenant: any): void {
+    this.settingsForm = {
+      name: tenant?.name,
+      publicDomain: tenant?.publicDomain || "",
+      primaryColor: tenant?.primaryColor,
+      accentColor: tenant?.accentColor,
+      bookingMode: tenant?.bookingMode,
+      publicTitle: tenant?.publicTitle ?? tenant?.name ?? "",
+      publicDescription:
+        tenant?.publicDescription ||
+        "Scegli il servizio, trova il momento giusto e invia la tua richiesta al salone.",
+      publicStepsText: Array.isArray(tenant?.publicSteps)
+        ? tenant.publicSteps.join("\n")
+        : "Scegli|Trova il servizio che desideri\nPrenota|Scegli professionista, giorno e orario\nConferma|Invia la richiesta al salone",
+      logoUrl: tenant?.logoUrl || "",
+      coverUrl: tenant?.coverUrl || "",
+      publicEnabled: tenant?.publicEnabled,
+      holidays: Array.isArray(tenant?.holidays)
+        ? tenant.holidays.map((holiday: any) => ({
+            date: new Date(holiday.date).toISOString().slice(0, 10),
+            name: holiday.name || "",
+          }))
+        : [],
+    };
   }
 
   async refreshCurrentView(): Promise<void> {
     if (this.activeView === "appointments") {
-      await this.refreshShell();
-      await this.appointmentsFeaturePage?.reloadViewData();
+      await Promise.all([
+        this.loadView(true),
+        this.appointmentsFeaturePage?.reloadViewData(),
+      ]);
       return;
     }
 
     // The global refresh is an explicit "go to today": reset the dashboard
     // reference date even if the user had picked another day.
-    this.goToTodayRevenue();
-    await this.refreshAll();
+    if (this.activeView === "dashboard") this.goToTodayRevenue();
+    await this.loadView(true);
   }
 
   private goToTodayRevenue(): void {
@@ -1202,45 +1250,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async refreshAfterAppointmentChange(): Promise<void> {
-    await this.refreshAll();
-    await this.appointmentsFeaturePage?.reloadViewData();
-  }
-
-  private async refreshShell(): Promise<void> {
-    try {
-      const state = await this.adminFacade.refreshShell();
-      this.loading = this.adminFacade.loading();
-      this.feedback = this.adminFacade.feedback();
-      this.currentUser = this.adminFacade.currentUser();
-
-      if (state.mode === "unauthenticated") {
-        return;
-      }
-
-      this.syncRouteWithUser();
-
-      if (state.mode === "platform") {
-        this.activeView = "platform";
-        this.platformTenants = this.adminFacade.platformTenants();
-        this.platformPlans = this.adminFacade.platformPlans();
-        this.platformSubscriptions = this.adminFacade.platformSubscriptions();
-        return;
-      }
-
-      this.tenant = this.adminFacade.tenant();
-      this.appointmentOrderNotifications.connect(this.sessionStore.token());
-    } catch (error: any) {
-      if (error?.status === 401) {
-        this.rememberRequestedUrl();
-        this.logout();
-        return;
-      }
-
-      this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Non riusciamo a caricare i dati del salone";
-    }
+    await Promise.all([
+      this.changed(["stats", "sales"]),
+      this.appointmentsFeaturePage?.reloadViewData(),
+    ]);
   }
 
   private async loadPlatformAdminData(): Promise<void> {
@@ -1269,15 +1282,8 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   selectView(view: ViewKey): void {
-    this.activeView = view;
-    if (view === "platform") {
-      void this.router.navigate(["/platform"]);
-    } else {
-      void this.router.navigate([`/${view}`]);
-    }
-    if (view === "dashboard") {
-      void this.refreshDashboardQueries();
-    }
+    // The route change reaches enterView(), which loads what the view needs.
+    void this.router.navigate([view === "platform" ? "/platform" : `/${view}`]);
   }
 
   prepareNewAppointment(): void {
@@ -1331,7 +1337,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.loading = true;
+    this.busy = true;
 
     try {
       const formData = new FormData();
@@ -1353,11 +1359,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         this.coverPreviewUrl = "";
       }
 
-      this.tenant = {
-        ...(this.tenant || {}),
+      this.adminFacade.patchTenant({
         logoUrl: updated?.logoUrl ?? this.tenant?.logoUrl,
         coverUrl: updated?.coverUrl ?? this.tenant?.coverUrl,
-      };
+      });
       this.showUploadFeedback(
         kind,
         "success",
@@ -1367,14 +1372,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.showUploadFeedback(
         kind,
         "error",
-        error?.error?.message ||
-          error?.message ||
-          (kind === "logo"
+        humanError(error, (kind === "logo"
             ? "Caricamento del logo non riuscito"
-            : "Caricamento della copertina non riuscito"),
+            : "Caricamento della copertina non riuscito")),
       );
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -1394,7 +1397,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async deleteMedia(kind: "logo" | "cover"): Promise<void> {
-    this.loading = true;
+    this.busy = true;
 
     try {
       const updated: any = await this.http
@@ -1411,11 +1414,10 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         this.coverPreviewUrl = "";
       }
 
-      this.tenant = {
-        ...(this.tenant || {}),
+      this.adminFacade.patchTenant({
         logoUrl: updated?.logoUrl ?? null,
         coverUrl: updated?.coverUrl ?? null,
-      };
+      });
 
       this.showUploadFeedback(
         kind,
@@ -1426,14 +1428,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.showUploadFeedback(
         kind,
         "error",
-        error?.error?.message ||
-          error?.message ||
-          (kind === "logo"
+        humanError(error, (kind === "logo"
             ? "Rimozione logo non riuscita"
-            : "Rimozione della copertina non riuscita"),
+            : "Rimozione della copertina non riuscita")),
       );
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -1794,7 +1794,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       );
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || "Storico cliente non disponibile";
+        humanError(error, "Storico cliente non disponibile");
     } finally {
       this.customerHistoryLoading = false;
     }
@@ -1828,7 +1828,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async saveAppointment(): Promise<void> {
-    this.loading = true;
+    this.busy = true;
     this.feedback = "";
 
     try {
@@ -1860,12 +1860,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         ? "Appuntamento aggiornato"
         : "Appuntamento creato";
       this.prepareNewAppointment();
-      await this.refreshAll();
+      await this.changed(["stats", "sales"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Salvataggio non riuscito";
+        humanError(error, "Salvataggio non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -1874,7 +1874,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.loading = true;
+    this.busy = true;
 
     try {
       await this.http
@@ -1886,12 +1886,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         .toPromise();
       this.feedback = "Appuntamento annullato";
       this.prepareNewAppointment();
-      await this.refreshAll();
+      await this.changed(["stats", "sales"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Annullamento non riuscito";
+        humanError(error, "Annullamento non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -1905,7 +1905,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       `Stai per eliminare l'appuntamento di ${this.appointmentForm.customerName || "questo cliente"}.`,
       "Elimina appuntamento",
       async () => {
-        this.loading = true;
+        this.busy = true;
 
         try {
           await this.http
@@ -1916,31 +1916,29 @@ export class AdminAppComponent implements OnInit, OnDestroy {
             .toPromise();
           this.feedback = "Appuntamento eliminato";
           this.prepareNewAppointment();
-          await this.refreshAll();
+          await this.changed(["stats", "sales"]);
         } catch (error: any) {
           this.feedback =
-            error?.error?.message ||
-            error?.message ||
-            "Eliminazione appuntamento non riuscita";
+            humanError(error, "Eliminazione appuntamento non riuscita");
           throw error;
         } finally {
-          this.loading = false;
+          this.busy = false;
         }
       },
     );
   }
 
   async saveSettings(): Promise<void> {
-    this.loading = true;
+    this.busy = true;
 
     try {
       if (this.selectedLogoFile) {
         await this.uploadMedia("logo");
-        this.loading = true; // reset to true since uploadMedia sets it to false
+        this.busy = true; // reset to true since uploadMedia sets it to false
       }
       if (this.selectedCoverFile) {
         await this.uploadMedia("cover");
-        this.loading = true;
+        this.busy = true;
       }
 
       await this.http
@@ -1972,14 +1970,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.feedback = "Impostazioni del salone aggiornate";
-      await this.refreshAll();
+      await this.changed(["tenant"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Aggiornamento impostazioni non riuscito";
+        humanError(error, "Aggiornamento impostazioni non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -1989,7 +1985,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   async savePlatformTenant(): Promise<void> {
     if (!this.selectedPlatformTenant) return;
-    this.loading = true;
+    this.busy = true;
     try {
       await this.http
         .patch(
@@ -1999,20 +1995,18 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.feedback = "Attività aggiornata";
-      await this.refreshAll();
+      await this.loadPlatformAdminData();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Aggiornamento dell'attività non riuscito";
+        humanError(error, "Aggiornamento dell'attività non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async suspendSelectedTenant(): Promise<void> {
     if (!this.selectedPlatformTenant) return;
-    this.loading = true;
+    this.busy = true;
     try {
       await this.http
         .post(
@@ -2022,20 +2016,18 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.feedback = "Attività sospesa";
-      await this.refreshAll();
+      await this.loadPlatformAdminData();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Sospensione dell'attività non riuscita";
+        humanError(error, "Sospensione dell'attività non riuscita");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async reactivateSelectedTenant(): Promise<void> {
     if (!this.selectedPlatformTenant) return;
-    this.loading = true;
+    this.busy = true;
     try {
       await this.http
         .post(
@@ -2045,20 +2037,18 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.feedback = "Attività riattivata";
-      await this.refreshAll();
+      await this.loadPlatformAdminData();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Riattivazione dell'attività non riuscita";
+        humanError(error, "Riattivazione dell'attività non riuscita");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async resetSelectedTenantData(): Promise<void> {
     if (!this.selectedPlatformTenant) return;
-    this.loading = true;
+    this.busy = true;
     try {
       this.platformHealthCheck = await this.http
         .post(
@@ -2068,14 +2058,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.feedback = "Dati dell'attività svuotati";
-      await this.refreshAll();
+      await this.loadPlatformAdminData();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Non è stato possibile svuotare i dati dell'attività";
+        humanError(error, "Non è stato possibile svuotare i dati dell'attività");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -2086,7 +2074,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       `Stai per eliminare ${this.selectedPlatformTenant.name}.`,
       "Elimina attività",
       async () => {
-        this.loading = true;
+        this.busy = true;
         try {
           await this.http
             .delete(
@@ -2098,15 +2086,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           this.selectedPlatformTenant = null;
           this.platformTenantForm = this.emptyPlatformTenantForm();
           this.platformHealthCheck = null;
-          await this.refreshAll();
+          await this.loadPlatformAdminData();
         } catch (error: any) {
           this.feedback =
-            error?.error?.message ||
-            error?.message ||
-            "Eliminazione dell'attività non riuscita";
+            humanError(error, "Eliminazione dell'attività non riuscita");
           throw error;
         } finally {
-          this.loading = false;
+          this.busy = false;
         }
       },
     );
@@ -2114,7 +2100,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   async exportSelectedTenant(): Promise<void> {
     if (!this.selectedPlatformTenant) return;
-    this.loading = true;
+    this.busy = true;
     try {
       const exported = await this.http
         .get(
@@ -2126,17 +2112,15 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback = "Copia completa pronta";
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Preparazione della copia non riuscita";
+        humanError(error, "Preparazione della copia non riuscita");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async exportSelectedTenantCsv(): Promise<void> {
     if (!this.selectedPlatformTenant) return;
-    this.loading = true;
+    this.busy = true;
     try {
       const exported = await this.http
         .get(
@@ -2148,17 +2132,15 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback = "Copia tabellare pronta";
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Preparazione delle tabelle non riuscita";
+        humanError(error, "Preparazione delle tabelle non riuscita");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async importSelectedTenant(): Promise<void> {
     if (!this.selectedPlatformTenant || !this.platformImportJson.trim()) return;
-    this.loading = true;
+    this.busy = true;
     try {
       const payload = JSON.parse(this.platformImportJson);
       this.platformHealthCheck = await this.http
@@ -2169,20 +2151,18 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.feedback = "Dati completi ripristinati";
-      await this.refreshAll();
+      await this.loadPlatformAdminData();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Ripristino dei dati non riuscito";
+        humanError(error, "Ripristino dei dati non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async importSelectedTenantCsv(): Promise<void> {
     if (!this.selectedPlatformTenant || !this.platformImportCsv.trim()) return;
-    this.loading = true;
+    this.busy = true;
     try {
       const payload = JSON.parse(this.platformImportCsv);
       this.platformHealthCheck = await this.http
@@ -2193,14 +2173,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.feedback = "Tabelle ripristinate";
-      await this.refreshAll();
+      await this.loadPlatformAdminData();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Ripristino delle tabelle non riuscito";
+        humanError(error, "Ripristino delle tabelle non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -2215,7 +2193,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }
 
   async savePlatformPlan(): Promise<void> {
-    this.loading = true;
+    this.busy = true;
     try {
       if (this.platformPlanForm.id) {
         await this.http
@@ -2238,20 +2216,18 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         ? "Piano aggiornato"
         : "Piano creato";
       this.resetPlatformPlanForm();
-      await this.refreshAll();
+      await this.loadPlatformAdminData();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Salvataggio piano non riuscito";
+        humanError(error, "Salvataggio piano non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async savePlatformSubscription(): Promise<void> {
     if (!this.selectedPlatformTenant) return;
-    this.loading = true;
+    this.busy = true;
     try {
       await this.http
         .post(
@@ -2265,14 +2241,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         )
         .toPromise();
       this.feedback = "Piano assegnato";
-      await this.refreshAll();
+      await this.loadPlatformAdminData();
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Assegnazione del piano non riuscita";
+        humanError(error, "Assegnazione del piano non riuscita");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -2294,21 +2268,18 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   async loadRevenueReport(): Promise<void> {
     const requestId = ++this.revenueReportRequestId;
     this.syncAutoRevenueDate();
-    this.loading = true;
+    this.busy = true;
     try {
       await Promise.all([
         this.adminFacade.refreshRevenueReport({ ...this.revenueFilters }),
         this.loadDashboardActivity(true),
       ]);
       if (requestId !== this.revenueReportRequestId) return;
-      this.revenueReport = this.adminFacade.revenueReport();
-      this.revenueMetrics = this.revenueReport?.metrics || [];
-      this.adminFacade.setRevenueReport(this.revenueReport);
     } catch (error: any) {
       if (requestId === this.revenueReportRequestId) this.feedback =
-        error?.error?.message || "Caricamento del report non riuscito";
+        humanError(error, "Caricamento del report non riuscito");
     } finally {
-      if (requestId === this.revenueReportRequestId) this.loading = false;
+      if (requestId === this.revenueReportRequestId) this.busy = false;
     }
   }
 
@@ -2343,7 +2314,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         return;
       }
       this.feedback =
-        error?.error?.message || "Caricamento movimenti non riuscito";
+        humanError(error, "Caricamento movimenti non riuscito");
     } finally {
       if (requestId === this.dashboardActivityRequestId) {
         this.dashboardActivityLoading = false;
@@ -2351,36 +2322,32 @@ export class AdminAppComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** `lists`: also reload sales and products (after a change, not on the timer). */
-  async refreshDashboardQueries(lists = false): Promise<void> {
+  /** Panoramica figures only (timer, back on the tab, return to the page). */
+  async refreshDashboardQueries(): Promise<void> {
     this.dashboardRefreshInFlight += 1;
+    this.lastDashboardRefresh = Date.now();
     this.syncAutoRevenueDate();
     try {
       await Promise.all([
-        this.adminFacade.refreshStatsData(this.revenueFilters, lists),
-        this.loadDashboardActivity(true),
+        this.adminFacade.refreshStatsData({ ...this.revenueFilters }),
+        this.can("dashboard.revenue.read") ? this.loadDashboardActivity(true) : Promise.resolve(),
       ]);
-      this.revenueReport = this.adminFacade.revenueReport();
-      this.revenueMetrics = this.adminFacade.revenueMetrics();
-      this.appointmentStats = this.adminFacade.appointmentStats();
-      this.collaboratorStats = this.adminFacade.collaboratorStats();
-      this.serviceStats = this.adminFacade.serviceStats();
     } catch (error: any) {
-      this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Aggiornamento della panoramica non riuscito";
+      // A missed periodic refresh keeps the figures on screen; say so only if there are none.
+      if (!this.revenueReport)
+        this.feedback = humanError(error, "Aggiornamento della panoramica non riuscito");
     } finally {
       this.dashboardRefreshInFlight -= 1;
     }
   }
 
+  /** The agenda changed something: reports and the till are no longer current. */
   async refreshAfterDataChange(scope: "dashboard" | "all"): Promise<void> {
-    if (scope === "all") {
-      await this.refreshAll();
-      return;
-    }
-    await this.refreshDashboardQueries(true);
+    await this.changed(
+      scope === "all"
+        ? ["stats", "sales", "customers", "customerOptions"]
+        : ["stats", "sales"],
+    );
   }
 
   async loadMoreDashboardActivity(): Promise<void> {
@@ -2422,21 +2389,21 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
   async retryQuickOrderCreation():Promise<void> {
     if(!this.can("sales.manage"))return;
-    this.loading=true;
-    try{await firstValueFrom(this.adminApi.retrySaleCreation());this.closeQuickOrder();this.feedback="Esito della vendita recuperato";await this.refreshAll();}
-    catch(error:any){this.feedback=error?.error?.message || error?.message || "Esito non disponibile";}
-    finally{this.loading=false;}
+    this.busy = true;
+    try{await firstValueFrom(this.adminApi.retrySaleCreation());this.closeQuickOrder();this.feedback="Esito della vendita recuperato";await this.changed(SALE_CHANGED);}
+    catch(error:any){this.feedback=humanError(error, "Esito non disponibile");}
+    finally{this.busy = false;}
   }
   async retryQuickOrderUpdate():Promise<void>{
     if(!this.quickOrderSale?.id || !this.can("sales.manage"))return;
-    this.loading=true;
-    try{await firstValueFrom(this.adminApi.retrySaleUpdate(this.quickOrderSale.id));this.closeQuickOrder();this.feedback="Modifica del conto recuperata";await this.refreshAll();}
-    catch(error:any){this.feedback=error?.error?.message || error?.message || "Esito non disponibile";}
-    finally{this.loading=false;}
+    this.busy = true;
+    try{await firstValueFrom(this.adminApi.retrySaleUpdate(this.quickOrderSale.id));this.closeQuickOrder();this.feedback="Modifica del conto recuperata";await this.changed(SALE_CHANGED);}
+    catch(error:any){this.feedback=humanError(error, "Esito non disponibile");}
+    finally{this.busy = false;}
   }
   async saveQuickOrder(payload: Record<string, unknown>): Promise<void> {
     if (!this.can("sales.manage")) return;
-    this.loading = true;
+    this.busy = true;
     try {
       const appointmentId = String(payload["appointmentId"] ?? "");
       const isEditing = Boolean(this.quickOrderSale?.id);
@@ -2466,32 +2433,29 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       }
       this.closeQuickOrder();
       this.feedback = payload["orderStatus"] === "open" ? "Conto salvato, incasso ancora aperto" : isEditing ? "Conto aggiornato" : "Vendita registrata";
-      await this.refreshAll();
+      await this.changed(SALE_CHANGED);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || error?.message || "Registrazione della vendita non riuscita";
+        humanError(error, "Registrazione della vendita non riuscita");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async openQuickOrder(appointment: any = null, sale: any = null): Promise<void> {
     if (!this.can("sales.manage")) return;
     try {
-      const [, people] = await Promise.all([
-        this.adminFacade.reloadProducts(),
-        firstValueFrom(this.adminApi.loadCollaboratorOptions()),
-      ]);
-      this.quickOrderCollaborators = people;
+      // Cached catalog opens the till at once; older than a minute it refreshes behind.
+      await this.adminFacade.ensure(QUICK_ORDER_DATASETS);
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Caricamento del catalogo per la cassa non riuscito";
+      this.feedback = humanError(error, "Caricamento del catalogo per la cassa non riuscito");
       return;
     }
     if (appointment && !sale) {
       try {
         sale = await firstValueFrom(this.adminApi.orderForAppointment(appointment.id));
       } catch (error: any) {
-        this.feedback = error?.error?.message || "Apertura del conto non riuscita";
+        this.feedback = humanError(error, "Apertura del conto non riuscita");
         return;
       }
     }
@@ -2595,7 +2559,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       }? La notifica sparirà dalla coda di conferma.`,
       "Annulla appuntamento",
       async () => {
-        this.loading = true;
+        this.busy = true;
         try {
           await firstValueFrom(
             this.adminApi.cancelAppointment(appointment.id, {
@@ -2604,12 +2568,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           );
           this.feedback = "Appuntamento annullato";
           this.appointmentOrderNotifications.dismiss(appointment.id);
-          await this.refreshAll();
+          await this.changed(["sales", "stats"]);
         } catch (error: any) {
-          this.feedback = error?.error?.message || "Annullamento non riuscito";
+          this.feedback = humanError(error, "Annullamento non riuscito");
           throw error;
         } finally {
-          this.loading = false;
+          this.busy = false;
         }
       },
     );
@@ -2621,19 +2585,19 @@ export class AdminAppComponent implements OnInit, OnDestroy {
   }): Promise<void> {
     if (!this.can("sales.manage")) return;
     if (!event?.appointment?.id || !event.saleId) return;
-    this.loading = true;
+    this.busy = true;
     try {
       await firstValueFrom(
         this.adminApi.linkSaleToAppointment(event.saleId, event.appointment.id),
       );
       this.appointmentOrderNotifications.dismiss(event.appointment.id);
       this.feedback = "Vendita collegata all'appuntamento";
-      await this.refreshAll();
+      await this.changed(["sales", "stats"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || "Collegamento della vendita non riuscito";
+        humanError(error, "Collegamento della vendita non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -2663,17 +2627,17 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         : "La vendita e tutte le sue voci verranno eliminate. L'appuntamento collegato resterà disponibile.",
       "Elimina vendita",
       async () => {
-        this.loading = true;
+        this.busy = true;
         try {
           await firstValueFrom(this.adminApi.deleteSale(sale.id));
           this.feedback = "Vendita eliminata";
-          await this.refreshAll();
+          await this.changed(["sales", "stats"]);
         } catch (error: any) {
           this.feedback =
-            error?.error?.message || "Eliminazione della vendita non riuscita";
+            humanError(error, "Eliminazione della vendita non riuscita");
           throw error;
         } finally {
-          this.loading = false;
+          this.busy = false;
         }
       },
     );
@@ -2695,7 +2659,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.loading = true;
+    this.busy = true;
 
     try {
       await this.http
@@ -2715,18 +2679,16 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback = "Prodotto collegato al servizio";
       const serviceId = this.serviceForm.id;
       this.resetServiceProductForm();
-      await this.refreshAll();
+      await this.changed(["services"]);
       const updated = this.services.find((service) => service.id === serviceId);
       if (updated) {
         this.editService(updated);
       }
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Collegamento prodotto non riuscito";
+        humanError(error, "Collegamento prodotto non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -2735,7 +2697,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.loading = true;
+    this.busy = true;
 
     try {
       await this.http
@@ -2747,23 +2709,21 @@ export class AdminAppComponent implements OnInit, OnDestroy {
 
       this.feedback = "Prodotto rimosso dal servizio";
       const serviceId = this.serviceForm.id;
-      await this.refreshAll();
+      await this.changed(["services"]);
       const updated = this.services.find((service) => service.id === serviceId);
       if (updated) {
         this.editService(updated);
       }
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Rimozione prodotto non riuscita";
+        humanError(error, "Rimozione prodotto non riuscita");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async saveService(): Promise<void> {
-    this.loading = true;
+    this.busy = true;
 
     try {
       const payload = {
@@ -2799,14 +2759,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         ? "Servizio aggiornato"
         : "Servizio creato";
       this.serviceForm = this.emptyServiceForm();
-      await this.refreshAll();
+      await this.changed(["services"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Salvataggio servizio non riuscito";
+        humanError(error, "Salvataggio servizio non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -2815,7 +2773,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       this.feedback = "Inserisci il nome del prodotto";
       return;
     }
-    this.loading = true;
+    this.busy = true;
     try {
       await firstValueFrom(
         this.adminApi.createOrUpdateProduct(this.productForm.id, {
@@ -2840,12 +2798,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         ? "Prodotto aggiornato"
         : "Prodotto creato";
       this.resetProductForm();
-      await this.refreshAll();
+      await this.changed(["products"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message || "Salvataggio prodotto non riuscito";
+        humanError(error, "Salvataggio prodotto non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -2856,16 +2814,16 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       `Disattiva ${this.productForm.name || "il prodotto selezionato"} conservando prezzi e movimenti storici.`,
       "Disattiva prodotto",
       async () => {
-        this.loading = true;
+        this.busy = true;
         try {
           await firstValueFrom(
             this.adminApi.deleteProduct(this.productForm.id),
           );
           this.feedback = "Prodotto disattivato; storico conservato";
           this.resetProductForm();
-          await this.refreshAll();
+          await this.changed(["products"]);
         } finally {
-          this.loading = false;
+          this.busy = false;
         }
       },
     );
@@ -2881,7 +2839,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       `Disattiva il servizio ${this.serviceForm.name || "selezionato"} conservando il suo storico.`,
       "Disattiva servizio",
       async () => {
-        this.loading = true;
+        this.busy = true;
 
         try {
           await this.http
@@ -2892,22 +2850,20 @@ export class AdminAppComponent implements OnInit, OnDestroy {
             .toPromise();
           this.feedback = "Servizio disattivato; storico conservato";
           this.serviceForm = this.emptyServiceForm();
-          await this.refreshAll();
+          await this.changed(["services"]);
         } catch (error: any) {
           this.feedback =
-            error?.error?.message ||
-            error?.message ||
-            "Eliminazione servizio non riuscita";
+            humanError(error, "Eliminazione servizio non riuscita");
           throw error;
         } finally {
-          this.loading = false;
+          this.busy = false;
         }
       },
     );
   }
 
   async saveCollaborator(): Promise<void> {
-    this.loading = true;
+    this.busy = true;
 
     try {
       const payload = {
@@ -2956,19 +2912,17 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         ? "Professionista aggiornato"
         : "Professionista aggiunto";
       this.collaboratorForm = this.emptyCollaboratorForm();
-      await this.refreshAll();
+      await this.changed(["collaborators", "collaboratorOptions"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Salvataggio del professionista non riuscito";
+        humanError(error, "Salvataggio del professionista non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
   async setDefaultCollaborator(collaboratorId: string): Promise<void> {
-    this.loading = true;
+    this.busy = true;
 
     try {
       await this.http
@@ -2983,14 +2937,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         .toPromise();
 
       this.feedback = "Professionista di riferimento aggiornato";
-      await this.refreshAll();
+      await this.changed(["tenant", "collaborators", "collaboratorOptions"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Aggiornamento del professionista di riferimento non riuscito";
+        humanError(error, "Aggiornamento del professionista di riferimento non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -3010,7 +2962,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       `Stai per eliminare ${this.collaboratorForm.firstName || "questo"} ${this.collaboratorForm.lastName || "professionista"}.`,
       "Elimina professionista",
       async () => {
-        this.loading = true;
+        this.busy = true;
 
         try {
           await this.http
@@ -3021,22 +2973,20 @@ export class AdminAppComponent implements OnInit, OnDestroy {
             .toPromise();
           this.feedback = "Professionista eliminato";
           this.collaboratorForm = this.emptyCollaboratorForm();
-          await this.refreshAll();
+          await this.changed(["collaborators", "collaboratorOptions"]);
         } catch (error: any) {
           this.feedback =
-            error?.error?.message ||
-            error?.message ||
-            "Eliminazione del professionista non riuscita";
+            humanError(error, "Eliminazione del professionista non riuscita");
           throw error;
         } finally {
-          this.loading = false;
+          this.busy = false;
         }
       },
     );
   }
 
   async saveCustomer(): Promise<void> {
-    this.loading = true;
+    this.busy = true;
 
     try {
       const payload = {
@@ -3069,14 +3019,12 @@ export class AdminAppComponent implements OnInit, OnDestroy {
         ? "Cliente aggiornato"
         : "Cliente creato";
       this.resetCustomerForm();
-      await this.refreshAll();
+      await this.changed(["customers", "customerOptions"]);
     } catch (error: any) {
       this.feedback =
-        error?.error?.message ||
-        error?.message ||
-        "Salvataggio cliente non riuscito";
+        humanError(error, "Salvataggio cliente non riuscito");
     } finally {
-      this.loading = false;
+      this.busy = false;
     }
   }
 
@@ -3086,7 +3034,7 @@ export class AdminAppComponent implements OnInit, OnDestroy {
       `Stai per eliminare ${customer.firstName} ${customer.lastName}.`,
       "Elimina cliente",
       async () => {
-        this.loading = true;
+        this.busy = true;
 
         try {
           await this.http
@@ -3099,15 +3047,13 @@ export class AdminAppComponent implements OnInit, OnDestroy {
           if (this.customerForm.id === customer.id) {
             this.resetCustomerForm();
           }
-          await this.refreshAll();
+          await this.changed(["customers", "customerOptions"]);
         } catch (error: any) {
           this.feedback =
-            error?.error?.message ||
-            error?.message ||
-            "Eliminazione cliente non riuscita";
+            humanError(error, "Eliminazione cliente non riuscita");
           throw error;
         } finally {
-          this.loading = false;
+          this.busy = false;
         }
       },
     );

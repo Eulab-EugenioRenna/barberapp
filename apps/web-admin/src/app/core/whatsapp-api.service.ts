@@ -8,6 +8,7 @@ import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection, WhatsAppConversationView,
   WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
   WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastView, WhatsAppBroadcastDetail,
+  WhatsAppNotificationsView,
 } from "@barber/shared/whatsapp";
 import { ADMIN_API_URL } from "./api-config";
 import { SessionStore } from "./session.store";
@@ -30,6 +31,8 @@ export class WhatsAppApiService {
   sessions() { return firstValueFrom(this.http.get<WhatsAppConnection[]>(this.root + "/sessions")); }
   archives() { return firstValueFrom(this.http.get<WhatsAppArchiveView[]>(this.root + "/archives")); }
   outbox() { return firstValueFrom(this.http.get<WhatsAppOutboxView[]>(this.root + "/outbox")); }
+  /** Running and recent «Messaggio a tutti» plus the single messages, in one request. */
+  notifications() { return firstValueFrom(this.http.get<WhatsAppNotificationsView>(this.root + "/notifications")); }
   connect(phone?: string) { return firstValueFrom(this.http.post<WhatsAppAcknowledgement>(this.root + "/sessions", phone ? { phone } : {})); }
   /** Switches a waiting link: with a phone the code, without it the QR. */
   relink(id: string, phone?: string) {

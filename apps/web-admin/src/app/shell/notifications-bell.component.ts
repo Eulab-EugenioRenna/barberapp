@@ -1,11 +1,11 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit, computed, inject, signal } from "@angular/core";
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener, OnInit, computed, inject, signal } from "@angular/core";
 import { DatePipe } from "@angular/common";
 import { Router } from "@angular/router";
 import { UiIconComponent } from "@alora/ui";
 import type { WhatsAppBroadcastView, WhatsAppOutboxView } from "@barber/shared/whatsapp";
 import { AppointmentOrderNotificationsService } from "../core/appointment-order-notifications.service";
 import { SessionStore } from "../core/session.store";
-import { WhatsAppApiService } from "../core/whatsapp-api.service";
+import { NotificationsFeedService } from "../core/notifications-feed.service";
 import { broadcastShares, sendStatus, type SendTone } from "../core/whatsapp-send-status";
 
 interface Notice {
@@ -20,7 +20,8 @@ const DAY = 24 * 3600_000;
 
 /**
  * Bell next to «Guida»: app notices (accounts to close), progress of every «Messaggio a tutti»
- * and the outcome of single messages of the last 24 hours. Polls faster while something is running.
+ * and the outcome of single messages of the last 24 hours. The data comes from one shared feed
+ * (NotificationsFeedService, polled once for the app), so a header per page costs no request.
  */
 @Component({
   selector: "alora-notifications-bell",
@@ -96,21 +97,19 @@ const DAY = 24 * 3600_000;
     @media (max-width: 640px) { .bell-panel { position: fixed; top: 4rem; right: 0.75rem; left: 0.75rem; width: auto; } }
   `],
 })
-export class NotificationsBellComponent implements OnInit, OnDestroy {
+export class NotificationsBellComponent implements OnInit {
   private readonly session = inject(SessionStore);
-  private readonly api = inject(WhatsAppApiService);
+  private readonly feed = inject(NotificationsFeedService);
   private readonly accounts = inject(AppointmentOrderNotificationsService);
   private readonly router = inject(Router);
   private readonly host = inject(ElementRef<HTMLElement>);
   private readonly cdr = inject(ChangeDetectorRef);
   readonly open = signal(false);
   readonly seen = signal("");
-  readonly waUnavailable = signal(false);
-  private readonly active = signal<WhatsAppBroadcastView[]>([]);
-  private readonly recent = signal<WhatsAppBroadcastView[]>([]);
-  private readonly singles = signal<WhatsAppOutboxView[]>([]);
-  private timer?: ReturnType<typeof setTimeout>;
-  private stopped = false;
+  readonly waUnavailable = this.feed.unavailable;
+  private readonly active = this.feed.active;
+  private readonly recent = this.feed.recent;
+  private readonly singles = this.feed.singles;
   readonly shares = broadcastShares;
 
   readonly notices = computed<Notice[]>(() => {
@@ -154,13 +153,12 @@ export class NotificationsBellComponent implements OnInit, OnDestroy {
   private get seenKey() { return `alora.notifications.seen:${this.session.currentUser()?.id ?? ""}`; }
   ngOnInit() {
     this.seen.set(localStorage.getItem(this.seenKey) ?? "");
-    void this.poll();
   }
-  ngOnDestroy() { this.stopped = true; if (this.timer) clearTimeout(this.timer); }
   toggle() {
     const next = !this.open();
     this.open.set(next);
-    if (next) { this.markSeen(); void this.poll(); }
+    // Opening shows the latest news, without asking again within 10 seconds.
+    if (next) { this.markSeen(); void this.feed.refresh(10_000).then(() => this.cdr.markForCheck()); }
   }
   go(n: Notice) { this.open.set(false); this.markSeen(); n.open(); }
   @HostListener("document:click", ["$event"]) outside(event: Event) {
@@ -174,20 +172,5 @@ export class NotificationsBellComponent implements OnInit, OnDestroy {
   }
   private openWhatsApp(broadcastId: string | null, messageId?: string) {
     void this.router.navigate(["/whatsapp"], { queryParams: broadcastId ? { invio: broadcastId } : { messaggio: messageId } });
-  }
-  private async poll() {
-    if (this.timer) clearTimeout(this.timer);
-    if (this.stopped) return;
-    if (!document.hidden && this.session.can("whatsapp.read")) {
-      try {
-        const [active, recent, singles] = await Promise.all([this.api.activeBroadcasts(), this.api.listBroadcasts(), this.api.outbox()]);
-        this.active.set(active); this.recent.set(recent); this.singles.set(singles);
-        this.waUnavailable.set(false);
-      } catch { this.waUnavailable.set(true); }
-      this.cdr.markForCheck();
-    }
-    if (this.stopped) return;
-    const busy = this.active().length > 0 || this.singles().some((s) => sendStatus(s).tone === "progress");
-    this.timer = setTimeout(() => void this.poll(), busy || this.open() ? 5_000 : 30_000);
   }
 }

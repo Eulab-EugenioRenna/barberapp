@@ -90,6 +90,15 @@ export interface WhatsAppBroadcastView {
   /** Closed text queue: «Completa e riprova i rimanenti» is possible. */
   retryable: boolean;
 }
+/** GET /whatsapp/notifications: everything the admin bell shows, in one call. */
+export interface WhatsAppNotificationsView {
+  /** Queues running or paused, oldest first (as GET /whatsapp/broadcasts/active). */
+  active: WhatsAppBroadcastView[];
+  /** Latest 30 queues, newest first (as GET /whatsapp/broadcasts). */
+  recent: WhatsAppBroadcastView[];
+  /** Single messages on Connect (as GET /whatsapp/outbox). */
+  outbox: WhatsAppOutboxView[];
+}
 export interface WhatsAppAudienceView {
   /** Active customers. */
   customers: number;

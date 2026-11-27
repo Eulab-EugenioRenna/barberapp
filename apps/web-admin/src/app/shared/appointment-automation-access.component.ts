@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { Component, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -464,15 +465,10 @@ export class AppointmentAutomationAccessComponent {
     }[row.status];
   }
   private message(error: unknown) {
-    const text =
-      error instanceof HttpErrorResponse
-        ? error.error?.message
-        : error instanceof Error
-          ? error.message
-          : null;
-    return typeof text === "string"
-      ? text
-      : "Operazione non completata. Aggiorna lo stato o recupera la stessa richiesta.";
+    return humanError(
+      error,
+      "Operazione non completata. Aggiorna lo stato o recupera la stessa richiesta.",
+    );
   }
   private async refresh() {
     this.grants = await this.api.list();

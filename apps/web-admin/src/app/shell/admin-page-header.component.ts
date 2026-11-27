@@ -36,9 +36,26 @@ import {
         }
         <alora-notifications-bell></alora-notifications-bell>
         @if (tour.hasTour(navKey)) {
-          <button type="button" class="icon-btn" data-tour="page-guide"
-            aria-label="Guida passo passo di questa pagina" data-tip="Guida" (click)="tour.start(navKey)">
+          @if (tour.hintFor(navKey)) {
+            <!-- Quiet suggestion: never opens anything, never takes focus. -->
+            <span class="guide-hint">
+              <button type="button" class="guide-hint-label" (click)="tour.startGuide(navKey)">
+                Nuovo? Guarda la guida
+              </button>
+              <button type="button" class="guide-hint-close" aria-label="Non suggerire la guida di questa pagina"
+                data-tip="Non suggerire più" (click)="tour.dismissHint(navKey)">
+                <span aria-hidden="true">×</span>
+              </button>
+            </span>
+          }
+          <button type="button" class="icon-btn guide-btn" data-tour="page-guide"
+            [class.has-hint]="tour.hintFor(navKey)"
+            [attr.aria-label]="tour.hintFor(navKey) ? 'Guida passo passo di questa pagina (nuova)' : 'Guida passo passo di questa pagina'"
+            data-tip="Guida" (click)="tour.startGuide(navKey)">
             <ui-icon name="help"></ui-icon>
+            @if (tour.hintFor(navKey)) {
+              <span class="guide-dot" aria-hidden="true"></span>
+            }
           </button>
         }
       </span>
@@ -62,6 +79,68 @@ import {
       }
       @keyframes header-spin {
         to { transform: rotate(360deg); }
+      }
+      .guide-btn {
+        position: relative;
+      }
+      .guide-dot {
+        position: absolute;
+        top: 0.3rem;
+        right: 0.3rem;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: var(--accent, #0f3d32);
+        box-shadow: 0 0 0 2px var(--surface, #fff);
+        pointer-events: none;
+      }
+      .guide-hint {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--accent, #0f3d32) 25%, transparent);
+        background: color-mix(in srgb, var(--accent, #0f3d32) 8%, transparent);
+        color: var(--accent, #0f3d32);
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      .guide-hint button {
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      .guide-hint-label {
+        padding: 0.4rem 0.25rem 0.4rem 0.7rem;
+      }
+      .guide-hint-close {
+        padding: 0.4rem 0.6rem 0.4rem 0.3rem;
+        font-size: 0.95rem;
+        opacity: 0.7;
+      }
+      .guide-hint-close:hover,
+      .guide-hint-close:focus-visible {
+        opacity: 1;
+      }
+      /* One soft fade-in, nothing looping; skipped when motion is reduced. */
+      @media (prefers-reduced-motion: no-preference) {
+        .guide-hint,
+        .guide-dot {
+          animation: guide-hint-in 0.4s ease-out both;
+        }
+      }
+      @keyframes guide-hint-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      /* Narrow screens: only the dot on «Guida», the header stays on one line. */
+      @media (max-width: 40rem) {
+        .guide-hint {
+          display: none;
+        }
       }
     `,
   ],

@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { Component, Input, inject, OnChanges } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -262,7 +263,7 @@ export class PriceSettingsComponent implements OnChanges {
       this.hasMore = result.hasMore;
       if (!this.history.length) this.feedback = "Nessuna variazione registrata";
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Storico non disponibile";
+      this.feedback = humanError(error, "Storico non disponibile");
     }
   }
   loadMore() {

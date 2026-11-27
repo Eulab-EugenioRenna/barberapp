@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { Component, inject } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -299,7 +300,7 @@ export class NotificationTemplateEditorComponent {
     return this.templates.find((t) => t.id === this.selectedId);
   }
   private error(error: any) {
-    return error?.error?.message || "Template non disponibili. Riprova.";
+    return humanError(error, "Template non disponibili. Riprova.");
   }
   async load() {
     if (this.busy) return;

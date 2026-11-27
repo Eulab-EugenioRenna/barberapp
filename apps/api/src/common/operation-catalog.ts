@@ -28,6 +28,8 @@ export const OPERATIONS: Readonly<Record<string, OperationDefinition>> = {
   "WhatsAppController.latestBroadcast": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.activeBroadcasts": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.listBroadcasts": { kind: "function", key: "whatsapp.send" },
+  /** Bell: broadcasts (whatsapp.send) plus outbox (whatsapp.read, implied by send). */
+  "WhatsAppController.notifications": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.broadcastDetail": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.broadcastStatus": { kind: "function", key: "whatsapp.send" },
   "WhatsAppController.cancelBroadcast": { kind: "function", key: "whatsapp.send" },

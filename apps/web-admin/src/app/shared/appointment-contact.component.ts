@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import {
   Component,
   Input,
@@ -144,7 +145,7 @@ export class AppointmentContactComponent implements OnChanges {
           : "";
     } catch (e: any) {
       this.contact = null;
-      this.feedback = e?.error?.message || "Consenso non disponibile.";
+      this.feedback = humanError(e, "Consenso non disponibile.");
     } finally {
       this.busy = false;
     }
@@ -192,8 +193,7 @@ export class AppointmentContactComponent implements OnChanges {
           command.body.idempotencyKey,
         );
       this.feedback =
-        e?.error?.message ||
-        "Esito da verificare: riprendi la stessa richiesta.";
+        humanError(e, "Esito da verificare: riprendi la stessa richiesta.");
     } finally {
       this.busy = false;
     }

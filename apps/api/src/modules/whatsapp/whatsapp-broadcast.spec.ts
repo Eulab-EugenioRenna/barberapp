@@ -18,6 +18,7 @@ import { Prisma } from "@prisma/client";
 import { BROADCAST_STEP, WhatsAppService, broadcastTiming, providerChat } from "./whatsapp.service";
 
 const SESSION = "00000000-0000-4000-8000-000000000001";
+const OUTBOX = "00000000-0000-4000-9000-0000000000aa";
 /** Every service of a test is stopped at its end: a late worker must not consume the next test's mocks. */
 const services: WhatsAppService[] = [];
 afterEach(() => { services.splice(0).forEach((s) => s.onModuleDestroy()); });
@@ -93,6 +94,10 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
             return job && job.contentHash === broadcast.contentHash && job.createdAt > broadcast.createdAt.gt;
           });
         }
+        if (broadcast?.tenantId && !broadcast.status) {
+          // Outbox grouping: recipients of this tenant's queues.
+          return rows.filter((r) => jobs.find((j) => j.id === r.broadcastId)?.tenantId === broadcast.tenantId);
+        }
         if (broadcast) {
           // Earlier active queues of the account.
           rows = rows.filter((r) => {
@@ -106,6 +111,11 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
       update: jest.fn(async ({ where, data }: any) => apply(recipients.find((r) => r.id === where.id), data)),
       findFirst: jest.fn(async ({ where }: any) => recipients.find((r) => match(r, where)) ?? null),
       count: jest.fn(async ({ where }: any) => recipients.filter((r) => match(r, where)).length),
+      groupBy: jest.fn(async ({ where }: any) => {
+        const counts = new Map<string, number>();
+        for (const r of recipients.filter((row) => match(row, where))) counts.set(r.broadcastId, (counts.get(r.broadcastId) ?? 0) + 1);
+        return [...counts].map(([broadcastId, n]) => ({ broadcastId, _count: { _all: n } }));
+      }),
       updateMany: jest.fn(async ({ where, data }: any) => {
         const found = recipients.filter((r) => match(r, where));
         found.forEach((r) => apply(r, data));
@@ -373,6 +383,39 @@ describe("«Messaggio a tutti» in the background", () => {
     expect(detail.recipients[0]).toMatchObject({ state: "sent", recipient: "+393331000000" });
     expect(detail.recipients[0].sentAt).toEqual(expect.any(String));
     expect((await service.listBroadcasts("auth")).map((job) => job.id)).toEqual([jobs[0].id]);
+  });
+
+  it("notifications: active, recent and outbox in one call, one grouped count of «sending»", async () => {
+    const { service, jobs, recipients } = setup([{ id: "a", phone: "3331111111" }, { id: "b", phone: "3332222222" }]);
+    await service.broadcast("auth", SESSION, input);
+    await service.broadcast("auth", SESSION, { ...input, text: "Orari delle feste", idempotencyKey: "key-87654321" });
+    jobs[0].status = "done";
+    recipients.filter((r) => r.broadcastId === jobs[1].id)[0].state = "sending";
+    wa.outbox.mockImplementation(async () => [{ id: OUTBOX, session_id: SESSION, state: "sent", recipient: "+393331111111", created_at: "2026-11-27T10:00:00.000Z" }]);
+    const prisma = (service as any).prisma;
+    prisma.whatsAppBroadcastRecipient.groupBy.mockClear();
+    const view = await service.notifications("auth");
+    expect(view.active.map((j) => [j.id, j.sending])).toEqual([[jobs[1].id, 1]]);
+    expect(view.recent.map((j) => [j.id, j.sending]).sort()).toEqual([[jobs[0].id, 0], [jobs[1].id, 1]].sort());
+    expect(view.outbox.map((o) => o.id)).toEqual([OUTBOX]);
+    expect(prisma.whatsAppBroadcastRecipient.groupBy).toHaveBeenCalledTimes(1);
+    expect(prisma.whatsAppBroadcastRecipient.count).not.toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ state: "sending" }) }));
+    // Counting is best effort: views still come back.
+    prisma.whatsAppBroadcastRecipient.groupBy.mockRejectedValueOnce(new Error("db"));
+    expect((await service.notifications("auth")).active[0].sending).toBe(0);
+  });
+
+  it("notifications fail as a whole when Connect is unavailable, and need whatsapp.read", async () => {
+    const { service } = setup([{ id: "a", phone: "3331111111" }]);
+    wa.outbox.mockRejectedValueOnce(Object.assign(new Error("down"), { status: 503 }));
+    await expect(service.notifications("auth")).rejects.toThrow("temporaneamente non disponibile");
+    const functions = owner.connectFunctions;
+    owner.connectFunctions = [];
+    try {
+      await expect(service.notifications("auth")).rejects.toThrow("Permesso WhatsApp esplicito richiesto");
+    } finally {
+      owner.connectFunctions = functions;
+    }
   });
 
   it("does not queue the same text twice", async () => {

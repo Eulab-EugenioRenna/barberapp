@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import { CommonModule, DOCUMENT } from "@angular/common";
 import { Component, inject, OnInit } from "@angular/core";
 import { FormsModule } from "@angular/forms";
@@ -117,7 +118,7 @@ import { AmountsPrivacyToggleComponent } from "../shared/amounts-privacy-toggle.
       <p class="mt-3 text-sm text-[var(--muted)]">Le guide evidenziano i pulsanti di ogni pagina e spiegano le azioni disponibili per il tuo account.</p>
       <div class="mt-4 flex flex-wrap items-center gap-4">
         <button type="button" class="secondary-btn" data-tour="account-guides-replay" (click)="replayGuides()">Rivedi tutte le guide</button>
-        <label class="field checkbox-field" data-tour="account-guides-auto"><input type="checkbox" name="toursAutoStart" [checked]="tours.autoStart()" (change)="setGuidesAutoStart($any($event.target).checked)" /><span>Apri le guide automaticamente</span></label>
+        <label class="field checkbox-field" data-tour="account-guides-auto"><input type="checkbox" name="toursAutoStart" [checked]="tours.autoStart()" (change)="setGuidesAutoStart($any($event.target).checked)" /><span>Suggerisci le guide nelle pagine nuove</span></label>
       </div>
     </section>
     <div *ngIf="pending" barberAutofocusFirst class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="account-confirm-title" (keydown)="dialogKeydown($event)">
@@ -163,7 +164,7 @@ export class PersonalAccountComponent implements OnInit {
       if (user) this.store.setCurrentUser({ ...user, firstName: result.profile.firstName, lastName: result.profile.lastName });
       this.feedback = "Profilo aggiornato in ALORA e nelle altre app EULAB.";
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Profilo non aggiornato. Riprova tra poco.";
+      this.feedback = humanError(error, "Profilo non aggiornato. Riprova tra poco.");
     } finally { this.busy = false; }
   }
   async setPreference(method: PersonalSecurity["preferredMethod"]): Promise<void> {
@@ -174,7 +175,7 @@ export class PersonalAccountComponent implements OnInit {
       this.security = await firstValueFrom(this.api.setPersonalMfaPreference(method));
       this.feedback = "Metodo di verifica aggiornato.";
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Preferenza non salvata: il metodo potrebbe non essere attivo per la tua organizzazione.";
+      this.feedback = humanError(error, "Preferenza non salvata: il metodo potrebbe non essere attivo per la tua organizzazione.");
     } finally { this.busy = false; }
   }
   /** Opens only the secure step of the provider, then the login brings the person back here. */
@@ -187,7 +188,7 @@ export class PersonalAccountComponent implements OnInit {
       this.store.rememberRequestedUrl("/account");
       this.document.location.assign(redirectUrl);
     } catch (error: any) {
-      this.feedback = error?.error?.message || "Operazione non disponibile ora. Riprova tra poco.";
+      this.feedback = humanError(error, "Operazione non disponibile ora. Riprova tra poco.");
       this.busy = false;
     }
   }

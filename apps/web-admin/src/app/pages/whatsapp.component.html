@@ -4,7 +4,7 @@
   <p *ngIf="feedback" class="wa-feedback" role="status">{{ feedback }}</p>
   <p *ngIf="loading" class="wa-muted" role="status">Caricamento di WhatsApp…</p>
 
-  <ui-tabs ariaLabel="Sezioni di WhatsApp" [tabs]="tabs" [active]="section" (activeChange)="section = $any($event)"></ui-tabs>
+  <ui-tabs ariaLabel="Sezioni di WhatsApp" [tabs]="tabs" [active]="section" (activeChange)="selectSection($any($event))"></ui-tabs>
 
   <!-- Collegamento: solo quello creato da questo account, QR compreso -->
   <section
@@ -109,7 +109,7 @@
       </div>
       <div *ngIf="!archives.length && !loading" class="wa-empty">
         <p>Per vedere le conversazioni serve prima collegare il tuo numero.</p>
-        <button type="button" class="secondary-btn" (click)="section = 'connection'">Vai al collegamento</button>
+        <button type="button" class="secondary-btn" (click)="selectSection('connection')">Vai al collegamento</button>
       </div>
       <div *ngIf="archiveId" class="wa-chat-tools">
         <input class="wa-search" type="search" name="chatQuery" [(ngModel)]="chatQuery" placeholder="Cerca nome, numero o testo" aria-label="Cerca conversazione" />
@@ -229,7 +229,7 @@
     <p *ngIf="!canSend" class="wa-empty">Per inviare messaggi occorre il permesso dedicato.</p>
     <div *ngIf="canSend && !connected && pending.kind === 'empty'" class="wa-confirm">
       <p>Per attivarlo serve prima: il tuo numero collegato e connesso.</p>
-      <button type="button" class="primary-btn" (click)="section = 'connection'">Vai al collegamento</button>
+      <button type="button" class="primary-btn" (click)="selectSection('connection')">Vai al collegamento</button>
     </div>
     <ng-container *ngIf="canSend && (connected || pending.kind !== 'empty')">
       <div *ngIf="pending.kind !== 'empty'" class="wa-feedback" role="status">

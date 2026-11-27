@@ -1,6 +1,5 @@
 import { DOCUMENT } from "@angular/common";
 import { Injectable, computed, inject, signal } from "@angular/core";
-import { UpdateReloadQueue } from "./update-reload-queue";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -9,12 +8,11 @@ type BeforeInstallPromptEvent = Event & {
 
 const INSTALL_DISMISS_KEY = "barber.pwa-install-dismissed";
 const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
-const OPEN_MODAL_SELECTOR = '[role="dialog"][aria-modal="true"]';
 
 /**
  * PWA installabile con worker per le push, senza cache o intercettazione HTTP.
- * I deploy vengono rilevati confrontando index.html; il reload attende
- * la chiusura delle modali, mentre le cache storiche vengono eliminate.
+ * I deploy vengono rilevati confrontando index.html: la pagina non si ricarica
+ * mai da sola, mostra un avviso e aggiorna solo quando l'utente lo chiede.
  */
 @Injectable({ providedIn: "root" })
 export class AdminPwaService {
@@ -23,12 +21,21 @@ export class AdminPwaService {
   private deferredPrompt: BeforeInstallPromptEvent | null = null;
   private checkingUpdate = false;
   private updateTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly updateReloadQueue: UpdateReloadQueue | null;
+  private readonly updateState = signal(false);
+  private reloading = false;
 
   readonly installAvailable = signal(false);
   readonly installed = signal(false);
   readonly offline = signal(false);
   readonly installDismissed = signal(false);
+  private readonly updateDismissed = signal(false);
+  /**
+   * A newer build is published and the user has not put it off («Più tardi»)
+   * in this session; the user decides when to load it.
+   */
+  readonly updateAvailable = computed(
+    () => this.updateState() && !this.updateDismissed(),
+  );
 
   readonly showInstallBanner = computed(
     () =>
@@ -38,24 +45,8 @@ export class AdminPwaService {
   constructor() {
     const window = this.document.defaultView;
     if (!window) {
-      this.updateReloadQueue = null;
       return;
     }
-
-    this.updateReloadQueue = new UpdateReloadQueue({
-      hasOpenModal: () =>
-        Boolean(this.document.querySelector(OPEN_MODAL_SELECTOR)),
-      observeModalChanges: (onChange) => {
-        const observer = new window.MutationObserver(onChange);
-        observer.observe(this.document.body, {
-          childList: true,
-          subtree: true,
-        });
-        return () => observer.disconnect();
-      },
-      beforeReload: () => this.clearCaches(),
-      reload: () => window.location.reload(),
-    });
 
     this.installed.set(this.isStandalone());
     this.offline.set(!window.navigator.onLine);
@@ -128,7 +119,13 @@ export class AdminPwaService {
    */
   async checkForUpdate(): Promise<boolean> {
     const window = this.document.defaultView;
-    if (!window || this.offline() || this.document.hidden || this.checkingUpdate) {
+    if (
+      !window ||
+      this.offline() ||
+      this.document.hidden ||
+      this.checkingUpdate ||
+      this.updateState()
+    ) {
       return false;
     }
 
@@ -148,7 +145,7 @@ export class AdminPwaService {
       const currentId = this.currentBuildId();
 
       if (remoteId && currentId && remoteId !== currentId) {
-        this.updateReloadQueue?.request();
+        this.updateState.set(true);
         return true;
       }
     } catch {
@@ -159,6 +156,20 @@ export class AdminPwaService {
     }
 
     return false;
+  }
+
+  /** Hides the update notice until the next page load. */
+  dismissUpdate(): void {
+    this.updateDismissed.set(true);
+  }
+
+  /** Loads the new build: clears old caches, then reloads. Only on user request. */
+  async applyUpdate(): Promise<void> {
+    const window = this.document.defaultView;
+    if (!window || this.reloading) return;
+    this.reloading = true;
+    await this.clearCaches();
+    window.location.reload();
   }
 
   private async clearCaches(): Promise<void> {

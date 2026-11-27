@@ -106,7 +106,7 @@ const CARD_WIDTH = 340;
           [checked]="!tour.autoStart()"
           (change)="tour.setAutoStart(!$any($event.target).checked)"
         />
-        Non aprire più le guide da sole (restano sul pulsante «Guida»)
+        Non suggerire più le guide (restano sul pulsante «Guida»)
       </label>
     </section>
   </ng-container>`,

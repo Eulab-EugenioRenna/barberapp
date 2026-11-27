@@ -1,3 +1,4 @@
+import { humanError } from "../core/human-error";
 import {
   Component,
   EventEmitter,
@@ -528,12 +529,7 @@ export class AccountPaymentsComponent implements OnInit {
     );
   }
   private message(error: unknown) {
-    if (
-      error instanceof HttpErrorResponse &&
-      typeof error.error?.message === "string"
-    )
-      return error.error.message;
-    return "Esito non disponibile. Verifica e riprova la stessa richiesta.";
+    return humanError(error, "Esito non disponibile. Verifica e riprova la stessa richiesta.");
   }
   async record() {
     if (this.busy || !this.data) return;
