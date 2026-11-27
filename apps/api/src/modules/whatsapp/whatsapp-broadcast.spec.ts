@@ -27,6 +27,9 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
   const recipients: any[] = [];
   const sends: any[] = alreadySent.map((recipient) => ({ recipient }));
   const events: any[] = [];
+  const connectSessions: any[] = [
+    { id: "cs", userId: "owner", installationId: "i1", sdkSessionCipher: "cipher", revokedAt: null, expiresAt: new Date(Date.now() + 3600_000) },
+  ];
   const match = (row: any, where: any = {}) =>
     Object.entries(where).every(([key, value]: [string, any]) =>
       value && typeof value === "object" && !(value instanceof Date)
@@ -44,7 +47,12 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
     return row;
   };
   const prisma: any = {
-    connectSession: { findFirst: jest.fn(async () => ({ sdkSessionCipher: "cipher", installationId: "i1" })) },
+    connectSession: {
+      findFirst: jest.fn(async ({ where }: any) => connectSessions.find((c) =>
+        (typeof where.id === "string" ? c.id === where.id : c.id !== where.id?.not) &&
+        c.userId === where.userId && !c.revokedAt && c.expiresAt > where.expiresAt.gt) ?? null),
+      findUnique: jest.fn(async ({ where }: any) => connectSessions.find((c) => c.id === where.id) ?? null),
+    },
     whatsAppLink: { findMany: jest.fn(async () => [{ tenantId: "t1", userId: "owner", sessionId: SESSION, removedAt: null }]), updateMany: jest.fn() },
     whatsAppSend: {
       findMany: jest.fn(async () => sends),
@@ -139,7 +147,7 @@ function setup(customers: Array<{ id: string; phone: string | null }>, alreadySe
     for (const job of jobs) job.nextRunAt = job.id === id ? new Date(0) : new Date(Date.now() + 3600_000);
     await service.tick();
   };
-  return { service, jobs, recipients, run, runJob, customers };
+  return { service, jobs, recipients, run, runJob, customers, connectSessions };
 }
 const input = { text: "Promo di Natale", idempotencyKey: "key-12345678", recipientAuthorized: true as const };
 
@@ -326,6 +334,37 @@ describe("«Messaggio a tutti» in the background", () => {
     expect((await service.resumeBroadcast("auth", jobs[0].id)).status).toBe("running");
     await run();
     expect(jobs[0]).toMatchObject({ status: "done", sent: 1 });
+  });
+
+  it("moves on to the user's new Connect sign-in when the one it started with expired", async () => {
+    const { service, jobs, run, connectSessions } = setup([{ id: "a", phone: "3331111111" }, { id: "b", phone: "3332222222" }]);
+    await service.broadcast("auth", SESSION, input);
+    connectSessions[0].expiresAt = new Date(Date.now() - 1000);
+    connectSessions.push({ ...connectSessions[0], id: "cs2", expiresAt: new Date(Date.now() + 3600_000) });
+    await run();
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 2, connectSessionId: "cs2" });
+  });
+
+  it("pauses when the salon's number is unlinked, without failing the customers", async () => {
+    const { service, jobs, recipients, run } = setup([{ id: "a", phone: "3331111111" }, { id: "b", phone: "3332222222" }]);
+    await service.broadcast("auth", SESSION, input);
+    wa.sendText.mockRejectedValueOnce(Object.assign(new Error('Connect 409: {"statusCode":409,"message":"Sessione non connessa"}'), { status: 409 }));
+    await run();
+    expect(jobs[0]).toMatchObject({ status: "paused", failed: 0, error: "Numero WhatsApp del salone scollegato: ricollegalo in WhatsApp e premi «Riprendi»" });
+    expect(recipients.map((r) => r.state)).toEqual(["pending", "pending"]);
+    expect((await service.resumeBroadcast("auth", jobs[0].id)).status).toBe("running");
+    await run();
+    expect(jobs[0]).toMatchObject({ status: "done", sent: 2 });
+  });
+
+  it("pauses instead of looping when the outcomes can no longer be read", async () => {
+    const { service, jobs, recipients, run, connectSessions } = setup([{ id: "a", phone: "3331111111" }]);
+    await service.broadcast("auth", SESSION, input);
+    recipients[0].state = "sending";
+    recipients[0].outboxId = OUTBOX;
+    connectSessions[0].revokedAt = new Date();
+    await run();
+    expect(jobs[0]).toMatchObject({ status: "paused", error: "Accesso Connect scaduto: apri ALORA e premi «Riprendi»" });
   });
 
   it("queues more messages: a number gets the second only after the first", async () => {

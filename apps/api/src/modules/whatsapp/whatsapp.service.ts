@@ -36,6 +36,10 @@ const BROADCAST_MAX_ATTEMPTS = 5;
 /** Who already got this very text from ALORA recently is not written to again. */
 const BROADCAST_REPEAT_WINDOW_MS = 48 * 3600_000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Connect's 409 «Sessione non connessa»: the salon's number is unlinked, nothing can leave. */
+export const sessionDisconnected = (error: unknown) =>
+  Number((error as { status?: unknown } | null)?.status) === 409 && /Sessione non connessa/i.test(error instanceof Error ? error.message : String(error));
+export const DISCONNECTED_PAUSE = "Numero WhatsApp del salone scollegato: ricollegalo in WhatsApp e premi «Riprendi»";
 const errorStatus = (error: unknown) =>
   error && typeof error === "object" && "status" in error ? Number((error as { status: unknown }).status) : undefined;
 /**
@@ -235,6 +239,36 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     return application.services(openConnect(linked.sdkSessionCipher), (client, token) =>
       operation(client.whatsapp(token), { tenantId, userId, connectSessionId }));
   }
+  /**
+   * Connect for a background queue. The queue keeps the sign-in it was started
+   * with; once that one has expired or was revoked, it moves to the same user's
+   * newest live sign-in on the same installation (what «Riprendi» would do), so a
+   * normal re-login never leaves a queue stuck. No live sign-in: 401 as before.
+   */
+  private async withJobConnect<T>(job: { id: string; tenantId: string; userId: string; connectSessionId: string },
+    operation: (client: Client, actor: Actor) => Promise<T>): Promise<T> {
+    try {
+      return await this.withConnect(job.tenantId, job.userId, job.connectSessionId, operation);
+    } catch (error) {
+      if (!(error instanceof UnauthorizedException || errorStatus(error) === 401)) throw error;
+      const stale = await this.prisma.connectSession.findUnique({
+        where: { id: job.connectSessionId }, select: { installationId: true },
+      });
+      const newer = await this.prisma.connectSession.findFirst({
+        where: {
+          userId: job.userId, id: { not: job.connectSessionId }, revokedAt: null,
+          expiresAt: { gt: new Date() }, sdkSessionCipher: { not: null },
+          ...(stale?.installationId ? { installationId: stale.installationId } : {}),
+        },
+        orderBy: { createdAt: "desc" }, select: { id: true },
+      });
+      if (!newer) throw error;
+      await this.prisma.whatsAppBroadcast.update({ where: { id: job.id }, data: { connectSessionId: newer.id } });
+      this.logger.log(`${job.id}: accesso Connect scaduto, continuo con quello attuale dell’utente`);
+      job.connectSessionId = newer.id;
+      return this.withConnect(job.tenantId, job.userId, newer.id, operation);
+    }
+  }
 
   private async run<T>(authorization: string | undefined, permission: FunctionKey,
     operation: (client: Client, actor: Actor) => Promise<T>): Promise<T> {
@@ -252,10 +286,12 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       if (error instanceof HttpException) throw error;
       const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+      if (status !== 401) this.logger.warn(`${permission}: Connect ha risposto ${String(status)} – ${error instanceof Error ? error.message : String(error)}`);
       if (status === 401) throw new UnauthorizedException("Ripeti l’accesso Connect");
       if (status === 403) throw new ForbiddenException("WhatsApp non autorizzato dalla delega o dalla licenza Connect");
       if (status === 404) throw new NotFoundException("Elemento WhatsApp non disponibile in questa attività");
       if (status === 400) throw new BadRequestException("Dati WhatsApp non validi");
+      if (sessionDisconnected(error)) throw new ConflictException("Il numero WhatsApp del salone è scollegato: ricollegalo in WhatsApp e riprova.");
       if (status === 409) throw new ConflictException("Stato WhatsApp cambiato. Aggiorna e verifica l’operazione precedente.");
       if (status === 429 || (typeof status === "number" && status >= 500))
         throw new ServiceUnavailableException("WhatsApp temporaneamente non disponibile. Verifica lo stato prima di riprovare.");
@@ -1185,7 +1221,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       // Each Connect call is short and separate: the SDK keeps the user's Connect session
       // locked during a call, so waiting for outcomes inside one would hold up every other
       // request of that user (pages, notifications) until they time out.
-      const connect: Connected = (fn) => this.withConnect(job.tenantId, job.userId, job.connectSessionId, fn);
+      const connect: Connected = (fn) => this.withJobConnect(job, fn);
       await (async () => {
         await connect((wa) => this.syncOutcomes(wa, id));
         for (const [index, target] of batch.entries()) {
@@ -1225,7 +1261,10 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
               busy = true; break;
             }
             const status = errorStatus(error);
-            if (status === 401 || status === 403) throw error;
+            // Unlinked number: every recipient would fail the same way, the whole queue stops instead.
+            if (status === 401 || status === 403 || sessionDisconnected(error)) throw error;
+            // Connect's own reason (code and body) is otherwise lost behind the salon wording.
+            this.logger.warn(`${id}: destinatario ${target.id} rifiutato – ${error instanceof Error ? error.message : String(error)}`);
             const transient = status === 429 || status === undefined || status >= 500;
             const giveUp = !transient || target.attempts + 1 >= BROADCAST_MAX_ATTEMPTS;
             await this.prisma.whatsAppBroadcastRecipient.update({
@@ -1247,6 +1286,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         await pause("Accesso Connect scaduto: apri ALORA e premi «Riprendi»");
       else if (error instanceof ForbiddenException || status === 403)
         await pause("WhatsApp non autorizzato dalla delega o dalla licenza Connect");
+      else if (sessionDisconnected(error))
+        await pause(DISCONNECTED_PAUSE);
       else { busy = true; this.logger.warn(`${id}: Connect non raggiungibile – ${error instanceof Error ? error.message : error}`); }
     }
     const updated = await this.prisma.whatsAppBroadcast.update({
@@ -1276,8 +1317,20 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     let sending = await this.prisma.whatsAppBroadcastRecipient.count({ where: { broadcastId: id, state: "sending" } });
     if (sending) {
       try {
-        sending = await this.withConnect(job.tenantId, job.userId, job.connectSessionId, (wa) => this.syncOutcomes(wa, id));
+        sending = await this.withJobConnect({ id, ...job }, (wa) => this.syncOutcomes(wa, id));
       } catch (error) {
+        const status = errorStatus(error);
+        // Without a usable sign-in the outcomes can never be read: stop and ask, never loop.
+        const stop = error instanceof UnauthorizedException || status === 401
+          ? "Accesso Connect scaduto: apri ALORA e premi «Riprendi»"
+          : error instanceof ForbiddenException || status === 403
+            ? "WhatsApp non autorizzato dalla delega o dalla licenza Connect" : null;
+        if (stop) {
+          const paused = await this.prisma.whatsAppBroadcast.update({ where: { id }, data: { status: "paused", error: stop } });
+          this.logger.warn(`${id}: in pausa – ${stop}`);
+          await this.event(id, "paused", { sent: paused.sent, failed: paused.failed, note: stop });
+          return;
+        }
         this.logger.warn(`${id}: esiti non letti – ${error instanceof Error ? error.message : error}`);
       }
     }
