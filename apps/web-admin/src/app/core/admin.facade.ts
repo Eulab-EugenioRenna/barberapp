@@ -75,7 +75,8 @@ export class AdminFacade {
     this.feedback.set("");
 
     try {
-      let currentUser = this.sessionStore.freshUser();
+      // Profile from the session snapshot (sessionStorage); fetched only if missing.
+      let currentUser = this.sessionStore.currentUser();
       if (!currentUser) {
         currentUser = await firstValueFrom(this.authApi.me());
         this.sessionStore.setCurrentUser(currentUser);
@@ -136,7 +137,8 @@ export class AdminFacade {
     this.feedback.set("");
 
     try {
-      let currentUser = this.sessionStore.freshUser();
+      // Profile from the session snapshot (sessionStorage); fetched only if missing.
+      let currentUser = this.sessionStore.currentUser();
       if (!currentUser) {
         currentUser = await firstValueFrom(this.authApi.me());
         this.sessionStore.setCurrentUser(currentUser);

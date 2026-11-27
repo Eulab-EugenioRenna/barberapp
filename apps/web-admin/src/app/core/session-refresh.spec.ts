@@ -22,10 +22,14 @@ jest.mock("@angular/common/http", () => ({
     }
   },
 }));
+jest.mock("@angular/router", () => ({ Router: class {} }));
+import { Router } from "@angular/router";
 import { SessionStore } from "./session.store";
 import { SessionRefreshService } from "./session-refresh.service";
 import { authInterceptor } from "./auth.interceptor";
 let store: SessionStore;
+let router: { url: string; navigateByUrl: jest.Mock };
+let tabStorage: Map<string, string>;
 let service: SessionRefreshService;
 const response = (label: string, expired = false) => ({
   accessToken: `access-${label}`,
@@ -54,8 +58,19 @@ beforeEach(() => {
     configurable: true,
     value: {},
   });
+  tabStorage = new Map<string, string>();
+  Object.defineProperty(globalThis, "sessionStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => tabStorage.get(key) ?? null,
+      setItem: (key: string, value: string) => tabStorage.set(key, value),
+      removeItem: (key: string) => tabStorage.delete(key),
+    },
+  });
   providers.clear();
   mockPost.mockReset();
+  router = { url: "/sales", navigateByUrl: jest.fn() };
+  providers.set(Router, router);
   store = new SessionStore();
   providers.set(SessionStore, store);
   service = new SessionRefreshService();
@@ -143,5 +158,47 @@ describe("shared session renewal", () => {
     await firstValueFrom(authInterceptor(original as never, next as never));
     expect(original.clone).not.toHaveBeenCalled();
     expect(mockPost).not.toHaveBeenCalled();
+  });
+  it("sends a definitively rejected session to the login, remembering the page", async () => {
+    store.setSession(response("old"));
+    mockPost.mockReturnValue(throwError(() => ({ status: 401 })));
+    const next = jest.fn(() => throwError(() => ({ status: 401 })));
+    await expect(
+      firstValueFrom(authInterceptor(request("GET") as never, next as never)),
+    ).rejects.toEqual({ status: 401 });
+    expect(store.isAuthenticated()).toBe(false);
+    expect(router.navigateByUrl).toHaveBeenCalledWith("/login");
+    expect(localStorage.getItem("barber.pending-url")).toBe("/sales");
+  });
+  it("keeps the session and the page on a temporary failure", async () => {
+    store.setSession(response("old"));
+    const next = jest.fn(() => throwError(() => ({ status: 503 })));
+    await expect(
+      firstValueFrom(authInterceptor(request("GET") as never, next as never)),
+    ).rejects.toEqual({ status: 503 });
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe("session profile kept for the tab", () => {
+  it("restores the /auth/me profile synchronously after a reload and forgets it on logout", () => {
+    store.setSession(response("old"));
+    store.setCurrentUser({ id: "u1", role: "owner", connectFunctions: ["sales.read"] });
+    const reloaded = new SessionStore();
+    expect(reloaded.currentUser()).toEqual({ id: "u1", role: "owner", connectFunctions: ["sales.read"] });
+    expect(reloaded.userAge()).toBeLessThan(1_000);
+    reloaded.clear();
+    expect(new SessionStore().currentUser()).toBeNull();
+  });
+  it("drops the profile when another tab signs in as someone else", () => {
+    store.setSession(response("old"));
+    store.setCurrentUser({ id: "u1", role: "owner" });
+    localStorage.setItem("barber.identity", "u2");
+    store.syncFromStorage();
+    expect(store.currentUser()).toBeNull();
+  });
+  it("never restores a profile without a token", () => {
+    tabStorage.set("barber.me", JSON.stringify({ user: { id: "u1" }, loadedAt: Date.now() }));
+    expect(new SessionStore().currentUser()).toBeNull();
   });
 });

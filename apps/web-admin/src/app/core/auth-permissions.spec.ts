@@ -7,6 +7,9 @@ import { Router, ActivatedRouteSnapshot, RouterStateSnapshot } from "@angular/ro
 import { AuthApiService } from "./auth-api.service";
 import { SessionStore } from "./session.store";
 import { authGuard } from "./auth.guard";
+import { SessionIdentityService } from "./session-identity.service";
+const revalidate = jest.fn();
+beforeEach(() => { revalidate.mockClear(); providers.set(SessionIdentityService, { revalidate }); });
 
 describe("function-based route access", () => {
   async function visit(role: string, permissions: string[], url: string) {
@@ -31,14 +34,25 @@ describe("function-based route access", () => {
     expect(await visit("manager",["users.manage"],"/team")).toBe(true);
     expect(await visit("manager",["appointments.read.all"],"/team")).toBe("/appointments");
   });
-  it("re-reads local restrictions and routes explicit empty collaborator policy away from the agenda", async()=>{
+  it("decides from the stored profile without waiting for /auth/me, revalidating in background", async()=>{
     const user = { role: "collaborator", permissions: [], permissionsConfigured: true, collaboratorId: "c1" };
-    providers.set(SessionStore, { isAuthenticated:()=>true, currentUser:()=>({ ...user, permissionsConfigured: false }), setCurrentUser:jest.fn(), clear:jest.fn() });
+    providers.set(SessionStore, { isAuthenticated:()=>true, currentUser:()=>user, setCurrentUser:jest.fn(), clear:jest.fn() });
     const me = jest.fn(()=>of(user));providers.set(AuthApiService, { me });
     providers.set(Router, { createUrlTree:(paths:string[])=>paths[0] });
     expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/my-agenda"} as RouterStateSnapshot)).toBe("/access-unavailable");
     expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/access-unavailable"} as RouterStateSnapshot)).toBe(true);
-    expect(me).toHaveBeenCalledTimes(2);
+    expect(me).not.toHaveBeenCalled();
+    expect(revalidate).toHaveBeenCalledTimes(2);
+  });
+  it("asks /auth/me only when the tab has no stored profile", async()=>{
+    const user = { role: "manager", permissions: ["appointments.read.all"], collaboratorId: "c1" };
+    const setCurrentUser = jest.fn();
+    providers.set(SessionStore, { isAuthenticated:()=>true, currentUser:()=>null, setCurrentUser, clear:jest.fn() });
+    const me = jest.fn(()=>of(user));providers.set(AuthApiService, { me });
+    providers.set(Router, { createUrlTree:(paths:string[])=>paths[0] });
+    expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/appointments"} as RouterStateSnapshot)).toBe(true);
+    expect(me).toHaveBeenCalledTimes(1);
+    expect(setCurrentUser).toHaveBeenCalledWith(user);
   });
   it("admits the single people page for either profiles or account administration", async () => {
     expect(await visit("manager", ["users.manage"], "/collaborators")).toBe(true);
@@ -68,14 +82,14 @@ describe("function-based route access", () => {
   });
   it("never admits a technical impersonation session to personal security", async () => {
     const user = { role: "owner", technicalAccess: true };
-    providers.set(SessionStore, { isAuthenticated:()=>true, setCurrentUser:jest.fn(), clear:jest.fn() });
+    providers.set(SessionStore, { isAuthenticated:()=>true, currentUser:()=>null, setCurrentUser:jest.fn(), clear:jest.fn() });
     providers.set(AuthApiService, { me:()=>of(user) });
     providers.set(Router, { createUrlTree:(paths:string[])=>paths[0] });
     expect(await authGuard({} as ActivatedRouteSnapshot, { url:"/account" } as RouterStateSnapshot)).toBe("/access-unavailable");
   });
   it("keeps the session on a temporary provider failure and offers a retry without a redirect loop", async()=>{
     const clear=jest.fn(),remember=jest.fn(),me=jest.fn(()=>throwError(()=>({status:503})));
-    providers.set(SessionStore,{isAuthenticated:()=>true,clear,rememberRequestedUrl:remember});
+    providers.set(SessionStore,{isAuthenticated:()=>true,currentUser:()=>null,clear,rememberRequestedUrl:remember});
     providers.set(AuthApiService,{me});providers.set(Router,{createUrlTree:(paths:string[])=>paths[0]});
     expect(await authGuard({} as ActivatedRouteSnapshot,{url:"/collaborators"} as RouterStateSnapshot)).toBe("/access-unavailable");
     expect(clear).not.toHaveBeenCalled();expect(remember).toHaveBeenCalledWith("/collaborators");
