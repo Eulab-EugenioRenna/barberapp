@@ -43,6 +43,9 @@ export class WhatsAppController {
   }
   @Get("outbox") @Header("Cache-Control", "no-store")
   outbox(@Req() r: ConnectRequest) { return this.whatsapp.outbox(r.headers.authorization); }
+  /** Admin bell: active and recent queues plus the outbox, in one call. */
+  @Get("notifications") @Header("Cache-Control", "no-store")
+  notifications(@Req() r: ConnectRequest) { return this.whatsapp.notifications(r.headers.authorization); }
   @Post("sessions/:id/messages")
   send(@Req() r: ConnectRequest, @Param("id", new ParseUUIDPipe()) id: string, @Body() body: SendWhatsAppTextDto) {
     connectBrowser(r); return this.whatsapp.send(r.headers.authorization, id, body);

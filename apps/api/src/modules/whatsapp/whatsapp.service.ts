@@ -16,7 +16,7 @@ import type {
   WhatsAppAcknowledgement, WhatsAppArchiveView, WhatsAppConnection,
   WhatsAppConversationView, WhatsAppMessageView, WhatsAppOutboxView, WhatsAppSendInput,
   WhatsAppAudienceView, WhatsAppBroadcastInput, WhatsAppBroadcastView, WhatsAppImageInput,
-  WhatsAppBroadcastDetail, WhatsAppBroadcastEventView, WhatsAppBroadcastRecipientView,
+  WhatsAppBroadcastDetail, WhatsAppBroadcastEventView, WhatsAppBroadcastRecipientView, WhatsAppNotificationsView,
 } from "../../common/whatsapp-contract";
 import { appointmentPhone } from "../notifications/appointment-automation-state";
 
@@ -238,7 +238,11 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
 
   private async run<T>(authorization: string | undefined, permission: FunctionKey,
     operation: (client: Client, actor: Actor) => Promise<T>): Promise<T> {
-    const session = await resolveRequestSession(this.prisma, authorization);
+    return this.runAs(await resolveRequestSession(this.prisma, authorization), permission, operation);
+  }
+  /** Same as `run`, for a session the caller already resolved. */
+  private async runAs<T>(session: Awaited<ReturnType<typeof resolveRequestSession>>, permission: FunctionKey,
+    operation: (client: Client, actor: Actor) => Promise<T>): Promise<T> {
     const user = requireUser(session), tenantId = requireTenantId(session);
     if (user.technicalAccess || user.role === "platform_admin" || !canUseLocalFunction(user, permission))
       throw new ForbiddenException("Permesso WhatsApp esplicito richiesto");
@@ -525,8 +529,11 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       return { mimetype: decoded.mimetype, filename: null, data: decoded.data };
     });
   }
-  outbox(auth?: string): Promise<WhatsAppOutboxView[]> {
-    return this.run(auth, "whatsapp.read", async (wa, actor) => {
+  async outbox(auth?: string): Promise<WhatsAppOutboxView[]> {
+    return this.outboxAs(await resolveRequestSession(this.prisma, auth));
+  }
+  private outboxAs(session: Awaited<ReturnType<typeof resolveRequestSession>>): Promise<WhatsAppOutboxView[]> {
+    return this.runAs(session, "whatsapp.read", async (wa, actor) => {
       const sessionIds = new Set((await this.mine(wa, actor)).map((item) => item.id));
       if (!sessionIds.size) return [];
       const items = rows(await wa.outbox()).filter((o) => sessionIds.has(o.session_id));
@@ -740,16 +747,46 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   async listBroadcasts(auth: string | undefined): Promise<WhatsAppBroadcastView[]> {
     const session = await resolveRequestSession(this.prisma, auth);
     const user = requireUser(session), tenantId = requireTenantId(session);
-    const jobs = await this.prisma.whatsAppBroadcast.findMany({
-      where: { tenantId, userId: user.id }, orderBy: { createdAt: "desc" }, take: 30,
-    });
-    return this.views(jobs);
+    return this.views(await this.recentJobs(tenantId, user.id));
   }
-  /** Views with the number of messages being verified on Connect. */
+  private recentJobs(tenantId: string, userId: string) {
+    return this.prisma.whatsAppBroadcast.findMany({
+      where: { tenantId, userId }, orderBy: { createdAt: "desc" }, take: 30,
+    });
+  }
+  private activeJobs(tenantId: string, userId: string) {
+    return this.prisma.whatsAppBroadcast.findMany({
+      where: { tenantId, userId, status: { in: ["running", "paused"] } },
+      orderBy: { createdAt: "asc" }, take: 20,
+    });
+  }
+  /**
+   * Everything the admin bell shows, in one call: queues in progress, recent
+   * queues and the single messages on Connect. The session is resolved once; the
+   * outbox needs whatsapp.read, and if Connect is unavailable the whole call fails.
+   */
+  async notifications(auth: string | undefined): Promise<WhatsAppNotificationsView> {
+    const session = await resolveRequestSession(this.prisma, auth);
+    const user = requireUser(session), tenantId = requireTenantId(session);
+    const [active, recent, outbox] = await Promise.all([
+      this.activeJobs(tenantId, user.id), this.recentJobs(tenantId, user.id), this.outboxAs(session),
+    ]);
+    const views = new Map((await this.views([...new Map([...active, ...recent].map((job) => [job.id, job])).values()]))
+      .map((view) => [view.id, view]));
+    return {
+      active: active.map((job) => views.get(job.id)!),
+      recent: recent.map((job) => views.get(job.id)!),
+      outbox,
+    };
+  }
+  /** Views with the number of messages being verified on Connect (one grouped query, best effort). */
   private async views<T extends Parameters<WhatsAppService["broadcastView"]>[0]>(jobs: T[]) {
     if (!jobs.length) return [];
-    const sending = new Map(await Promise.all(jobs.map(async (job) => [job.id,
-      await this.prisma.whatsAppBroadcastRecipient.count({ where: { broadcastId: job.id, state: "sending" } }).catch(() => 0)] as const)));
+    const groups = await this.prisma.whatsAppBroadcastRecipient.groupBy({
+      by: ["broadcastId"], where: { broadcastId: { in: jobs.map((job) => job.id) }, state: "sending" },
+      _count: { _all: true },
+    }).catch(() => [] as Array<{ broadcastId: string; _count: { _all: number } }>);
+    const sending = new Map(groups.map((group) => [group.broadcastId, group._count._all]));
     return jobs.map((job) => this.broadcastView(job, sending.get(job.id) ?? 0));
   }
   /** Detail card of one queue: its steps and every recipient. */
@@ -790,11 +827,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   async activeBroadcasts(auth: string | undefined): Promise<WhatsAppBroadcastView[]> {
     const session = await resolveRequestSession(this.prisma, auth);
     const user = requireUser(session), tenantId = requireTenantId(session);
-    const jobs = await this.prisma.whatsAppBroadcast.findMany({
-      where: { tenantId, userId: user.id, status: { in: ["running", "paused"] } },
-      orderBy: { createdAt: "asc" }, take: 20,
-    });
-    return this.views(jobs);
+    return this.views(await this.activeJobs(tenantId, user.id));
   }
   /** The latest «Messaggio a tutti» of this account, to show its progress again. */
   async latestBroadcast(auth: string | undefined): Promise<WhatsAppBroadcastView | null> {
