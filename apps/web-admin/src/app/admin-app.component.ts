@@ -170,7 +170,7 @@ const SALE_CHANGED: readonly AdminDataset[] = ["sales", "stats", "products", "cu
                 <barber-ui-icon name="receipt"></barber-ui-icon>
                 <span>
                   <strong>Vendi adesso</strong>
-                  <small>Prodotti, servizi o entrambi. I servizi vanno in agenda, anche con orario passato.</small>
+                  <small>Prodotti, servizi o entrambi. I servizi vanno in agenda come appena fatti.</small>
                 </span>
               </button>
               <button
