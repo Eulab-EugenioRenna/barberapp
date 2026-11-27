@@ -118,7 +118,7 @@ import { AmountsPrivacyToggleComponent } from "../shared/amounts-privacy-toggle.
       <p class="mt-3 text-sm text-[var(--muted)]">Le guide evidenziano i pulsanti di ogni pagina e spiegano le azioni disponibili per il tuo account.</p>
       <div class="mt-4 flex flex-wrap items-center gap-4">
         <button type="button" class="secondary-btn" data-tour="account-guides-replay" (click)="replayGuides()">Rivedi tutte le guide</button>
-        <label class="field checkbox-field" data-tour="account-guides-auto"><input type="checkbox" name="toursAutoStart" [checked]="tours.autoStart()" (change)="setGuidesAutoStart($any($event.target).checked)" /><span>Apri le guide automaticamente</span></label>
+        <label class="field checkbox-field" data-tour="account-guides-auto"><input type="checkbox" name="toursAutoStart" [checked]="tours.autoStart()" (change)="setGuidesAutoStart($any($event.target).checked)" /><span>Suggerisci le guide nelle pagine nuove</span></label>
       </div>
     </section>
     <div *ngIf="pending" barberAutofocusFirst class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="account-confirm-title" (keydown)="dialogKeydown($event)">

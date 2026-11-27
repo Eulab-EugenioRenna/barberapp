@@ -70,7 +70,7 @@ export const GENERAL_TOUR: TourDefinition = {
       title: "Guida di ogni pagina",
       body:
         "Ogni pagina ha la sua guida passo passo con le azioni disponibili per il tuo account. " +
-        "La prima volta si apre da sola; poi la ritrovi sempre su questo pulsante.",
+        "La trovi sempre su questo pulsante; nelle pagine nuove te la suggeriamo qui accanto.",
       fallback:
         "Ogni pagina ha la sua guida passo passo con le azioni disponibili per il tuo account: " +
         "cerca il pulsante «Guida» in alto nella pagina.",
