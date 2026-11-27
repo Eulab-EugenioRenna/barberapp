@@ -286,7 +286,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       if (error instanceof HttpException) throw error;
       const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
-      if (status !== 401) this.logger.warn(`${permission}: Connect ha risposto ${String(status)} – ${error instanceof Error ? error.message : String(error)}`);
+      // Only what needs a look: conflicts, overload and failures (not 401/404 of normal browsing).
+      if (status === 409 || status === 429 || status === undefined || Number(status) >= 500) this.logger.warn(`${permission}: Connect ha risposto ${String(status)} – ${error instanceof Error ? error.message : String(error)}`);
       if (status === 401) throw new UnauthorizedException("Ripeti l’accesso Connect");
       if (status === 403) throw new ForbiddenException("WhatsApp non autorizzato dalla delega o dalla licenza Connect");
       if (status === 404) throw new NotFoundException("Elemento WhatsApp non disponibile in questa attività");
