@@ -28,82 +28,86 @@ type Contact = {
   selector: "app-appointment-contact",
   standalone: true,
   imports: [CommonModule],
-  template: ` <section
-    class="contact"
-    aria-label="Promemoria WhatsApp della prenotazione"
-  >
-    <h3>Promemoria WhatsApp</h3>
-    <p *ngIf="contact">
-      {{
-        contact.authorized
-          ? "Consenso registrato per questa prenotazione"
-          : "Consenso non registrato"
-      }}
-      · {{ contact.phoneMasked || "Numero internazionale non disponibile" }}
-    </p>
-    <p>
-      Registra il consenso solo su richiesta del cliente. La revoca ferma i
-      promemoria ancora da inviare; un messaggio già acquisito dal canale può
-      essere già partito.
-    </p>
-    <p *ngIf="feedback" role="status">{{ feedback }}</p>
-    <button
-      *ngIf="pending().kind === 'pending'"
-      type="button"
-      class="secondary-btn"
-      [disabled]="busy || disabled"
-      (click)="retry()"
-    >
-      Verifica consenso precedente
-    </button>
-    <button
-      *ngIf="contact && pending().kind === 'empty'"
-      type="button"
-      class="secondary-btn"
-      [disabled]="
-        busy || disabled || (!contact.authorized && !contact.phoneMasked)
-      "
-      (click)="save(!contact.authorized)"
-    >
-      {{
-        contact.authorized
-          ? "Revoca per questa prenotazione"
-          : "Registra il consenso del cliente"
-      }}
-    </button>
-    <button
-      type="button"
-      class="secondary-btn"
-      [disabled]="busy || disabled"
-      (click)="load()"
-    >
-      Aggiorna consenso
-    </button>
-  </section>`,
+  template: ` <label class="compact-line">
+      <input
+        type="checkbox"
+        [checked]="!!contact?.authorized"
+        [disabled]="
+          busy ||
+          disabled ||
+          !contact ||
+          pending().kind !== 'empty' ||
+          (!contact.authorized && !contact.phoneMasked)
+        "
+        (change)="save(!contact?.authorized)"
+      />
+      <span
+        >Promemoria WhatsApp consentiti<ng-container *ngIf="contact?.phoneMasked">
+          · {{ contact?.phoneMasked }}</ng-container
+        ></span
+      >
+      <span
+        class="info"
+        tabindex="0"
+        role="note"
+        [attr.title]="compactInfo"
+        [attr.aria-label]="compactInfo"
+        >i</span
+      >
+      <button
+        *ngIf="pending().kind === 'pending'"
+        type="button"
+        class="link"
+        [disabled]="busy || disabled"
+        (click)="retry()"
+      >
+        Verifica
+      </button>
+      <small *ngIf="feedback" role="status">{{ feedback }}</small>
+      <small *ngIf="!feedback && contact && !contact.authorized && !contact.phoneMasked"
+        >Serve il numero con prefisso internazionale nella scheda cliente.</small
+      >
+    </label>
+`,
   styles: [
     `
       :host {
         display: block;
-        margin: 1rem 0;
       }
-      .contact {
-        padding: 1rem;
-        border: 1px solid var(--line, #d9dfd8);
-        border-radius: 1rem;
-        background: var(--panel, #fffdf8);
+      .compact-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
       }
-      h3 {
-        font-size: 1rem;
-        margin: 0 0 0.5rem;
+      .compact-line input {
+        width: 1.15rem;
+        height: 1.15rem;
       }
-      p {
-        font-size: 0.85rem;
-        line-height: 1.6;
+      .compact-line small {
+        flex-basis: 100%;
         color: var(--muted, #68746d);
       }
-      button {
-        margin: 0.3rem 0.5rem 0.3rem 0;
-        max-width: 100%;
+      .compact-line .info {
+        display: inline-grid;
+        place-items: center;
+        width: 1.2rem;
+        height: 1.2rem;
+        border: 1px solid var(--line, #d9dfd8);
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        font-style: italic;
+        color: var(--muted, #68746d);
+        cursor: help;
+      }
+      .compact-line .link {
+        margin: 0;
+        border: 0;
+        background: transparent;
+        text-decoration: underline;
+        font-weight: 700;
       }
     `,
   ],
@@ -111,6 +115,8 @@ type Contact = {
 export class AppointmentContactComponent implements OnChanges {
   @Input({ required: true }) appointmentId = "";
   @Input() disabled = false;
+  readonly compactInfo =
+    "Registra il consenso solo su richiesta del cliente: promemoria e richieste di conferma su WhatsApp per questa prenotazione, al numero con prefisso internazionale. La revoca ferma i promemoria ancora da inviare.";
   @Output() changed = new EventEmitter<void>();
   private readonly http = inject(HttpClient);
   private readonly session = inject(SessionStore);

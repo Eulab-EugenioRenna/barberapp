@@ -1,0 +1,381 @@
+<div
+  class="booking-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="booking-editor-title"
+  [attr.aria-busy]="loading || saving"
+>
+  <button
+    class="booking-backdrop"
+    type="button"
+    aria-label="Chiudi l'appuntamento"
+    [disabled]="saving"
+    (click)="close.emit()"
+  ></button>
+  <section class="booking-sheet">
+    <header class="booking-header">
+      <div class="be-title">
+        <p class="eyebrow text-[var(--accent)]">
+          {{ isEdit ? "Agenda · appuntamento" : "Agenda" }}
+        </p>
+        <h2 id="booking-editor-title" class="font-display">{{ title }}</h2>
+        <p class="be-subtitle">{{ subtitle }}</p>
+      </div>
+      <button
+        type="button"
+        class="pill-btn"
+        [disabled]="saving"
+        (click)="close.emit()"
+      >
+        Chiudi
+      </button>
+    </header>
+
+    <div *ngIf="pendingCreation" class="be-recovery" role="status">
+      <p>
+        L’invio precedente è ancora da verificare. Recuperane l’esito prima di
+        iniziare una nuova prenotazione.
+      </p>
+      <button
+        type="button"
+        class="primary-btn"
+        [disabled]="
+          facade.loading() ||
+          facade.creations.state('appointment').kind !== 'pending'
+        "
+        (click)="retryCreation()"
+      >
+        Verifica prenotazione precedente
+      </button>
+    </div>
+    <div *ngIf="pendingUpdate" class="be-recovery" role="status">
+      <p>
+        La modifica precedente è ancora da verificare. Recupera lo stesso invio
+        prima di cambiare l’appuntamento.
+      </p>
+      <button
+        type="button"
+        class="primary-btn"
+        [disabled]="
+          facade.loading() || facade.appointmentUpdateState().kind !== 'pending'
+        "
+        (click)="retryUpdate()"
+      >
+        Verifica modifica precedente
+      </button>
+    </div>
+
+    <p *ngIf="loading" class="be-loading" role="status">
+      Apro l’appuntamento…
+    </p>
+    <div *ngIf="loadFailed && !loading" class="be-recovery" role="alert">
+      <p>{{ feedback }}</p>
+      <button
+        type="button"
+        class="primary-btn"
+        (click)="loadExisting(anchorId)"
+      >
+        Riprova
+      </button>
+    </div>
+
+    <fieldset class="be-fieldset" [disabled]="blocked">
+      <div class="booking-layout">
+        <div class="booking-main">
+          <section class="be-section">
+            <p class="be-step">1 · Cliente</p>
+            <alora-customer-select
+              [value]="customerId"
+              (valueChange)="customerId = $event"
+              [extra]="customerExtra"
+              [createLabel]="
+                session.can('clients.manage') ? 'Aggiungi nuovo cliente' : ''
+              "
+              (createRequest)="quickCreateKind = 'customer'"
+            ></alora-customer-select>
+            <p
+              *ngIf="customerChanged"
+              class="be-note"
+            >
+              Il nuovo cliente vale per tutta la prenotazione e il suo conto.
+            </p>
+            <label *ngIf="!isEdit" class="be-consent">
+              <input
+                type="checkbox"
+                name="appointmentWhatsAppConsent"
+                [(ngModel)]="whatsAppConsent"
+              />
+              <span>Promemoria WhatsApp consentiti</span>
+              <span
+                class="be-info"
+                tabindex="0"
+                role="note"
+                title="Il cliente autorizza promemoria e richieste di conferma su WhatsApp per questa prenotazione. Serve il numero con prefisso internazionale."
+                aria-label="Il cliente autorizza promemoria e richieste di conferma su WhatsApp per questa prenotazione. Serve il numero con prefisso internazionale."
+                >i</span
+              >
+            </label>
+            <app-appointment-contact
+              *ngIf="isEdit && session.can('appointments.update.all')"
+              [appointmentId]="anchorId"
+              [disabled]="blocked"
+            ></app-appointment-contact>
+            <div *ngIf="showLocation" class="field">
+              <span>Sede</span>
+              <ui-select
+                [value]="locationId"
+                (valueChange)="setLocation($event)"
+                [options]="facade.bookingLocationOptions()"
+                label="Sede"
+                placeholder="Scegli la sede"
+              ></ui-select>
+            </div>
+          </section>
+
+          <section class="be-section">
+            <div class="be-step-row">
+              <p class="be-step">
+                2 · Servizi<span class="be-hint"> · tocca per aggiungere</span>
+              </p>
+              <button
+                *ngIf="session.can('services.manage')"
+                type="button"
+                class="pill-btn"
+                (click)="quickCreateKind = 'service'"
+              >
+                + Servizio
+              </button>
+            </div>
+            <div class="touch-grid">
+              <button
+                *ngFor="let item of catalog"
+                type="button"
+                class="touch-card service-card"
+                [class.picked]="picked(item.id)"
+                [attr.aria-label]="'Aggiungi ' + item.name"
+                (click)="addService(item.id)"
+              >
+                <span class="touch-card-kind"
+                  >{{ item.durationMinutes }} min</span
+                >
+                <strong>{{ item.name }}</strong>
+                <span *ngIf="canSeeAmounts" class="touch-card-price"
+                  >€{{ +item.basePrice || 0 | number: "1.2-2" }}</span
+                >
+              </button>
+            </div>
+            <p *ngIf="!catalog.length && !loading" class="be-note">
+              Nessun servizio prenotabile in questa sede.
+            </p>
+          </section>
+        </div>
+
+        <aside class="booking-side">
+          <div class="booking-side-scroll">
+            <section class="be-section">
+              <p class="be-step">Giorno e ora</p>
+              <div class="be-day">
+                <barber-calendar-input
+                  compact
+                  [value]="day"
+                  (valueChange)="setDay($event)"
+                  label="Giorno"
+                  name="bookingDay"
+                  placeholder="Scegli il giorno"
+                ></barber-calendar-input>
+              </div>
+              <p *ngIf="!rows.length" class="be-empty">
+                Tocca un servizio: compare qui con il professionista e l’ora.
+              </p>
+              <article
+                *ngFor="let row of rows; let index = index; trackBy: trackRow"
+                class="be-line"
+                [attr.aria-label]="'Servizio ' + (index + 1)"
+              >
+                <div class="be-line-head">
+                  <span class="be-kind"
+                    >Servizio {{ index + 1 }} · {{ duration(row) }} min</span
+                  >
+                  <button
+                    *ngIf="canRemove(row)"
+                    type="button"
+                    class="be-remove"
+                    [attr.aria-label]="'Togli ' + serviceName(row.serviceId)"
+                    (click)="removeRow(row)"
+                  >
+                    Togli
+                  </button>
+                </div>
+                <ui-select
+                  [value]="row.serviceId"
+                  (valueChange)="setService(row, $event)"
+                  [options]="serviceOptions(row)"
+                  [label]="'Servizio ' + (index + 1)"
+                ></ui-select>
+                <ui-select
+                  [value]="row.collaboratorId"
+                  (valueChange)="setCollaborator(row, $event)"
+                  [options]="peopleOptions(row)"
+                  [label]="'Professionista servizio ' + (index + 1)"
+                  placeholder="Nessuna preferenza"
+                ></ui-select>
+                <div class="be-time">
+                  <label>
+                    <span>Ora</span>
+                    <input
+                      type="time"
+                      [value]="row.time"
+                      [attr.aria-label]="'Ora servizio ' + (index + 1)"
+                      (change)="pickTime(row, $any($event.target).value)"
+                    />
+                  </label>
+                  <span *ngIf="index > 0 && row.follow" class="be-follow"
+                    >dopo il servizio precedente</span
+                  >
+                  <button
+                    *ngIf="index > 0 && !row.follow"
+                    type="button"
+                    class="be-link"
+                    (click)="followAgain(row)"
+                  >
+                    Metti dopo il precedente
+                  </button>
+                </div>
+                <div
+                  *ngIf="slotsFor(row) as entry"
+                  class="be-chips"
+                  [attr.aria-label]="'Orari suggeriti servizio ' + (index + 1)"
+                >
+                  <span *ngIf="entry.loading" class="be-chips-note"
+                    >Cerco gli orari liberi…</span
+                  >
+                  <button
+                    *ngFor="let slot of entry.slots"
+                    type="button"
+                    class="be-chip"
+                    [class.active]="slot.time === row.time"
+                    [class.outside]="slot.outsideHours"
+                    [attr.aria-pressed]="slot.time === row.time"
+                    [attr.title]="
+                      slot.outsideHours ? 'Fuori orario' : 'Orario libero'
+                    "
+                    (click)="pickTime(row, slot.time)"
+                  >
+                    {{ slot.time }}
+                  </button>
+                  <span
+                    *ngIf="!entry.loading && !entry.slots.length"
+                    class="be-chips-note"
+                    >{{
+                      entry.failed
+                        ? "Orari suggeriti non disponibili: scrivi l’ora."
+                        : "Nessun orario suggerito: scrivi l’ora."
+                    }}</span
+                  >
+                </div>
+                <ul *ngIf="warnings(row).length" class="be-warnings">
+                  <li *ngFor="let warning of warnings(row)">{{ warning }}</li>
+                </ul>
+              </article>
+              <div *ngIf="history.length" class="be-history">
+                <p>Già nello storico di questa prenotazione</p>
+                <span *ngFor="let row of history">{{ historyLabel(row) }}</span>
+              </div>
+            </section>
+
+            <section class="be-section">
+              <p class="be-step">3 · Stato e note</p>
+              <div class="be-status" role="radiogroup" aria-label="Stato">
+                <button
+                  *ngFor="let option of statusOptions"
+                  type="button"
+                  role="radio"
+                  class="be-status-chip"
+                  [class.active]="status === option.value"
+                  [class.danger]="option.value === 'cancelled'"
+                  [attr.aria-checked]="status === option.value"
+                  (click)="setStatus(option.value)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+              <label *ngIf="askReason" class="be-field">
+                <span>Motivo dell’annullamento (facoltativo)</span>
+                <input
+                  name="appointmentCancelReason"
+                  maxlength="2000"
+                  [(ngModel)]="reason"
+                />
+              </label>
+              <label class="be-field">
+                <span>Note</span>
+                <textarea
+                  name="appointmentCustomerNotes"
+                  rows="3"
+                  maxlength="4000"
+                  placeholder="Dettagli del cliente o richieste speciali"
+                  [(ngModel)]="notes"
+                ></textarea>
+              </label>
+            </section>
+          </div>
+        </aside>
+      </div>
+    </fieldset>
+
+    <footer class="booking-bar">
+      <div class="be-total">
+        <span
+          >{{ rows.length }}
+          {{ rows.length === 1 ? "servizio" : "servizi" }} ·
+          {{ totalMinutes }} min</span
+        >
+        <strong *ngIf="canSeeAmounts">€{{ total | number: "1.2-2" }}</strong>
+      </div>
+      <p
+        *ngIf="feedback || missing"
+        class="be-feedback"
+        [class.error]="!!feedback"
+        role="status"
+      >
+        {{ feedback || missing }}
+      </p>
+      <div class="be-actions">
+        <button
+          *ngIf="canCancel && session.can('appointments.update.all')"
+          type="button"
+          class="be-cancel"
+          [disabled]="blocked"
+          (click)="cancelAppointment()"
+        >
+          Annulla appuntamento
+        </button>
+        <button
+          *ngIf="isEdit && session.can('sales.manage')"
+          type="button"
+          class="be-secondary"
+          [disabled]="blocked || !!missing"
+          (click)="openAccount()"
+        >
+          {{ accountLabel }}
+        </button>
+        <button
+          type="button"
+          class="primary-btn be-save"
+          [disabled]="blocked || !!missing"
+          (click)="save()"
+        >
+          {{ saving ? "Salvo…" : "Salva" }}
+        </button>
+      </div>
+    </footer>
+  </section>
+
+  <barber-quick-create-dialog
+    *ngIf="quickCreateKind"
+    [kind]="quickCreateKind"
+    [locationId]="locationId"
+    (cancel)="quickCreateKind = null"
+    (created)="onQuickCreated($event.kind, $event.entity)"
+  ></barber-quick-create-dialog>
+</div>

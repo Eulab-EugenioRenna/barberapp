@@ -15,10 +15,6 @@ import { AdminAppointmentsPageComponent } from "../pages/admin-appointments-page
 import { AdminAppointmentsCalendarComponent } from "./admin-appointments-calendar.component";
 import { UiMultiSelectComponent } from "@alora/ui";
 import { AppointmentsFacade } from "./appointments.facade";
-import {
-  QuickCreateDialogComponent,
-  QuickCreateKind,
-} from "../quick-create-dialog.component";
 
 @Component({
   selector: "barber-admin-appointments-feature-page",
@@ -30,7 +26,6 @@ import {
     AdminAppointmentsPageComponent,
     AdminAppointmentsCalendarComponent,
     UiMultiSelectComponent,
-    QuickCreateDialogComponent,
   ],
   template: `
     <article
@@ -206,12 +201,6 @@ import {
           appointmentsFacade.setQuickRescheduleValue($event.key, $event.value)
         "
       ></barber-admin-appointments-quick-reschedule-modal>
-      <barber-quick-create-dialog
-        *ngIf="quickCreateKind"
-        [kind]="quickCreateKind"
-        (cancel)="quickCreateKind = null"
-        (created)="onQuickCreated($event.kind, $event.entity)"
-      ></barber-quick-create-dialog>
     </section>
   `,
   styles: [
@@ -327,13 +316,6 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
   @Output() dataChanged = new EventEmitter<"dashboard" | "all">();
   @Output() openEditor = new EventEmitter<any>();
   activeTab: "calendar" | "list" = "calendar";
-  quickCreateKind: QuickCreateKind | null = null;
-
-  onQuickCreated(kind: "customer" | "service", entity: any): void {
-    this.appointmentsFacade.selectQuickCreatedEntity(kind, entity);
-    this.quickCreateKind = null;
-    this.dataChanged.emit("all");
-  }
 
   async ngOnInit(): Promise<void> {
     await this.reloadViewData();
@@ -363,71 +345,6 @@ export class AdminAppointmentsFeaturePageComponent implements OnInit {
       this.appointmentsFacade.syncDetailAppointment(detailId);
     } catch {
       // The facade exposes the current load error to the template.
-    }
-  }
-
-  prepareNewAppointment(): void {
-    this.activeTab = "list";
-    this.appointmentsFacade.closeDrawer();
-    this.appointmentsFacade.prepareNewAppointment();
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { detail: null },
-      queryParamsHandling: "merge",
-    });
-  }
-
-  async saveAppointment(): Promise<void> {
-    try {
-      await this.appointmentsFacade.saveAppointment();
-      await this.appointmentsFacade.loadViewData();
-      this.dataChanged.emit("dashboard");
-    } catch {
-      // The facade exposes user-facing feedback for request failures.
-    }
-  }
-
-  async confirmOrderFromEditor(): Promise<void> {
-    const appointmentId = this.appointmentsFacade.appointmentForm().id;
-    if (!appointmentId) {
-      return;
-    }
-    try {
-      await this.appointmentsFacade.saveAppointment();
-      await this.appointmentsFacade.loadViewData();
-      this.dataChanged.emit("dashboard");
-    } catch {
-      return;
-    }
-    const appointment = this.appointmentsFacade
-      .appointments()
-      .find((item) => item.id === appointmentId);
-    if (appointment) {
-      this.createOrder.emit(appointment);
-    }
-  }
-
-  async cancelAppointment(): Promise<void> {
-    try {
-      await this.appointmentsFacade.cancelAppointment();
-      await this.appointmentsFacade.loadViewData();
-      this.dataChanged.emit("dashboard");
-    } catch {
-      // The facade exposes user-facing feedback for request failures.
-    }
-  }
-
-  async removeAppointment(): Promise<void> {
-    try {
-      await this.appointmentsFacade.removeAppointment();
-      await this.appointmentsFacade.loadViewData();
-      this.dataChanged.emit("dashboard");
-      await this.router.navigate([], {
-        queryParams: { detail: null },
-        queryParamsHandling: "merge",
-      });
-    } catch {
-      // The facade exposes user-facing feedback for request failures.
     }
   }
 
