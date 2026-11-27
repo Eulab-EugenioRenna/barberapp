@@ -3,6 +3,7 @@ import { SaleFulfilmentService } from "./sale-fulfilment.service";
 import { randomUUID } from "node:crypto";
 import { OrderCommandService } from "../orders/order-command.service";
 import { changeAccountCustomer } from "../orders/account-customer";
+import { linkLegacyBooking } from "../orders/legacy-booking-link";
 import { saleCommandResult, SALE_COMMAND_INCLUDE } from "./sale-command-result";
 import { PaymentsService } from "../payments/payments.service";
 import { settledStatus } from "../payments/payment-balance";
@@ -64,6 +65,24 @@ export class SalesController {
     private readonly customersAlignmentService: CustomersAlignmentService,
     private readonly scheduleWarnings: SaleScheduleWarningsService,
   ) {}
+
+  /** Prenotazione storica senza riga nel conto: la si collega al volo invece di bloccare. */
+  private async healLegacyBooking(
+    tenantId: string,
+    actorId: string,
+    appointmentId: string,
+    scope: Parameters<typeof sectorFilter>[0],
+  ): Promise<void> {
+    await this.prisma.$transaction(
+      async (tx) => {
+        await this.orders.lock(tx, tenantId);
+        await setOperationalActor(tx, actorId);
+        await linkLegacyBooking(tx, tenantId, appointmentId, sectorFilter(scope));
+        await tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+      },
+      { timeout: 15000 },
+    );
+  }
 
   private totals(items: Parameters<typeof sumPricedLines>[0]) {
     try {
@@ -333,14 +352,20 @@ export class SalesController {
       session,
       request.headers,
     );
-    const booking = await this.prisma.appointment.findFirst({
-      where: { id: appointmentId, tenantId, ...sectorFilter(scope) },
-      select: { orderIssue: true, orderItem: { select: { saleId: true } } },
-    });
+    const findBooking = () =>
+      this.prisma.appointment.findFirst({
+        where: { id: appointmentId, tenantId, ...sectorFilter(scope) },
+        select: { orderIssue: true, orderItem: { select: { saleId: true } } },
+      });
+    let booking = await findBooking();
     if (!booking) throw new NotFoundException("Appuntamento non trovato");
-    if (booking.orderIssue || !booking.orderItem)
+    if (booking.orderIssue || !booking.orderItem) {
+      await this.healLegacyBooking(tenantId, requireUser(session).id, appointmentId, scope);
+      booking = await findBooking();
+    }
+    if (!booking?.orderItem || booking.orderIssue)
       throw new ConflictException(
-        "Riconcilia prima il collegamento storico del conto",
+        "Non riesco a collegare la prenotazione al conto: riprova",
       );
     const sale = await this.prisma.sale.findFirst({
       where: { id: booking.orderItem.saleId, tenantId, ...saleFilter(scope) },
@@ -401,19 +426,25 @@ export class SalesController {
         ? body["appointmentId"]
         : undefined;
     if (appointmentId) {
-      const booking = await this.prisma.appointment.findFirst({
-        where: { id: appointmentId, tenantId, ...sectorFilter(scope) },
-        select: {
-          orderIssue: true,
-          orderItem: {
-            select: { saleId: true, sale: { select: { orderStatus: true } } },
+      const findBooking = () =>
+        this.prisma.appointment.findFirst({
+          where: { id: appointmentId, tenantId, ...sectorFilter(scope) },
+          select: {
+            orderIssue: true,
+            orderItem: {
+              select: { saleId: true, sale: { select: { orderStatus: true } } },
+            },
           },
-        },
-      });
+        });
+      let booking = await findBooking();
       if (!booking) throw new BadRequestException("Appuntamento non valido");
-      if (booking.orderIssue || !booking.orderItem)
+      if (booking.orderIssue || !booking.orderItem) {
+        await this.healLegacyBooking(tenantId, requireUser(session).id, appointmentId, scope);
+        booking = await findBooking();
+      }
+      if (!booking?.orderItem || booking.orderIssue)
         throw new ConflictException(
-          "Riconcilia prima il collegamento storico del conto",
+          "Non riesco a collegare la prenotazione al conto: riprova",
         );
       if (booking.orderItem.sale.orderStatus !== "open") {
         const prior =
@@ -1183,12 +1214,18 @@ export class SalesController {
         where: { id, tenantId, ...saleFilter(scope) },
         include: { items: true },
       });
-      const appointment = await transaction.appointment.findFirst({
-        where: { id: appointmentId, tenantId, ...sectorFilter(scope) },
-        include: {
-          orderItem: { include: { sale: { include: { items: true } } } },
-        },
-      });
+      const findAppointment = () =>
+        transaction.appointment.findFirst({
+          where: { id: appointmentId, tenantId, ...sectorFilter(scope) },
+          include: {
+            orderItem: { include: { sale: { include: { items: true } } } },
+          },
+        });
+      let appointment = await findAppointment();
+      if (appointment?.orderIssue) {
+        await linkLegacyBooking(transaction, tenantId, appointmentId, sectorFilter(scope));
+        appointment = await findAppointment();
+      }
       if (!sale) throw new NotFoundException("Vendita non trovata");
       if (!appointment)
         throw new BadRequestException("Appuntamento non valido");
@@ -1199,7 +1236,7 @@ export class SalesController {
         );
       if (appointment.orderIssue)
         throw new ConflictException(
-          "Riconcilia prima il collegamento storico del conto",
+          "Non riesco a collegare la prenotazione al conto: riprova",
         );
       if (existing?.id === id) return sale;
       if (sale.appointmentId && sale.appointmentId !== appointmentId)
