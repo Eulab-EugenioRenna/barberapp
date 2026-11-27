@@ -1,17 +1,21 @@
-import { Routes } from "@angular/router";
+import { Route, Routes } from "@angular/router";
 import { authGuard } from "./core/auth.guard";
 import { AccessUnavailableComponent } from "./pages/access-unavailable.component";
 import { AdminAuthPageComponent } from "./pages/admin-auth-page.component";
 import { AdminShellComponent } from "./shell/admin-shell.component";
+import { WORKSPACE_VIEW } from "./core/admin-route-reuse.strategy";
 
 // Pages load on first visit: login and the frame do not wait for every screen's code.
 const adminApp = () => import("./admin-app.component").then((m) => m.AdminAppComponent);
 
-const shellView = (path: string, view: string) => ({
+// One component for all these views, kept alive across them (AdminRouteReuseStrategy);
+// the guard still checks each view. `preload`: fetched when the browser is idle.
+const shellView = (path: string, view: string): Route => ({
   path,
   loadComponent: adminApp,
   canActivate: [authGuard],
-  data: { view },
+  runGuardsAndResolvers: "always",
+  data: { view, [WORKSPACE_VIEW]: true, preload: true },
 });
 
 const page = (path: string, loadComponent: () => Promise<any>) => ({
