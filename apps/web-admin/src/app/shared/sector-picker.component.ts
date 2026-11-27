@@ -3,6 +3,7 @@ import {
   Component,
   EventEmitter,
   Input,
+  OnChanges,
   OnInit,
   Output,
   inject,
@@ -14,7 +15,8 @@ import { OperationalContextService } from "../core/operational-context.service";
   selector: "alora-sector-picker",
   standalone: true,
   imports: [CommonModule, FormsModule, UiSelectComponent],
-  template: `<div class="field"
+  // One location with one activity: nothing to choose, it is assigned silently.
+  template: `<div class="field" *ngIf="!single || error || !value"
     ><span>Attività</span
     ><ui-select
       [ngModel]="value"
@@ -30,13 +32,17 @@ import { OperationalContextService } from "../core/operational-context.service";
     ><small *ngIf="error" role="alert">{{ error }}</small></div
   >`,
 })
-export class SectorPickerComponent implements OnInit {
+export class SectorPickerComponent implements OnInit, OnChanges {
   readonly context = inject(OperationalContextService);
   @Input() value = "";
   @Input() locationId = "";
   @Input() disabled = false;
   @Output() valueChange = new EventEmitter<string>();
   error = "";
+  /** The salon has a single location and a single activity. */
+  get single(): boolean {
+    return this.context.locations().length === 1 && this.context.sectors.length === 1 && this.choices.length === 1;
+  }
   get choices() {
     const selected = this.context.selected;
     return this.context.sectors.filter(
@@ -62,6 +68,11 @@ export class SectorPickerComponent implements OnInit {
       this.sectorOptionsCache = options;
     }
     return this.sectorOptionsCache;
+  }
+  /** A form reset empties the value: with one choice it is assigned again. */
+  ngOnChanges() {
+    if (!this.value && this.context.locations().length && this.choices.length === 1)
+      queueMicrotask(() => { if (!this.value) this.valueChange.emit(this.choices[0].id); });
   }
   async ngOnInit() {
     try {
