@@ -1473,3 +1473,38 @@ button:disabled {
 [data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 @media (hover: none) { [data-tip]:hover::after { opacity: 0; } }
 [data-tip][aria-expanded="true"]::after { display: none; }
+
+/* Page changes (router withViewTransitions in main.ts): only the content area moves,
+   sidebar and top bar stay still. Browsers without View Transitions just switch. */
+#ui-shell-main {
+  view-transition-name: alora-page;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(alora-page) {
+  animation: alora-page-out 120ms ease-in both;
+}
+::view-transition-new(alora-page) {
+  animation: alora-page-in 240ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes alora-page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes alora-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
