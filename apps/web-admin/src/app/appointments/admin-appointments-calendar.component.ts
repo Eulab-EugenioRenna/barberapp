@@ -7,8 +7,10 @@ import {
   inject,
   ElementRef,
   EventEmitter,
+  HostListener,
   Input,
   OnChanges,
+  OnDestroy,
   Output,
   SimpleChanges,
   ViewChild,
@@ -16,6 +18,99 @@ import {
 import { CalendarInputComponent } from "../calendar-input.component";
 import { toLocalDateKey } from "@barber/shared/utils";
 import { buildDayListingEvent } from "./calendar-date";
+import {
+  Interval,
+  bookingInterval,
+  clockToMinutes,
+  closedSegments,
+  fitPxPerMinute,
+  hourMarks,
+  layoutLanes,
+  localDateTime,
+  magnetEdges,
+  minutesToClock,
+  minutesToPx,
+  overlaps,
+  pxToMinutes,
+  snapStart,
+  timeRange,
+  timeRangeLabel,
+  visibleDays,
+} from "./calendar-time-grid";
+
+interface GridCard {
+  id: string;
+  start: number;
+  end: number;
+  duration: number;
+  left: string;
+  width: string;
+  color: string;
+  startLabel: string;
+  endLabel: string;
+  title: string;
+  subtitle: string;
+  ariaLabel: string;
+  collaboratorId: string;
+  status: string;
+  revision?: number;
+}
+
+interface GridColumn {
+  key: string;
+  date: Date;
+  dateKey: string;
+  label: string;
+  sublabel: string;
+  color?: string;
+  collaboratorId?: string;
+  isToday: boolean;
+  isSelected: boolean;
+  closed: boolean;
+  window: Interval | null;
+  shaded: Array<Interval & { duration: number }>;
+  cards: GridCard[];
+}
+
+interface GridModel {
+  view: "day" | "week";
+  range: Interval;
+  hours: number[];
+  columns: GridColumn[];
+}
+
+interface PointerDrag {
+  pointerId: number;
+  pointerType: string;
+  element: HTMLElement;
+  card: GridCard;
+  sourceColumnKey: string;
+  startX: number;
+  startY: number;
+  /** Minutes between the booking start and the grab point. */
+  grabOffset: number;
+  active: boolean;
+  longPress?: ReturnType<typeof setTimeout>;
+}
+
+interface DragGhost {
+  columnKey: string;
+  start: number;
+  duration: number;
+  label: string;
+  title: string;
+  color: string;
+  conflict: boolean;
+  magnet: number | null;
+}
+
+/** Mouse/pen: movement before a press becomes a drag (clicks stay clicks). */
+const DRAG_THRESHOLD_PX = 4;
+/** Touch: hold this long to pick a booking up; moving earlier scrolls. */
+const TOUCH_HOLD_MS = 350;
+const TOUCH_SLOP_PX = 10;
+const HEADER_HEIGHT_PX = 58;
+const AUTO_SCROLL_EDGE_PX = 36;
 
 @Component({
   selector: "barber-admin-appointments-calendar",
@@ -60,71 +155,21 @@ import { buildDayListingEvent } from "./calendar-date";
         background: rgba(245, 158, 11, 0.08);
       }
 
-      .calendar-day-track {
-        background-image: linear-gradient(
-          to bottom,
-          rgba(148, 163, 184, 0.18) 1px,
-          transparent 1px
-        );
-        background-size: 100% 2.75rem;
-      }
-
-      .calendar-hour-grid {
-        display: grid;
-        grid-template-rows: repeat(20, 2.75rem);
-      }
-
-      .calendar-hour-label {
-        display: flex;
-        align-items: flex-start;
-        justify-content: flex-end;
-        padding-right: 0.75rem;
-        font-size: 0.72rem;
-        color: var(--muted);
-      }
-
-      .calendar-slot-line {
-        border-top: 1px dashed rgba(148, 163, 184, 0.2);
-      }
-
-      .calendar-slot-line-half {
-        border-top: 1px dotted rgba(148, 163, 184, 0.12);
-      }
-
-      .calendar-working-band {
-        position: absolute;
-        left: 0.5rem;
-        right: 0.5rem;
-        border-radius: 1rem;
-        background: rgba(16, 185, 129, 0.08);
-        border: 1px dashed rgba(16, 185, 129, 0.22);
-      }
-
       .calendar-drag-preview {
         outline: 2px dashed rgba(136, 189, 57, 0.45);
         outline-offset: -4px;
         background: rgba(136, 189, 57, 0.08);
       }
 
-      .calendar-drag-ghost {
-        pointer-events: none;
-        z-index: 2;
-        opacity: 0.55;
-        border: 1px dashed rgba(255, 255, 255, 0.65);
-        box-shadow: 0 18px 30px rgba(30, 52, 37, 0.2);
-        transition:
-          top 120ms ease,
-          min-height 120ms ease;
-      }
-
       .calendar-current-time-line {
         position: absolute;
-        left: 0.5rem;
-        right: 0.5rem;
+        left: 0;
+        right: 0;
         height: 2px;
         background: #ef4444;
         box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.38);
         z-index: 3;
+        pointer-events: none;
       }
 
       .calendar-current-time-dot {
@@ -137,29 +182,12 @@ import { buildDayListingEvent } from "./calendar-date";
         background: #ef4444;
       }
 
-      .calendar-month-cell.calendar-is-selected,
-      .calendar-week-day.calendar-is-selected {
+      .calendar-month-cell.calendar-is-selected {
         box-shadow: 0 0 0 2px rgba(136, 189, 57, 0.22) inset;
       }
 
-      .calendar-month-cell.calendar-is-today,
-      .calendar-week-day.calendar-is-today {
+      .calendar-month-cell.calendar-is-today {
         border-color: rgba(136, 189, 57, 0.42);
-      }
-
-      .calendar-sticky-header {
-        position: sticky;
-        top: 0;
-        z-index: 6;
-        backdrop-filter: blur(12px);
-      }
-
-      .calendar-day-column-header-surface {
-        min-height: 4.75rem;
-        border: 1px solid rgba(30, 52, 37, 0.08);
-        border-radius: 1.6rem 1.6rem 0 0;
-        background: rgba(244, 248, 236, 0.94);
-        padding: 1rem 1rem 0.95rem;
       }
 
       .calendar-main {
@@ -167,16 +195,6 @@ import { buildDayListingEvent } from "./calendar-date";
         flex: 1 1 auto;
         min-height: 0;
         margin-top: 1.25rem;
-        overflow: hidden;
-      }
-
-      .calendar-day-scroll {
-        display: flex;
-        flex: 1 1 auto;
-        flex-direction: column;
-        width: 100%;
-        max-width: 100%;
-        min-height: 0;
         overflow: hidden;
       }
 
@@ -189,111 +207,331 @@ import { buildDayListingEvent } from "./calendar-date";
         overflow: hidden;
       }
 
-      .calendar-day-grid {
-        display: flex;
-        width: 100%;
-        max-width: 100%;
-        height: 100%;
-        min-height: 0;
-        align-items: flex-start;
-        gap: 1rem;
-        min-width: 0;
-        overflow: auto;
-      }
-
-      .calendar-day-columns {
+      /* Time grid (week and day): one scroller, one shared time axis. */
+      .tg-shell {
         display: flex;
         flex: 1 1 auto;
-        gap: 1rem;
-        align-items: flex-start;
-        min-width: 0;
+        flex-direction: column;
+        min-height: 0;
+        gap: 0.75rem;
+      }
+
+      .tg-scroll {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: var(--tg-max-height, 40rem);
+        overflow: auto;
+        overscroll-behavior: contain;
+        border: 1px solid rgba(30, 52, 37, 0.08);
+        border-radius: 1.4rem;
+        background: rgba(255, 255, 255, 0.82);
+      }
+
+      .tg-grid {
+        display: grid;
+        grid-template-rows: auto auto;
         width: 100%;
       }
 
-      .calendar-day-column {
-        flex: 1 1 0;
-        min-width: 0;
-        max-width: 100%;
-        display: flex;
-        flex-direction: column;
-        align-self: flex-start;
-        border-radius: 1.6rem;
-        overflow: visible;
+      .tg-corner {
+        position: sticky;
+        top: 0;
+        left: 0;
+        z-index: 6;
+        background: rgba(244, 248, 236, 0.98);
+        border-bottom: 1px solid rgba(30, 52, 37, 0.08);
       }
 
-      .calendar-hour-rail {
+      .tg-col-header {
         position: sticky;
-        left: 0;
         top: 0;
         z-index: 5;
-        flex: 0 0 4.25rem;
-        background: rgba(244, 248, 236, 0.92);
-        align-self: flex-start;
+        min-width: 0;
+        padding: 0.6rem 0.7rem 0.55rem;
+        background: rgba(244, 248, 236, 0.96);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(30, 52, 37, 0.08);
+        border-left: 1px solid rgba(30, 52, 37, 0.06);
+        cursor: default;
+        user-select: none;
       }
 
-      .calendar-hour-rail-spacer {
-        height: 5rem;
+      .tg-grid:not(.tg-grid-day) .tg-col-header {
+        cursor: pointer;
       }
 
-      .calendar-day-empty {
-        position: absolute;
-        inset-inline: 1rem;
-        top: 1rem;
-        z-index: 1;
+      .tg-col-header-selected {
+        box-shadow: inset 0 -3px 0 rgba(136, 189, 57, 0.55);
       }
 
-      .calendar-day-column-track {
-        flex: 1 1 auto;
-        min-height: 0;
+      .tg-col-header-today {
+        background: rgba(233, 244, 214, 0.98);
+      }
+
+      .tg-col-header-closed {
+        background: rgba(253, 243, 226, 0.98);
+      }
+
+      .tg-col-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        min-width: 0;
+      }
+
+      .tg-col-title {
         overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.9rem;
+      }
+
+      .tg-col-count {
+        flex: 0 0 auto;
+        min-width: 1.5rem;
+        padding: 0.05rem 0.45rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.85);
         border: 1px solid rgba(30, 52, 37, 0.08);
-        border-top: 0;
-        border-radius: 0 0 1.6rem 1.6rem;
-        background: rgba(255, 255, 255, 0.82);
-        display: block;
-        width: 100%;
-        margin-top: -1px;
-        padding: 0.75rem 0.75rem 0.75rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-align: center;
+        color: var(--muted);
       }
 
-      .calendar-week-shell {
-        display: grid;
-        flex: 1 1 auto;
-        grid-template-rows: auto minmax(0, 1fr);
-        min-height: 0;
-        gap: 0.75rem;
+      .tg-col-sub {
+        margin-top: 0.15rem;
         overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.72rem;
+        color: var(--muted);
       }
 
-      .calendar-week-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: 0.75rem;
-        min-height: 0;
-        overflow: auto;
+      .tg-col-sub-closed {
+        color: #b45309;
+        font-weight: 600;
       }
 
-      .calendar-week-day-card {
+      .tg-axis {
+        position: sticky;
+        left: 0;
+        z-index: 4;
+        background: rgba(244, 248, 236, 0.96);
+      }
+
+      .tg-axis-label {
+        position: absolute;
+        right: 0.5rem;
+        transform: translateY(-50%);
+        font-size: 0.7rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+        line-height: 1;
+      }
+
+      .tg-axis-label-first {
+        transform: translateY(0.2rem);
+      }
+
+      .tg-col {
+        position: relative;
+        min-width: 0;
+        border-left: 1px solid rgba(30, 52, 37, 0.06);
+        /* Hour lines and half-hour dots; size set from the scale. */
+        background-image:
+          linear-gradient(to bottom, rgba(148, 163, 184, 0.26) 1px, transparent 1px),
+          linear-gradient(to bottom, transparent 50%, rgba(148, 163, 184, 0.1) 50%, rgba(148, 163, 184, 0.1) calc(50% + 1px), transparent calc(50% + 1px));
+        background-repeat: repeat-y;
+        touch-action: auto;
+      }
+
+      .tg-col-today {
+        background-color: rgba(136, 189, 57, 0.04);
+      }
+
+      .tg-off-hours {
+        position: absolute;
+        left: 0;
+        right: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          135deg,
+          rgba(245, 158, 11, 0.07) 0 6px,
+          rgba(245, 158, 11, 0.02) 6px 12px
+        );
+      }
+
+      .tg-card {
+        position: absolute;
+        z-index: 1;
         display: flex;
         flex-direction: column;
-        height: 100%;
+        align-items: stretch;
+        gap: 0.05rem;
         min-height: 0;
         overflow: hidden;
+        margin-left: 2px;
+        padding: 0.25rem 0.45rem;
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: 0.65rem;
+        color: white;
+        text-align: left;
+        line-height: 1.2;
+        box-shadow: 0 2px 6px rgba(30, 52, 37, 0.14);
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        transition: opacity 120ms ease, box-shadow 120ms ease;
       }
 
-      .calendar-week-day-scroll {
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow: auto;
-        padding-right: 0.25rem;
-      }
-
-      .calendar-week-day-header {
-        position: sticky;
-        top: 0;
+      .tg-card:hover,
+      .tg-card:focus-visible {
         z-index: 2;
-        background: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(12px);
+        box-shadow: 0 6px 16px rgba(30, 52, 37, 0.24);
+      }
+
+      .tg-card:focus-visible {
+        outline: 2px solid var(--focus, #88bd39);
+        outline-offset: 1px;
+      }
+
+      .tg-card-draggable {
+        cursor: grab;
+      }
+
+      .tg-is-dragging,
+      .tg-is-dragging .tg-card {
+        cursor: grabbing;
+      }
+
+      .tg-card-source {
+        opacity: 0.35;
+      }
+
+      .tg-card-time,
+      .tg-card-title,
+      .tg-card-sub,
+      .tg-ghost-time,
+      .tg-ghost-warning {
+        display: block;
+        flex-shrink: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+
+      .tg-card-time,
+      .tg-ghost-time {
+        font-size: 0.68rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        opacity: 0.9;
+      }
+
+      .tg-card-title {
+        font-size: 0.78rem;
+      }
+
+      .tg-card-sub {
+        font-size: 0.68rem;
+        opacity: 0.8;
+      }
+
+      /* Short bookings: time and client side by side, wrapping when narrow. */
+      .tg-card-compact {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        align-items: baseline;
+        column-gap: 0.3rem;
+        row-gap: 0;
+        padding-block: 1px;
+      }
+
+      .tg-card-compact .tg-card-title {
+        flex: 1 1 3rem;
+      }
+
+      .tg-card-compact .tg-card-time {
+        flex: 0 0 auto;
+      }
+
+      .tg-card-compact .tg-card-sub {
+        display: none;
+      }
+
+      /* Narrow lanes keep the start time and drop the end. */
+      .tg-card {
+        container-type: inline-size;
+      }
+
+      @container (max-width: 6.5rem) {
+        .tg-card-end {
+          display: none;
+        }
+      }
+
+      .tg-card-tiny {
+        padding-block: 0;
+        align-items: center;
+      }
+
+      .tg-card-tiny .tg-card-time,
+      .tg-card-tiny .tg-card-title {
+        font-size: 0.62rem;
+      }
+
+      .tg-ghost {
+        position: absolute;
+        left: 3px;
+        right: 3px;
+        z-index: 4;
+        pointer-events: none;
+        overflow: hidden;
+        padding: 0.25rem 0.45rem;
+        border: 2px dashed rgba(255, 255, 255, 0.95);
+        border-radius: 0.65rem;
+        background: var(--tg-ghost-color, #1c7c64);
+        color: white;
+        line-height: 1.2;
+        opacity: 0.88;
+        box-shadow:
+          0 0 0 2px rgba(136, 189, 57, 0.75),
+          0 14px 28px rgba(30, 52, 37, 0.28);
+        transition: top 70ms ease-out;
+      }
+
+      .tg-ghost-magnet {
+        border-style: solid;
+      }
+
+      .tg-ghost-conflict {
+        border-color: #fff;
+        box-shadow:
+          0 0 0 3px #dc2626,
+          0 14px 28px rgba(127, 29, 29, 0.35);
+        background-image: repeating-linear-gradient(
+          135deg,
+          rgba(220, 38, 38, 0.45) 0 6px,
+          transparent 6px 12px
+        );
+      }
+
+      .tg-ghost-warning {
+        margin-top: 0.1rem;
+        font-size: 0.66rem;
+        font-weight: 700;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .tg-card,
+        .tg-ghost {
+          transition: none;
+        }
       }
 
       .calendar-week-legend {
@@ -370,19 +608,6 @@ import { buildDayListingEvent } from "./calendar-date";
         overflow: hidden;
       }
 
-      /*
-       * Tablet and phone keep natural page scrolling. Columns follow the
-       * actual calendar width, including the space left by navigation.
-       */
-      @container (min-width: 34rem) {
-        .calendar-week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      }
-      @container (min-width: 44rem) {
-        .calendar-week-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      }
-      @container (min-width: 60rem) {
-        .calendar-week-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-      }
       @container (min-width: 40rem) {
         .calendar-month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
       }
@@ -394,7 +619,8 @@ import { buildDayListingEvent } from "./calendar-date";
       /*
        * Mobile: il calendario smette di essere una "app dentro la app".
        * L'altezza diventa naturale e lasciamo scorrere il contenitore della
-       * pagina: cosi giorno, settimana e mese restano sempre visibili.
+       * pagina; la griglia oraria resta un riquadro scorrevole alto quanto
+       * lo schermo, con intestazioni e orari sempre visibili.
        */
       @media (max-width: 79.99rem) {
         :host {
@@ -412,52 +638,10 @@ import { buildDayListingEvent } from "./calendar-date";
         }
 
         .calendar-view-viewport,
-        .calendar-day-scroll,
-        .calendar-week-shell,
         .calendar-month-shell,
-        .calendar-week-grid,
         .calendar-month-grid {
           overflow: visible;
         }
-
-        /* Giorno: una colonna per professionista, scorrevole in orizzontale. */
-        .calendar-day-grid {
-          height: auto;
-          overflow-x: auto;
-          overflow-y: visible;
-          scroll-snap-type: x proximity;
-          padding-bottom: 0.25rem;
-        }
-
-        .calendar-hour-rail {
-          position: sticky;
-          left: 0;
-          z-index: 7;
-        }
-
-        .calendar-day-columns {
-          gap: 0.75rem;
-        }
-
-        .calendar-day-column {
-          flex: 0 0 min(86vw, 18rem);
-          scroll-snap-align: start;
-        }
-
-        .calendar-day-column-header-surface {
-          min-height: 3.5rem;
-          padding: 0.75rem;
-        }
-
-        /* Settimana e mese: lista verticale di card, nessun taglio. */
-        .calendar-week-day-card {
-          height: auto;
-        }
-
-        .calendar-week-day-scroll {
-          overflow: visible;
-        }
-
       }
     `,
   ],
@@ -563,171 +747,12 @@ import { buildDayListingEvent } from "./calendar-date";
 
       <main class="calendar-main" data-tour="appointments-grid">
         <section
-          *ngIf="view === 'day'"
-          class="calendar-day-scroll calendar-view-viewport"
+          *ngIf="(view === 'day' || view === 'week') && grid"
+          class="calendar-view-viewport"
         >
-          <article
-            *ngIf="!dayColumns.length"
-            class="rounded-[1.4rem] border border-[var(--line)]/70 bg-white/80 p-5 text-sm text-[var(--muted)]"
-          >
-            Nessun professionista disponibile per il giorno selezionato o dati
-            ancora in caricamento.
-          </article>
-
-          <div
-            *ngIf="dayColumns.length"
-            #dayScrollContainer
-            class="calendar-day-grid gap-4"
-          >
-            <div class="calendar-hour-rail">
-              <div class="calendar-hour-rail-spacer"></div>
-              <div class="calendar-hour-grid">
-                <div
-                  *ngFor="let slot of timeSlots; let i = index"
-                  class="calendar-hour-label"
-                >
-                  <span *ngIf="i % 2 === 0">{{ slot }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="calendar-day-columns">
-              <article
-                *ngFor="let column of dayColumns; trackBy: trackByColumn"
-                class="calendar-day-column"
-                [class.calendar-is-today]="isCurrentCalendarDate()"
-                [class.calendar-is-selected]="isCurrentCalendarDate()"
-              >
-                <header
-                  class="calendar-sticky-header calendar-day-column-header-surface flex items-center justify-between gap-4"
-                >
-                  <div>
-                    <strong>{{ column.label }}</strong>
-                    <p class="mt-1 text-xs text-[var(--muted)]">
-                      <ng-container
-                        *ngIf="
-                          column.workingWindow.isAvailable;
-                          else unavailableDay
-                        "
-                      >
-                        {{ column.workingWindow.startTime }} -
-                        {{ column.workingWindow.endTime }}
-                      </ng-container>
-                      <ng-template #unavailableDay>
-                        {{
-                          column.workingWindow.isHoliday
-                            ? "Festivo"
-                            : "Non disponibile"
-                        }}
-                      </ng-template>
-                    </p>
-                  </div>
-                  <span
-                    class="inline-flex size-3 rounded-full"
-                    [style.background]="column.color"
-                  ></span>
-                </header>
-                <div
-                  class="calendar-day-column-track"
-                  [class.calendar-unavailable-day]="
-                    !column.workingWindow.isAvailable
-                  "
-                >
-                  <div
-                    class="calendar-day-track relative min-h-[55rem] rounded-[1.2rem] bg-white/80"
-                    (dragover)="handleDayDragOver($event, column)"
-                    (dragleave)="handleDayDragLeave($event, column.id)"
-                    [attr.data-collaborator-id]="column.id"
-                    (drop)="handleDrop($event, column.id)"
-                  >
-                    <div
-                      class="calendar-hour-grid absolute inset-0 pointer-events-none"
-                    >
-                      <div
-                        *ngFor="let slot of timeSlots; let i = index"
-                        [class.calendar-slot-line]="i % 2 === 0"
-                        [class.calendar-slot-line-half]="i % 2 === 1"
-                      ></div>
-                    </div>
-                    <div
-                      *ngIf="isCurrentCalendarDate()"
-                      class="calendar-current-time-line"
-                      [style.top.rem]="currentTimeTop()"
-                    >
-                      <span class="calendar-current-time-dot"></span>
-                    </div>
-                    <div
-                      *ngIf="column.workingWindow.isAvailable"
-                      class="calendar-working-band"
-                      [style.top.rem]="
-                        workingBandTop(column.workingWindow.startTime)
-                      "
-                      [style.height.rem]="
-                        workingBandHeight(
-                          column.workingWindow.startTime,
-                          column.workingWindow.endTime
-                        )
-                      "
-                    ></div>
-                    <div
-                      *ngIf="
-                        draggedAppointment &&
-                        dayDragPreview &&
-                        dayDragPreview.columnId === column.id
-                      "
-                      class="calendar-drag-ghost absolute left-2 right-2 rounded-[1rem] px-3 py-2 text-left text-white"
-                      [style.top.rem]="dayDragPreview.top"
-                      [style.min-height.rem]="dayDragPreview.height"
-                      [style.background]="dayDragPreview.color"
-                    >
-                      <strong class="block text-sm"
-                        >{{ dayDragPreview.timeLabel }} ·
-                        {{ dayDragPreview.title }}</strong
-                      >
-                      <span class="block text-xs text-white/80">{{
-                        dayDragPreview.subtitle
-                      }}</span>
-                    </div>
-                    <button
-                      *ngFor="
-                        let appointment of column.appointments;
-                        trackBy: trackByAppointment
-                      "
-                      type="button"
-                      class="absolute left-2 right-2 rounded-[1rem] px-3 py-2 text-left text-white shadow-lg"
-                      [style.top.rem]="appointment.top"
-                      [style.min-height.rem]="appointment.height"
-                      [style.background]="appointment.color"
-                      [attr.data-appointment-id]="appointment.id"
-                      [draggable]="session.can('appointments.update.all')"
-                      (dragstart)="handleDragStart($event, appointment.id)"
-                      (dragend)="handleDragEnd()"
-                      (click)="appointmentClick.emit(appointment.id)"
-                    >
-                      <strong class="block text-sm"
-                        >{{ appointment.timeLabel }} ·
-                        {{ appointment.title }}</strong
-                      >
-                      <span class="block text-xs text-white/80">{{
-                        appointment.subtitle
-                      }}</span>
-                    </button>
-                    <div
-                      *ngIf="!column.appointments.length"
-                      class="calendar-day-empty rounded-[0.9rem] border border-dashed border-[var(--line)]/80 bg-white/70 px-3 py-2 text-xs text-[var(--muted)]"
-                    >
-                      Nessun appuntamento pianificato
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section *ngIf="view === 'week'" class="calendar-view-viewport">
-          <div class="calendar-week-shell">
+          <div class="tg-shell">
             <div
+              *ngIf="view === 'week'"
               class="calendar-week-legend flex flex-wrap gap-2 rounded-[1.4rem] border border-[var(--line)]/70 bg-white/72"
               role="region"
               aria-label="Professionisti nel calendario settimanale"
@@ -745,76 +770,157 @@ import { buildDayListingEvent } from "./calendar-date";
               </div>
             </div>
 
-            <div class="calendar-week-grid">
-              <article
-                *ngFor="let day of weekDays; trackBy: trackByKey"
-                class="calendar-week-day calendar-week-day-card rounded-[1.5rem] border border-[var(--line)]/70 bg-white/80 p-3"
-                [class.calendar-unavailable-day]="day.isUnavailable"
-                [class.calendar-is-today]="day.isToday"
-                [class.calendar-is-selected]="day.isSelected"
-                [class.calendar-drag-preview]="
-                  dragOverKey === 'week:' + day.key
-                "
-                (click)="selectCalendarDate(day.date)"
-                (dblclick)="openDayView(day.date)"
-                (dragenter)="dragOverKey = 'week:' + day.key"
-                (dragover)="handleDragOver($event, 'week:' + day.key)"
-                [attr.data-date]="day.date | date: 'yyyy-MM-dd'"
-                (drop)="handleWeekDrop($event, day)"
+            <article
+              *ngIf="!grid.columns.length"
+              class="rounded-[1.4rem] border border-[var(--line)]/70 bg-white/80 p-5 text-sm text-[var(--muted)]"
+            >
+              {{
+                view === "day"
+                  ? "Nessun professionista disponibile per il giorno selezionato o dati ancora in caricamento."
+                  : "Salone chiuso tutta la settimana e nessun appuntamento in programma."
+              }}
+            </article>
+
+            <div
+              *ngIf="grid.columns.length"
+              #gridScroll
+              class="tg-scroll"
+              [style.--tg-max-height.px]="gridMaxHeight"
+            >
+              <div
+                class="tg-grid"
+                [class.tg-grid-day]="view === 'day'"
+                [class.tg-is-dragging]="!!dragActive"
+                [style.grid-template-columns]="gridTemplateColumns"
+                [style.min-width]="gridMinWidth"
+                [attr.data-ppm]="ppm"
+                [attr.data-range-start]="grid.range.start"
+                [attr.data-range-end]="grid.range.end"
               >
+                <div class="tg-corner" aria-hidden="true"></div>
                 <header
-                  class="calendar-week-day-header mb-3 border-b border-[var(--line)]/70 pb-3"
+                  *ngFor="let column of grid.columns; trackBy: trackByKey"
+                  class="tg-col-header"
+                  data-tg-header
+                  [class.tg-col-header-today]="column.isToday"
+                  [class.tg-col-header-selected]="
+                    view === 'week' && column.isSelected
+                  "
+                  [class.tg-col-header-closed]="column.closed"
+                  (click)="view === 'week' && selectCalendarDate(column.date)"
+                  (dblclick)="view === 'week' && openDayView(column.date)"
                 >
-                  <strong [class.text-accent-strong]="day.isToday">{{
-                    day.label
-                  }}</strong>
-                  <p class="mt-1 text-xs text-[var(--muted)]">
-                    {{ day.statusLabel }}
+                  <div class="tg-col-header-row">
+                    <strong
+                      class="tg-col-title"
+                      [class.text-accent-strong]="column.isToday"
+                      >{{ column.label }}</strong
+                    >
+                    <span
+                      *ngIf="column.color"
+                      class="inline-flex size-3 shrink-0 rounded-full"
+                      [style.background]="column.color"
+                    ></span>
+                    <span *ngIf="!column.color" class="tg-col-count">{{
+                      column.cards.length
+                    }}</span>
+                  </div>
+                  <p class="tg-col-sub" [class.tg-col-sub-closed]="column.closed">
+                    {{ column.sublabel }}
                   </p>
                 </header>
-                <div class="calendar-week-day-scroll">
-                  <div class="grid gap-2">
-                    <button
-                      *ngFor="
-                        let appointment of day.appointments;
-                        trackBy: trackByAppointment
-                      "
-                      type="button"
-                      class="rounded-[1rem] px-3 py-2 text-left text-white"
-                      [style.background]="appointment.color"
-                      [attr.data-appointment-id]="appointment.id"
-                      [draggable]="session.can('appointments.update.all')"
-                      (dragstart)="handleDragStart($event, appointment.id)"
-                      (click)="appointmentClick.emit(appointment.id)"
+
+                <div
+                  class="tg-axis"
+                  aria-hidden="true"
+                  [style.height.px]="trackHeight"
+                >
+                  <span
+                    *ngFor="let mark of grid.hours; let first = first"
+                    class="tg-axis-label"
+                    [class.tg-axis-label-first]="first"
+                    [style.top.px]="px(mark)"
+                    >{{ clock(mark) }}</span
+                  >
+                </div>
+
+                <div
+                  *ngFor="let column of grid.columns; trackBy: trackByKey"
+                  class="tg-col"
+                  data-tg-column
+                  [attr.data-column-key]="column.key"
+                  [attr.data-date]="column.dateKey"
+                  [attr.data-collaborator-id]="column.collaboratorId || null"
+                  [class.tg-col-today]="column.isToday"
+                  [class.tg-col-closed]="column.closed"
+                  [style.height.px]="trackHeight"
+                  [style.background-size]="gridBackgroundSize"
+                  (click)="view === 'week' && selectCalendarDate(column.date)"
+                  (dblclick)="view === 'week' && openDayView(column.date)"
+                >
+                  <div
+                    *ngFor="let segment of column.shaded"
+                    class="tg-off-hours"
+                    [style.top.px]="px(segment.start)"
+                    [style.height.px]="segment.duration * ppm"
+                  ></div>
+                  <div
+                    *ngIf="column.isToday && nowVisible()"
+                    class="calendar-current-time-line"
+                    [style.top.px]="px(nowMinutes())"
+                  >
+                    <span class="calendar-current-time-dot"></span>
+                  </div>
+                  <button
+                    *ngFor="let card of column.cards; trackBy: trackByAppointment"
+                    type="button"
+                    class="tg-card"
+                    [class.tg-card-compact]="card.duration * ppm < 38"
+                    [class.tg-card-tiny]="card.duration * ppm < 16"
+                    [class.tg-card-source]="dragActive?.card?.id === card.id"
+                    [class.tg-card-draggable]="canMove"
+                    [style.top.px]="px(card.start) + 1"
+                    [style.height.px]="card.duration * ppm - 2"
+                    [style.left]="card.left"
+                    [style.width]="card.width"
+                    [style.background]="card.color"
+                    [attr.data-appointment-id]="card.id"
+                    [attr.title]="card.ariaLabel"
+                    [attr.aria-label]="card.ariaLabel"
+                    (pointerdown)="onCardPointerDown($event, card, column)"
+                    (pointermove)="onCardPointerMove($event)"
+                    (pointerup)="onCardPointerUp($event)"
+                    (pointercancel)="cancelPointerDrag()"
+                    (lostpointercapture)="onLostPointerCapture($event)"
+                    (touchmove)="onCardTouchMove($event)"
+                    (contextmenu)="onCardContextMenu($event)"
+                    (click)="onCardClick($event, card)"
+                  >
+                    <span class="tg-card-time"
+                      >{{ card.startLabel
+                      }}<span class="tg-card-end">–{{ card.endLabel }}</span></span
                     >
-                      <strong class="block text-sm"
-                        >{{ appointment.timeLabel }} ·
-                        {{ appointment.title }}</strong
-                      >
-                      <span class="block text-xs text-white/75">{{
-                        appointment.subtitle
-                      }}</span>
-                    </button>
-                    <p
-                      *ngIf="!day.appointments.length"
-                      class="text-sm text-[var(--muted)]"
+                    <strong class="tg-card-title">{{ card.title }}</strong>
+                    <span class="tg-card-sub">{{ card.subtitle }}</span>
+                  </button>
+                  <div
+                    *ngIf="ghost && ghost.columnKey === column.key"
+                    class="tg-ghost"
+                    [class.tg-ghost-conflict]="ghost.conflict"
+                    [class.tg-ghost-magnet]="ghost.magnet !== null"
+                    [style.top.px]="px(ghost.start) + 1"
+                    [style.height.px]="ghost.duration * ppm - 2"
+                    [style.--tg-ghost-color]="ghost.color"
+                    role="status"
+                  >
+                    <span class="tg-ghost-time">{{ ghost.label }}</span>
+                    <strong class="tg-card-title">{{ ghost.title }}</strong>
+                    <span *ngIf="ghost.conflict" class="tg-ghost-warning"
+                      >Si sovrappone a un altro appuntamento</span
                     >
-                      Nessun evento
-                    </p>
-                    <button
-                      *ngIf="day.hiddenCount > 0"
-                      type="button"
-                      class="pill-btn justify-start"
-                      (click)="
-                        openDayListing(day.date, 'week');
-                        $event.stopPropagation()
-                      "
-                    >
-                      +{{ day.hiddenCount }} altri
-                    </button>
                   </div>
                 </div>
-              </article>
+              </div>
             </div>
           </div>
         </section>
@@ -908,16 +1014,13 @@ import { buildDayListingEvent } from "./calendar-date";
   `,
 })
 export class AdminAppointmentsCalendarComponent
-  implements AfterViewInit, OnChanges
+  implements AfterViewInit, OnChanges, OnDestroy
 {
   readonly session = inject(SessionStore);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  private static readonly DAY_START_MINUTES = 9 * 60;
-  private static readonly DAY_END_MINUTES = 19 * 60;
-  private static readonly SLOT_HEIGHT_REM = 2.75;
-
-  @ViewChild("dayScrollContainer")
-  private readonly dayScrollContainer?: ElementRef<HTMLElement>;
+  @ViewChild("gridScroll")
+  private readonly gridScroll?: ElementRef<HTMLElement>;
 
   @Input() title = "";
   @Input() view: "day" | "week" | "month" = "week";
@@ -933,17 +1036,22 @@ export class AdminAppointmentsCalendarComponent
   @Input() dayColumns: any[] = [];
   @Input() weekDays: any[] = [];
   @Input() monthCells: any[] = [];
+  /** Month view keeps the native drag and drop. */
   dragOverKey = "";
   draggedAppointment: any = null;
-  dayDragPreview: {
-    columnId: string;
-    top: number;
-    height: number;
-    color: string;
-    timeLabel: string;
-    title: string;
-    subtitle: string;
-  } | null = null;
+
+  /** Week and day views: one time grid. */
+  grid: GridModel | null = null;
+  ppm = 1;
+  gridMaxHeight = 640;
+  gridTemplateColumns = "";
+  gridMinWidth = "";
+  gridBackgroundSize = "";
+  trackHeight = 0;
+  ghost: DragGhost | null = null;
+  dragActive: PointerDrag | null = null;
+  private pointerDrag: PointerDrag | null = null;
+  private suppressClickId = "";
 
   @Output() viewChange = new EventEmitter<"day" | "week" | "month">();
   @Output() navigate = new EventEmitter<-1 | 1>();
@@ -976,18 +1084,9 @@ export class AdminAppointmentsCalendarComponent
   ];
   readonly monthWeekdays = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
 
-  readonly hours = Array.from(
-    { length: 10 },
-    (_, index) =>
-      `${String(index + AdminAppointmentsCalendarComponent.DAY_START_MINUTES / 60).padStart(2, "0")}:00`,
-  );
-  readonly timeSlots = Array.from({ length: 20 }, (_, index) => {
-    const totalMinutes =
-      AdminAppointmentsCalendarComponent.DAY_START_MINUTES + index * 30;
-    const hour = Math.floor(totalMinutes / 60);
-    const minute = totalMinutes % 60;
-    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-  });
+  get canMove(): boolean {
+    return this.session.can("appointments.update.all");
+  }
 
   formatDateTime(value: string): string {
     return new Date(value).toLocaleString("it-IT", {
@@ -998,29 +1097,26 @@ export class AdminAppointmentsCalendarComponent
     });
   }
 
-  workingBandTop(startTime: string): number {
-    const startMinutes = this.parseTime(startTime);
-    return this.minutesToTrackRem(startMinutes);
-  }
-
-  workingBandHeight(startTime: string, endTime: string): number {
-    const clampedStart = this.clampMinutesToTrack(this.parseTime(startTime));
-    const clampedEnd = this.clampMinutesToTrack(this.parseTime(endTime));
-    const diffMinutes = Math.max(0, clampedEnd - clampedStart);
-    return Math.max(
-      AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM,
-      (diffMinutes / 30) * AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM,
-    );
-  }
-
   isCurrentCalendarDate(): boolean {
     return this.isSameDay(this.calendarDate, new Date());
   }
 
-  currentTimeTop(): number {
+  nowMinutes(): number {
     const now = new Date();
-    const minutes = now.getHours() * 60 + now.getMinutes();
-    return this.minutesToTrackRem(minutes);
+    return now.getHours() * 60 + now.getMinutes();
+  }
+
+  nowVisible(): boolean {
+    const now = this.nowMinutes();
+    return !!this.grid && now >= this.grid.range.start && now <= this.grid.range.end;
+  }
+
+  px(minutes: number): number {
+    return this.grid ? minutesToPx(minutes, this.grid.range.start, this.ppm) : 0;
+  }
+
+  clock(minutes: number): string {
+    return minutesToClock(minutes);
   }
 
   selectCalendarDate(date: Date): void {
@@ -1067,18 +1163,176 @@ export class AdminAppointmentsCalendarComponent
   }
 
   ngAfterViewInit(): void {
-    this.scrollDayViewIntoPosition();
+    this.scrollGridIntoPosition();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (
+      changes["view"] ||
+      changes["calendarDate"] ||
+      changes["weekDays"] ||
+      changes["dayColumns"]
+    ) {
+      this.rebuildGrid();
+    }
     if (changes["view"] || changes["calendarDate"]) {
-      queueMicrotask(() => this.scrollDayViewIntoPosition());
+      queueMicrotask(() => this.scrollGridIntoPosition());
     }
   }
 
-  private parseTime(value: string): number {
-    const [hours, minutes] = value.split(":").map((segment) => Number(segment));
-    return hours * 60 + minutes;
+  ngOnDestroy(): void {
+    this.cancelPointerDrag();
+  }
+
+  @HostListener("window:resize")
+  onResize(): void {
+    this.applyScale();
+  }
+
+  @HostListener("document:keydown.escape")
+  onEscape(): void {
+    if (this.pointerDrag) this.cancelPointerDrag();
+  }
+
+  /** Builds the columns, the shared time range and the card lanes. */
+  private rebuildGrid(): void {
+    if (this.view === "week") this.grid = this.buildWeekGrid();
+    else if (this.view === "day") this.grid = this.buildDayGrid();
+    else this.grid = null;
+    this.applyScale();
+  }
+
+  private buildWeekGrid(): GridModel {
+    const days = visibleDays(
+      this.weekDays || [],
+      (day: any) => !!day.isUnavailable,
+      (day: any) => (day.visibleAppointments || []).length,
+    );
+    const columns = days.map((day: any) => {
+      const window = day.isUnavailable ? null : this.toInterval(day.workingWindow);
+      return {
+        key: `week:${day.key}`,
+        date: new Date(day.date),
+        dateKey: toLocalDateKey(new Date(day.date)),
+        label: day.label,
+        sublabel: day.isUnavailable ? "Chiuso · appuntamenti forzati" : day.statusLabel,
+        isToday: !!day.isToday,
+        isSelected: !!day.isSelected,
+        closed: !!day.isUnavailable,
+        window,
+        cards: this.placeCards(day.visibleAppointments || []),
+      };
+    });
+    return this.finishGrid("week", columns);
+  }
+
+  private buildDayGrid(): GridModel {
+    const date = new Date(this.calendarDate);
+    const isToday = this.isSameDay(date, new Date());
+    const columns = (this.dayColumns || []).map((column: any) => {
+      const working = column.workingWindow;
+      const window = working?.isAvailable ? this.toInterval(working) : null;
+      return {
+        key: `day:${column.id}`,
+        date,
+        dateKey: toLocalDateKey(date),
+        label: column.label,
+        sublabel: working?.isAvailable
+          ? `${working.startTime} - ${working.endTime}`
+          : working?.isHoliday
+            ? "Festivo"
+            : "Non disponibile",
+        color: column.color,
+        collaboratorId: column.id,
+        isToday,
+        isSelected: true,
+        closed: !working?.isAvailable,
+        window,
+        cards: this.placeCards(column.appointments || []),
+      };
+    });
+    return this.finishGrid("day", columns);
+  }
+
+  private finishGrid(
+    view: "day" | "week",
+    columns: Array<Omit<GridColumn, "shaded">>,
+  ): GridModel {
+    const range = timeRange(
+      columns
+        .map((column) => column.window)
+        .filter((window): window is Interval => !!window),
+      columns.flatMap((column) => column.cards),
+    );
+    return {
+      view,
+      range,
+      hours: hourMarks(range),
+      columns: columns.map((column) => ({
+        ...column,
+        shaded: closedSegments(range, column.window).map((segment) => ({
+          ...segment,
+          duration: segment.end - segment.start,
+        })),
+      })),
+    };
+  }
+
+  private placeCards(cards: any[]): GridCard[] {
+    const items = cards.map((card) => ({
+      card,
+      id: String(card.id),
+      ...bookingInterval(card.startsAt, card.endsAt ?? card.source?.endsAt),
+    }));
+    const lanes = layoutLanes(items);
+    return items.map(({ card, id, start, end }) => {
+      const placement = lanes.get(id) || { lane: 0, lanes: 1, span: 1 };
+      const timeLabel = timeRangeLabel({ start, end });
+      return {
+        id,
+        start,
+        end,
+        duration: end - start,
+        left: `${(placement.lane / placement.lanes) * 100}%`,
+        width: `calc(${(placement.span / placement.lanes) * 100}% - 4px)`,
+        color: card.color,
+        startLabel: minutesToClock(start),
+        endLabel: minutesToClock(end),
+        title: card.title,
+        subtitle: card.subtitle,
+        ariaLabel: `${timeLabel} · ${card.title} · ${card.subtitle}`,
+        collaboratorId: card.collaboratorId || "",
+        status: card.status || "",
+        revision: card.source?.orderItem?.sale?.revision,
+      };
+    });
+  }
+
+  private toInterval(
+    window: { startTime?: string; endTime?: string } | null | undefined,
+  ): Interval | null {
+    const start = clockToMinutes(window?.startTime);
+    const end = clockToMinutes(window?.endTime);
+    return start !== null && end !== null && end > start ? { start, end } : null;
+  }
+
+  /** Scale that shows the whole range in a screen-high grid when possible. */
+  private applyScale(): void {
+    const viewportHeight =
+      typeof window !== "undefined" ? window.innerHeight : 800;
+    this.gridMaxHeight = Math.max(448, viewportHeight - 112);
+    if (!this.grid) return;
+    const minutes = this.grid.range.end - this.grid.range.start;
+    this.ppm =
+      Math.round(
+        fitPxPerMinute(this.gridMaxHeight - HEADER_HEIGHT_PX - 4, minutes, 1, 2) *
+          100,
+      ) / 100;
+    this.trackHeight = minutes * this.ppm;
+    const columnMin = this.view === "day" ? "12rem" : "8.5rem";
+    this.gridTemplateColumns = `3.25rem repeat(${this.grid.columns.length}, minmax(${columnMin}, 1fr))`;
+    this.gridMinWidth = `calc(3.25rem + ${this.grid.columns.length} * ${columnMin})`;
+    this.gridBackgroundSize = `100% ${60 * this.ppm}px`;
   }
 
   private isSameDay(left: Date, right: Date): boolean {
@@ -1089,45 +1343,250 @@ export class AdminAppointmentsCalendarComponent
     );
   }
 
-  private scrollDayViewIntoPosition(): void {
-    if (this.view !== "day") {
+  /** Today: bring the current time into view; otherwise the opening. */
+  private scrollGridIntoPosition(): void {
+    if (this.view === "month" || typeof requestAnimationFrame === "undefined") {
       return;
     }
-
     requestAnimationFrame(() => {
-      const container = this.dayScrollContainer?.nativeElement;
-      if (!container) {
+      const container = this.gridScroll?.nativeElement;
+      if (!container || !this.grid) {
         return;
       }
-
-      const targetTopRem = this.isCurrentCalendarDate()
-        ? Math.max(0, this.currentTimeTop() - 8)
-        : 0;
-      const maxScrollTop = Math.max(
-        0,
-        container.scrollHeight - container.clientHeight,
-      );
-      const targetTopPx = Math.min(maxScrollTop, targetTopRem * 16);
-
-      container.scrollTo({ top: targetTopPx, behavior: "auto" });
+      const showsToday = this.grid.columns.some((column) => column.isToday);
+      const target =
+        showsToday && this.nowVisible()
+          ? Math.max(0, this.px(this.nowMinutes() - 60))
+          : 0;
+      container.scrollTo({ top: target, behavior: "auto" });
     });
   }
 
-  private clampMinutesToTrack(minutes: number): number {
-    return Math.min(
-      AdminAppointmentsCalendarComponent.DAY_END_MINUTES,
-      Math.max(AdminAppointmentsCalendarComponent.DAY_START_MINUTES, minutes),
+  // ---- Pointer drag (week and day) -------------------------------------
+
+  onCardPointerDown(
+    event: PointerEvent,
+    card: GridCard,
+    column: GridColumn,
+  ): void {
+    if (!this.canMove || this.pointerDrag || !this.grid) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const element = event.currentTarget as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    this.pointerDrag = {
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      element,
+      card,
+      sourceColumnKey: column.key,
+      startX: event.clientX,
+      startY: event.clientY,
+      grabOffset: Math.max(0, (event.clientY - rect.top) / this.ppm),
+      active: false,
+    };
+    if (event.pointerType !== "touch") {
+      // Moves keep reaching the card even when they leave it at once.
+      try {
+        element.setPointerCapture(event.pointerId);
+      } catch {
+        // Synthetic pointer: moves outside the card are simply missed.
+      }
+    } else {
+      this.pointerDrag.longPress = setTimeout(() => {
+        if (this.pointerDrag && !this.pointerDrag.active) {
+          this.activateDrag(this.pointerDrag.startX, this.pointerDrag.startY);
+        }
+      }, TOUCH_HOLD_MS);
+    }
+  }
+
+  onCardPointerMove(event: PointerEvent): void {
+    const drag = this.pointerDrag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const distance = Math.hypot(
+      event.clientX - drag.startX,
+      event.clientY - drag.startY,
+    );
+    if (!drag.active) {
+      if (drag.pointerType === "touch") {
+        // Moving before the hold: the finger is scrolling, not dragging.
+        if (distance > TOUCH_SLOP_PX) this.cancelPointerDrag();
+        return;
+      }
+      if (distance < DRAG_THRESHOLD_PX) return;
+      this.activateDrag(event.clientX, event.clientY);
+    }
+    event.preventDefault();
+    this.autoScroll(event.clientX, event.clientY);
+    this.updateGhost(event.clientX, event.clientY);
+  }
+
+  onCardPointerUp(event: PointerEvent): void {
+    const drag = this.pointerDrag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (!drag.active) {
+      this.cancelPointerDrag();
+      return;
+    }
+    // The ghost already shows the last snapped place: drop exactly there.
+    const ghost = this.ghost;
+    const column = ghost
+      ? this.grid?.columns.find((entry) => entry.key === ghost.columnKey)
+      : undefined;
+    this.suppressClickId = drag.card.id;
+    setTimeout(() => (this.suppressClickId = ""), 400);
+    this.cancelPointerDrag();
+    if (!ghost || !column) return;
+    if (column.key === drag.sourceColumnKey && ghost.start === drag.card.start) {
+      return;
+    }
+    this.appointmentDrop.emit({
+      appointmentId: drag.card.id,
+      // Week: same professional, new day and time. Day: the column's.
+      collaboratorId: column.collaboratorId || drag.card.collaboratorId,
+      startsAt: localDateTime(column.date, ghost.start),
+      revision: drag.card.revision,
+    });
+  }
+
+  onLostPointerCapture(event: PointerEvent): void {
+    // Pointerup releases the capture first; anything else aborts the drag.
+    if (this.pointerDrag?.active && event.pointerId === this.pointerDrag.pointerId) {
+      queueMicrotask(() => {
+        if (this.pointerDrag?.pointerId === event.pointerId) {
+          this.cancelPointerDrag();
+        }
+      });
+    }
+  }
+
+  /** While a booking is held, the finger moves it instead of the page. */
+  onCardTouchMove(event: TouchEvent): void {
+    if (this.pointerDrag?.active && event.cancelable) event.preventDefault();
+  }
+
+  onCardContextMenu(event: Event): void {
+    if (this.pointerDrag?.pointerType === "touch") event.preventDefault();
+  }
+
+  onCardClick(event: MouseEvent, card: GridCard): void {
+    if (this.suppressClickId === card.id) {
+      this.suppressClickId = "";
+      event.stopPropagation();
+      return;
+    }
+    this.appointmentClick.emit(card.id);
+  }
+
+  cancelPointerDrag(): void {
+    const drag = this.pointerDrag;
+    if (drag?.longPress) clearTimeout(drag.longPress);
+    if (drag?.element.hasPointerCapture?.(drag.pointerId)) {
+      try {
+        drag.element.releasePointerCapture(drag.pointerId);
+      } catch {
+        // Already released by the browser.
+      }
+    }
+    this.pointerDrag = null;
+    this.dragActive = null;
+    this.ghost = null;
+  }
+
+  private activateDrag(clientX: number, clientY: number): void {
+    const drag = this.pointerDrag;
+    if (!drag) return;
+    drag.active = true;
+    this.dragActive = drag;
+    try {
+      drag.element.setPointerCapture(drag.pointerId);
+    } catch {
+      // The pointer is gone: the next event cancels the drag.
+    }
+    this.updateGhost(clientX, clientY);
+  }
+
+  private columnElements(): HTMLElement[] {
+    return Array.from(
+      this.host.nativeElement.querySelectorAll<HTMLElement>("[data-tg-column]"),
     );
   }
 
-  private minutesToTrackRem(minutes: number): number {
-    return (
-      ((this.clampMinutesToTrack(minutes) -
-        AdminAppointmentsCalendarComponent.DAY_START_MINUTES) /
-        30) *
-      AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM
+  /** Snapped landing place under the pointer, or none outside the grid. */
+  private updateGhost(clientX: number, clientY: number): void {
+    const drag = this.pointerDrag;
+    const grid = this.grid;
+    const scroller = this.gridScroll?.nativeElement;
+    if (!drag || !grid || !scroller) return;
+    const bounds = scroller.getBoundingClientRect();
+    if (
+      clientX < bounds.left - 24 ||
+      clientX > bounds.right + 24 ||
+      clientY < bounds.top - 24 ||
+      clientY > bounds.bottom + 24
+    ) {
+      this.ghost = null;
+      return;
+    }
+    const elements = this.columnElements();
+    if (!elements.length) return;
+    let target = elements[0];
+    let best = Infinity;
+    for (const element of elements) {
+      const rect = element.getBoundingClientRect();
+      const distance =
+        clientX < rect.left ? rect.left - clientX : clientX > rect.right ? clientX - rect.right : 0;
+      if (distance < best) {
+        best = distance;
+        target = element;
+      }
+    }
+    const column = grid.columns.find(
+      (entry) => entry.key === target.dataset["columnKey"],
     );
+    if (!column) return;
+    const rect = target.getBoundingClientRect();
+    const duration = drag.card.duration;
+    const raw =
+      pxToMinutes(clientY - rect.top, grid.range.start, this.ppm) - drag.grabOffset;
+    const others = column.cards.filter((card) => card.id !== drag.card.id);
+    const snapped = snapStart(raw, duration, {
+      magnets: magnetEdges(others, drag.card.id, column.window),
+      min: grid.range.start,
+      max: grid.range.end,
+    });
+    const landing = { start: snapped.start, end: snapped.start + duration };
+    const professional = column.collaboratorId || drag.card.collaboratorId;
+    const conflict = others.some(
+      (card) =>
+        card.status !== "cancelled" &&
+        (column.collaboratorId || card.collaboratorId === professional) &&
+        overlaps(card, landing),
+    );
+    this.ghost = {
+      columnKey: column.key,
+      start: landing.start,
+      duration,
+      label: timeRangeLabel(landing),
+      title: drag.card.title,
+      color: drag.card.color,
+      conflict,
+      magnet: snapped.magnet,
+    };
   }
+
+  private autoScroll(clientX: number, clientY: number): void {
+    const scroller = this.gridScroll?.nativeElement;
+    if (!scroller) return;
+    const rect = scroller.getBoundingClientRect();
+    const top = rect.top + HEADER_HEIGHT_PX;
+    if (clientY < top + AUTO_SCROLL_EDGE_PX) scroller.scrollTop -= 12;
+    else if (clientY > rect.bottom - AUTO_SCROLL_EDGE_PX) scroller.scrollTop += 12;
+    if (clientX < rect.left + 52 + AUTO_SCROLL_EDGE_PX) scroller.scrollLeft -= 12;
+    else if (clientX > rect.right - AUTO_SCROLL_EDGE_PX) scroller.scrollLeft += 12;
+  }
+
+  // ---- Month view: native drag and drop, unchanged --------------------
 
   handleDragStart(event: DragEvent, appointmentId: string): void {
     if (!this.session.can("appointments.update.all")) {
@@ -1170,141 +1629,9 @@ export class AdminAppointmentsCalendarComponent
     }
   }
 
-  handleDayDragOver(event: DragEvent, column: any): void {
-    event.preventDefault();
-    if (!this.draggedAppointment) {
-      return;
-    }
-    const track = event.currentTarget as HTMLElement;
-    const rect = track.getBoundingClientRect();
-    if (!rect.height) {
-      return;
-    }
-    const totalSlots = Math.round(
-      (AdminAppointmentsCalendarComponent.DAY_END_MINUTES -
-        AdminAppointmentsCalendarComponent.DAY_START_MINUTES) /
-        30,
-    );
-    const slotPx = rect.height / totalSlots;
-    const heightSlots = Math.max(
-      1,
-      Math.ceil(
-        this.draggedAppointment.height /
-          AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM,
-      ),
-    );
-    const rawIndex = Math.floor((event.clientY - rect.top) / slotPx);
-    const slotIndex = Math.max(0, Math.min(totalSlots - heightSlots, rawIndex));
-    const totalMinutes =
-      AdminAppointmentsCalendarComponent.DAY_START_MINUTES + slotIndex * 30;
-    const hour = Math.floor(totalMinutes / 60);
-    const minute = totalMinutes % 60;
-    this.dragOverKey = "day:" + column.id;
-    this.dayDragPreview = {
-      columnId: column.id,
-      top: slotIndex * AdminAppointmentsCalendarComponent.SLOT_HEIGHT_REM,
-      height: this.draggedAppointment.height,
-      color: this.draggedAppointment.color,
-      timeLabel: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
-      title: this.draggedAppointment.title,
-      subtitle: this.draggedAppointment.subtitle,
-    };
-  }
-
-  handleDayDragLeave(event: DragEvent, columnId: string): void {
-    const next = event.relatedTarget as Node | null;
-    const current = event.currentTarget as HTMLElement;
-    if (next && current.contains(next)) {
-      return;
-    }
-    if (this.dayDragPreview?.columnId === columnId) {
-      this.dayDragPreview = null;
-    }
-  }
-
   handleDragEnd(): void {
     this.dragOverKey = "";
     this.draggedAppointment = null;
-    this.dayDragPreview = null;
-  }
-
-  clearDragPreview(key: string): void {
-    if (this.dragOverKey === key) {
-      this.dragOverKey = "";
-    }
-  }
-
-  handleDrop(event: DragEvent, collaboratorId: string): void {
-    if (!this.session.can("appointments.update.all")) {
-      event.preventDefault();
-      return;
-    }
-    event.preventDefault();
-    this.dragOverKey = "";
-    this.dayDragPreview = null;
-    const payload = this.readDragPayload(event);
-    if (!payload) {
-      return;
-    }
-
-    const target = event.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    const relativeY = Math.max(
-      0,
-      Math.min(rect.height, event.clientY - rect.top),
-    );
-    const startsAt = this.buildDropDateTime(
-      relativeY,
-      rect.height,
-      new Date(this.calendarDate),
-    );
-
-    const nextCollaboratorId =
-      payload.originalCollaboratorId === collaboratorId
-        ? payload.originalCollaboratorId
-        : collaboratorId;
-
-    this.appointmentDrop.emit({
-      appointmentId: payload.appointmentId,
-      collaboratorId: nextCollaboratorId,
-      startsAt,
-      revision: payload.originalRevision,
-    });
-  }
-
-  handleWeekDrop(
-    event: DragEvent,
-    day: {
-      date: Date;
-    },
-  ): void {
-    if (!this.session.can("appointments.update.all")) {
-      event.preventDefault();
-      return;
-    }
-    event.preventDefault();
-    this.dragOverKey = "";
-    const payload = this.readDragPayload(event);
-    if (!payload) {
-      return;
-    }
-
-    const original = new Date(payload.originalStartsAt);
-    const target = new Date(day.date);
-    target.setHours(
-      original.getHours(),
-      original.getMinutes(),
-      original.getSeconds(),
-      original.getMilliseconds(),
-    );
-    this.appointmentRescheduleRequest.emit({
-      appointmentId: payload.appointmentId,
-      targetDate: toLocalDateKey(target),
-      suggestedStartsAt: this.toLocalDateTimeValue(target),
-      suggestedCollaboratorId: payload.originalCollaboratorId,
-      revision: payload.originalRevision,
-      sourceView: "week",
-    });
   }
 
   handleMonthDrop(event: DragEvent, date: Date): void {
@@ -1341,34 +1668,6 @@ export class AdminAppointmentsCalendarComponent
     this.showDayAppointments.emit(buildDayListingEvent(date, sourceView));
   }
 
-  private buildDropDateTime(
-    relativeY: number,
-    height: number,
-    day: Date,
-    workingWindow?: { startTime: string; endTime: string },
-  ): string {
-    const startMinutes = workingWindow
-      ? this.parseTime(workingWindow.startTime)
-      : 9 * 60;
-    const endMinutes = workingWindow
-      ? this.parseTime(workingWindow.endTime)
-      : 19 * 60;
-    const totalSlots = Math.max(
-      1,
-      Math.floor((endMinutes - startMinutes) / 30),
-    );
-    const slotSize = height / totalSlots;
-    const slotIndex = Math.max(
-      0,
-      Math.min(totalSlots - 1, Math.floor(relativeY / slotSize)),
-    );
-    const totalMinutes = startMinutes + slotIndex * 30;
-    const hour = Math.floor(totalMinutes / 60);
-    const minute = totalMinutes % 60;
-
-    return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-  }
-
   private readDragPayload(event: DragEvent): {
     appointmentId: string;
     originalStartsAt: string;
@@ -1400,22 +1699,6 @@ export class AdminAppointmentsCalendarComponent
   }
 
   private findDraggedAppointment(appointmentId: string): any {
-    for (const column of this.dayColumns || []) {
-      const match = (column.appointments || []).find(
-        (entry: any) => entry.id === appointmentId,
-      );
-      if (match) {
-        return match;
-      }
-    }
-    for (const day of this.weekDays || []) {
-      const match = (day.appointments || []).find(
-        (entry: any) => entry.id === appointmentId,
-      );
-      if (match) {
-        return match;
-      }
-    }
     for (const cell of this.monthCells || []) {
       const match = (cell.visibleAppointments || []).find(
         (entry: any) => entry.id === appointmentId,

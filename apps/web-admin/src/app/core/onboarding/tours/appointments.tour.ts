@@ -51,8 +51,8 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
       tab: "calendar",
       title: "Giorno, settimana, mese",
       body:
-        "Cambia l'ampiezza del calendario. In settimana e mese fai doppio clic su un giorno per aprirlo, " +
-        "oppure tocca «+N altri» per vederne la lista completa.",
+        "Cambia l'ampiezza del calendario. In settimana fai doppio clic su un giorno per aprirlo; " +
+        "nel mese tocca «+N altri» per vederne la lista completa.",
     },
     {
       target: "appointments-summary",
@@ -74,8 +74,8 @@ export const APPOINTMENTS_TOUR: TourDefinition = {
       tab: "calendar",
       title: "Spostare un appuntamento",
       body:
-        "Trascina un appuntamento: nella vista giorno lo sposti direttamente su un altro orario o professionista; " +
-        "in settimana e mese si apre una finestra per scegliere orario e professionista.",
+        "Trascina un appuntamento (su tablet tienilo premuto): l'ombra mostra dove arriva. " +
+        "In settimana scegli giorno e ora, nel giorno anche il professionista; nel mese si apre una finestra.",
       when: (c) => c.can("appointments.update.all"),
     },
     {

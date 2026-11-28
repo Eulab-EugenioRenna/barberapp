@@ -6,6 +6,7 @@ import {
   parseLocalBookingTime,
 } from "./booking-local-time";
 import { agendaWindow, windowCovers } from "./agenda-window";
+import { clockToMinutes } from "./calendar-time-grid";
 import { CreateRecoveryService } from "../core/create-recovery.service";
 import { Injectable, computed, signal, inject } from "@angular/core";
 import { firstValueFrom } from "rxjs";
@@ -278,6 +279,7 @@ export class AppointmentsFacade {
         isToday: this.isSameDay(day, new Date()),
         isSelected: this.isSameDay(day, this.calendarDate()),
         isUnavailable: this.isDayUnavailable(day),
+        workingWindow: this.teamWorkingWindow(collaborators, day),
         statusLabel: this.isDayUnavailable(day)
           ? "Giorno libero / festivo"
           : collaborators.some((collaborator) => {
@@ -812,7 +814,34 @@ export class AppointmentsFacade {
       sortValue: startsAt.getTime(),
       collaboratorId: appointment.collaboratorId || "",
       startsAt: appointment.startsAt,
+      endsAt: appointment.endsAt,
       source: appointment,
+    };
+  }
+
+  /** Earliest opening and latest closing of the team on a day, if open. */
+  private teamWorkingWindow(
+    collaborators: any[],
+    day: Date,
+  ): { startTime: string; endTime: string } | null {
+    const windows = collaborators
+      .map((collaborator) =>
+        this.resolveCollaboratorWorkingWindow(collaborator, day),
+      )
+      .filter((window) => window.isAvailable);
+    if (!windows.length) return null;
+    const minutes = (value: string) => clockToMinutes(value) ?? 0;
+    return {
+      startTime: windows.reduce(
+        (min, window) =>
+          minutes(window.startTime) < minutes(min) ? window.startTime : min,
+        windows[0].startTime,
+      ),
+      endTime: windows.reduce(
+        (max, window) =>
+          minutes(window.endTime) > minutes(max) ? window.endTime : max,
+        windows[0].endTime,
+      ),
     };
   }
 
