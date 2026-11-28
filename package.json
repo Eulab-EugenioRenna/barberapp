@@ -21,7 +21,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed:platform-demo": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' prisma/seed.ts",
-    "demo:create": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/create-demo-account.ts",
+    "demo:create": "ts-node --transpile-only --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\",\"target\":\"ES2022\",\"experimentalDecorators\":true,\"emitDecoratorMetadata\":true}' scripts/create-demo-account.ts",
     "connect:check": "node scripts/check-connect-configuration.mjs",
     "brand:icons": "swift scripts/generate-brand-icons.swift"
   },
