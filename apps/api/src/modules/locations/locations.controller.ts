@@ -45,6 +45,16 @@ function roomCapacity(value: unknown): number | undefined {
     );
   return value;
 }
+/**
+ * Settings of a new sector. With an existing activity the name comes from the
+ * activity: the key is dropped, not set to undefined (settings() would still
+ * validate it as a name and refuse every «add activity» request).
+ */
+export function sectorSettingsFor(body: Record<string, unknown>, existingActivity: boolean) {
+  const { name: _bodyName, ...withoutName } = body;
+  const { name: _sectorName, ...rest } = settings(existingActivity ? withoutName : body);
+  return rest;
+}
 function settings(body: Record<string, unknown>) {
   const result: {
     name?: string;
@@ -277,9 +287,7 @@ export class LocationsController {
       });
       if (!activity) throw new BadRequestException("Attività non valida");
     }
-    const { name: _sectorName, ...sectorSettings } = settings(
-      activityId ? { ...body, name: undefined } : body,
-    );
+    const sectorSettings = sectorSettingsFor(body, !!activityId);
     const exists = await this.prisma.sector.findFirst({
       where: {
         tenantId,
