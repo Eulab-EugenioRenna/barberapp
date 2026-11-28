@@ -319,6 +319,7 @@ export class BookingResourcesService {
       const demand = {
         start: row.startsAt.getTime() - row.service.bufferBeforeMinutes * 60000,
         end: row.endsAt.getTime() + row.service.bufferAfterMinutes * 60000,
+        core: { start: row.startsAt.getTime(), end: row.endsAt.getTime() },
         collaboratorIds: needsStaff ? eligible : [null],
         rooms: candidateRooms,
       };

@@ -5,10 +5,18 @@ export interface ResourceInterval {
 export interface ResourceReservation extends ResourceInterval {
   collaboratorId: string | null;
   roomId: string | null;
+  /** Set on rows of this same request: the service time without buffers. */
+  core?: ResourceInterval;
 }
 export interface ResourceDemand extends ResourceInterval {
   collaboratorIds: Array<string | null>;
   rooms: Array<{ id: string | null; capacity: number }>;
+  /**
+   * The service time without buffers. Services of the same request (one client's
+   * sequence) only collide on this: no cleanup between them. Against other
+   * bookings the buffered interval still applies.
+   */
+  core?: ResourceInterval;
 }
 export class ResourceSearchLimitError extends Error {
   constructor() {
@@ -91,23 +99,39 @@ export function allocateBookingResources(
     reservations: ResourceReservation[],
   ) => {
     const rows: ResourceReservation[] = [];
+    const core = demand.core ?? demand;
+    const theirs = reservations.filter((row) => !row.core);
+    const ours = reservations
+      .filter((row) => row.core)
+      .map((row) => ({ ...row, start: row.core!.start, end: row.core!.end }));
     for (const collaboratorId of demand.collaboratorIds) {
       if (
         collaboratorId &&
-        reservations.some(
+        (theirs.some(
           (row) =>
             row.collaboratorId === collaboratorId && overlaps(row, demand),
-        )
+        ) ||
+          ours.some(
+            (row) =>
+              row.collaboratorId === collaboratorId && overlaps(row, core),
+          ))
       )
         continue;
       for (const room of demand.rooms) {
-        if (room.id && !roomFits(demand, room.id, room.capacity, reservations))
+        if (
+          room.id &&
+          !(
+            roomFits(demand, room.id, room.capacity, theirs) &&
+            roomFits(core, room.id, room.capacity, [...theirs, ...ours])
+          )
+        )
           continue;
         rows.push({
           start: demand.start,
           end: demand.end,
           collaboratorId,
           roomId: room.id,
+          core: { start: core.start, end: core.end },
         });
       }
     }
@@ -138,5 +162,10 @@ export function allocateBookingResources(
     assigned[index] = undefined;
     return false;
   };
-  return search(demands.length) ? assigned.map((row) => row!) : null;
+  return search(demands.length)
+    ? assigned.map((row) => {
+        const { core: _core, ...plain } = row!;
+        return plain;
+      })
+    : null;
 }

@@ -36,6 +36,25 @@ describe("multi-service resource allocation", () => {
       [40, 60],
     ]);
   });
+  it("a sequence of one client runs back to back: buffers count only against other bookings", () => {
+    // Shave 10:00–10:30 with 10' cleanup after, then cut 10:30–11:00 with 5' before: same person.
+    const shave = demand(["A"], { start: 0, end: 40, core: { start: 0, end: 30 } });
+    const cut = demand(["A"], { start: 25, end: 60, core: { start: 30, end: 60 } });
+    expect(allocateBookingResources([shave, cut], [])?.map((row) => row.collaboratorId)).toEqual(["A", "A"]);
+    // Another client's booking inside the cleanup still blocks.
+    expect(allocateBookingResources([shave], [{ start: 35, end: 50, collaboratorId: "A", roomId: null }])).toBeNull();
+    // Truly overlapping services of the same request still collide.
+    const overlap = demand(["A"], { start: 20, end: 50, core: { start: 20, end: 50 } });
+    expect(allocateBookingResources([shave, overlap], [])).toBeNull();
+    // Same for a one-seat room used by the whole sequence.
+    const room = [{ id: "R", capacity: 1 }];
+    expect(
+      allocateBookingResources(
+        [demand([null], { ...shave, collaboratorIds: [null], rooms: room }), demand([null], { ...cut, collaboratorIds: [null], rooms: room })],
+        [],
+      )?.map((row) => row.roomId),
+    ).toEqual(["R", "R"]);
+  });
   it("shares professionals across sectors/sites and honors existing buffered intervals", () => {
     expect(
       allocateBookingResources(

@@ -127,7 +127,7 @@ describe("transaction-bound booking resource planner", () => {
     activitySectors[1].locationId = "different-site";
     await expect(plan()).rejects.toThrow("non è disponibile in questa sede");
   });
-  it("keeps non-grid sequential times exact and honors buffer conflicts between lines", async () => {
+  it("keeps non-grid sequential times exact; a client's own sequence ignores buffers between its lines", async () => {
     const { services, plan } = fixture();
     services[0].durationMinutes = 45;
     const exact = await plan([
@@ -140,7 +140,9 @@ describe("transaction-bound booking resource planner", () => {
       { serviceId: "one", startsAt: at("09:00") },
       { serviceId: "two", startsAt: at("09:45") },
     ]);
-    expect(buffered.map((row) => row.collaboratorId)).toEqual(["B", "A"]);
+    // The cleanup after the first service is between clients, not inside one sequence:
+    // the same professional can go on (before: only a second professional could).
+    expect(buffered.map((row) => row.collaboratorId)).toEqual(["A", "A"]);
   });
   it("never blocks on an overlapping legacy booking with unknown resources", async () => {
     const { calendar, plan } = fixture();
