@@ -63,11 +63,6 @@ import {
         align-content: start;
         gap: 1rem;
       }
-      .history-summary-line {
-        color: var(--muted);
-        font-size: 0.85rem;
-        font-weight: 500;
-      }
       .history-kpis {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -449,65 +444,54 @@ import {
         aria-labelledby="customer-history-title"
       >
         <p id="customer-history-title" class="ui-step">2 · Storico</p>
-        <label class="field history-search">
-            <span class="sr-only">Cerca nello storico</span>
-            <input
-              [(ngModel)]="historyQuery"
-              name="historyQuery"
-              type="search"
-              autocomplete="off"
-              placeholder="Cerca servizio, prodotto, professionista, note"
-            />
-          </label>
-        <details class="ui-advanced" data-tour="customer-history-filters">
-          <summary>
-            <span>Riepilogo e filtri</span>
-            <small class="history-summary-line" *ngIf="!historyLoading && customerHistory">
-              €{{ summary.spent | number: "1.2-2" }} · {{ summary.visits }} visite<ng-container *ngIf="filtersActive"> · filtri attivi</ng-container>
-            </small>
-          </summary>
-          <div class="ui-advanced-body">
-            <div class="history-kpis" *ngIf="!historyLoading && customerHistory">
-              <div><span>Speso</span><strong>€{{ summary.spent | number: "1.2-2" }}</strong></div>
-              <div><span>Visite</span><strong>{{ summary.visits }}</strong></div>
-              <div>
-                <span>Ultima visita</span
-                ><strong>{{ summary.lastVisit ? formatShortDate(summary.lastVisit) : "—" }}</strong>
-              </div>
-              <div>
-                <span>Prossimo</span
-                ><strong>{{ summary.nextAppointment ? formatShortDate(summary.nextAppointment) : "—" }}</strong>
-              </div>
-            </div>
-
-            <div class="history-filters">
-              <div class="history-pills" role="group" aria-label="Tipo">
-                <button
-                  *ngFor="let option of kindOptions"
-                  type="button"
-                  class="history-pill"
-                  [class.on]="historyKind === option.value"
-                  [attr.aria-pressed]="historyKind === option.value"
-                  (click)="historyKind = option.value"
-                >
-                  {{ option.label }} <em>{{ kindCount(option.value) }}</em>
-                </button>
-              </div>
-              <div class="history-pills" role="group" aria-label="Periodo">
-                <button
-                  *ngFor="let option of periodOptions"
-                  type="button"
-                  class="history-pill"
-                  [class.on]="historyPeriod === option.value"
-                  [attr.aria-pressed]="historyPeriod === option.value"
-                  (click)="historyPeriod = option.value"
-                >
-                  {{ option.label }}
-                </button>
-              </div>
-            </div>
+        <div class="history-kpis" *ngIf="!historyLoading && customerHistory">
+          <div><span>Speso</span><strong>€{{ summary.spent | number: "1.2-2" }}</strong></div>
+          <div><span>Visite</span><strong>{{ summary.visits }}</strong></div>
+          <div>
+            <span>Ultima visita</span
+            ><strong>{{ summary.lastVisit ? formatShortDate(summary.lastVisit) : "—" }}</strong>
           </div>
-        </details>
+          <div>
+            <span>Prossimo</span
+            ><strong>{{ summary.nextAppointment ? formatShortDate(summary.nextAppointment) : "—" }}</strong>
+          </div>
+        </div>
+        <label class="field history-search">
+          <span class="sr-only">Cerca nello storico</span>
+          <input
+            [(ngModel)]="historyQuery"
+            name="historyQuery"
+            type="search"
+            autocomplete="off"
+            placeholder="Cerca servizio, prodotto, professionista, note"
+          />
+        </label>
+        <div class="history-filters" data-tour="customer-history-filters">
+          <div class="history-pills" role="group" aria-label="Tipo">
+            <button
+              *ngFor="let option of kindOptions"
+              type="button"
+              class="history-pill"
+              [class.on]="historyKind === option.value"
+              [attr.aria-pressed]="historyKind === option.value"
+              (click)="historyKind = option.value"
+            >
+              {{ option.label }} <em>{{ kindCount(option.value) }}</em>
+            </button>
+          </div>
+          <div class="history-pills" role="group" aria-label="Periodo">
+            <button
+              *ngFor="let option of periodOptions"
+              type="button"
+              class="history-pill"
+              [class.on]="historyPeriod === option.value"
+              [attr.aria-pressed]="historyPeriod === option.value"
+              (click)="historyPeriod = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
         <p *ngIf="historyLoading" class="text-sm text-[var(--muted)]" role="status">
           Caricamento storico…
         </p>
@@ -685,10 +669,6 @@ export class AdminCustomersPageComponent {
     return row.kind === "sale"
       ? this.formatPaymentStatus(row.status)
       : this.formatAppointmentStatus(row.status);
-  }
-
-  get filtersActive(): boolean {
-    return this.historyKind !== "all" || this.historyPeriod !== "all";
   }
 
   resetHistoryFilters(): void {
